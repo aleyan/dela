@@ -1,6 +1,6 @@
 # Dela!
 
-A task runner that delegates the work to others. For your current working directory, it will scan the task definition files for tasks and allow you to invoke them directly from your shell.
+A task runner that delegates the work to others. For your current working directory, it will scan the task definition files for tasks and allow you to invoke them directly from your shell. Dela simplifies discovery and execution of tasks in projects.
 
 ## Installation
 
