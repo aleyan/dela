@@ -1,18 +1,160 @@
 # Project Plan
 
-## Initial Phase
+This plan outlines the major development phases and tasks for building `dela`, a Rust-based task runner that automatically delegates commands to recognized task definition files. Each phase includes checklists that can be marked as completed in Markdown.
 
-[x] Setup project repository
-[ ] Write the Architecture doc
-[ ] Write the Project Plan doc
+---
 
-## Spike the first version
+## Phase 1: Shell Integration and Basic CLI
 
-TBD. This portion will be written after architecture doc is written.
+- [ ] **Shell Integration**
+  - [ ] Modify `.zshrc`, `.bashrc`, or `.config/fish/config.fish` to invoke `dela`.
+  - [ ] Implement `dela init` command to automate creation of `~/.dela`.
+  - [ ] Append/update `command_not_found_handle`.
 
-## Share the spike with the world
+- [ ] **CLI Scaffolding**
+  - [ ] Set up CLI argument parsing (e.g., `clap`).
+  - [ ] Implement basic subcommands: `init`, `configure_shell`, `list`, `run`.
 
-[ ] Write the README.md
-[ ] Deploy the spike to crates.io
-[ ] Share the spike with friends
-[ ] Share the spike with the world
+- [ ] **Repository Preparation**
+  - [ ] Confirm Rust workspace structure is stable.
+  - [ ] Ensure code compiles and installs via `cargo install dela`.
+
+**Deliverables**
+- [ ] Shell fallback for unrecognized commands.
+- [ ] Working `dela init`.
+- [ ] Placeholder implementations of `dela list` and `dela run`.
+
+---
+
+## Phase 2: Task Discovery & Parsing
+
+- [ ] **Task Definition Parsers**
+  - [ ] Create `task_discovery.rs`.
+  - [ ] Implement Makefile parser (using `make -pn` or similar).
+  - [ ] Implement parser for `package.json` scripts.
+  - [ ] Implement parser for `pyproject.toml`.
+
+- [ ] **Structs and Runners**
+  - [ ] Define `Task` and `TaskRunner` enums in `types.rs`.
+  - [ ] Associate discovered tasks with appropriate runner.
+
+- [ ] **CLI Implementation for `list`**
+  - [ ] Ensure `dela list` shows tasks from recognized files.
+  - [ ] Print tasks with references to the source file.
+
+**Deliverables**
+- [ ] Parsing logic for multiple file types.
+- [ ] Working `dela list` displaying discovered tasks.
+- [ ] Documentation on adding new parser modules.
+
+---
+
+## Phase 3: Task Execution & Workflow
+
+- [ ] **Task Execution Logic**
+  - [ ] Implement `task_execution.rs` to invoke tasks (e.g., `make <target>`, `npm run <script>`).
+  - [ ] Handle errors if required CLI tools are missing.
+
+- [ ] **`run` Command and Bare-Command Invocation**
+  - [ ] Complete `dela run <task>` for direct execution.
+  - [ ] Ensure bare commands invoke `dela` through the fallback.
+  - [ ] Prompt user if multiple matching tasks exist.
+
+- [ ] **Disambiguation**
+  - [ ] Implement logic to handle multiple tasks with the same name.
+  - [ ] Store or remember user’s choice, if desired.
+
+**Deliverables**
+- [ ] Fully functional `dela run <task>`.
+- [ ] Automatic fallback from unrecognized commands.
+- [ ] Handling of multiple tasks with the same name.
+
+---
+
+## Phase 4: Security & Allowlist Management
+
+- [ ] **Allowlist Data Structures**
+  - [ ] Implement `allowlist.rs` to read/write `~/.dela/allowlist.toml`.
+  - [ ] Define `AllowlistEntry` with `file`/`directory` scopes.
+
+- [ ] **User Prompts**
+  - [ ] Prompt user on first invocation of task from new file/directory.
+  - [ ] Support “Allow once,” “Allow this task,” “Allow file,” “Allow directory,” and “Deny.”
+  - [ ] Persist decisions in the allowlist.
+
+- [ ] **Runtime Checks**
+  - [ ] Consult allowlist before executing tasks.
+  - [ ] If disallowed, prompt or block execution.
+
+**Deliverables**
+- [ ] Secure allowlist solution.
+- [ ] Integrated prompting mechanism.
+- [ ] Repeated approvals handled gracefully.
+
+---
+
+## Phase 5: Testing & Quality Assurance
+
+- [ ] **Unit Tests**
+  - [ ] Cover each module: `shell_integration`, `task_discovery`, `allowlist`, `task_execution`.
+
+- [ ] **Integration Tests**
+  - [ ] Simulate user flows with different shells (Zsh, Bash, Fish).
+  - [ ] Validate allowlist logic and parsing of different file types.
+
+- [ ] **Cross-Shell Checks**
+  - [ ] Test on macOS and Linux to ensure consistent behavior.
+  - [ ] Explore Windows/PowerShell feasibility.
+
+**Deliverables**
+- [ ] Comprehensive test coverage.
+- [ ] CI/CD pipeline to automate test runs.
+- [ ] Verified cross-shell compatibility.
+
+---
+
+## Phase 6: Documentation & Release
+
+- [ ] **Documentation**
+  - [ ] Update `README.md` with usage instructions and examples.
+  - [ ] Provide short tutorials or usage demos.
+  - [ ] Consider additional docs folder or GitHub Pages for extended guides.
+
+- [ ] **Versioning and Release**
+  - [ ] Bump version in `Cargo.toml`.
+  - [ ] Publish to crates.io.
+  - [ ] Tag a stable release in the repository.
+
+- [ ] **Community Feedback**
+  - [ ] Collect user feedback on command discovery and allowlist features.
+  - [ ] Triage bug reports and feature requests.
+
+**Deliverables**
+- [ ] User-friendly documentation.
+- [ ] Release package on crates.io.
+- [ ] Announcement of new tool.
+
+---
+
+## Future Enhancements (Post-Launch)
+
+- [ ] **Plugin Architecture**
+  - [ ] Provide a standardized interface for community-built task parsers.
+
+- [ ] **Remote Execution**
+  - [ ] Support containers or remote servers for distributed workloads.
+
+- [ ] **Advanced Configuration**
+  - [ ] Introduce optional `~/.dela/config.toml` for global settings.
+  - [ ] Add more flexible user preferences.
+
+---
+
+## Timeline & Dependencies
+
+- **Phase 1 & 2** can proceed in parallel (shell integration vs. parsing).
+- **Phase 3** depends on Phase 2’s completed task discovery.
+- **Phase 4** requires partial functionality of Phases 1 and 3.
+- **Phase 5 & 6** overlap with the finishing of earlier phases and preparing release.
+
+Mark these items `[x]` when completed to track progress. This checklist format facilitates easy status updates for individuals and teams working on different tasks.
