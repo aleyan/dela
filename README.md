@@ -45,7 +45,7 @@ dela run build
 
 ## Frequently Asked Questions
 
-### How does it work?
+### How does dela work?
 
 `dela` uses your shell's command_not_found_handler to detect when you are trying to run a command that doesn't exist. It then scans the current working directory for task definition files and executes the appropriate task runner.
 
@@ -57,3 +57,6 @@ Then the bare command will be executed instead of the task. To execute the task,
 
 You can add a new task by adding a new task definition file. The task definition file can be a Makefile, a pyproject.toml, a package.json, or a shell script.
 
+### What shell environment are tasks executed in?
+
+Tasks are executed in the same shell environment as the command you are running.
