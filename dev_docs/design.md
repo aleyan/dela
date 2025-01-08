@@ -35,7 +35,7 @@ src/
 		- Optionally runs `dela configure_shell` logic so that updates propagate automatically.
 	2. **`dela list`**: Lists all tasks found in the current directory.
 	3. **`dela run <task>`**: Directly executes a given task without going through the “command not found” mechanism.
-	4. **`dela configure_shell`**: Prints shell function definitions for the user’s environment to use `dela` as the fallback for unrecognized commands. Typically invoked by `init`.
+	4. **`dela configure_shell`**: Prints shell function definitions for the user’s environment to use `dela` as the fallback for unrecognized commands. Typically invoked and eval'ed by shell configuration scripts.
 	5. **(Optional) Additional Commands**: Additional commands for debugging, verbose logging, or plugin management could be placed here.
 
 ### `shell_integration.rs`
@@ -81,6 +81,15 @@ pub struct Task {
 	pub name: String,
 	pub file_path: String,
 	pub runner: TaskRunner, // e.g., Make, Npm, Python, etc.
+	pub permission: TaskPermission,
+}
+
+pub enum TaskPermission {
+	AllowTask,
+	AllowTaskFile,
+	AllowTaskDirectory,
+	Deny,
+	Prompt,
 }
 
 pub enum TaskRunner {
