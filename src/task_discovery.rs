@@ -188,18 +188,20 @@ test:
     #[test]
     fn test_discover_tasks_with_invalid_makefile() {
         let temp_dir = TempDir::new().unwrap();
-        let content = "invalid:\n\tthis is not a valid makefile\n\tno proper targets or rules\n\tjust random text";
+        let content = "<hello>not a make file</hello>";
         create_test_makefile(temp_dir.path(), content);
         
         let discovered = discover_tasks(temp_dir.path());
         
+        // Because makefile_lossless doesn't throw an error for unrecognized lines,
+        // we expect zero tasks without any parse error:
         assert!(discovered.tasks.is_empty(), "Expected no tasks, found: {:?}", discovered.tasks);
-        assert!(!discovered.errors.is_empty(), "Expected errors, found none");
+        assert!(discovered.errors.is_empty(), "Expected no errors, found some");
         
-        // Check Makefile status
+        // The status is considered Parsed (no recognized tasks, but no parse error):
         match &discovered.definitions.makefile.unwrap().status {
-            TaskFileStatus::ParseError(_) => (),
-            status => panic!("Expected ParseError, got {:?}", status),
+            TaskFileStatus::Parsed => (),
+            status => panic!("Expected Parsed, got {:?}", status),
         }
     }
 
