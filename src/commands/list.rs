@@ -1,10 +1,12 @@
 use std::env;
+use std::fs;
 use std::collections::HashMap;
 use crate::types::{Task, TaskFileStatus};
 use crate::task_discovery;
 
-pub fn execute() {
-    let current_dir = env::current_dir().expect("Failed to get current directory");
+pub fn execute() -> Result<(), String> {
+    let current_dir = env::current_dir()
+        .map_err(|e| format!("Failed to get current directory: {}", e))?;
     let discovered = task_discovery::discover_tasks(&current_dir);
     
     // Display task definition files status
@@ -40,7 +42,7 @@ pub fn execute() {
 
     if discovered.tasks.is_empty() {
         println!("No tasks found in the current directory.");
-        return;
+        return Ok(());
     }
 
     // Group tasks by their source file for better organization
@@ -69,5 +71,82 @@ pub fn execute() {
         for error in discovered.errors {
             println!("  ! {}", error);
         }
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+    use std::io::Write;
+
+    fn setup_test_dir() -> TempDir {
+        let temp_dir = TempDir::new().expect("Failed to create temp directory");
+        
+        // Create a test Makefile
+        let makefile_content = "
+build: ## Building the project
+\t@echo Building...
+
+test: ## Running tests
+\t@echo Testing...
+";
+        let mut makefile = fs::File::create(temp_dir.path().join("Makefile"))
+            .expect("Failed to create Makefile");
+        makefile.write_all(makefile_content.as_bytes())
+            .expect("Failed to write Makefile");
+
+        temp_dir
+    }
+
+    #[test]
+    fn test_list_with_task_files() {
+        let original_dir = env::current_dir().expect("Failed to get current directory");
+        let temp_dir = setup_test_dir();
+        env::set_current_dir(&temp_dir).expect("Failed to change directory");
+
+        let result = execute();
+        assert!(result.is_ok(), "Should succeed with task files present");
+
+        // Keep temp_dir alive until after we restore the directory
+        env::set_current_dir(&original_dir).expect("Failed to restore directory");
+        drop(temp_dir);
+    }
+
+    #[test]
+    fn test_list_empty_directory() {
+        let original_dir = env::current_dir().expect("Failed to get current directory");
+        let temp_dir = TempDir::new().expect("Failed to create temp directory");
+        env::set_current_dir(&temp_dir).expect("Failed to change directory");
+
+        let result = execute();
+        assert!(result.is_ok(), "Should succeed with empty directory");
+
+        // Keep temp_dir alive until after we restore the directory
+        env::set_current_dir(&original_dir).expect("Failed to restore directory");
+        drop(temp_dir);
+    }
+
+    #[test]
+    fn test_list_with_invalid_makefile() {
+        let original_dir = env::current_dir().expect("Failed to get current directory");
+        let temp_dir = TempDir::new().expect("Failed to create temp directory");
+        env::set_current_dir(&temp_dir).expect("Failed to change directory");
+
+        // Create an invalid Makefile
+        let makefile_content = "invalid makefile content";
+        let mut makefile = fs::File::create(temp_dir.path().join("Makefile"))
+            .expect("Failed to create Makefile");
+        makefile.write_all(makefile_content.as_bytes())
+            .expect("Failed to write Makefile");
+
+        let result = execute();
+        assert!(result.is_ok(), "Should succeed with invalid Makefile");
+
+        // Keep temp_dir alive until after we restore the directory
+        env::set_current_dir(&original_dir).expect("Failed to restore directory");
+        drop(temp_dir);
     }
 } 

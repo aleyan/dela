@@ -48,15 +48,17 @@ enum Commands {
 fn main() {
     let cli = Cli::parse();
 
-    match cli.command {
+    let result = match cli.command {
         Commands::Init => {
             println!("Initializing dela...");
             // TODO(DTKT-14): Implement dela init command to automate creation of ~/.dela
             // TODO(DTKT-15): Modify dela init command to add eval of command_not_found_handle
+            Ok(())
         }
         Commands::ConfigureShell => {
             println!("Configuring shell...");
             // TODO(DTKT-13): Implement dela configure_shell command to return the command_not_found_handle
+            Ok(())
         }
         Commands::List => commands::list::execute(),
         Commands::Run { task } => {
@@ -64,7 +66,12 @@ fn main() {
             // TODO(DTKT-23): Complete dela run <task> for direct execution
             // TODO(DTKT-25): Prompt user if multiple matching tasks exist
             // TODO(DTKT-26): Implement logic to handle multiple tasks with the same name
+            Ok(())
         }
         Commands::GetCommand { task } => commands::get_command::execute(&task),
+    };
+
+    if let Err(_) = result {
+        std::process::exit(1);
     }
 }
