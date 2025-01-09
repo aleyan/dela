@@ -43,9 +43,28 @@ At a high level, `dela` operates by intercepting commands in your shell that wou
    - Once a matching task is found, `dela` instructs the shell to run the appropriate command. For example, if the task is in a Makefile, it runs `make <task>`. For a Node-based task, it might run `npm run <task>`, and so on.
 
 2. **Direct vs. `dela run`**
-   - Users can invoke tasks by calling them directly (`build`), which triggers the “command not found” handler. Or they can use `dela run build`, which bypasses the shell’s “command not found” mechanism and directly invokes the runner logic.
+   - Users can invoke tasks by calling them directly (`build`), which triggers the "command not found" handler. Or they can use `dela run build`, which bypasses the shell's "command not found" mechanism and directly invokes the runner logic.
 
-3. **Extensibility**
+3. **Shell Execution Strategy**
+   - Rather than executing commands directly from Rust, `dela` returns commands to the shell for execution.
+   - This is implemented through shell function wrappers:
+   ```zsh
+   dela() {
+       if [[ $1 == "run" ]]; then
+           cmd=$(dela get_command "${@:2}")
+           eval "$cmd"
+       else
+           command dela "$@"
+       fi
+   }
+   ```
+   - Benefits:
+     - Commands execute in the actual shell environment
+     - Shell builtins (cd, source, etc.) work correctly
+     - Environment modifications persist
+     - Shell aliases and functions are available
+
+4. **Extensibility**
    - The architecture supports adding new task definition modules for various technologies. Each module implements a function to detect tasks and a strategy to execute them.
 
 ---
