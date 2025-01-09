@@ -170,9 +170,12 @@ This plan outlines the major development phases and tasks for building `dela`, a
 
 ## Timeline & Dependencies
 
-- **Phase 1 & 2** can proceed in parallel (shell integration vs. parsing).
-- **Phase 3** depends on Phase 2’s completed task discovery.
-- **Phase 4** requires partial functionality of Phases 1 and 3.
-- **Phase 5 & 6** overlap with the finishing of earlier phases and preparing release.
+- **Phase 1** (Task Discovery & Parsing & CLI) is foundational and should be completed first.
+- **Phase 2** (Shell Integration and Basic CLI) can proceed in parallel with Phase 1.
+- **Phase 3** (Task Execution & Workflow) depends on both Phase 1 and 2 being completed.
+- **Phase 4** (Security & Allowlist Management) requires Phase 3's task execution to be functional.
+- **Phase 5** (Expand shell capabilities) builds upon Phase 2's shell integration work.
+- **Phase 6** (Testing & Quality Assurance) can begin after Phase 4, running in parallel with Phase 5.
+- **Phase 7** (Documentation & Release) should commence after all other phases are substantially complete.
 
 Mark these items `[x]` when completed to track progress. This checklist format facilitates easy status updates for individuals and teams working on different tasks.
