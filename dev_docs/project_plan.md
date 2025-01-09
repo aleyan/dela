@@ -8,7 +8,15 @@ This plan outlines the major development phases and tasks for building `dela`, a
 
 - [ ] **CLI Scaffolding**
   - [x] [DTKT-1] Set up CLI argument parsing (e.g., `clap`).
-  - [ ] [DTKT-2] Implement basic subcommands: `init`, `configure_shell`, `list`, `run`, `get_command`.
+  - [ ] **Basic Commands Implementation**
+    - [ ] [DTKT-56] Implement `init` command structure and help text
+    - [ ] [DTKT-57] Implement `configure_shell` command structure and help text
+    - [x] [DTKT-9] Implement `list` command structure and help text
+    - [ ] [DTKT-58] Implement `run` command structure and help text
+    - [ ] [DTKT-59] Implement `get_command` command structure and help text
+    - [ ] [DTKT-60] Add command-line options for verbosity and debug output
+    - [ ] [DTKT-61] Add `--help` text for each subcommand
+    - [ ] [DTKT-62] Add `--version` flag to show version information
 
 - [ ] **Task Definition Parsers**
   - [x] [DTKT-3] Create `task_discovery.rs`.
@@ -39,6 +47,14 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [ ] [DTKT-14] Implement `dela init` command to automate creation of `~/.dela`.
   - [ ] [DTKT-15] Modify `dela init` command add eval of command_not_found_handle.
 
+- [ ] **Shell Execution Strategy**
+  - [ ] [DTKT-75] Implement shell function wrapper for `dela run` command
+  - [ ] [DTKT-76] Implement `get_command` to return shell-executable command string
+  - [ ] [DTKT-77] Ensure commands execute in actual shell environment
+  - [ ] [DTKT-78] Support shell builtins (cd, source, etc.)
+  - [ ] [DTKT-79] Ensure environment modifications persist
+  - [ ] [DTKT-80] Make shell aliases and functions available to tasks
+
 - [ ] **Repository Preparation**
   - [ ] [DTKT-16] Confirm Rust workspace structure is stable.
   - [ ] [DTKT-17] Ensure code compiles and installs via `cargo install dela`.
@@ -47,6 +63,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
 - [ ] Shell fallback for unrecognized commands.
 - [ ] Working `dela init`.
 - [ ] Placeholder implementations of `dela list` and `dela run`.
+- [ ] Shell-aware task execution environment.
 
 ---
 
@@ -177,3 +194,29 @@ This plan outlines the major development phases and tasks for building `dela`, a
 - **Phase 7** (Documentation & Release) should commence after all other phases are substantially complete.
 
 Mark these items `[x]` when completed to track progress. This checklist format facilitates easy status updates for individuals and teams working on different tasks.
+
+## Phase 8: Command-Line Experience
+
+- [ ] **Command Output Formatting**
+  - [ ] [DTKT-63] Implement colored output for task status and errors
+  - [ ] [DTKT-64] Add progress indicators for long-running tasks
+  - [ ] [DTKT-65] Support machine-readable output format (e.g., JSON)
+  - [ ] [DTKT-66] Add `--quiet` flag to suppress non-error output
+
+- [ ] **Task Search and Discovery**
+  - [ ] [DTKT-67] Add fuzzy matching for task names
+  - [ ] [DTKT-68] Support searching tasks by description
+  - [ ] [DTKT-69] Add `--filter` option to show only specific types of tasks
+  - [ ] [DTKT-70] Support task name completion in shells
+
+- [ ] **Task Execution Control**
+  - [ ] [DTKT-71] Add `--dry-run` flag to show what would be executed
+  - [ ] [DTKT-72] Support task dependencies and ordering
+  - [ ] [DTKT-73] Add timeout support for long-running tasks
+  - [ ] [DTKT-74] Support cancellation of running tasks
+
+**Deliverables**
+- [ ] Rich command-line interface with colored output
+- [ ] Task search and filtering capabilities
+- [ ] Enhanced task execution control
+- [ ] Shell completion support
