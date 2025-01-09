@@ -66,25 +66,28 @@ fn main() {
             if let Some(makefile) = &discovered.definitions.makefile {
                 print!("  Makefile: ");
                 match &makefile.status {
-                    TaskFileStatus::Parsed => println!("Found and parsed"),
-                    TaskFileStatus::ParseError(e) => println!("Error parsing: {}", e),
-                    TaskFileStatus::NotReadable(e) => println!("Not readable: {}", e),
-                    TaskFileStatus::NotFound => println!("Not found"),
+                    TaskFileStatus::Parsed => println!("  Makefile: Found and parsed"),
+                    TaskFileStatus::NotImplemented => println!("  Makefile: Found but parsing not yet implemented"),
+                    TaskFileStatus::ParseError(e) => println!("  Makefile: Error parsing: {}", e),
+                    TaskFileStatus::NotReadable(e) => println!("  Makefile: Not readable: {}", e),
+                    TaskFileStatus::NotFound => println!("  Makefile: Not found"),
                 }
             }
             if let Some(package_json) = &discovered.definitions.package_json {
                 print!("  package.json: ");
                 match &package_json.status {
                     TaskFileStatus::Parsed => println!("Found and parsed"),
+                    TaskFileStatus::NotImplemented => println!("Found but parsing not yet implemented"),
                     TaskFileStatus::ParseError(e) => println!("Error parsing: {}", e),
                     TaskFileStatus::NotReadable(e) => println!("Not readable: {}", e),
                     TaskFileStatus::NotFound => println!("Not found"),
                 }
             }
-            if let Some(pyproject) = &discovered.definitions.pyproject_toml {
+            if let Some(pyproject_toml) = &discovered.definitions.pyproject_toml {
                 print!("  pyproject.toml: ");
-                match &pyproject.status {
+                match &pyproject_toml.status {
                     TaskFileStatus::Parsed => println!("Found and parsed"),
+                    TaskFileStatus::NotImplemented => println!("Found but parsing not yet implemented"),
                     TaskFileStatus::ParseError(e) => println!("Error parsing: {}", e),
                     TaskFileStatus::NotReadable(e) => println!("Not readable: {}", e),
                     TaskFileStatus::NotFound => println!("Not found"),

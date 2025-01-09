@@ -5,6 +5,8 @@ use std::path::PathBuf;
 pub enum TaskFileStatus {
     /// File exists and was successfully parsed
     Parsed,
+    /// File exists but parsing is not yet implemented
+    NotImplemented,
     /// File exists but had parsing errors
     ParseError(String),
     /// File exists but is not readable

@@ -48,7 +48,7 @@ fn discover_makefile_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Resu
     discovered.definitions.makefile = Some(TaskDefinitionFile {
         path: makefile_path.clone(),
         runner: TaskRunner::Make,
-        status: TaskFileStatus::Parsed,
+        status: TaskFileStatus::NotImplemented,
     });
 
     // Placeholder until DTKT-4 is implemented
@@ -78,7 +78,7 @@ fn discover_npm_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<()
     discovered.definitions.package_json = Some(TaskDefinitionFile {
         path: package_json,
         runner: TaskRunner::Npm,
-        status: TaskFileStatus::Parsed,
+        status: TaskFileStatus::NotImplemented,
     });
 
     // Placeholder until DTKT-5 is implemented
@@ -100,7 +100,7 @@ fn discover_python_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result
     discovered.definitions.pyproject_toml = Some(TaskDefinitionFile {
         path: pyproject_toml,
         runner: TaskRunner::Python,
-        status: TaskFileStatus::Parsed,
+        status: TaskFileStatus::NotImplemented,
     });
 
     // Placeholder until DTKT-6 is implemented
