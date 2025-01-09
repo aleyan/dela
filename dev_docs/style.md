@@ -9,3 +9,5 @@ The folder organization prefers flatness over deep nesting.
 You are often going to be generating code that is not complete. Leave TODOs and reference the DTKT that will complete the task from project_plan.md. Create new DTKT task if necessary.
 
 When adding new dependencies, show or run the command for the package manger to install the dependency rather than modifying the dependencies definitions directly.
+
+Implementation for individual cli subcommands should be in the src/commands/ subfolder.
