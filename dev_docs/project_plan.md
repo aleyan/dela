@@ -12,9 +12,9 @@ This plan outlines the major development phases and tasks for building `dela`, a
 
 - [ ] **Task Definition Parsers**
   - [ ] Create `task_discovery.rs`.
-  - [ ] Implement Makefile parser (using `make -pn` or similar).
-  - [ ] Implement parser for `package.json` scripts.
-  - [ ] Implement parser for `pyproject.toml`.
+  - [ ] Implement Makefile parser (using `makefile-lossless` or similar).
+  - [ ] Implement parser for `package.json` scripts (`package-json` or `package_json_schema`).
+  - [ ] Implement parser for `pyproject.toml` scripts (`pyproject-toml`).
 
 - [ ] **Structs and Runners**
   - [ ] Define `Task` and `TaskRunner` enums in `types.rs`.
