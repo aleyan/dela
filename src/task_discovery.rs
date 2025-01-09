@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use crate::types::{DiscoveredTasks, TaskFileStatus, TaskDefinitionFile, TaskRunner};
 
 use crate::parse_makefile;

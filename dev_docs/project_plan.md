@@ -21,12 +21,12 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [ ] [DTKT-8] Associate discovered tasks with appropriate runner.
 
 - [ ] **CLI Implementation for `list`**
-  - [ ] [DTKT-9] Ensure `dela list` shows tasks from recognized files.
-  - [ ] [DTKT-10] Print tasks with references to the source file.
+  - [x] [DTKT-9] Ensure `dela list` shows tasks from recognized files.
+  - [x] [DTKT-10] Print tasks with references to the source file.
 
 **Deliverables**
-- [ ] Parsing logic for multiple file types.
-- [ ] Working `dela list` displaying discovered tasks.
+- [x] Parsing logic for multiple file types.
+- [x] Working `dela list` displaying discovered tasks.
 - [ ] Documentation on adding new parser modules.
 ---
 
