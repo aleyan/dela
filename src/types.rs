@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 /// Status of a task definition file
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TaskFileStatus {
     /// File exists and was successfully parsed
     Parsed,
@@ -16,7 +16,7 @@ pub enum TaskFileStatus {
 }
 
 /// Information about a task definition file
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TaskDefinitionFile {
     /// Path to the task definition file
     pub path: PathBuf,
@@ -38,7 +38,7 @@ pub struct DiscoveredTaskDefinitions {
 }
 
 /// Represents a discovered task that can be executed
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Task {
     /// Name of the task (e.g., "build", "test", "start")
     pub name: String,
@@ -53,7 +53,7 @@ pub struct Task {
 }
 
 /// Different types of task runners supported by dela
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TaskRunner {
     /// Make tasks from Makefile
     Make,
