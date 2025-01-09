@@ -3,6 +3,7 @@ use clap::{Parser, Subcommand};
 
 mod types;
 mod task_discovery;
+mod parse_makefile;
 
 use types::{DiscoveredTasks, TaskFileStatus};
 

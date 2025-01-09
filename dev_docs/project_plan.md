@@ -12,7 +12,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
 
 - [ ] **Task Definition Parsers**
   - [x] [DTKT-3] Create `task_discovery.rs`.
-  - [ ] [DTKT-4] Implement Makefile parser (using `makefile-lossless` or similar).
+  - [x] [DTKT-4] Implement Makefile parser (using `makefile-lossless` or similar).
   - [ ] [DTKT-5] Implement parser for `package.json` scripts (`package-json` or `package_json_schema`).
   - [ ] [DTKT-6] Implement parser for `pyproject.toml` scripts (`pyproject-toml`).
 

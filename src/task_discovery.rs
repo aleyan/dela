@@ -1,12 +1,12 @@
 use std::path::{Path, PathBuf};
+use crate::types::{DiscoveredTasks, TaskFileStatus, TaskDefinitionFile, TaskRunner};
 
-use crate::types::{DiscoveredTasks, Task, TaskRunner, TaskDefinitionFile, TaskFileStatus};
+use crate::parse_makefile;
 
 /// Discovers tasks in the given directory
 pub fn discover_tasks(dir: &Path) -> DiscoveredTasks {
     let mut discovered = DiscoveredTasks::default();
     
-    // TODO(DTKT-4): Implement Makefile parser
     if let Err(e) = discover_makefile_tasks(dir, &mut discovered) {
         discovered.errors.push(format!("Error parsing Makefile: {}", e));
         if let Some(makefile) = &mut discovered.definitions.makefile {
@@ -37,30 +37,30 @@ fn discover_makefile_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Resu
     let makefile_path = dir.join("Makefile");
     
     if !makefile_path.exists() {
-        discovered.definitions.makefile = Some(TaskDefinitionFile {
-            path: makefile_path,
-            runner: TaskRunner::Make,
-            status: TaskFileStatus::NotFound,
-        });
+        discovered.definitions.makefile = Some(parse_makefile::create_definition(
+            &makefile_path,
+            TaskFileStatus::NotFound,
+        ));
         return Ok(());
     }
 
-    discovered.definitions.makefile = Some(TaskDefinitionFile {
-        path: makefile_path.clone(),
-        runner: TaskRunner::Make,
-        status: TaskFileStatus::NotImplemented,
-    });
-
-    // Placeholder until DTKT-4 is implemented
-    discovered.tasks.push(Task {
-        name: "build".to_string(),
-        file_path: makefile_path,
-        runner: TaskRunner::Make,
-        source_name: "build".to_string(),
-        description: None,
-    });
-
-    Ok(())
+    match parse_makefile::parse(&makefile_path) {
+        Ok(tasks) => {
+            discovered.definitions.makefile = Some(parse_makefile::create_definition(
+                &makefile_path,
+                TaskFileStatus::Parsed,
+            ));
+            discovered.tasks.extend(tasks);
+            Ok(())
+        }
+        Err(e) => {
+            discovered.definitions.makefile = Some(parse_makefile::create_definition(
+                &makefile_path,
+                TaskFileStatus::ParseError(e.clone()),
+            ));
+            Err(e)
+        }
+    }
 }
 
 fn discover_npm_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<(), String> {
@@ -81,7 +81,7 @@ fn discover_npm_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<()
         status: TaskFileStatus::NotImplemented,
     });
 
-    // Placeholder until DTKT-5 is implemented
+    // TODO(DTKT-5): Implement package.json parser
     Ok(())
 }
 
@@ -103,7 +103,7 @@ fn discover_python_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result
         status: TaskFileStatus::NotImplemented,
     });
 
-    // Placeholder until DTKT-6 is implemented
+    // TODO(DTKT-6): Implement pyproject.toml parser
     Ok(())
 }
 
