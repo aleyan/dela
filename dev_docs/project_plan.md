@@ -11,13 +11,13 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [ ] [DTKT-2] Implement basic subcommands: `init`, `configure_shell`, `list`, `run`, `get_command`.
 
 - [ ] **Task Definition Parsers**
-  - [ ] [DTKT-3] Create `task_discovery.rs`.
+  - [x] [DTKT-3] Create `task_discovery.rs`.
   - [ ] [DTKT-4] Implement Makefile parser (using `makefile-lossless` or similar).
   - [ ] [DTKT-5] Implement parser for `package.json` scripts (`package-json` or `package_json_schema`).
   - [ ] [DTKT-6] Implement parser for `pyproject.toml` scripts (`pyproject-toml`).
 
 - [ ] **Structs and Runners**
-  - [ ] [DTKT-7] Define `Task` and `TaskRunner` enums in `types.rs`.
+  - [x] [DTKT-7] Define `Task` and `TaskRunner` enums in `types.rs`.
   - [ ] [DTKT-8] Associate discovered tasks with appropriate runner.
 
 - [ ] **CLI Implementation for `list`**
