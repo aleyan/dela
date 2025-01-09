@@ -60,6 +60,9 @@ This plan outlines the major development phases and tasks for building `dela`, a
 - [ ] **Task Execution Logic**
   - [ ] Implement `task_execution.rs` to invoke tasks (e.g., `make <target>`, `npm run <script>`).
   - [ ] Handle errors if required CLI tools are missing.
+  - [ ] Implement shell environment inheritance for task execution.
+  - [ ] Support both direct execution and subshell spawning based on task type.
+  - [ ] Ensure environment variables and working directory are properly propagated.
 
 - [ ] **`run` Command and Bare-Command Invocation**
   - [ ] Complete `dela run <task>` for direct execution.
