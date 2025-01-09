@@ -7,22 +7,22 @@ This plan outlines the major development phases and tasks for building `dela`, a
 ## Phase 1: Task Discovery & Parsing & CLI
 
 - [ ] **CLI Scaffolding**
-  - [ ] Set up CLI argument parsing (e.g., `clap`).
-  - [ ] Implement basic subcommands: `init`, `configure_shell`, `list`, `run`.
+  - [ ] [DTKT-1] Set up CLI argument parsing (e.g., `clap`).
+  - [ ] [DTKT-2] Implement basic subcommands: `init`, `configure_shell`, `list`, `run`.
 
 - [ ] **Task Definition Parsers**
-  - [ ] Create `task_discovery.rs`.
-  - [ ] Implement Makefile parser (using `makefile-lossless` or similar).
-  - [ ] Implement parser for `package.json` scripts (`package-json` or `package_json_schema`).
-  - [ ] Implement parser for `pyproject.toml` scripts (`pyproject-toml`).
+  - [ ] [DTKT-3] Create `task_discovery.rs`.
+  - [ ] [DTKT-4] Implement Makefile parser (using `makefile-lossless` or similar).
+  - [ ] [DTKT-5] Implement parser for `package.json` scripts (`package-json` or `package_json_schema`).
+  - [ ] [DTKT-6] Implement parser for `pyproject.toml` scripts (`pyproject-toml`).
 
 - [ ] **Structs and Runners**
-  - [ ] Define `Task` and `TaskRunner` enums in `types.rs`.
-  - [ ] Associate discovered tasks with appropriate runner.
+  - [ ] [DTKT-7] Define `Task` and `TaskRunner` enums in `types.rs`.
+  - [ ] [DTKT-8] Associate discovered tasks with appropriate runner.
 
 - [ ] **CLI Implementation for `list`**
-  - [ ] Ensure `dela list` shows tasks from recognized files.
-  - [ ] Print tasks with references to the source file.
+  - [ ] [DTKT-9] Ensure `dela list` shows tasks from recognized files.
+  - [ ] [DTKT-10] Print tasks with references to the source file.
 
 **Deliverables**
 - [ ] Parsing logic for multiple file types.
@@ -33,16 +33,15 @@ This plan outlines the major development phases and tasks for building `dela`, a
 ## Phase 2: Shell Integration and Basic CLI
 
 - [ ] **Shell Integration**
-  - [ ] Modify `.zshrc` to invoke `dela` manually.
-  - [ ] Append/update `command_not_found_handle` manually.
-  - [ ] Implement `dela configure_shell` command to return the command_not_found_handle.
-  - [ ] Implement `dela init` command to automate creation of `~/.dela`.
-  - [ ] Modify `dela init` command add eval of command_not_found_handle.
-
+  - [ ] [DTKT-11] Modify `.zshrc` to invoke `dela` manually.
+  - [ ] [DTKT-12] Append/update `command_not_found_handle` manually.
+  - [ ] [DTKT-13] Implement `dela configure_shell` command to return the command_not_found_handle.
+  - [ ] [DTKT-14] Implement `dela init` command to automate creation of `~/.dela`.
+  - [ ] [DTKT-15] Modify `dela init` command add eval of command_not_found_handle.
 
 - [ ] **Repository Preparation**
-  - [ ] Confirm Rust workspace structure is stable.
-  - [ ] Ensure code compiles and installs via `cargo install dela`.
+  - [ ] [DTKT-16] Confirm Rust workspace structure is stable.
+  - [ ] [DTKT-17] Ensure code compiles and installs via `cargo install dela`.
 
 **Deliverables**
 - [ ] Shell fallback for unrecognized commands.
@@ -51,27 +50,23 @@ This plan outlines the major development phases and tasks for building `dela`, a
 
 ---
 
-
-
----
-
 ## Phase 3: Task Execution & Workflow
 
 - [ ] **Task Execution Logic**
-  - [ ] Implement `task_execution.rs` to invoke tasks (e.g., `make <target>`, `npm run <script>`).
-  - [ ] Handle errors if required CLI tools are missing.
-  - [ ] Implement shell environment inheritance for task execution.
-  - [ ] Support both direct execution and subshell spawning based on task type.
-  - [ ] Ensure environment variables and working directory are properly propagated.
+  - [ ] [DTKT-18] Implement `task_execution.rs` to invoke tasks (e.g., `make <target>`, `npm run <script>`).
+  - [ ] [DTKT-19] Handle errors if required CLI tools are missing.
+  - [ ] [DTKT-20] Implement shell environment inheritance for task execution.
+  - [ ] [DTKT-21] Support both direct execution and subshell spawning based on task type.
+  - [ ] [DTKT-22] Ensure environment variables and working directory are properly propagated.
 
 - [ ] **`run` Command and Bare-Command Invocation**
-  - [ ] Complete `dela run <task>` for direct execution.
-  - [ ] Ensure bare commands invoke `dela` through the fallback.
-  - [ ] Prompt user if multiple matching tasks exist.
+  - [ ] [DTKT-23] Complete `dela run <task>` for direct execution.
+  - [ ] [DTKT-24] Ensure bare commands invoke `dela` through the fallback.
+  - [ ] [DTKT-25] Prompt user if multiple matching tasks exist.
 
 - [ ] **Disambiguation**
-  - [ ] Implement logic to handle multiple tasks with the same name.
-  - [ ] Store or remember user’s choice, if desired.
+  - [ ] [DTKT-26] Implement logic to handle multiple tasks with the same name.
+  - [ ] [DTKT-27] Store or remember user's choice, if desired.
 
 **Deliverables**
 - [ ] Fully functional `dela run <task>`.
@@ -83,17 +78,17 @@ This plan outlines the major development phases and tasks for building `dela`, a
 ## Phase 4: Security & Allowlist Management
 
 - [ ] **Allowlist Data Structures**
-  - [ ] Implement `allowlist.rs` to read/write `~/.dela/allowlist.toml`.
-  - [ ] Define `AllowlistEntry` with `file`/`directory` scopes.
+  - [ ] [DTKT-28] Implement `allowlist.rs` to read/write `~/.dela/allowlist.toml`.
+  - [ ] [DTKT-29] Define `AllowlistEntry` with `file`/`directory` scopes.
 
 - [ ] **User Prompts**
-  - [ ] Prompt user on first invocation of task from new file/directory.
-  - [ ] Support “Allow once,” “Allow this task,” “Allow file,” “Allow directory,” and “Deny.”
-  - [ ] Persist decisions in the allowlist.
+  - [ ] [DTKT-30] Prompt user on first invocation of task from new file/directory.
+  - [ ] [DTKT-31] Support "Allow once," "Allow this task," "Allow file," "Allow directory," and "Deny."
+  - [ ] [DTKT-32] Persist decisions in the allowlist.
 
 - [ ] **Runtime Checks**
-  - [ ] Consult allowlist before executing tasks.
-  - [ ] If disallowed, prompt or block execution.
+  - [ ] [DTKT-33] Consult allowlist before executing tasks.
+  - [ ] [DTKT-34] If disallowed, prompt or block execution.
 
 **Deliverables**
 - [ ] Secure allowlist solution.
@@ -105,27 +100,27 @@ This plan outlines the major development phases and tasks for building `dela`, a
 ## Phase 5: Expand shell capabilities to support bash and fish
 
 - [ ] **Bash Support**
-  - [ ] Implement `dela configure_shell` for bash.
-  - [ ] Implement `dela init` for bash.
+  - [ ] [DTKT-35] Implement `dela configure_shell` for bash.
+  - [ ] [DTKT-36] Implement `dela init` for bash.
 
 - [ ] **Fish Support**
-  - [ ] Implement `dela configure_shell` for fish.
-  - [ ] Implement `dela init` for fish.
+  - [ ] [DTKT-37] Implement `dela configure_shell` for fish.
+  - [ ] [DTKT-38] Implement `dela init` for fish.
 
 ---
 
 ## Phase 6: Testing & Quality Assurance
 
 - [ ] **Unit Tests**
-  - [ ] Cover each module: `shell_integration`, `task_discovery`, `allowlist`, `task_execution`.
+  - [ ] [DTKT-39] Cover each module: `shell_integration`, `task_discovery`, `allowlist`, `task_execution`.
 
 - [ ] **Integration Tests**
-  - [ ] Simulate user flows with different shells (Zsh, Bash, Fish).
-  - [ ] Validate allowlist logic and parsing of different file types.
+  - [ ] [DTKT-40] Simulate user flows with different shells (Zsh, Bash, Fish).
+  - [ ] [DTKT-41] Validate allowlist logic and parsing of different file types.
 
 - [ ] **Cross-Shell Checks**
-  - [ ] Test on macOS and Linux to ensure consistent behavior.
-  - [ ] Explore Windows/PowerShell feasibility.
+  - [ ] [DTKT-42] Test on macOS and Linux to ensure consistent behavior.
+  - [ ] [DTKT-43] Explore Windows/PowerShell feasibility.
 
 **Deliverables**
 - [ ] Comprehensive test coverage.
@@ -137,18 +132,18 @@ This plan outlines the major development phases and tasks for building `dela`, a
 ## Phase 7: Documentation & Release
 
 - [ ] **Documentation**
-  - [ ] Update `README.md` with usage instructions and examples.
-  - [ ] Provide short tutorials or usage demos.
-  - [ ] Consider additional docs folder or GitHub Pages for extended guides.
+  - [ ] [DTKT-44] Update `README.md` with usage instructions and examples.
+  - [ ] [DTKT-45] Provide short tutorials or usage demos.
+  - [ ] [DTKT-46] Consider additional docs folder or GitHub Pages for extended guides.
 
 - [ ] **Versioning and Release**
-  - [ ] Bump version in `Cargo.toml`.
-  - [ ] Publish to crates.io.
-  - [ ] Tag a stable release in the repository.
+  - [ ] [DTKT-47] Bump version in `Cargo.toml`.
+  - [ ] [DTKT-48] Publish to crates.io.
+  - [ ] [DTKT-49] Tag a stable release in the repository.
 
 - [ ] **Community Feedback**
-  - [ ] Collect user feedback on command discovery and allowlist features.
-  - [ ] Triage bug reports and feature requests.
+  - [ ] [DTKT-50] Collect user feedback on command discovery and allowlist features.
+  - [ ] [DTKT-51] Triage bug reports and feature requests.
 
 **Deliverables**
 - [ ] User-friendly documentation.
@@ -160,14 +155,14 @@ This plan outlines the major development phases and tasks for building `dela`, a
 ## Future Enhancements (Post-Launch)
 
 - [ ] **Plugin Architecture**
-  - [ ] Provide a standardized interface for community-built task parsers.
+  - [ ] [DTKT-52] Provide a standardized interface for community-built task parsers.
 
 - [ ] **Remote Execution**
-  - [ ] Support containers or remote servers for distributed workloads.
+  - [ ] [DTKT-53] Support containers or remote servers for distributed workloads.
 
 - [ ] **Advanced Configuration**
-  - [ ] Introduce optional `~/.dela/config.toml` for global settings.
-  - [ ] Add more flexible user preferences.
+  - [ ] [DTKT-54] Introduce optional `~/.dela/config.toml` for global settings.
+  - [ ] [DTKT-55] Add more flexible user preferences.
 
 ---
 
