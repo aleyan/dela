@@ -4,29 +4,11 @@ This plan outlines the major development phases and tasks for building `dela`, a
 
 ---
 
-## Phase 1: Shell Integration and Basic CLI
-
-- [ ] **Shell Integration**
-  - [ ] Modify `.zshrc`, `.bashrc`, or `.config/fish/config.fish` to invoke `dela`.
-  - [ ] Implement `dela init` command to automate creation of `~/.dela`.
-  - [ ] Append/update `command_not_found_handle`.
+## Phase 1: Task Discovery & Parsing & CLI
 
 - [ ] **CLI Scaffolding**
   - [ ] Set up CLI argument parsing (e.g., `clap`).
   - [ ] Implement basic subcommands: `init`, `configure_shell`, `list`, `run`.
-
-- [ ] **Repository Preparation**
-  - [ ] Confirm Rust workspace structure is stable.
-  - [ ] Ensure code compiles and installs via `cargo install dela`.
-
-**Deliverables**
-- [ ] Shell fallback for unrecognized commands.
-- [ ] Working `dela init`.
-- [ ] Placeholder implementations of `dela list` and `dela run`.
-
----
-
-## Phase 2: Task Discovery & Parsing
 
 - [ ] **Task Definition Parsers**
   - [ ] Create `task_discovery.rs`.
@@ -46,6 +28,30 @@ This plan outlines the major development phases and tasks for building `dela`, a
 - [ ] Parsing logic for multiple file types.
 - [ ] Working `dela list` displaying discovered tasks.
 - [ ] Documentation on adding new parser modules.
+---
+
+## Phase 2: Shell Integration and Basic CLI
+
+- [ ] **Shell Integration**
+  - [ ] Modify `.zshrc` to invoke `dela` manually.
+  - [ ] Append/update `command_not_found_handle` manually.
+  - [ ] Implement `dela configure_shell` command to return the command_not_found_handle.
+  - [ ] Implement `dela init` command to automate creation of `~/.dela`.
+  - [ ] Modify `dela init` command add eval of command_not_found_handle.
+
+
+- [ ] **Repository Preparation**
+  - [ ] Confirm Rust workspace structure is stable.
+  - [ ] Ensure code compiles and installs via `cargo install dela`.
+
+**Deliverables**
+- [ ] Shell fallback for unrecognized commands.
+- [ ] Working `dela init`.
+- [ ] Placeholder implementations of `dela list` and `dela run`.
+
+---
+
+
 
 ---
 
@@ -93,7 +99,19 @@ This plan outlines the major development phases and tasks for building `dela`, a
 
 ---
 
-## Phase 5: Testing & Quality Assurance
+## Phase 5: Expand shell capabilities to support bash and fish
+
+- [ ] **Bash Support**
+  - [ ] Implement `dela configure_shell` for bash.
+  - [ ] Implement `dela init` for bash.
+
+- [ ] **Fish Support**
+  - [ ] Implement `dela configure_shell` for fish.
+  - [ ] Implement `dela init` for fish.
+
+---
+
+## Phase 6: Testing & Quality Assurance
 
 - [ ] **Unit Tests**
   - [ ] Cover each module: `shell_integration`, `task_discovery`, `allowlist`, `task_execution`.
@@ -113,7 +131,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
 
 ---
 
-## Phase 6: Documentation & Release
+## Phase 7: Documentation & Release
 
 - [ ] **Documentation**
   - [ ] Update `README.md` with usage instructions and examples.
