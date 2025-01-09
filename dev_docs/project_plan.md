@@ -7,7 +7,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
 ## Phase 1: Task Discovery & Parsing & CLI
 
 - [ ] **CLI Scaffolding**
-  - [ ] [DTKT-1] Set up CLI argument parsing (e.g., `clap`).
+  - [x] [DTKT-1] Set up CLI argument parsing (e.g., `clap`).
   - [ ] [DTKT-2] Implement basic subcommands: `init`, `configure_shell`, `list`, `run`, `get_command`.
 
 - [ ] **Task Definition Parsers**

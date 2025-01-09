@@ -1,7 +1,14 @@
 use clap::{Parser, Subcommand};
 
+/// dela - A task runner that delegates to others
 #[derive(Parser)]
-#[command(author, version, about, long_about = None)]
+#[command(
+    name = "dela",
+    author = "Alex Yankov",
+    version,
+    about = "A task runner that delegates to others",
+    long_about = "Dela scans your project directory for task definitions in various formats (Makefile, package.json, etc.) and lets you run them directly from your shell."
+)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -37,23 +44,28 @@ fn main() {
     match cli.command {
         Commands::Init => {
             println!("Initializing dela...");
-            // TODO: Implement init logic
+            // TODO(DTKT-14): Implement dela init command to automate creation of ~/.dela
+            // TODO(DTKT-15): Modify dela init command to add eval of command_not_found_handle
         }
         Commands::ConfigureShell => {
             println!("Configuring shell...");
-            // TODO: Implement shell configuration
+            // TODO(DTKT-13): Implement dela configure_shell command to return the command_not_found_handle
         }
         Commands::List => {
             println!("Listing tasks...");
-            // TODO: Implement task listing
+            // TODO(DTKT-9): Ensure dela list shows tasks from recognized files
+            // TODO(DTKT-10): Print tasks with references to the source file
         }
         Commands::Run { task } => {
             println!("Running task: {}", task);
-            // TODO: Implement task running
+            // TODO(DTKT-23): Complete dela run <task> for direct execution
+            // TODO(DTKT-25): Prompt user if multiple matching tasks exist
+            // TODO(DTKT-26): Implement logic to handle multiple tasks with the same name
         }
         Commands::GetCommand { task } => {
             println!("Getting command for task: {}", task);
-            // TODO: Implement command retrieval
+            // TODO(DTKT-20): Implement shell environment inheritance for task execution
+            // TODO(DTKT-21): Support both direct execution and subshell spawning based on task type
         }
     }
 }
