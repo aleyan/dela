@@ -1,4 +1,10 @@
+use std::env;
 use clap::{Parser, Subcommand};
+
+mod types;
+mod task_discovery;
+
+use types::{DiscoveredTasks, TaskFileStatus};
 
 /// dela - A task runner that delegates to others
 #[derive(Parser)]
@@ -52,9 +58,60 @@ fn main() {
             // TODO(DTKT-13): Implement dela configure_shell command to return the command_not_found_handle
         }
         Commands::List => {
-            println!("Listing tasks...");
-            // TODO(DTKT-9): Ensure dela list shows tasks from recognized files
-            // TODO(DTKT-10): Print tasks with references to the source file
+            let current_dir = env::current_dir().expect("Failed to get current directory");
+            let discovered = task_discovery::discover_tasks(&current_dir);
+            
+            // Display task definition files status
+            println!("Task definition files:");
+            if let Some(makefile) = &discovered.definitions.makefile {
+                print!("  Makefile: ");
+                match &makefile.status {
+                    TaskFileStatus::Parsed => println!("Found and parsed"),
+                    TaskFileStatus::ParseError(e) => println!("Error parsing: {}", e),
+                    TaskFileStatus::NotReadable(e) => println!("Not readable: {}", e),
+                    TaskFileStatus::NotFound => println!("Not found"),
+                }
+            }
+            if let Some(package_json) = &discovered.definitions.package_json {
+                print!("  package.json: ");
+                match &package_json.status {
+                    TaskFileStatus::Parsed => println!("Found and parsed"),
+                    TaskFileStatus::ParseError(e) => println!("Error parsing: {}", e),
+                    TaskFileStatus::NotReadable(e) => println!("Not readable: {}", e),
+                    TaskFileStatus::NotFound => println!("Not found"),
+                }
+            }
+            if let Some(pyproject) = &discovered.definitions.pyproject_toml {
+                print!("  pyproject.toml: ");
+                match &pyproject.status {
+                    TaskFileStatus::Parsed => println!("Found and parsed"),
+                    TaskFileStatus::ParseError(e) => println!("Error parsing: {}", e),
+                    TaskFileStatus::NotReadable(e) => println!("Not readable: {}", e),
+                    TaskFileStatus::NotFound => println!("Not found"),
+                }
+            }
+            println!();
+
+            if discovered.tasks.is_empty() {
+                println!("No tasks found in the current directory.");
+                return;
+            }
+
+            println!("Available tasks:");
+            for task in discovered.tasks {
+                if let Some(desc) = task.description {
+                    println!("  {} - {} (from {})", task.name, desc, task.file_path.display());
+                } else {
+                    println!("  {} (from {})", task.name, task.file_path.display());
+                }
+            }
+
+            if !discovered.errors.is_empty() {
+                println!("\nWarnings:");
+                for error in discovered.errors {
+                    println!("  {}", error);
+                }
+            }
         }
         Commands::Run { task } => {
             println!("Running task: {}", task);
