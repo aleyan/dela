@@ -1,6 +1,7 @@
 use std::env;
 use std::fs;
 use std::path::PathBuf;
+use std::io::Write;
 
 pub fn execute() -> Result<(), String> {
     // Get the current shell from SHELL environment variable
@@ -25,5 +26,97 @@ pub fn execute() -> Result<(), String> {
         "bash" => Err("Bash shell integration not yet implemented".to_string()),
         "fish" => Err("Fish shell integration not yet implemented".to_string()),
         _ => Err(format!("Unsupported shell: {}", shell_name)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    fn setup_test_env(shell: &str) {
+        env::set_var("SHELL", shell);
+    }
+
+    fn create_test_zsh_file() -> TempDir {
+        let test_dir = TempDir::new().unwrap();
+        let resources_dir = test_dir.path().join("resources");
+        fs::create_dir(&resources_dir).unwrap();
+        
+        let zsh_content = "# Test zsh config\necho 'test'";
+        let mut file = fs::File::create(resources_dir.join("zsh.sh")).unwrap();
+        file.write_all(zsh_content.as_bytes()).unwrap();
+        
+        env::set_current_dir(&test_dir).unwrap();
+        test_dir
+    }
+
+    #[test]
+    fn test_zsh_shell() {
+        let test_dir = create_test_zsh_file();
+        setup_test_env("/bin/zsh");
+        
+        let result = execute();
+        if let Err(e) = &result {
+            eprintln!("Error: {}", e);
+            eprintln!("Current dir: {:?}", env::current_dir().unwrap());
+            eprintln!("Test dir: {:?}", test_dir.path());
+        }
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_bash_shell() {
+        setup_test_env("/bin/bash");
+        let result = execute();
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err(),
+            "Bash shell integration not yet implemented"
+        );
+    }
+
+    #[test]
+    fn test_fish_shell() {
+        setup_test_env("/usr/local/bin/fish");
+        let result = execute();
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err(),
+            "Fish shell integration not yet implemented"
+        );
+    }
+
+    #[test]
+    fn test_unknown_shell() {
+        setup_test_env("/bin/unknown");
+        let result = execute();
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err(),
+            "Unsupported shell: unknown"
+        );
+    }
+
+    #[test]
+    fn test_invalid_shell_path() {
+        setup_test_env("");
+        let result = execute();
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err(),
+            "Invalid shell path"
+        );
+    }
+
+    #[test]
+    fn test_missing_shell_env() {
+        env::remove_var("SHELL");
+        let result = execute();
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err(),
+            "SHELL environment variable not set"
+        );
     }
 } 

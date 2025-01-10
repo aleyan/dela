@@ -2,6 +2,8 @@ use std::env;
 use std::collections::HashMap;
 use crate::types::{Task, TaskFileStatus};
 use crate::task_discovery;
+use std::fs::File;
+use std::io::Write;
 
 pub fn execute() -> Result<(), String> {
     let current_dir = env::current_dir()
@@ -78,8 +80,9 @@ pub fn execute() -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::TempDir;
+    use std::fs::File;
     use std::io::Write;
+    use tempfile::TempDir;
 
     fn setup_test_dir() -> TempDir {
         let temp_dir = TempDir::new().expect("Failed to create temp directory");
@@ -92,7 +95,7 @@ build: ## Building the project
 test: ## Running tests
 \t@echo Testing...
 ";
-        let mut makefile = fs::File::create(temp_dir.path().join("Makefile"))
+        let mut makefile = File::create(temp_dir.path().join("Makefile"))
             .expect("Failed to create Makefile");
         makefile.write_all(makefile_content.as_bytes())
             .expect("Failed to write Makefile");
@@ -136,7 +139,7 @@ test: ## Running tests
 
         // Create an invalid Makefile
         let makefile_content = "invalid makefile content";
-        let mut makefile = fs::File::create(temp_dir.path().join("Makefile"))
+        let mut makefile = File::create(temp_dir.path().join("Makefile"))
             .expect("Failed to create Makefile");
         makefile.write_all(makefile_content.as_bytes())
             .expect("Failed to write Makefile");
