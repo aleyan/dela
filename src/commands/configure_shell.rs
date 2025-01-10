@@ -2,30 +2,51 @@ use std::env;
 use std::fs;
 use std::path::PathBuf;
 
+#[derive(Debug, PartialEq)]
+enum Shell {
+    Zsh,
+    Bash,
+    Fish,
+    Unknown(String),
+}
+
+impl Shell {
+    fn from_path(path: &str) -> Result<Shell, String> {
+        let shell_path = PathBuf::from(path);
+        let shell_name = shell_path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or_else(|| "Invalid shell path".to_string())?;
+
+        match shell_name {
+            "zsh" => Ok(Shell::Zsh),
+            "bash" => Ok(Shell::Bash),
+            "fish" => Ok(Shell::Fish),
+            name => Ok(Shell::Unknown(name.to_string())),
+        }
+    }
+}
+
 pub fn execute() -> Result<(), String> {
     // Get the current shell from SHELL environment variable
     let shell = env::var("SHELL")
         .map_err(|_| "SHELL environment variable not set".to_string())?;
     
-    // Extract the shell name from the path
-    let shell_path = PathBuf::from(&shell);
-    let shell_name = shell_path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .ok_or_else(|| "Invalid shell path".to_string())?;
+    // Parse the shell type
+    let shell_type = Shell::from_path(&shell)?;
 
-    // Match on the exact shell name
-    match shell_name {
-        "zsh" => {
+    // Handle each shell type
+    match shell_type {
+        Shell::Zsh => {
             // Read and print the zsh.sh file
             let zsh_config = fs::read_to_string("resources/zsh.sh")
                 .map_err(|e| format!("Failed to read zsh.sh: {}", e))?;
             print!("{}", zsh_config);
             Ok(())
         }
-        "bash" => Err("Bash shell integration not yet implemented".to_string()),
-        "fish" => Err("Fish shell integration not yet implemented".to_string()),
-        _ => Err("Invalid shell path".to_string()),
+        Shell::Bash => Err("Bash shell integration not yet implemented".to_string()),
+        Shell::Fish => Err("Fish shell integration not yet implemented".to_string()),
+        Shell::Unknown(name) => Err(format!("Unsupported shell: {}", name)),
     }
 }
 
@@ -36,36 +57,33 @@ mod tests {
     use tempfile::TempDir;
 
     fn setup_test_env(shell: &str) {
+        env::remove_var("SHELL");
         env::set_var("SHELL", shell);
     }
 
-    fn create_test_zsh_file() -> TempDir {
+    fn create_test_zsh_file() -> (TempDir, PathBuf) {
         let test_dir = TempDir::new().unwrap();
-        let resources_dir = test_dir.path().join("resources");
+        let test_path = test_dir.path().to_path_buf();
+        let resources_dir = test_path.join("resources");
         fs::create_dir(&resources_dir).unwrap();
         
         let zsh_content = "# Test zsh config\necho 'test'";
         let mut file = fs::File::create(resources_dir.join("zsh.sh")).unwrap();
         file.write_all(zsh_content.as_bytes()).unwrap();
         
-        test_dir
+        (test_dir, test_path)
     }
 
     #[test]
     fn test_zsh_shell() {
-        let test_dir = create_test_zsh_file();
+        let (test_dir, test_path) = create_test_zsh_file();
         setup_test_env("/bin/zsh");
         
         // Change to the test directory before executing
         let original_dir = env::current_dir().unwrap();
-        env::set_current_dir(test_dir.path()).unwrap();
+        env::set_current_dir(&test_path).unwrap();
         
         let result = execute();
-        if let Err(e) = &result {
-            eprintln!("Error: {}", e);
-            eprintln!("Current dir: {:?}", env::current_dir().unwrap());
-            eprintln!("Test dir: {:?}", test_dir.path());
-        }
         assert!(result.is_ok());
 
         // Restore directory before dropping test_dir
@@ -102,7 +120,7 @@ mod tests {
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err(),
-            "Invalid shell path"
+            "Unsupported shell: unknown"
         );
     }
 
