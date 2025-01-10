@@ -2,8 +2,6 @@ use std::env;
 use std::collections::HashMap;
 use crate::types::{Task, TaskFileStatus};
 use crate::task_discovery;
-use std::fs::File;
-use std::io::Write;
 
 pub fn execute() -> Result<(), String> {
     let current_dir = env::current_dir()
