@@ -56,9 +56,7 @@ fn main() {
             Ok(())
         }
         Commands::ConfigureShell => {
-            println!("Configuring shell...");
-            // TODO(DTKT-13): Implement dela configure_shell command to return the command_not_found_handle
-            Ok(())
+            commands::configure_shell::execute()
         }
         Commands::List => commands::list::execute(),
         Commands::Run { task } => {

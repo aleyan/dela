@@ -1,5 +1,3 @@
-#!/bin/zsh
-
 # dela function wrapper to handle 'run' command specially
 dela() {
     if [[ $1 == "run" ]]; then
@@ -18,4 +16,4 @@ command_not_found_handler() {
     fi
     echo "zsh: command not found: $1" >&2
     return 127
-} 
+}
