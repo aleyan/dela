@@ -73,7 +73,7 @@ test: ## Running tests
         let result = execute("test");
         assert!(result.is_ok(), "Should succeed for a single task");
 
-        // Keep temp_dir alive until after we restore the directory
+        // Restore directory before dropping temp_dir
         env::set_current_dir(&original_dir).expect("Failed to restore directory");
         drop(temp_dir);
     }
@@ -91,7 +91,7 @@ test: ## Running tests
             "No task named 'nonexistent' found"
         );
 
-        // Keep temp_dir alive until after we restore the directory
+        // Restore directory before dropping temp_dir
         env::set_current_dir(&original_dir).expect("Failed to restore directory");
         drop(temp_dir);
     }

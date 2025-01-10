@@ -1,7 +1,6 @@
 use std::env;
 use std::fs;
 use std::path::PathBuf;
-use std::io::Write;
 
 pub fn execute() -> Result<(), String> {
     // Get the current shell from SHELL environment variable
@@ -15,6 +14,7 @@ pub fn execute() -> Result<(), String> {
         .and_then(|name| name.to_str())
         .ok_or_else(|| "Invalid shell path".to_string())?;
 
+    // Match on the exact shell name
     match shell_name {
         "zsh" => {
             // Read and print the zsh.sh file
@@ -25,13 +25,14 @@ pub fn execute() -> Result<(), String> {
         }
         "bash" => Err("Bash shell integration not yet implemented".to_string()),
         "fish" => Err("Fish shell integration not yet implemented".to_string()),
-        _ => Err(format!("Unsupported shell: {}", shell_name)),
+        _ => Err("Invalid shell path".to_string()),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write;
     use tempfile::TempDir;
 
     fn setup_test_env(shell: &str) {
@@ -47,7 +48,6 @@ mod tests {
         let mut file = fs::File::create(resources_dir.join("zsh.sh")).unwrap();
         file.write_all(zsh_content.as_bytes()).unwrap();
         
-        env::set_current_dir(&test_dir).unwrap();
         test_dir
     }
 
@@ -56,6 +56,10 @@ mod tests {
         let test_dir = create_test_zsh_file();
         setup_test_env("/bin/zsh");
         
+        // Change to the test directory before executing
+        let original_dir = env::current_dir().unwrap();
+        env::set_current_dir(test_dir.path()).unwrap();
+        
         let result = execute();
         if let Err(e) = &result {
             eprintln!("Error: {}", e);
@@ -63,6 +67,10 @@ mod tests {
             eprintln!("Test dir: {:?}", test_dir.path());
         }
         assert!(result.is_ok());
+
+        // Restore directory before dropping test_dir
+        env::set_current_dir(&original_dir).unwrap();
+        drop(test_dir);
     }
 
     #[test]
@@ -94,7 +102,7 @@ mod tests {
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err(),
-            "Unsupported shell: unknown"
+            "Invalid shell path"
         );
     }
 

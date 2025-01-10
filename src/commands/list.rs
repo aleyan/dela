@@ -105,12 +105,12 @@ test: ## Running tests
     fn test_list_with_task_files() {
         let original_dir = env::current_dir().expect("Failed to get current directory");
         let temp_dir = setup_test_dir();
-        env::set_current_dir(&temp_dir).expect("Failed to change directory");
+        env::set_current_dir(temp_dir.path()).expect("Failed to change directory");
 
         let result = execute();
         assert!(result.is_ok(), "Should succeed with task files present");
 
-        // Keep temp_dir alive until after we restore the directory
+        // Restore directory before dropping temp_dir
         env::set_current_dir(&original_dir).expect("Failed to restore directory");
         drop(temp_dir);
     }
@@ -119,12 +119,12 @@ test: ## Running tests
     fn test_list_empty_directory() {
         let original_dir = env::current_dir().expect("Failed to get current directory");
         let temp_dir = TempDir::new().expect("Failed to create temp directory");
-        env::set_current_dir(&temp_dir).expect("Failed to change directory");
+        env::set_current_dir(temp_dir.path()).expect("Failed to change directory");
 
         let result = execute();
         assert!(result.is_ok(), "Should succeed with empty directory");
 
-        // Keep temp_dir alive until after we restore the directory
+        // Restore directory before dropping temp_dir
         env::set_current_dir(&original_dir).expect("Failed to restore directory");
         drop(temp_dir);
     }
@@ -133,7 +133,7 @@ test: ## Running tests
     fn test_list_with_invalid_makefile() {
         let original_dir = env::current_dir().expect("Failed to get current directory");
         let temp_dir = TempDir::new().expect("Failed to create temp directory");
-        env::set_current_dir(&temp_dir).expect("Failed to change directory");
+        env::set_current_dir(temp_dir.path()).expect("Failed to change directory");
 
         // Create an invalid Makefile
         let makefile_content = "invalid makefile content";
@@ -145,7 +145,7 @@ test: ## Running tests
         let result = execute();
         assert!(result.is_ok(), "Should succeed with invalid Makefile");
 
-        // Keep temp_dir alive until after we restore the directory
+        // Restore directory before dropping temp_dir
         env::set_current_dir(&original_dir).expect("Failed to restore directory");
         drop(temp_dir);
     }

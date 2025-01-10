@@ -10,7 +10,7 @@ dela() {
 
 # Command not found handler to delegate unknown commands to dela
 command_not_found_handler() {
-    if cmd=$(dela get-command "$1" "${@:2}"); then
+    if cmd=$(dela get-command "$1" 2>/dev/null); then
         eval "$cmd"
         return $?
     fi
