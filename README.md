@@ -60,3 +60,17 @@ You can add a new task by adding a new task definition file. The task definition
 ### What shell environment are tasks executed in?
 
 Tasks are executed in the same shell environment as the command you are running.
+
+## Development
+
+To use a dev version of the rust binary locally, build and install it with the following command.
+
+```sh
+cargo install --path .
+```
+
+You can also source the shell integration directly from the `resources` directory.
+
+```sh
+source resources/zsh.sh
+```

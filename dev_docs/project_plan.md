@@ -41,8 +41,8 @@ This plan outlines the major development phases and tasks for building `dela`, a
 ## Phase 2: Shell Integration and Basic CLI
 
 - [ ] **Shell Integration**
-  - [ ] [DTKT-11] Modify `.zshrc` to invoke `dela` manually.
-  - [ ] [DTKT-12] Append/update `command_not_found_handle` manually.
+  - [x] [DTKT-11] Modify `.zshrc` to invoke `dela` manually.
+  - [x] [DTKT-12] Append/update `command_not_found_handle` manually.
   - [ ] [DTKT-13] Implement `dela configure_shell` command to return the command_not_found_handle.
   - [ ] [DTKT-14] Implement `dela init` command to automate creation of `~/.dela`.
   - [ ] [DTKT-15] Modify `dela init` command add eval of command_not_found_handle.
@@ -208,6 +208,7 @@ Mark these items `[x]` when completed to track progress. This checklist format f
   - [ ] [DTKT-68] Support searching tasks by description
   - [ ] [DTKT-69] Add `--filter` option to show only specific types of tasks
   - [ ] [DTKT-70] Support task name completion in shells
+  - [ ] [DTKT-81] Implement zsh completion for dela commands and task names
 
 - [ ] **Task Execution Control**
   - [ ] [DTKT-71] Add `--dry-run` flag to show what would be executed
