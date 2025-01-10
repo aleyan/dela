@@ -2,6 +2,7 @@ use std::env;
 use std::collections::HashMap;
 use crate::types::{Task, TaskFileStatus};
 use crate::task_discovery;
+use serial_test::serial;
 
 pub fn execute() -> Result<(), String> {
     let current_dir = env::current_dir()
@@ -102,6 +103,7 @@ test: ## Running tests
     }
 
     #[test]
+    #[serial]
     fn test_list_with_task_files() {
         let original_dir = env::current_dir().expect("Failed to get current directory");
         let temp_dir = setup_test_dir();
@@ -116,6 +118,7 @@ test: ## Running tests
     }
 
     #[test]
+    #[serial]
     fn test_list_empty_directory() {
         let original_dir = env::current_dir().expect("Failed to get current directory");
         let temp_dir = TempDir::new().expect("Failed to create temp directory");
@@ -130,13 +133,14 @@ test: ## Running tests
     }
 
     #[test]
+    #[serial]
     fn test_list_with_invalid_makefile() {
         let original_dir = env::current_dir().expect("Failed to get current directory");
         let temp_dir = TempDir::new().expect("Failed to create temp directory");
         env::set_current_dir(temp_dir.path()).expect("Failed to change directory");
 
         // Create an invalid Makefile
-        let makefile_content = "invalid makefile content";
+        let makefile_content = "<invalid>makefile</invalid>";
         let mut makefile = File::create(temp_dir.path().join("Makefile"))
             .expect("Failed to create Makefile");
         makefile.write_all(makefile_content.as_bytes())

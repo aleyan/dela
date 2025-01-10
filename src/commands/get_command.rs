@@ -1,5 +1,6 @@
 use std::env;
 use crate::task_discovery;
+use serial_test::serial;
 
 pub fn execute(task: &str) -> Result<(), String> {
     // TODO(DTKT-20): Implement shell environment inheritance for task execution
@@ -65,6 +66,7 @@ test: ## Running tests
     }
 
     #[test]
+    #[serial]
     fn test_get_command_single_task() {
         let original_dir = env::current_dir().expect("Failed to get current directory");
         let temp_dir = setup_test_dir();
@@ -79,6 +81,7 @@ test: ## Running tests
     }
 
     #[test]
+    #[serial]
     fn test_get_command_no_task() {
         let original_dir = env::current_dir().expect("Failed to get current directory");
         let temp_dir = setup_test_dir();

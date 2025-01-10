@@ -1,6 +1,7 @@
 use std::env;
 use std::fs;
 use std::path::PathBuf;
+use serial_test::serial;
 
 #[derive(Debug, PartialEq)]
 enum Shell {
@@ -75,6 +76,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_zsh_shell() {
         let (test_dir, test_path) = create_test_zsh_file();
         setup_test_env("/bin/zsh");
@@ -92,6 +94,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_bash_shell() {
         setup_test_env("/bin/bash");
         let result = execute();
@@ -103,6 +106,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_fish_shell() {
         setup_test_env("/usr/local/bin/fish");
         let result = execute();
@@ -114,6 +118,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_unknown_shell() {
         setup_test_env("/bin/unknown");
         let result = execute();
@@ -125,6 +130,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_invalid_shell_path() {
         setup_test_env("");
         let result = execute();
@@ -136,6 +142,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_missing_shell_env() {
         env::remove_var("SHELL");
         let result = execute();
