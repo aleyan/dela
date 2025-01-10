@@ -13,7 +13,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
     - [ ] [DTKT-57] Implement `configure_shell` command structure and help text
     - [x] [DTKT-9] Implement `list` command structure and help text
     - [ ] [DTKT-58] Implement `run` command structure and help text
-    - [ ] [DTKT-59] Implement `get_command` command structure and help text
+    - [x] [DTKT-59] Implement `get_command` command structure and help text
     - [ ] [DTKT-60] Add command-line options for verbosity and debug output
     - [ ] [DTKT-61] Add `--help` text for each subcommand
     - [ ] [DTKT-62] Add `--version` flag to show version information
@@ -26,7 +26,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
 
 - [ ] **Structs and Runners**
   - [x] [DTKT-7] Define `Task` and `TaskRunner` enums in `types.rs`.
-  - [ ] [DTKT-8] Associate discovered tasks with appropriate runner.
+  - [x] [DTKT-8] Associate discovered tasks with appropriate runner.
 
 - [ ] **CLI Implementation for `list`**
   - [x] [DTKT-9] Ensure `dela list` shows tasks from recognized files.
