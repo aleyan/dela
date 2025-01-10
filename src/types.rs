@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 /// Status of a task definition file
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum TaskFileStatus {
     /// File exists and was successfully parsed
@@ -53,6 +54,7 @@ pub struct Task {
 }
 
 /// Different types of task runners supported by dela
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum TaskRunner {
     /// Make tasks from Makefile
