@@ -44,7 +44,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [x] [DTKT-11] Modify `.zshrc` to invoke `dela` manually.
   - [x] [DTKT-12] Append/update `command_not_found_handle` manually.
   - [ ] [DTKT-13] Implement `dela configure_shell` command to return the command_not_found_handle.
-  - [ ] [DTKT-14] Implement `dela init` command to automate creation of `~/.dela`.
+  - [ ] [DTKT-14] Implement `dela init` command to automate creation of `~/.dela` and eval of `dela configure_shell`.
   - [ ] [DTKT-15] Modify `dela init` command add eval of command_not_found_handle.
 
 - [ ] **Shell Execution Strategy**
