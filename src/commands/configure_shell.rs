@@ -1,7 +1,6 @@
 use std::env;
 use std::fs;
 use std::path::PathBuf;
-use serial_test::serial;
 
 #[derive(Debug, PartialEq)]
 enum Shell {
@@ -56,6 +55,7 @@ mod tests {
     use super::*;
     use std::io::Write;
     use tempfile::TempDir;
+    use serial_test::serial;
 
     fn setup_test_env(shell: &str) {
         env::remove_var("SHELL");

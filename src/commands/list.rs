@@ -2,7 +2,6 @@ use std::env;
 use std::collections::HashMap;
 use crate::types::{Task, TaskFileStatus};
 use crate::task_discovery;
-use serial_test::serial;
 
 pub fn execute() -> Result<(), String> {
     let current_dir = env::current_dir()
@@ -82,6 +81,7 @@ mod tests {
     use std::fs::File;
     use std::io::Write;
     use tempfile::TempDir;
+    use serial_test::serial;
 
     fn setup_test_dir() -> TempDir {
         let temp_dir = TempDir::new().expect("Failed to create temp directory");

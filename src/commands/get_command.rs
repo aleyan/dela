@@ -1,6 +1,5 @@
 use std::env;
 use crate::task_discovery;
-use serial_test::serial;
 
 pub fn execute(task: &str) -> Result<(), String> {
     // TODO(DTKT-20): Implement shell environment inheritance for task execution
@@ -45,6 +44,7 @@ mod tests {
     use std::fs::File;
     use std::io::Write;
     use tempfile::TempDir;
+    use serial_test::serial;
 
     fn setup_test_dir() -> TempDir {
         let temp_dir = TempDir::new().expect("Failed to create temp directory");

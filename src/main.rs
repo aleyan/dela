@@ -51,9 +51,7 @@ fn main() {
     let result = match cli.command {
         Commands::Init => {
             println!("Initializing dela...");
-            // TODO(DTKT-14): Implement dela init command to automate creation of ~/.dela
-            // TODO(DTKT-15): Modify dela init command to add eval of command_not_found_handle
-            Ok(())
+            commands::init::execute()
         }
         Commands::ConfigureShell => {
             commands::configure_shell::execute()
@@ -69,7 +67,8 @@ fn main() {
         Commands::GetCommand { task } => commands::get_command::execute(&task),
     };
 
-    if let Err(_) = result {
+    if let Err(err) = result {
+        eprintln!("Error: {}", err);
         std::process::exit(1);
     }
 }
