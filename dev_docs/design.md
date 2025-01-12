@@ -14,6 +14,7 @@ This document provides a detailed technical design for `dela`, a task runner imp
 
 We will maintain a relatively simple, flat file structure in the `src/` directory, guided by Rust’s recommended layout:
 
+```
 src/
 ├── main.rs          // Entry point that parses CLI arguments and dispatches commands
 ├── commands.rs      // Contains definitions and implementations for all CLI subcommands
@@ -22,6 +23,7 @@ src/
 ├── task_discovery.rs // Logic for scanning directories, parsing tasks from recognized files
 ├── task_execution.rs // Functions responsible for executing tasks once discovered
 └── types.rs         // Common data structures (Task, TaskFile, etc.)
+```
 
 ### `main.rs`
 - The main entry point for the CLI application.
@@ -62,21 +64,22 @@ src/
 	task_name = "build"
 	file_path = "/Users/alex/Projects/dela/Makefile"
 
-task_discovery.rs
-	•	Scans the current directory (and possibly subdirectories) for recognized task definition files (Makefile, package.json, pyproject.toml, etc.).
-	•	Parses these files to extract tasks. For example:
-	•	Makefile: Use a small parser or call make -pn to list target names.
-	•	package.json: Load JSON and look in the "scripts" section.
-	•	pyproject.toml: Possibly look for [tool.poetry.scripts] or other relevant sections.
-	•	Returns a collection of Task objects, each describing a discovered task name and associated runner info.
+### `task_discovery.rs`
+- Scans the current directory (and possibly subdirectories) for recognized task definition files (Makefile, package.json, pyproject.toml, etc.).
+- Parses these files to extract tasks. For example:
+	- Makefile: Use a small parser or call make -pn to list target names.
+	- package.json: Load JSON and look in the "scripts" section.
+	- pyproject.toml: Possibly look for [tool.poetry.scripts] or other relevant sections.
+- Returns a collection of Task objects, each describing a discovered task name and associated runner info.
 
-task_execution.rs
-	•	Implements logic for executing a discovered task using the appropriate command line (e.g., make <task>, npm run <task>, etc.).
-	•	Contains error handling to provide user-friendly messages if something fails (e.g., missing tool, unrecognized task, insufficient permissions).
+### `task_execution.rs`
+- Implements logic for executing a discovered task using the appropriate command line (e.g., make <task>, npm run <task>, etc.).
+- Contains error handling to provide user-friendly messages if something fails (e.g., missing tool, unrecognized task, insufficient permissions).
 
-types.rs
-	•	Defines common structs, enums, or types:
+### `types.rs`
+- Defines common structs, enums, or types:
 
+```rust
 pub struct Task {
 	pub name: String,
 	pub file_path: String,
@@ -104,63 +107,72 @@ pub struct AllowlistEntry {
 	pub path: String,   // file or directory
 	pub scope: String,  // "file", "directory", etc.
 }
+```
+
+These types are shared throughout the modules for consistent representation of tasks and allowlist entries.
 
 
-	•	These types are shared throughout the modules for consistent representation of tasks and allowlist entries.
-
-Command-Line Interface
+## Command-Line Interface
 
 The following commands are planned for dela:
-	1.	dela init
-	•	Updates the user’s shell configuration to set up dela as the fallback for “command not found”.
-	•	Creates ~/.dela directory (if missing) and an initial allowlist.toml.
-	2.	dela list
-	•	Prints out all discovered tasks in the current directory.
-	•	Each task might be listed with its origin file.
-	•	Example output:
+1) dela init
+- Updates the user’s shell configuration to set up dela as the fallback for “command not found”.
+- Creates ~/.dela directory (if missing) and an initial allowlist.toml.
+2) dela list
+- Prints out all discovered tasks in the current directory.
+- Each task might be listed with its origin file.
+- Example output:
 
+```sh
 $ dela list
 build (Makefile)
 test (Makefile)
 start (package.json)
+```	
 
+3) dela run <task>
+- Bypasses the shell’s fallback mechanism and directly invokes the discovered task.
+- If multiple tasks with the same name exist in different files, prompts the user to disambiguate or choose from a menu.
 
-	3.	dela run <task>
-	•	Bypasses the shell’s fallback mechanism and directly invokes the discovered task.
-	•	If multiple tasks with the same name exist in different files, prompts the user to disambiguate or choose from a menu.
-	4.	Implicit invocation (bare command in shell)
-	•	A user types build, which is not recognized by the shell, triggering the command_not_found_handle.
-	•	dela scans for a matching “build” task, checks the allowlist, and if permitted, executes the command.
-	•	If not allowed, prompts the user with allowlist options.
-	5.	dela configure_shell (sub-invocation)
-	•	Prints lines or shell functions that the user’s rc file needs.
-	•	Called internally by dela init or manually by advanced users.
+4) dela configure_shell (sub-invocation)
+- If not allowed, prompts the user with allowlist options.
 
-Typical Workflow
-	1.	User runs cargo install dela.
-	2.	User calls dela init, which:
-	•	Creates ~/.dela if necessary.
-	•	Writes or updates lines in .zshrc (or other shell config).
-	•	Installs a minimal function for command_not_found_handle that delegates to dela.
-	3.	User opens or reloads their shell session.
-	4.	In a project directory with a Makefile containing build and test:
-	•	User types build.
-	•	The shell can’t find a command named build, so it calls command_not_found_handle("build").
-	•	dela finds build in the Makefile. If it’s the first time, dela prompts about allowlisting. The user says “Allow any command from this Makefile.”
-	•	dela executes make build.
+5) dela configure_shell (sub-invocation)
+- Prints lines or shell functions that the user’s rc file needs.
+- Called internally by dela init or manually by advanced users.
 
-Security & Allowlist Management
-	•	Prompt: On the first run of any new command from a file or directory, dela asks if the user wants to allow just one-time execution, allow that specific task, allow all tasks from that file, allow all tasks in the directory, or deny.
-	•	Storage: The user choice is written into a TOML-based allowlist in ~/.dela/allowlist.toml.
-	•	Checks: Each time a task is run, dela consults the allowlist to ensure permission.
-	•	Example: If the user chooses to allow a single run, the entry is ephemeral and not stored permanently. If the user chooses to “Allow any command from ~/Projects/dela/Makefile,” a matching entry is created in the allowlist.
+### Typical Workflow
+1) User runs cargo install dela.
+2) User calls dela init, which:
+- Creates ~/.dela if necessary.
+- Writes or updates lines in .zshrc (or other shell config).
+- Installs a minimal function for command_not_found_handle that delegates to dela.
+3) User opens or reloads their shell session.
+4) In a project directory with a Makefile containing build and test:
+- User types build.
+- The shell can’t find a command named build, so it calls command_not_found_handle("build").
+- dela finds build in the Makefile. If it’s the first time, dela prompts about allowlisting. The user says “Allow any command from this Makefile.”
+- dela executes make build.
 
-Future Extensibility
-	•	Plugin Architecture: Potential for adding new parsers or new ways to run tasks (Java-based, Docker-based, etc.).
-	•	Cross-Platform: Although we primarily target macOS and Linux shells, we want minimal friction for Windows, possibly with PowerShell compatibility.
-	•	Configuration Management: We might add a ~/.dela/config.toml for additional user settings like default scopes or plugin directories.
-	•	Logging & Debugging: Provide verbose output with dela --verbose or RUST_LOG environment variable.
+### Security & Allowlist Management
+- Prompt: On the first run of any new command from a file or directory, dela asks if the user wants to allow just one-time execution, allow that specific task, allow all tasks from that file, allow all tasks in the directory, or deny.
+- Storage: The user choice is written into a TOML-based allowlist in ~/.dela/allowlist.toml.
+- Checks: Each time a task is run, dela consults the allowlist to ensure permission.
+- Example: If the user chooses to allow a single run, the entry is ephemeral and not stored permanently. If the user chooses to “Allow any command from ~/Projects/dela/Makefile,” a matching entry is created in the allowlist.
 
-Conclusion
+### Future Extensibility
+- Plugin Architecture: Potential for adding new parsers or new ways to run tasks (Java-based, Docker-based, etc.).
+- Cross-Platform: Although we primarily target macOS and Linux shells, we want minimal friction for Windows, possibly with PowerShell compatibility.
+- Configuration Management: We might add a ~/.dela/config.toml for additional user settings like default scopes or plugin directories.
+- Logging & Debugging: Provide verbose output with dela --verbose or RUST_LOG environment variable.
+
+## Testing
+
+Each rust module will have its own unit tests. Adding tests is a requirements for checking a DTKT as complete.
+
+### Integration Tests with Docker
+This projects has non-trivial interactions between shells and rust code. This section will need to be filled out.
+
+## Conclusion
 
 This design outlines a flexible Rust-based task runner with a modular approach to shell integration, task discovery, and allowlist management. Key modules (shell_integration.rs, allowlist.rs, task_discovery.rs, task_execution.rs) interoperate to seamlessly intercept unrecognized commands and map them to tasks. By prioritizing security, extensibility, and ease of configuration, dela aims to enhance developer productivity for a variety of project structures and ecosystems.
