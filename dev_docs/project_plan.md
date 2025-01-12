@@ -129,6 +129,15 @@ This plan outlines the major development phases and tasks for building `dela`, a
 ## Phase 6: Testing & Quality Assurance
 
 - [ ] **Unit Tests**
+
+### Dockerized Cross-Shell Testing
+- [ ] [DTKT-82] Build Docker images that contain multiple shells (zsh, bash, fish).
+- [ ] [DTKT-83] Automate a test workflow where each container:
+  - Installs `dela`.
+  - Runs `dela init`.
+  - Sources the relevant shell configuration.
+  - Validates that tasks can be run both via bare command (through command_not_found_handler) and with `dela run <task>`.
+- [ ] [DTKT-84] Integrate these Docker-based tests into CI to confirm cross-shell compatibility.
   - [ ] [DTKT-39] Cover each module: `shell_integration`, `task_discovery`, `allowlist`, `task_execution`.
 
 - [ ] **Integration Tests**

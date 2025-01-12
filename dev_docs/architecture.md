@@ -99,6 +99,17 @@ At a high level, `dela` operates by intercepting commands in your shell that wou
 
 ## Future Enhancements
 
+## Dockerized Testing for Shell Scripts and Shell Integration
+While unit tests suffice for Rust logic, shell integration tests often require multiple real shells. A recommended approach is:
+1. Create lightweight Docker images that contain different shells (e.g., zsh, bash, fish).
+2. Copy (or mount) the `dela` binary and associated resources (like `zsh.sh`) into each container.
+3. Run scenario-based tests that:
+   - Initialize a fresh user environment (HOME, SHELL, etc.).
+   - Execute `dela init`.
+   - Source the updated shell configuration (e.g., `.zshrc`, `.bashrc`, or `config.fish`).
+   - Confirm that tasks can be executed directly (bare command) and via `dela run <task>`.
+4. Collect results for each shell to ensure cross-shell functionality remains consistent.
+
 1. **Extending to More Task Runners**
    - Additional detection and execution for other popular build or scripting tools (Gradle, Maven, Rake, etc.).
 
