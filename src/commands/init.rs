@@ -3,28 +3,27 @@ use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
 
-/// Get the path to the user's shell configuration file
+/// Get the appropriate shell config path based on SHELL env var
 fn get_shell_config_path() -> Result<PathBuf, String> {
     let shell = env::var("SHELL")
         .map_err(|_| "SHELL environment variable not set".to_string())?;
     
-    let home = env::var("HOME")
-        .map_err(|_| "HOME environment variable not set".to_string())?;
-    
-    let shell_path = PathBuf::from(&shell);
+    let shell_path = std::path::PathBuf::from(&shell);
     let shell_name = shell_path
         .file_name()
         .and_then(|name| name.to_str())
         .ok_or_else(|| "Invalid shell path".to_string())?;
 
-    let config_path = match shell_name {
-        "zsh" => PathBuf::from(&home).join(".zshrc"),
-        "bash" => PathBuf::from(&home).join(".bashrc"),
-        "fish" => PathBuf::from(&home).join(".config/fish/config.fish"),
-        name => return Err(format!("Unsupported shell: {}", name)),
-    };
+    let home = env::var("HOME")
+        .map_err(|_| "HOME environment variable not set".to_string())?;
+    let home_path = PathBuf::from(&home);
 
-    Ok(config_path)
+    match shell_name {
+        "zsh" => Ok(home_path.join(".zshrc")),
+        "bash" => Ok(home_path.join(".bashrc")),
+        "fish" => Ok(home_path.join(".config").join("fish").join("config.fish")),
+        name => Err(format!("Unsupported shell: {}", name)),
+    }
 }
 
 /// Add dela shell integration to the shell config file
@@ -35,6 +34,7 @@ fn add_shell_integration(config_path: &PathBuf) -> Result<(), String> {
 
     // Check if dela integration is already present
     if content.contains("eval \"$(dela configure-shell)\"") {
+        println!("Shell integration already present in {}", config_path.display());
         return Ok(());
     }
 
@@ -53,25 +53,38 @@ fn add_shell_integration(config_path: &PathBuf) -> Result<(), String> {
 }
 
 pub fn execute() -> Result<(), String> {
+    println!("Initializing dela...");
+
+    // Get the shell config path first to validate shell support
+    let config_path = get_shell_config_path()?;
+    let shell_name = config_path.file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("unknown")
+        .trim_start_matches('.')
+        .to_string();
+
+    println!("Detected {} shell configuration at {}", shell_name, config_path.display());
+
     // Create ~/.dela directory if it doesn't exist
     let home = env::var("HOME")
         .map_err(|_| "HOME environment variable not set".to_string())?;
     let dela_dir = PathBuf::from(&home).join(".dela");
     
     if !dela_dir.exists() {
+        println!("Creating dela configuration directory at {}", dela_dir.display());
         fs::create_dir_all(&dela_dir)
             .map_err(|e| format!("Failed to create ~/.dela directory: {}", e))?;
-        println!("Created ~/.dela directory");
+    } else {
+        println!("Using existing dela configuration directory at {}", dela_dir.display());
     }
 
-    // Get the shell config path
-    let config_path = get_shell_config_path()?;
-
     // Add shell integration
+    println!("Adding shell integration to {}", config_path.display());
     add_shell_integration(&config_path)?;
-    println!("Added dela shell integration to {}", config_path.display());
-    println!("\nPlease restart your shell or run:");
-    println!("  source {}", config_path.display());
+
+    println!("\nInitialization complete! To activate dela, either:");
+    println!("1. Restart your shell");
+    println!("2. Run: source {}", config_path.display());
 
     Ok(())
 }

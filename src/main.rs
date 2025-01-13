@@ -50,7 +50,6 @@ fn main() {
 
     let result = match cli.command {
         Commands::Init => {
-            println!("Initializing dela...");
             commands::init::execute()
         }
         Commands::ConfigureShell => {
