@@ -3,12 +3,14 @@ use std::env;
 const ZSH_CONFIG: &str = include_str!("../../resources/zsh.sh");
 const BASH_CONFIG: &str = include_str!("../../resources/bash.sh");
 const FISH_CONFIG: &str = include_str!("../../resources/fish.sh");
+const KSH_CONFIG: &str = include_str!("../../resources/ksh.sh");
 
 #[derive(Debug, PartialEq)]
 enum Shell {
     Zsh,
     Bash,
     Fish,
+    Ksh,
     Unknown(String),
 }
 
@@ -24,6 +26,7 @@ impl Shell {
             "zsh" => Ok(Shell::Zsh),
             "bash" => Ok(Shell::Bash),
             "fish" => Ok(Shell::Fish),
+            "ksh" => Ok(Shell::Ksh),
             name => Ok(Shell::Unknown(name.to_string())),
         }
     }
@@ -49,6 +52,10 @@ pub fn execute() -> Result<(), String> {
         }
         Shell::Fish => {
             print!("{}", FISH_CONFIG);
+            Ok(())
+        }
+        Shell::Ksh => {
+            print!("{}", KSH_CONFIG);
             Ok(())
         }
         Shell::Unknown(name) => Err(format!("Unsupported shell: {}", name)),
@@ -85,6 +92,14 @@ mod tests {
     #[serial]
     fn test_fish_shell() {
         setup_test_env("/usr/local/bin/fish");
+        let result = execute();
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    #[serial]
+    fn test_ksh_shell() {
+        setup_test_env("/bin/ksh");
         let result = execute();
         assert!(result.is_ok());
     }
