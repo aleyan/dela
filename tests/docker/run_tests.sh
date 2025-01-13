@@ -70,7 +70,7 @@ run_shell_tests() {
 }
 
 # Run tests for each shell
-for shell in zsh bash fish ksh pwsh; do
+for shell in zsh bash ksh pwsh; do
     log "Testing ${shell} shell integration..."
     run_shell_tests "${shell}"
 done

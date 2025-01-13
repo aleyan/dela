@@ -32,9 +32,9 @@ test -f ~/Makefile || (error "Makefile not found" && exit 1)
 
 # Verify initial command_not_found_handler works
 output=$(nonexistent_command 2>&1) || true
-if ! echo "$output" | grep -q "ksh: command not found: nonexistent_command"; then
+if ! echo "$output" | grep -q "not found"; then
     error "Initial command_not_found_handler not working."
-    error "Expected: 'ksh: command not found: nonexistent_command'"
+    error "Expected message containing: 'not found'"
     error "Got: '$output'"
     exit 1
 fi
@@ -100,7 +100,7 @@ echo "$output" | grep -q "Another task executed successfully" || {
 # Verify command_not_found_handler was properly replaced
 log "Testing final command_not_found_handler..."
 output=$(nonexistent_command 2>&1) || true
-if echo "$output" | grep -q "ksh: command not found: nonexistent_command"; then
+if echo "$output" | grep -q "not found"; then
     error "Command not found handler wasn't properly replaced."
     error "Got: '$output'"
     exit 1

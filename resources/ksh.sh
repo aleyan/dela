@@ -9,7 +9,7 @@ dela() {
 }
 
 # Command not found handler to delegate unknown commands to dela
-function command_not_found_handler {
+function command_not_found {
     if cmd=$(dela get-command "$1" 2>/dev/null); then
         shift
         eval "$cmd $*"
@@ -17,4 +17,7 @@ function command_not_found_handler {
     fi
     echo "ksh: command not found: $1" >&2
     return 127
-} 
+}
+
+# Set up command not found handling for ksh
+alias .sh.command_not_found=command_not_found

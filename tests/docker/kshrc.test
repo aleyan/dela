@@ -1,14 +1,15 @@
 # Basic ksh configuration for testing
+PS1='$ '
 
-# Basic prompt
-PS1='${USER}@${HOSTNAME}:${PWD}$ '
-
-# Basic path
+# Set up basic path
 PATH=/usr/local/bin:/usr/bin:/bin:$PATH
 export PATH
 
-# Basic command not found handler (will be replaced by dela)
-function command_not_found_handler {
+# Command not found handler to delegate unknown commands to dela
+function command_not_found {
     echo "ksh: command not found: $1" >&2
     return 127
-} 
+}
+
+# Set up command not found handling for ksh
+alias .sh.command_not_found=command_not_found
