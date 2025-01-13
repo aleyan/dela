@@ -1,0 +1,19 @@
+# Basic bash configuration for testing
+
+# Basic history configuration
+HISTFILE=~/.bash_history
+HISTSIZE=1000
+HISTFILESIZE=2000
+
+# Basic prompt
+PS1='\u@\h:\w\$ '
+
+# Basic path
+PATH=/usr/local/bin:/usr/bin:/bin:$PATH
+export PATH
+
+# Basic command not found handler (will be replaced by dela)
+command_not_found_handle() {
+    echo "bash: command not found: $1" >&2
+    return 127
+} 
