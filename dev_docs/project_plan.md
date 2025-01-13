@@ -9,10 +9,10 @@ This plan outlines the major development phases and tasks for building `dela`, a
 - [ ] **CLI Scaffolding**
   - [x] [DTKT-1] Set up CLI argument parsing (e.g., `clap`).
   - [ ] **Basic Commands Implementation**
-    - [ ] [DTKT-56] Implement `init` command structure and help text
-    - [ ] [DTKT-57] Implement `configure_shell` command structure and help text
+    - [x] [DTKT-56] Implement `init` command structure and help text
+    - [x] [DTKT-57] Implement `configure_shell` command structure and help text
     - [x] [DTKT-9] Implement `list` command structure and help text
-    - [ ] [DTKT-58] Implement `run` command structure and help text
+    - [x] [DTKT-58] Implement `run` command structure and help text
     - [x] [DTKT-59] Implement `get_command` command structure and help text
     - [ ] [DTKT-60] Add command-line options for verbosity and debug output
     - [ ] [DTKT-61] Add `--help` text for each subcommand
@@ -45,11 +45,11 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [x] [DTKT-12] Append/update `command_not_found_handle` manually.
   - [x] [DTKT-13] Implement `dela configure-shell` command to return the command_not_found_handle.
   - [ ] [DTKT-14] Implement `dela init` command to automate creation of `~/.dela` and `~/.dela/allowlist.toml`.
-  - [ ] [DTKT-15] Modify `dela init` command add eval of `dela configure_shell`.
+  - [x] [DTKT-15] Modify `dela init` command add eval of `dela configure_shell`.
 
 - [ ] **Shell Execution Strategy**
-  - [ ] [DTKT-75] Implement shell function wrapper for `dela run` command
-  - [ ] [DTKT-76] Implement `get_command` to return shell-executable command string
+  - [x] [DTKT-75] Implement shell function wrapper for `dela run` command
+  - [x] [DTKT-76] Implement `get-command` to return shell-executable command string
   - [ ] [DTKT-77] Ensure commands execute in actual shell environment
   - [ ] [DTKT-78] Support shell builtins (cd, source, etc.)
   - [ ] [DTKT-79] Ensure environment modifications persist
@@ -62,7 +62,6 @@ This plan outlines the major development phases and tasks for building `dela`, a
 **Deliverables**
 - [ ] Shell fallback for unrecognized commands.
 - [ ] Working `dela init`.
-- [ ] Placeholder implementations of `dela list` and `dela run`.
 - [ ] Shell-aware task execution environment.
 
 ---
