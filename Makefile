@@ -1,4 +1,4 @@
-.PHONY: build test test_shells run
+.PHONY: build test test_shells run install
 
 # Default to non-verbose output
 VERBOSE ?= 0
@@ -19,6 +19,10 @@ test_shells:
 		echo "Running shell integration tests..."; \
 		VERBOSE=0 ./tests/docker/run_tests.sh; \
 	fi
+
+install:
+	@echo "Installing dela locally..."
+	cargo install --path .
 
 run:
 	@echo "Running dela..."
