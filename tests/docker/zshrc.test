@@ -1,0 +1,23 @@
+# Basic zsh configuration for testing
+HISTFILE=~/.zsh_history
+HISTSIZE=1000
+SAVEHIST=1000
+
+# Basic zsh options
+setopt autocd
+setopt extendedglob
+setopt nomatch
+setopt notify
+
+# Basic prompt
+PS1='%n@%m:%~%# '
+
+# Basic path
+path=(/usr/local/bin /usr/bin /bin $path)
+export PATH
+
+# Basic command not found handler (will be replaced by dela)
+function command_not_found_handler() {
+    echo "Command not found: $1" >&2
+    return 127
+} 
