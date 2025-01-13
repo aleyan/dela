@@ -70,8 +70,7 @@ run_shell_tests() {
 }
 
 
-# fish, ksh, pwsh are not supported yet
-# Run tests for each shell
+# Run tests for each shell. fish and pwsh are commented out.
 for shell in zsh bash; do
     log "Testing ${shell} shell integration..."
     run_shell_tests "${shell}"

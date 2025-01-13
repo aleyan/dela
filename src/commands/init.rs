@@ -36,7 +36,6 @@ fn get_shell_config_path() -> Result<PathBuf, String> {
         "zsh" => Ok(home_path.join(".zshrc")),
         "bash" => Ok(home_path.join(".bashrc")),
         "fish" => Ok(home_path.join(".config").join("fish").join("config.fish")),
-        "ksh" => Ok(home_path.join(".kshrc")),
         name => Err(format!("Unsupported shell: {}", name)),
     }
 }
