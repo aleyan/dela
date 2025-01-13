@@ -1,9 +1,5 @@
 #!/bin/zsh
 
-# Exit on any error
-set -e
-set -x  # Print each command for debugging
-
 echo "=== Testing dela shell integration for zsh ==="
 
 echo "1. Verifying test environment..."
