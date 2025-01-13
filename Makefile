@@ -1,5 +1,8 @@
 .PHONY: build test test_shells run
 
+# Default to non-verbose output
+VERBOSE ?= 0
+
 build:
 	@echo "Building dela..."
 	cargo build
@@ -9,8 +12,13 @@ test:
 	cargo test
 
 test_shells:
-	@echo "Running shell integration tests..."
-	./tests/docker/run_tests.sh
+	@if [ "$(VERBOSE)" = "1" ]; then \
+		echo "Running shell integration tests (verbose)..."; \
+		VERBOSE=1 ./tests/docker/run_tests.sh; \
+	else \
+		echo "Running shell integration tests..."; \
+		VERBOSE=0 ./tests/docker/run_tests.sh; \
+	fi
 
 run:
 	@echo "Running dela..."
