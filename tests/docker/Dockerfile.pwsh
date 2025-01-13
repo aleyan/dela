@@ -24,7 +24,7 @@ RUN apt-get update && \
     # Get Debian version
     . /etc/os-release && \
     # Download and register Microsoft repository
-    wget -q https://packages.microsoft.com/config/debian/$VERSION_ID/packages-microsoft-prod.deb && \
+    wget -q https://packages.microsoft.com/config/debian/12/packages-microsoft-prod.deb && \
     dpkg -i packages-microsoft-prod.deb && \
     rm packages-microsoft-prod.deb && \
     # Update package list and install PowerShell

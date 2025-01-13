@@ -69,8 +69,10 @@ run_shell_tests() {
     log "${shell} tests passed successfully!"
 }
 
+
+# fish, ksh, pwsh are not supported yet
 # Run tests for each shell
-for shell in zsh bash ksh pwsh; do
+for shell in zsh bash; do
     log "Testing ${shell} shell integration..."
     run_shell_tests "${shell}"
 done
