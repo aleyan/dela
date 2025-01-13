@@ -1,0 +1,15 @@
+# Basic fish configuration for testing
+
+# Set up basic prompt
+function fish_prompt
+    echo -n (whoami)'@'(hostname)':'(pwd)'$ '
+end
+
+# Set up basic path
+set -x PATH /usr/local/bin /usr/bin /bin $PATH
+
+# Basic command not found handler (will be replaced by dela)
+function fish_command_not_found
+    echo "fish: Unknown command: $argv[1]" >&2
+    return 127
+end 

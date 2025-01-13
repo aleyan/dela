@@ -2,6 +2,7 @@ use std::env;
 
 const ZSH_CONFIG: &str = include_str!("../../resources/zsh.sh");
 const BASH_CONFIG: &str = include_str!("../../resources/bash.sh");
+const FISH_CONFIG: &str = include_str!("../../resources/fish.sh");
 
 #[derive(Debug, PartialEq)]
 enum Shell {
@@ -46,7 +47,10 @@ pub fn execute() -> Result<(), String> {
             print!("{}", BASH_CONFIG);
             Ok(())
         }
-        Shell::Fish => Err("Fish shell integration not yet implemented".to_string()),
+        Shell::Fish => {
+            print!("{}", FISH_CONFIG);
+            Ok(())
+        }
         Shell::Unknown(name) => Err(format!("Unsupported shell: {}", name)),
     }
 }
@@ -82,11 +86,7 @@ mod tests {
     fn test_fish_shell() {
         setup_test_env("/usr/local/bin/fish");
         let result = execute();
-        assert!(result.is_err());
-        assert_eq!(
-            result.unwrap_err(),
-            "Fish shell integration not yet implemented"
-        );
+        assert!(result.is_ok());
     }
 
     #[test]
