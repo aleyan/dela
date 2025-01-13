@@ -171,7 +171,44 @@ start (package.json)
 Each rust module will have its own unit tests. Adding tests is a requirements for checking a DTKT as complete.
 
 ### Integration Tests with Docker
-This projects has non-trivial interactions between shells and rust code. This section will need to be filled out.
+The project requires testing complex interactions between shell integration and Rust code. We use Docker to provide isolated, reproducible test environments.
+
+#### Current Implementation
+1. **Test Infrastructure**
+   - Docker-based test environment using Debian Bookworm
+   - Multi-stage builds to optimize image size
+   - Shell scripts embedded in binary at compile time
+   - Makefile integration via `test_shells` target
+
+2. **Test Coverage**
+   - Environment verification
+   - Shell integration installation
+   - Command not found handler
+   - Task discovery and execution
+   - Direct task invocation
+
+3. **Test Execution**
+   - Quiet mode (default): `make test_shells`
+   - Verbose mode: `make test_shells VERBOSE=1`
+   - Proper error reporting and test progress
+
+#### Future Enhancements
+1. **Additional Test Cases**
+   - Task allowlist functionality
+   - Multiple task definitions
+   - Error cases and edge conditions
+   - Shell environment persistence
+
+2. **CI/CD Integration**
+   - GitHub Actions workflow
+   - Matrix testing across shell versions
+   - Test result reporting
+   - Coverage tracking
+
+3. **Performance Optimization**
+   - Parallel shell testing
+   - Build caching improvements
+   - Test suite organization
 
 ## Conclusion
 
