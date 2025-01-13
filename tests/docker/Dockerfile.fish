@@ -19,15 +19,16 @@ RUN cargo build --release --all-features
 FROM debian:bookworm-slim
 
 # Install minimal required packages for testing
-RUN apt-get update && apt-get install -y \
-    fish \
-    make \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && \
+    apt-get install -y \
+        fish \
+        make && \
+    rm -rf /var/lib/apt/lists/*
 
-# Create test user
+# Create test user and set up fish
 RUN useradd -m -s /usr/bin/fish testuser
 
-# Set up basic fish configuration
+# Set up fish configuration
 RUN mkdir -p /home/testuser/.config/fish
 COPY --chown=testuser:testuser tests/docker/config.fish.test /home/testuser/.config/fish/config.fish
 

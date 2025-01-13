@@ -26,6 +26,13 @@ run_shell_tests() {
     local image_name="dela-test-${shell}"
     local dockerfile="Dockerfile.${shell}"
     local test_script="test_${shell}.sh"
+    local container_script="test_script.sh"
+    
+    # PowerShell uses .ps1 extension
+    if [ "$shell" = "pwsh" ]; then
+        test_script="test_${shell}.ps1"
+        container_script="test_script.ps1"
+    fi
 
     # Build the Docker image
     log "Building ${shell} test image..."
@@ -48,13 +55,13 @@ run_shell_tests() {
     if [ "$VERBOSE" = "1" ]; then
         docker run --rm \
             --platform linux/amd64 \
-            -v "${SCRIPT_DIR}/${test_script}:/home/testuser/test_script.sh:ro" \
+            -v "${SCRIPT_DIR}/${test_script}:/home/testuser/${container_script}:ro" \
             -e VERBOSE=1 \
             "${image_name}"
     else
         docker run --rm \
             --platform linux/amd64 \
-            -v "${SCRIPT_DIR}/${test_script}:/home/testuser/test_script.sh:ro" \
+            -v "${SCRIPT_DIR}/${test_script}:/home/testuser/${container_script}:ro" \
             -e VERBOSE=0 \
             "${image_name}" >/dev/null 2>&1
     fi
@@ -63,8 +70,10 @@ run_shell_tests() {
 }
 
 # Run tests for each shell
-run_shell_tests "zsh"
-run_shell_tests "bash"
+for shell in zsh bash fish ksh pwsh; do
+    log "Testing ${shell} shell integration..."
+    run_shell_tests "${shell}"
+done
 
 # Only show success message if all tests pass
 echo "All shell integration tests passed successfully!" 
