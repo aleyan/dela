@@ -3,22 +3,36 @@ use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
 
-/// Get the appropriate shell config path based on SHELL env var
-fn get_shell_config_path() -> Result<PathBuf, String> {
+/// Get the current shell name by checking the parent process
+fn get_current_shell() -> Result<String, String> {
+    // Try to get shell from BASH_VERSION or ZSH_VERSION first
+    if env::var("BASH_VERSION").is_ok() {
+        return Ok("bash".to_string());
+    }
+    if env::var("ZSH_VERSION").is_ok() {
+        return Ok("zsh".to_string());
+    }
+
+    // Fallback to $SHELL if version variables aren't set
     let shell = env::var("SHELL")
         .map_err(|_| "SHELL environment variable not set".to_string())?;
     
     let shell_path = std::path::PathBuf::from(&shell);
-    let shell_name = shell_path
+    shell_path
         .file_name()
         .and_then(|name| name.to_str())
-        .ok_or_else(|| "Invalid shell path".to_string())?;
+        .map(|s| s.to_string())
+        .ok_or_else(|| "Invalid shell path".to_string())
+}
 
+/// Get the appropriate shell config path based on current shell
+fn get_shell_config_path() -> Result<PathBuf, String> {
+    let shell_name = get_current_shell()?;
     let home = env::var("HOME")
         .map_err(|_| "HOME environment variable not set".to_string())?;
     let home_path = PathBuf::from(&home);
 
-    match shell_name {
+    match shell_name.as_str() {
         "zsh" => Ok(home_path.join(".zshrc")),
         "bash" => Ok(home_path.join(".bashrc")),
         "fish" => Ok(home_path.join(".config").join("fish").join("config.fish")),
@@ -57,13 +71,9 @@ pub fn execute() -> Result<(), String> {
 
     // Get the shell config path first to validate shell support
     let config_path = get_shell_config_path()?;
-    let shell_name = config_path.file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or("unknown")
-        .trim_start_matches('.')
-        .to_string();
+    let shell_name = get_current_shell()?;
 
-    println!("Detected {} shell configuration at {}", shell_name, config_path.display());
+    println!("Detected {} shell, configuring {}", shell_name, config_path.display());
 
     // Create ~/.dela directory if it doesn't exist
     let home = env::var("HOME")
