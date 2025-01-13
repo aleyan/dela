@@ -12,6 +12,7 @@ RUN cargo fetch || true
 
 # Now copy source code and build
 COPY src ./src
+COPY resources ./resources
 RUN cargo build --release --all-features
 
 # --- Stage 2: Test environment ---

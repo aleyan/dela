@@ -1,6 +1,6 @@
 use std::env;
-use std::fs;
-use std::path::PathBuf;
+
+const ZSH_CONFIG: &str = include_str!("../../resources/zsh.sh");
 
 #[derive(Debug, PartialEq)]
 enum Shell {
@@ -12,7 +12,7 @@ enum Shell {
 
 impl Shell {
     fn from_path(path: &str) -> Result<Shell, String> {
-        let shell_path = PathBuf::from(path);
+        let shell_path = std::path::PathBuf::from(path);
         let shell_name = shell_path
             .file_name()
             .and_then(|name| name.to_str())
@@ -38,10 +38,7 @@ pub fn execute() -> Result<(), String> {
     // Handle each shell type
     match shell_type {
         Shell::Zsh => {
-            // Read and print the zsh.sh file
-            let zsh_config = fs::read_to_string("resources/zsh.sh")
-                .map_err(|e| format!("Failed to read zsh.sh: {}", e))?;
-            print!("{}", zsh_config);
+            print!("{}", ZSH_CONFIG);
             Ok(())
         }
         Shell::Bash => Err("Bash shell integration not yet implemented".to_string()),
@@ -53,8 +50,6 @@ pub fn execute() -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Write;
-    use tempfile::TempDir;
     use serial_test::serial;
 
     fn setup_test_env(shell: &str) {
@@ -62,35 +57,12 @@ mod tests {
         env::set_var("SHELL", shell);
     }
 
-    fn create_test_zsh_file() -> (TempDir, PathBuf) {
-        let test_dir = TempDir::new().unwrap();
-        let test_path = test_dir.path().to_path_buf();
-        let resources_dir = test_path.join("resources");
-        fs::create_dir(&resources_dir).unwrap();
-        
-        let zsh_content = "# Test zsh config\necho 'test'";
-        let mut file = fs::File::create(resources_dir.join("zsh.sh")).unwrap();
-        file.write_all(zsh_content.as_bytes()).unwrap();
-        
-        (test_dir, test_path)
-    }
-
     #[test]
     #[serial]
     fn test_zsh_shell() {
-        let (test_dir, test_path) = create_test_zsh_file();
         setup_test_env("/bin/zsh");
-        
-        // Change to the test directory before executing
-        let original_dir = env::current_dir().unwrap();
-        env::set_current_dir(&test_path).unwrap();
-        
         let result = execute();
         assert!(result.is_ok());
-
-        // Restore directory before dropping test_dir
-        env::set_current_dir(&original_dir).unwrap();
-        drop(test_dir);
     }
 
     #[test]
