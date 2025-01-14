@@ -2,6 +2,7 @@ use std::path::Path;
 use crate::types::{DiscoveredTasks, TaskFileStatus, TaskDefinitionFile, TaskRunner};
 
 use crate::parse_makefile;
+use crate::parse_package_json;
 
 /// Discovers tasks in the given directory
 pub fn discover_tasks(dir: &Path) -> DiscoveredTasks {
@@ -77,14 +78,25 @@ fn discover_npm_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<()
         return Ok(());
     }
 
-    discovered.definitions.package_json = Some(TaskDefinitionFile {
-        path: package_json,
-        runner: TaskRunner::Npm,
-        status: TaskFileStatus::NotImplemented,
-    });
-
-    // TODO(DTKT-5): Implement package.json parser
-    Ok(())
+    match parse_package_json::parse(&package_json) {
+        Ok(tasks) => {
+            discovered.definitions.package_json = Some(TaskDefinitionFile {
+                path: package_json.clone(),
+                runner: TaskRunner::Npm,
+                status: TaskFileStatus::Parsed,
+            });
+            discovered.tasks.extend(tasks);
+            Ok(())
+        }
+        Err(e) => {
+            discovered.definitions.package_json = Some(TaskDefinitionFile {
+                path: package_json,
+                runner: TaskRunner::Npm,
+                status: TaskFileStatus::ParseError(e.clone()),
+            });
+            Err(e)
+        }
+    }
 }
 
 fn discover_python_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<(), String> {
@@ -231,5 +243,58 @@ test = "pytest""#).unwrap();
             discovered.definitions.pyproject_toml.unwrap().status,
             TaskFileStatus::NotImplemented
         ));
+    }
+
+    #[test]
+    fn test_discover_npm_tasks() {
+        let temp_dir = TempDir::new().unwrap();
+        
+        // Create package.json with scripts
+        let content = r#"{
+            "name": "test-package",
+            "scripts": {
+                "test": "jest",
+                "build": "tsc"
+            }
+        }"#;
+        
+        let mut file = File::create(temp_dir.path().join("package.json")).unwrap();
+        write!(file, "{}", content).unwrap();
+        
+        let discovered = discover_tasks(temp_dir.path());
+        
+        // Check package.json status
+        let package_json_def = discovered.definitions.package_json.unwrap();
+        assert_eq!(package_json_def.status, TaskFileStatus::Parsed);
+        
+        // Verify tasks were discovered
+        assert_eq!(discovered.tasks.len(), 2);
+        
+        let test_task = discovered.tasks.iter().find(|t| t.name == "test").unwrap();
+        assert_eq!(test_task.runner, TaskRunner::Npm);
+        assert_eq!(test_task.description, Some("npm script: jest".to_string()));
+        
+        let build_task = discovered.tasks.iter().find(|t| t.name == "build").unwrap();
+        assert_eq!(build_task.runner, TaskRunner::Npm);
+        assert_eq!(build_task.description, Some("npm script: tsc".to_string()));
+    }
+
+    #[test]
+    fn test_discover_npm_tasks_invalid_json() {
+        let temp_dir = TempDir::new().unwrap();
+        
+        // Create invalid package.json
+        let content = r#"{ invalid json }"#;
+        let mut file = File::create(temp_dir.path().join("package.json")).unwrap();
+        write!(file, "{}", content).unwrap();
+        
+        let discovered = discover_tasks(temp_dir.path());
+        
+        // Check package.json status shows parse error
+        let package_json_def = discovered.definitions.package_json.unwrap();
+        assert!(matches!(package_json_def.status, TaskFileStatus::ParseError(_)));
+        
+        // Verify no tasks were discovered
+        assert!(discovered.tasks.is_empty());
     }
 } 

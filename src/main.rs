@@ -3,6 +3,7 @@ use clap::{Parser, Subcommand};
 mod types;
 mod task_discovery;
 mod parse_makefile;
+mod parse_package_json;
 mod commands;
 
 /// dela - A task runner that delegates to others

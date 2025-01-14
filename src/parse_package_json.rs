@@ -1,10 +1,10 @@
-use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 use serde_json::Value;
 use crate::types::{Task, TaskRunner};
 
-pub fn parse_package_json(path: &Path) -> Result<Vec<Task>, String> {
+/// Parse a package.json file at the given path and extract tasks
+pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
     // Read and parse the package.json file
     let content = fs::read_to_string(path)
         .map_err(|e| format!("Failed to read package.json: {}", e))?;
@@ -25,11 +25,10 @@ pub fn parse_package_json(path: &Path) -> Result<Vec<Task>, String> {
         if let Value::String(cmd) = cmd {
             tasks.push(Task {
                 name: name.clone(),
-                description: format!("npm script: {}", cmd),
-                runner: TaskRunner::Npm {
-                    script: name.clone(),
-                },
-                source_file: path.to_path_buf(),
+                file_path: path.to_path_buf(),
+                runner: TaskRunner::Npm,
+                source_name: name.clone(),
+                description: Some(format!("npm script: {}", cmd)),
             });
         }
     }
@@ -63,12 +62,19 @@ mod tests {
             .write_all(content.as_bytes())
             .unwrap();
 
-        let tasks = parse_package_json(&package_json).unwrap();
+        let tasks = parse(&package_json).unwrap();
         
         assert_eq!(tasks.len(), 3);
-        assert!(tasks.iter().any(|t| t.name == "test"));
-        assert!(tasks.iter().any(|t| t.name == "build"));
-        assert!(tasks.iter().any(|t| t.name == "start"));
+        
+        let test_task = tasks.iter().find(|t| t.name == "test").unwrap();
+        assert_eq!(test_task.runner, TaskRunner::Npm);
+        assert_eq!(test_task.source_name, "test");
+        assert_eq!(test_task.description, Some("npm script: jest".to_string()));
+        
+        let build_task = tasks.iter().find(|t| t.name == "build").unwrap();
+        assert_eq!(build_task.runner, TaskRunner::Npm);
+        assert_eq!(build_task.source_name, "build");
+        assert_eq!(build_task.description, Some("npm script: tsc".to_string()));
     }
 
     #[test]
@@ -85,7 +91,7 @@ mod tests {
             .write_all(content.as_bytes())
             .unwrap();
 
-        let tasks = parse_package_json(&package_json).unwrap();
+        let tasks = parse(&package_json).unwrap();
         assert!(tasks.is_empty());
     }
 
@@ -104,7 +110,7 @@ mod tests {
             .write_all(content.as_bytes())
             .unwrap();
 
-        let result = parse_package_json(&package_json);
+        let result = parse(&package_json);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("'scripts' must be an object"));
     }
