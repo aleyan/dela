@@ -21,7 +21,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
 - [ ] **Task Definition Parsers**
   - [x] [DTKT-3] Create `task_discovery.rs`.
   - [x] [DTKT-4] Implement Makefile parser (using `makefile-lossless` or similar).
-  - [ ] [DTKT-5] Implement parser for `package.json` scripts (`package-json` or `package_json_schema`).
+  - [x] [DTKT-5] Implement parser for `package.json` scripts (`package-json` or `package_json_schema`).
   - [ ] [DTKT-6] Implement parser for `pyproject.toml` scripts (`pyproject-toml`).
 
 - [ ] **Structs and Runners**
@@ -76,6 +76,8 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [ ] [DTKT-22] Ensure environment variables and working directory are properly propagated.
   - [ ] [DTKT-85] Design task name collision resolution strategy
   - [ ] [DTKT-86] Implement task name collision resolution
+  - [ ] [DTKT-87] Implement tark runner installation detection
+  - [ ] [DTKT-88] Implement task runner disambiguation (npm vs yarn)
 
 - [ ] **`run` Command and Bare-Command Invocation**
   - [ ] [DTKT-23] Complete `dela run <task>` for direct execution.
