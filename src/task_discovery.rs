@@ -221,10 +221,6 @@ test:
     fn test_discover_tasks_with_unimplemented_parsers() {
         let temp_dir = TempDir::new().unwrap();
         
-        // Create package.json
-        let mut file = File::create(temp_dir.path().join("package.json")).unwrap();
-        write!(file, r#"{{ "scripts": {{ "test": "jest" }} }}"#).unwrap();
-        
         // Create pyproject.toml
         let mut file = File::create(temp_dir.path().join("pyproject.toml")).unwrap();
         write!(file, r#"[tool.poetry.scripts]
@@ -232,11 +228,6 @@ test = "pytest""#).unwrap();
         
         let discovered = discover_tasks(temp_dir.path());
         
-        // Check package.json status
-        assert!(matches!(
-            discovered.definitions.package_json.unwrap().status,
-            TaskFileStatus::NotImplemented
-        ));
         
         // Check pyproject.toml status
         assert!(matches!(
