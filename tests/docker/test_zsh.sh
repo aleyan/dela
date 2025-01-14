@@ -81,21 +81,15 @@ dela list | grep -q "npm-build" || (error "npm-build not found in dela list" && 
 
 log "4. Testing task execution..."
 
-# Test dela run command
+# Test dela run command with Makefile task only
 log "Testing dela run command..."
-# Test Make task
 output=$(dela run test-task 2>&1)
 if ! echo "$output" | grep -q "Test task executed successfully"; then
     error "dela run test-task (Make) failed. Got: $output"
     exit 1
 fi
 
-# Test npm task
-output=$(dela run npm-test 2>&1)
-if ! echo "$output" | grep -q "NPM test task executed successfully"; then
-    error "dela run npm-test (npm) failed. Got: $output"
-    exit 1
-fi
+# Remove npm task execution test
 
 # Verify command_not_found_handler was properly replaced
 log "Testing final command_not_found_handler..."

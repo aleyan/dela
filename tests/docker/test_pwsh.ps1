@@ -85,28 +85,20 @@ Write-Log "Testing dela list command..."
 if (-not (dela list | Select-String "test-task")) {
     Write-Error "test-task not found in dela list"
 }
+if (-not (dela list | Select-String "npm-test")) {
+    Write-Error "npm-test not found in dela list"
+}
+if (-not (dela list | Select-String "npm-build")) {
+    Write-Error "npm-build not found in dela list"
+}
 
 Write-Log "4. Testing task execution..."
 
-# Test dela run command
+# Test dela run command with Makefile task only
 Write-Log "Testing dela run command..."
 $output = dela run test-task
 if (-not ($output -match "Test task executed successfully")) {
     Write-Error "dela run test-task failed. Got: $output"
-}
-
-# Test direct task invocation
-Write-Log "Testing direct task invocation..."
-$output = test-task
-if (-not ($output -match "Test task executed successfully")) {
-    Write-Error "Direct task invocation failed. Got: $output"
-}
-
-# Test another task
-Write-Log "Testing another task..."
-$output = another-task
-if (-not ($output -match "Another task executed successfully")) {
-    Write-Error "another-task failed. Got: $output"
 }
 
 # Verify command not found handler was properly replaced

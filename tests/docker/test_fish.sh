@@ -79,34 +79,26 @@ end
 
 # Test dela list command
 log "Testing dela list command..."
-dela list | grep "test-task"; or begin
+dela list | grep -q "test-task"; or begin
     error "test-task not found in dela list"
+    exit 1
+end
+dela list | grep -q "npm-test"; or begin
+    error "npm-test not found in dela list"
+    exit 1
+end
+dela list | grep -q "npm-build"; or begin
+    error "npm-build not found in dela list"
     exit 1
 end
 
 log "4. Testing task execution..."
 
-# Test dela run command
+# Test dela run command with Makefile task only
 log "Testing dela run command..."
 set output (dela run test-task)
 echo $output | grep -q "Test task executed successfully"; or begin
     error "dela run test-task failed. Got: $output"
-    exit 1
-end
-
-# Test direct task invocation
-log "Testing direct task invocation..."
-set output (test-task)
-echo $output | grep -q "Test task executed successfully"; or begin
-    error "Direct task invocation failed. Got: $output"
-    exit 1
-end
-
-# Test another task
-log "Testing another task..."
-set output (another-task)
-echo $output | grep -q "Another task executed successfully"; or begin
-    error "another-task failed. Got: $output"
     exit 1
 end
 

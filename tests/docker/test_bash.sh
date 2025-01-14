@@ -75,11 +75,13 @@ fi
 
 # Test dela list command
 log "Testing dela list command..."
-dela list | grep "test-task" || (error "test-task not found in dela list" && exit 1)
+dela list | grep -q "test-task" || (error "test-task not found in dela list" && exit 1)
+dela list | grep -q "npm-test" || (error "npm-test not found in dela list" && exit 1)
+dela list | grep -q "npm-build" || (error "npm-build not found in dela list" && exit 1)
 
 log "4. Testing task execution..."
 
-# Test dela run command
+# Test dela run command with Makefile task only
 log "Testing dela run command..."
 output=$(dela run test-task)
 echo "$output" | grep -q "Test task executed successfully" || {
