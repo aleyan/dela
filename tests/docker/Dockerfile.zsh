@@ -34,6 +34,9 @@ COPY --chown=testuser:testuser tests/docker/zshrc.test /home/testuser/.zshrc
 # Copy test Makefile
 COPY --chown=testuser:testuser tests/docker/Makefile.test /home/testuser/Makefile
 
+# Copy test package.json
+COPY --chown=testuser:testuser tests/docker/package.json.test /home/testuser/package.json
+
 USER testuser
 WORKDIR /home/testuser
 

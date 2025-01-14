@@ -74,6 +74,8 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [ ] [DTKT-20] Implement shell environment inheritance for task execution.
   - [ ] [DTKT-21] Support both direct execution and subshell spawning based on task type.
   - [ ] [DTKT-22] Ensure environment variables and working directory are properly propagated.
+  - [ ] [DTKT-85] Design task name collision resolution strategy
+  - [ ] [DTKT-86] Implement task name collision resolution
 
 - [ ] **`run` Command and Bare-Command Invocation**
   - [ ] [DTKT-23] Complete `dela run <task>` for direct execution.

@@ -1,0 +1,8 @@
+{
+  "name": "dela-test",
+  "version": "1.0.0",
+  "scripts": {
+    "npm-test": "echo \"NPM test task executed successfully\"",
+    "npm-build": "echo \"NPM build task executed successfully\""
+  }
+} 
