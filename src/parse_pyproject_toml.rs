@@ -21,14 +21,18 @@ pub fn parse(path: &Path) -> Result<(Vec<Task>, TaskRunner), String> {
     let toml: Value = content.parse()
         .map_err(|e| format!("Failed to parse pyproject.toml: {}", e))?;
 
-    // Try to find poetry scripts first
+    let mut all_tasks = Vec::new();
+    let mut selected_runner = TaskRunner::PythonUv; // Default to UV
+
+    // Try to find poetry scripts
     if let Some(poetry_scripts) = toml.get("tool")
         .and_then(|t| t.get("poetry"))
         .and_then(|p| p.get("scripts"))
         .and_then(|s| s.as_table()) {
         let tasks = extract_tasks(poetry_scripts, path, TaskRunner::PythonPoetry)?;
         if !tasks.is_empty() {
-            return Ok((tasks, TaskRunner::PythonPoetry));
+            all_tasks.extend(tasks);
+            selected_runner = TaskRunner::PythonPoetry;
         }
     }
 
@@ -38,11 +42,12 @@ pub fn parse(path: &Path) -> Result<(Vec<Task>, TaskRunner), String> {
         .and_then(|s| s.as_table()) {
         let tasks = extract_tasks(project_scripts, path, TaskRunner::PythonUv)?;
         if !tasks.is_empty() {
-            return Ok((tasks, TaskRunner::PythonUv));
+            all_tasks.extend(tasks);
+            // Keep Poetry as selected runner if it was found, otherwise use UV
         }
     }
 
-    Ok((vec![], TaskRunner::PythonUv)) // Default to UV if no tasks found
+    Ok((all_tasks, selected_runner))
 }
 
 fn extract_tasks(scripts: &toml::map::Map<String, Value>, path: &Path, runner: TaskRunner) -> Result<Vec<Task>, String> {
@@ -132,5 +137,58 @@ test = "pytest"
         let serve_task = tasks.iter().find(|t| t.name == "serve").unwrap();
         assert_eq!(serve_task.runner, TaskRunner::PythonUv);
         assert_eq!(serve_task.description, Some("python script: uvicorn main:app --reload".to_string()));
+    }
+
+    #[test]
+    fn test_parse_both_uv_and_poetry_scripts() {
+        let temp_dir = TempDir::new().unwrap();
+        let pyproject_path = temp_dir.path().join("pyproject.toml");
+        
+        let content = r#"
+[project]
+name = "test-project"
+
+[project.scripts]
+uv-serve = "uvicorn main:app --reload"
+uv-test = "pytest"
+
+[tool.poetry]
+name = "test-project"
+
+[tool.poetry.scripts]
+poetry-serve = "python -m http.server"
+poetry-test = "pytest"
+"#;
+        
+        File::create(&pyproject_path)
+            .unwrap()
+            .write_all(content.as_bytes())
+            .unwrap();
+
+        let (tasks, runner) = parse(&pyproject_path).unwrap();
+        
+        // We should get all 4 tasks
+        assert_eq!(tasks.len(), 4);
+        
+        // Check UV tasks
+        let uv_serve = tasks.iter().find(|t| t.name == "uv-serve").unwrap();
+        assert_eq!(uv_serve.runner, TaskRunner::PythonUv);
+        assert_eq!(uv_serve.description, Some("python script: uvicorn main:app --reload".to_string()));
+
+        let uv_test = tasks.iter().find(|t| t.name == "uv-test").unwrap();
+        assert_eq!(uv_test.runner, TaskRunner::PythonUv);
+        assert_eq!(uv_test.description, Some("python script: pytest".to_string()));
+
+        // Check Poetry tasks
+        let poetry_serve = tasks.iter().find(|t| t.name == "poetry-serve").unwrap();
+        assert_eq!(poetry_serve.runner, TaskRunner::PythonPoetry);
+        assert_eq!(poetry_serve.description, Some("python script: python -m http.server".to_string()));
+
+        let poetry_test = tasks.iter().find(|t| t.name == "poetry-test").unwrap();
+        assert_eq!(poetry_test.runner, TaskRunner::PythonPoetry);
+        assert_eq!(poetry_test.description, Some("python script: pytest".to_string()));
+
+        // Runner should be Poetry since it was found last
+        assert_eq!(runner, TaskRunner::PythonPoetry);
     }
 } 
