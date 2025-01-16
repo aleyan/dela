@@ -4,6 +4,7 @@ mod types;
 mod task_discovery;
 mod parse_makefile;
 mod parse_package_json;
+mod parse_pyproject_toml;
 mod commands;
 
 /// dela - A task runner that delegates to others

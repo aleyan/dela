@@ -61,8 +61,10 @@ pub enum TaskRunner {
     Make,
     /// npm scripts from package.json
     Npm,
-    /// Python scripts from pyproject.toml
-    Python,
+    /// Python scripts from pyproject.toml using uv
+    PythonUv,
+    /// Python scripts from pyproject.toml using poetry
+    PythonPoetry,
     /// Direct shell script execution
     ShellScript,
     // TODO(DTKT-52): Add plugin support for custom runners
@@ -74,7 +76,8 @@ impl TaskRunner {
         match self {
             TaskRunner::Make => format!("make {}", task.source_name),
             TaskRunner::Npm => format!("npm run {}", task.source_name),
-            TaskRunner::Python => format!("python -m {}", task.source_name),
+            TaskRunner::PythonUv => format!("uv run {}", task.source_name),
+            TaskRunner::PythonPoetry => format!("poetry run {}", task.source_name),
             TaskRunner::ShellScript => format!("./{}", task.source_name),
         }
     }

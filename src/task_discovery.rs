@@ -3,6 +3,7 @@ use crate::types::{DiscoveredTasks, TaskFileStatus, TaskDefinitionFile, TaskRunn
 
 use crate::parse_makefile;
 use crate::parse_package_json;
+use crate::parse_pyproject_toml;
 
 /// Discovers tasks in the given directory
 pub fn discover_tasks(dir: &Path) -> DiscoveredTasks {
@@ -105,20 +106,31 @@ fn discover_python_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result
     if !pyproject_toml.exists() {
         discovered.definitions.pyproject_toml = Some(TaskDefinitionFile {
             path: pyproject_toml,
-            runner: TaskRunner::Python,
+            runner: TaskRunner::PythonUv,
             status: TaskFileStatus::NotFound,
         });
         return Ok(());
     }
 
-    discovered.definitions.pyproject_toml = Some(TaskDefinitionFile {
-        path: pyproject_toml,
-        runner: TaskRunner::Python,
-        status: TaskFileStatus::NotImplemented,
-    });
-
-    // TODO(DTKT-6): Implement pyproject.toml parser
-    Ok(())
+    match parse_pyproject_toml::parse(&pyproject_toml) {
+        Ok((tasks, runner)) => {
+            discovered.definitions.pyproject_toml = Some(TaskDefinitionFile {
+                path: pyproject_toml.clone(),
+                runner: runner.clone(),
+                status: TaskFileStatus::Parsed,
+            });
+            discovered.tasks.extend(tasks);
+            Ok(())
+        }
+        Err(e) => {
+            discovered.definitions.pyproject_toml = Some(TaskDefinitionFile {
+                path: pyproject_toml,
+                runner: TaskRunner::PythonUv,
+                status: TaskFileStatus::ParseError(e.clone()),
+            });
+            Err(e)
+        }
+    }
 }
 
 // TODO(DTKT-52): Add trait for plugin-based task discovery 
@@ -221,18 +233,16 @@ test:
     fn test_discover_tasks_with_unimplemented_parsers() {
         let temp_dir = TempDir::new().unwrap();
         
-        // Create pyproject.toml
+        // Create an invalid pyproject.toml to trigger a parse error
         let mut file = File::create(temp_dir.path().join("pyproject.toml")).unwrap();
-        write!(file, r#"[tool.poetry.scripts]
-test = "pytest""#).unwrap();
+        write!(file, "invalid toml content").unwrap();
         
         let discovered = discover_tasks(temp_dir.path());
         
-        
-        // Check pyproject.toml status
+        // Check pyproject.toml status - should be ParseError now that we've implemented it
         assert!(matches!(
             discovered.definitions.pyproject_toml.unwrap().status,
-            TaskFileStatus::NotImplemented
+            TaskFileStatus::ParseError(_)
         ));
     }
 
@@ -287,5 +297,36 @@ test = "pytest""#).unwrap();
         
         // Verify no tasks were discovered
         assert!(discovered.tasks.is_empty());
+    }
+
+    #[test]
+    fn test_discover_python_tasks() {
+        let temp_dir = TempDir::new().unwrap();
+        
+        // Create pyproject.toml with UV scripts
+        let content = r#"
+[project]
+name = "test-project"
+
+[project.scripts]
+serve = "uvicorn main:app --reload"
+"#;
+        
+        let pyproject_path = temp_dir.path().join("pyproject.toml");
+        let mut file = File::create(&pyproject_path).unwrap();
+        write!(file, "{}", content).unwrap();
+        
+        let discovered = discover_tasks(temp_dir.path());
+        
+        // Check pyproject.toml status
+        let pyproject_def = discovered.definitions.pyproject_toml.unwrap();
+        assert_eq!(pyproject_def.status, TaskFileStatus::Parsed);
+        
+        // Verify tasks were discovered
+        assert_eq!(discovered.tasks.len(), 1);
+        
+        let serve_task = discovered.tasks.iter().find(|t| t.name == "serve").unwrap();
+        assert_eq!(serve_task.runner, TaskRunner::PythonUv);
+        assert_eq!(serve_task.description, Some("python script: uvicorn main:app --reload".to_string()));
     }
 } 
