@@ -1,0 +1,15 @@
+[project]
+name = "dela-test"
+version = "1.0.0"
+
+[project.scripts]
+uv-test = "echo \"UV test task executed successfully\""
+uv-build = "echo \"UV build task executed successfully\""
+
+[tool.poetry]
+name = "dela-test"
+version = "1.0.0"
+
+[tool.poetry.scripts]
+poetry-test = "echo \"Poetry test task executed successfully\""
+poetry-build = "echo \"Poetry build task executed successfully\"" 

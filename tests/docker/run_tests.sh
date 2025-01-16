@@ -38,13 +38,13 @@ run_shell_tests() {
     log "Building ${shell} test image..."
     if [ "$VERBOSE" = "1" ]; then
         docker build \
-            --platform linux/amd64 \
+            --platform linux/arm64 \
             -t "${image_name}" \
             -f "${SCRIPT_DIR}/${dockerfile}" \
             "${PROJECT_ROOT}"
     else
         docker build \
-            --platform linux/amd64 \
+            --platform linux/arm64 \
             -t "${image_name}" \
             -f "${SCRIPT_DIR}/${dockerfile}" \
             "${PROJECT_ROOT}" >/dev/null 2>&1
@@ -54,13 +54,13 @@ run_shell_tests() {
     log "Running ${shell} tests..."
     if [ "$VERBOSE" = "1" ]; then
         docker run --rm \
-            --platform linux/amd64 \
+            --platform linux/arm64 \
             -v "${SCRIPT_DIR}/${test_script}:/home/testuser/${container_script}:ro" \
             -e VERBOSE=1 \
             "${image_name}"
     else
         docker run --rm \
-            --platform linux/amd64 \
+            --platform linux/arm64 \
             -v "${SCRIPT_DIR}/${test_script}:/home/testuser/${container_script}:ro" \
             -e VERBOSE=0 \
             "${image_name}" >/dev/null 2>&1

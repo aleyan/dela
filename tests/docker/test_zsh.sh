@@ -78,6 +78,10 @@ log "Testing dela list command..."
 dela list | grep -q "test-task" || (error "test-task not found in dela list" && exit 1)
 dela list | grep -q "npm-test" || (error "npm-test not found in dela list" && exit 1)
 dela list | grep -q "npm-build" || (error "npm-build not found in dela list" && exit 1)
+dela list | grep -q "uv-test" || (error "uv-test not found in dela list" && exit 1)
+dela list | grep -q "uv-build" || (error "uv-build not found in dela list" && exit 1)
+dela list | grep -q "poetry-test" || (error "poetry-test not found in dela list" && exit 1)
+dela list | grep -q "poetry-build" || (error "poetry-build not found in dela list" && exit 1)
 
 log "4. Testing task execution..."
 
@@ -89,7 +93,33 @@ if ! echo "$output" | grep -q "Test task executed successfully"; then
     exit 1
 fi
 
-# Remove npm task execution test
+# Test UV tasks
+log "Testing UV tasks..."
+output=$(dela run uv-test 2>&1)
+if ! echo "$output" | grep -q "UV test task executed successfully"; then
+    error "dela run uv-test failed. Got: $output"
+    exit 1
+fi
+
+output=$(dela run uv-build 2>&1)
+if ! echo "$output" | grep -q "UV build task executed successfully"; then
+    error "dela run uv-build failed. Got: $output"
+    exit 1
+fi
+
+# Test Poetry tasks
+log "Testing Poetry tasks..."
+output=$(dela run poetry-test 2>&1)
+if ! echo "$output" | grep -q "Poetry test task executed successfully"; then
+    error "dela run poetry-test failed. Got: $output"
+    exit 1
+fi
+
+output=$(dela run poetry-build 2>&1)
+if ! echo "$output" | grep -q "Poetry build task executed successfully"; then
+    error "dela run poetry-build failed. Got: $output"
+    exit 1
+fi
 
 # Verify command_not_found_handler was properly replaced
 log "Testing final command_not_found_handler..."

@@ -18,10 +18,19 @@ RUN cargo build --release --all-features
 # --- Stage 2: Test environment ---
 FROM debian:bookworm-slim
 
+# Manually create the sources.list file with a known good mirror
+RUN echo "deb http://ftp.us.debian.org/debian bookworm main contrib non-free" > /etc/apt/sources.list && \
+    echo "deb http://ftp.us.debian.org/debian bookworm-updates main contrib non-free" >> /etc/apt/sources.list && \
+    echo "deb http://security.debian.org/debian-security bookworm-security main contrib non-free" >> /etc/apt/sources.list
+
 # Install minimal required packages for testing
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y  \
     zsh \
     make \
+    python3 \
+    python3-pip \
+    python3-poetry \
+    && pipx install uv \
     && rm -rf /var/lib/apt/lists/*
 
 # Create test user
@@ -31,10 +40,10 @@ RUN useradd -m -s /bin/zsh testuser
 RUN echo "ZDOTDIR=\$HOME" > /etc/zsh/zshenv
 COPY --chown=testuser:testuser tests/docker/zshrc.test /home/testuser/.zshrc
 
-# Copy test Makefile
+# Copy test files
 COPY --chown=testuser:testuser tests/docker/Makefile.test /home/testuser/Makefile
 COPY --chown=testuser:testuser tests/docker/package.json.test /home/testuser/package.json
-
+COPY --chown=testuser:testuser tests/docker/pyproject.toml.test /home/testuser/pyproject.toml
 
 USER testuser
 WORKDIR /home/testuser
@@ -45,6 +54,7 @@ COPY --from=builder --chown=testuser:testuser /app/target/release/dela /usr/loca
 # Set up test environment
 ENV HOME=/home/testuser
 ENV SHELL=/bin/zsh
+ENV PATH="/home/testuser/.local/bin:${PATH}"
 
 # Entry point script will be mounted
 CMD ["zsh", "/home/testuser/test_script.sh"] 
