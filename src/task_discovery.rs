@@ -1,5 +1,5 @@
 use std::path::Path;
-use crate::types::{DiscoveredTasks, TaskFileStatus, TaskDefinitionFile, TaskRunner};
+use crate::types::{DiscoveredTasks, TaskFileStatus, TaskRunner};
 
 use crate::parse_makefile;
 use crate::parse_package_json;
@@ -71,30 +71,33 @@ fn discover_npm_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<()
     let package_json = dir.join("package.json");
     
     if !package_json.exists() {
-        discovered.definitions.package_json = Some(TaskDefinitionFile {
-            path: package_json,
-            runner: TaskRunner::Npm,
-            status: TaskFileStatus::NotFound,
-        });
+        discovered.definitions.package_json = Some(
+            parse_package_json::create_definition(
+                &package_json,
+                TaskFileStatus::NotFound
+            )
+        );
         return Ok(());
     }
 
     match parse_package_json::parse(&package_json) {
         Ok(tasks) => {
-            discovered.definitions.package_json = Some(TaskDefinitionFile {
-                path: package_json.clone(),
-                runner: TaskRunner::Npm,
-                status: TaskFileStatus::Parsed,
-            });
+            discovered.definitions.package_json = Some(
+                parse_package_json::create_definition(
+                    &package_json,
+                    TaskFileStatus::Parsed
+                )
+            );
             discovered.tasks.extend(tasks);
             Ok(())
         }
         Err(e) => {
-            discovered.definitions.package_json = Some(TaskDefinitionFile {
-                path: package_json,
-                runner: TaskRunner::Npm,
-                status: TaskFileStatus::ParseError(e.clone()),
-            });
+            discovered.definitions.package_json = Some(
+                parse_package_json::create_definition(
+                    &package_json,
+                    TaskFileStatus::ParseError(e.clone())
+                )
+            );
             Err(e)
         }
     }

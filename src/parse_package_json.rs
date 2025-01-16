@@ -1,7 +1,12 @@
 use std::fs;
 use std::path::Path;
 use serde_json::Value;
-use crate::types::{Task, TaskRunner};
+use crate::types::{
+    Task, 
+    TaskRunner,
+    TaskDefinitionFile,
+    TaskFileStatus,
+};
 
 /// Parse a package.json file at the given path and extract tasks
 pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
@@ -34,6 +39,15 @@ pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
     }
 
     Ok(tasks)
+}
+
+/// Create a TaskDefinitionFile for a package.json
+pub fn create_definition(path: &Path, status: TaskFileStatus) -> TaskDefinitionFile {
+    TaskDefinitionFile {
+        path: path.to_path_buf(),
+        runner: TaskRunner::Npm,
+        status,
+    }
 }
 
 #[cfg(test)]
