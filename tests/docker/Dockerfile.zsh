@@ -1,12 +1,20 @@
 # --- Stage 1: Builder ---
-FROM rust:slim-bookworm AS builder
+FROM rust:alpine3.21 AS builder
+
+# Install build dependencies
+RUN apk add --no-cache \
+    musl-dev \
+    gcc \
+    make \
+    openssl-dev \
+    pkgconfig
 
 # Set the working directory inside the container
 WORKDIR /app
-
+    
 # Copy Cargo definition files first (better Docker caching)
 COPY Cargo.toml Cargo.lock ./
-
+    
 # Pre-fetch dependencies (creates a build cache layer)
 RUN cargo fetch || true
 
@@ -14,47 +22,41 @@ RUN cargo fetch || true
 COPY src ./src
 COPY resources ./resources
 RUN cargo build --release --all-features
-
-# --- Stage 2: Test environment ---
-FROM debian:bookworm-slim
-
-# Manually create the sources.list file with a known good mirror
-RUN echo "deb http://ftp.us.debian.org/debian bookworm main contrib non-free" > /etc/apt/sources.list && \
-    echo "deb http://ftp.us.debian.org/debian bookworm-updates main contrib non-free" >> /etc/apt/sources.list && \
-    echo "deb http://security.debian.org/debian-security bookworm-security main contrib non-free" >> /etc/apt/sources.list
-
-# Install minimal required packages for testing
-RUN apt-get update && apt-get install -y  \
+    
+    # --- Stage 2: Test environment ---
+FROM alpine:3.21
+    
+# Install required packages
+RUN apk add --no-cache \
     zsh \
     make \
     python3 \
-    python3-pip \
-    python3-poetry \
-    && pipx install uv \
-    && rm -rf /var/lib/apt/lists/*
+    uv \
+    poetry
 
 # Create test user
-RUN useradd -m -s /bin/zsh testuser
+RUN adduser -D -s /bin/zsh testuser
 
 # Set up basic zsh configuration
-RUN echo "ZDOTDIR=\$HOME" > /etc/zsh/zshenv
-COPY --chown=testuser:testuser tests/docker/zshrc.test /home/testuser/.zshrc
+COPY tests/docker/zshrc.test /home/testuser/.zshrc
+RUN chown testuser:testuser /home/testuser/.zshrc
 
 # Copy test files
-COPY --chown=testuser:testuser tests/docker/Makefile.test /home/testuser/Makefile
-COPY --chown=testuser:testuser tests/docker/package.json.test /home/testuser/package.json
-COPY --chown=testuser:testuser tests/docker/pyproject.toml.test /home/testuser/pyproject.toml
+COPY tests/docker/Makefile.test /home/testuser/Makefile
+COPY tests/docker/package.json.test /home/testuser/package.json
+COPY tests/docker/pyproject.toml.test /home/testuser/pyproject.toml
+RUN chown -R testuser:testuser /home/testuser
+
+# Copy the compiled binary from the builder stage
+COPY --from=builder /app/target/release/dela /usr/local/bin/dela
 
 USER testuser
 WORKDIR /home/testuser
 
-# Copy the compiled binary from the builder stage
-COPY --from=builder --chown=testuser:testuser /app/target/release/dela /usr/local/bin/dela
-
-# Set up test environment
+# Set up environment variables
 ENV HOME=/home/testuser
 ENV SHELL=/bin/zsh
 ENV PATH="/home/testuser/.local/bin:${PATH}"
 
 # Entry point script will be mounted
-CMD ["zsh", "/home/testuser/test_script.sh"] 
+CMD ["zsh", "/home/testuser/test_script.sh"]
