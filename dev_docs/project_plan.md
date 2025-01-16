@@ -22,7 +22,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [x] [DTKT-3] Create `task_discovery.rs`.
   - [x] [DTKT-4] Implement Makefile parser (using `makefile-lossless` or similar).
   - [x] [DTKT-5] Implement parser for `package.json` scripts (`package-json` or `package_json_schema`).
-  - [ ] [DTKT-6] Implement parser for `pyproject.toml` scripts (`pyproject-toml`).
+  - [x] [DTKT-6] Implement parser for `pyproject.toml` scripts (`pyproject-toml`).
 
 - [ ] **Structs and Runners**
   - [x] [DTKT-7] Define `Task` and `TaskRunner` enums in `types.rs`.
@@ -44,7 +44,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [x] [DTKT-11] Modify `.zshrc` to invoke `dela` manually.
   - [x] [DTKT-12] Append/update `command_not_found_handle` manually.
   - [x] [DTKT-13] Implement `dela configure-shell` command to return the command_not_found_handle.
-  - [ ] [DTKT-14] Implement `dela init` command to automate creation of `~/.dela` and `~/.dela/allowlist.toml`.
+  - [x] [DTKT-14] Implement `dela init` command to automate creation of `~/.dela` and `~/.dela/allowlist.toml`.
   - [x] [DTKT-15] Modify `dela init` command add eval of `dela configure_shell`.
 
 - [ ] **Shell Execution Strategy**
