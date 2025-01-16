@@ -104,30 +104,36 @@ fn discover_python_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result
     let pyproject_toml = dir.join("pyproject.toml");
     
     if !pyproject_toml.exists() {
-        discovered.definitions.pyproject_toml = Some(TaskDefinitionFile {
-            path: pyproject_toml,
-            runner: TaskRunner::PythonUv,
-            status: TaskFileStatus::NotFound,
-        });
+        discovered.definitions.pyproject_toml = Some(
+            parse_pyproject_toml::create_definition(
+                &pyproject_toml,
+                TaskFileStatus::NotFound,
+                TaskRunner::PythonUv
+            )
+        );
         return Ok(());
     }
 
     match parse_pyproject_toml::parse(&pyproject_toml) {
         Ok((tasks, runner)) => {
-            discovered.definitions.pyproject_toml = Some(TaskDefinitionFile {
-                path: pyproject_toml.clone(),
-                runner: runner.clone(),
-                status: TaskFileStatus::Parsed,
-            });
+            discovered.definitions.pyproject_toml = Some(
+                parse_pyproject_toml::create_definition(
+                    &pyproject_toml,
+                    TaskFileStatus::Parsed,
+                    runner.clone()
+                )
+            );
             discovered.tasks.extend(tasks);
             Ok(())
         }
         Err(e) => {
-            discovered.definitions.pyproject_toml = Some(TaskDefinitionFile {
-                path: pyproject_toml,
-                runner: TaskRunner::PythonUv,
-                status: TaskFileStatus::ParseError(e.clone()),
-            });
+            discovered.definitions.pyproject_toml = Some(
+                parse_pyproject_toml::create_definition(
+                    &pyproject_toml,
+                    TaskFileStatus::ParseError(e.clone()),
+                    TaskRunner::PythonUv
+                )
+            );
             Err(e)
         }
     }
