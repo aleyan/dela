@@ -46,8 +46,16 @@ fn add_shell_integration(config_path: &PathBuf) -> Result<(), String> {
     let content = fs::read_to_string(config_path)
         .map_err(|e| format!("Failed to read shell config: {}", e))?;
 
-    // Check if dela integration is already present
-    if content.contains("eval \"$(dela configure-shell)\"") {
+    // Get the shell type from the path
+    let shell = get_current_shell()?;
+
+    // Check if dela integration is already present, with shell-specific patterns
+    let integration_pattern = match shell.as_str() {
+        "fish" => "eval (dela configure-shell | string collect)",
+        _ => "eval \"$(dela configure-shell)\"",
+    };
+
+    if content.contains(integration_pattern) {
         println!("Shell integration already present in {}", config_path.display());
         return Ok(());
     }
@@ -58,10 +66,10 @@ fn add_shell_integration(config_path: &PathBuf) -> Result<(), String> {
         .open(config_path)
         .map_err(|e| format!("Failed to open shell config: {}", e))?;
 
-    // Add dela integration
+    // Add dela integration with shell-specific syntax
     writeln!(file).map_err(|e| format!("Failed to write to shell config: {}", e))?;
     writeln!(file, "# dela shell integration").map_err(|e| format!("Failed to write to shell config: {}", e))?;
-    writeln!(file, "eval \"$(dela configure-shell)\"").map_err(|e| format!("Failed to write to shell config: {}", e))?;
+    writeln!(file, "{}", integration_pattern).map_err(|e| format!("Failed to write to shell config: {}", e))?;
 
     Ok(())
 }
@@ -179,5 +187,26 @@ mod tests {
         let result = execute();
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "Unsupported shell: unsupported");
+    }
+
+    #[test]
+    #[serial]
+    fn test_init_fish() {
+        let temp_dir = TempDir::new().unwrap();
+        let home = temp_dir.path().to_path_buf();
+        setup_test_env("/usr/bin/fish", &home).unwrap();
+
+        // Create fish config directory and minimal config.fish
+        let fish_config_dir = home.join(".config").join("fish");
+        fs::create_dir_all(&fish_config_dir).unwrap();
+        let config_fish = fish_config_dir.join("config.fish");
+        fs::write(&config_fish, "# existing fish config\n").unwrap();
+
+        let result = execute();
+        assert!(result.is_ok());
+
+        // Verify the content has the fish-specific integration pattern
+        let content = fs::read_to_string(&config_fish).unwrap();
+        assert!(content.contains("eval (dela configure-shell | string collect)"));
     }
 } 

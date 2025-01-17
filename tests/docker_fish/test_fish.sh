@@ -59,7 +59,7 @@ test -d ~/.dela; or begin
 end
 
 # Verify shell integration was added
-grep -q "eval (dela configure-shell)" ~/.config/fish/config.fish; or begin
+grep -q "eval (dela configure-shell | string collect)" ~/.config/fish/config.fish; or begin
     error "Shell integration not found in config.fish"
     exit 1
 end
