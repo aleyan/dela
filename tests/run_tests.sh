@@ -73,7 +73,7 @@ run_shell_tests() {
 
 
 # Run tests for each shell. fish and pwsh are commented out.
-for shell in zsh bash; do
+for shell in zsh bash fish; do
     log "Testing ${shell} shell integration..."
     run_shell_tests "${shell}"
 done

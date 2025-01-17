@@ -1,12 +1,20 @@
 # --- Stage 1: Builder ---
-FROM rust:slim-bookworm AS builder
+FROM rust:alpine3.21 AS builder
+
+# Install build dependencies
+RUN apk add --no-cache \
+    musl-dev \
+    gcc \
+    make \
+    openssl-dev \
+    pkgconfig
 
 # Set the working directory inside the container
 WORKDIR /app
-
+    
 # Copy Cargo definition files first (better Docker caching)
 COPY Cargo.toml Cargo.lock ./
-
+    
 # Pre-fetch dependencies (creates a build cache layer)
 RUN cargo fetch || true
 
@@ -14,37 +22,39 @@ RUN cargo fetch || true
 COPY src ./src
 COPY resources ./resources
 RUN cargo build --release --all-features
+    
+    # --- Stage 2: Test environment ---
+FROM alpine:3.21
+    
+# Install required packages
+RUN apk add --no-cache \
+    fish \
+    make \
+    python3 \
+    uv \
+    poetry
 
-# --- Stage 2: Test environment ---
-FROM debian:bookworm-slim
+# Create test user
+RUN adduser -D -s /bin/fish testuser
 
-# Install minimal required packages for testing
-RUN apt-get update && \
-    apt-get install -y \
-        fish \
-        make && \
-    rm -rf /var/lib/apt/lists/*
+# Set up basic zsh configuration
+COPY tests/docker_fish/config.fish.test /home/testuser/config.fish
+RUN chown testuser:testuser /home/testuser/config.fish
 
-# Create test user and set up fish
-RUN useradd -m -s /usr/bin/fish testuser
+# Copy test files
+COPY tests/task_definitions /home/testuser/
+RUN chown -R testuser:testuser /home/testuser
 
-# Set up fish configuration
-RUN mkdir -p /home/testuser/.config/fish
-COPY --chown=testuser:testuser tests/docker/config.fish.test /home/testuser/.config/fish/config.fish
-
-# Copy test Makefile
-COPY --chown=testuser:testuser tests/docker/Makefile.test /home/testuser/Makefile
-COPY --chown=testuser:testuser tests/docker/package.json.test /home/testuser/package.json
+# Copy the compiled binary from the builder stage
+COPY --from=builder /app/target/release/dela /usr/local/bin/dela
 
 USER testuser
 WORKDIR /home/testuser
 
-# Copy the compiled binary from the builder stage
-COPY --from=builder --chown=testuser:testuser /app/target/release/dela /usr/local/bin/dela
-
-# Set up test environment
+# Set up environment variables
 ENV HOME=/home/testuser
-ENV SHELL=/usr/bin/fish
+ENV SHELL=/bin/fish
+ENV PATH="/home/testuser/.local/bin:${PATH}"
 
 # Entry point script will be mounted
-CMD ["fish", "/home/testuser/test_script.sh"] 
+CMD ["fish", "/home/testuser/test_script.sh"]
