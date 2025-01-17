@@ -54,6 +54,9 @@ WORKDIR /home/testuser
 # Copy dela binary
 COPY --from=builder --chown=testuser:testuser /app/target/release/dela /usr/local/bin/dela
 
+# Set shell environment variable
+ENV SHELL=/bin/pwsh
+
 # Switch to test user
 USER testuser
 

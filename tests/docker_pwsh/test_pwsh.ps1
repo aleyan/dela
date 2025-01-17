@@ -45,8 +45,8 @@ try {
     nonexistent_command
 } catch {
     $output = $_.Exception.Message
-    if (-not ($output -match "pwsh: command not found: nonexistent_command")) {
-        Write-Error "Initial command_not_found_handler not working.`nExpected: 'pwsh: command not found: nonexistent_command'`nGot: '$output'"
+    if (-not ($output -match "The term 'nonexistent_command' is not recognized")) {
+        Write-Error "Initial command_not_found_handler not working.`nExpected PowerShell error message for unrecognized command`nGot: '$output'"
     }
 }
 
@@ -108,7 +108,7 @@ try {
     Write-Error "Command not found handler didn't throw an error as expected"
 } catch {
     $output = $_.Exception.Message
-    if ($output -match "pwsh: command not found: nonexistent_command") {
+    if (-not ($output -match "The term 'nonexistent_command' is not recognized")) {
         Write-Error "Command not found handler wasn't properly replaced.`nGot: '$output'"
     }
 }

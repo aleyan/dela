@@ -36,6 +36,7 @@ fn get_shell_config_path() -> Result<PathBuf, String> {
         "zsh" => Ok(home_path.join(".zshrc")),
         "bash" => Ok(home_path.join(".bashrc")),
         "fish" => Ok(home_path.join(".config").join("fish").join("config.fish")),
+        "pwsh" => Ok(home_path.join(".config").join("powershell").join("Microsoft.PowerShell_profile.ps1")),
         name => Err(format!("Unsupported shell: {}", name)),
     }
 }
@@ -52,6 +53,7 @@ fn add_shell_integration(config_path: &PathBuf) -> Result<(), String> {
     // Check if dela integration is already present, with shell-specific patterns
     let integration_pattern = match shell.as_str() {
         "fish" => "eval (dela configure-shell | string collect)",
+        "pwsh" => "Invoke-Expression (dela configure-shell)",
         _ => "eval \"$(dela configure-shell)\"",
     };
 
@@ -60,8 +62,17 @@ fn add_shell_integration(config_path: &PathBuf) -> Result<(), String> {
         return Ok(());
     }
 
+    // Create parent directory if it doesn't exist (needed for PowerShell)
+    if let Some(parent) = config_path.parent() {
+        if !parent.exists() {
+            fs::create_dir_all(parent)
+                .map_err(|e| format!("Failed to create config directory: {}", e))?;
+        }
+    }
+
     // Open file in append mode
     let mut file = fs::OpenOptions::new()
+        .create(true)
         .append(true)
         .open(config_path)
         .map_err(|e| format!("Failed to open shell config: {}", e))?;
@@ -208,5 +219,26 @@ mod tests {
         // Verify the content has the fish-specific integration pattern
         let content = fs::read_to_string(&config_fish).unwrap();
         assert!(content.contains("eval (dela configure-shell | string collect)"));
+    }
+
+    #[test]
+    #[serial]
+    fn test_init_pwsh() {
+        let temp_dir = TempDir::new().unwrap();
+        let home = temp_dir.path().to_path_buf();
+        setup_test_env("/bin/pwsh", &home).unwrap();
+
+        // Create PowerShell config directory and minimal profile
+        let pwsh_config_dir = home.join(".config").join("powershell");
+        fs::create_dir_all(&pwsh_config_dir).unwrap();
+        let config_pwsh = pwsh_config_dir.join("Microsoft.PowerShell_profile.ps1");
+        fs::write(&config_pwsh, "# existing PowerShell config\n").unwrap();
+
+        let result = execute();
+        assert!(result.is_ok());
+
+        // Verify the content has the PowerShell-specific integration pattern
+        let content = fs::read_to_string(&config_pwsh).unwrap();
+        assert!(content.contains("Invoke-Expression (dela configure-shell)"));
     }
 } 
