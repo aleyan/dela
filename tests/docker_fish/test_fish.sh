@@ -38,8 +38,11 @@ test -f ~/Makefile; or begin
 end
 
 # Verify initial command_not_found_handler works
-set output (nonexistent_command 2>&1); or true
-if not echo $output | grep -q "fish: Unknown command: nonexistent_command"
+begin
+    set output (fish -c "nonexistent_command" 2>&1)
+    or true
+end
+if not string match -q "*fish: Unknown command: nonexistent_command*" -- "$output"
     error "Initial command_not_found_handler not working."
     error "Expected: 'fish: Unknown command: nonexistent_command'"
     error "Got: '$output'"
