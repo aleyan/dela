@@ -45,6 +45,7 @@ RUN chown testuser:testuser /home/testuser/.zshrc
 COPY tests/docker/Makefile.test /home/testuser/Makefile
 COPY tests/docker/package.json.test /home/testuser/package.json
 COPY tests/docker/pyproject.toml.test /home/testuser/pyproject.toml
+COPY tests/docker/example.py.test /home/testuser/example.py
 RUN chown -R testuser:testuser /home/testuser
 
 # Copy the compiled binary from the builder stage

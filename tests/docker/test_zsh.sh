@@ -96,13 +96,13 @@ fi
 # Test UV tasks
 log "Testing UV tasks..."
 output=$(dela run uv-test 2>&1)
-if ! echo "$output" | grep -q "UV test task executed successfully"; then
+if ! echo "$output" | grep -q "Test task executed successfully"; then
     error "dela run uv-test failed. Got: $output"
     exit 1
 fi
 
 output=$(dela run uv-build 2>&1)
-if ! echo "$output" | grep -q "UV build task executed successfully"; then
+if ! echo "$output" | grep -q "Build task executed successfully"; then
     error "dela run uv-build failed. Got: $output"
     exit 1
 fi
@@ -110,13 +110,13 @@ fi
 # Test Poetry tasks
 log "Testing Poetry tasks..."
 output=$(dela run poetry-test 2>&1)
-if ! echo "$output" | grep -q "Poetry test task executed successfully"; then
+if ! echo "$output" | grep -q "Test task executed successfully"; then
     error "dela run poetry-test failed. Got: $output"
     exit 1
 fi
 
 output=$(dela run poetry-build 2>&1)
-if ! echo "$output" | grep -q "Poetry build task executed successfully"; then
+if ! echo "$output" | grep -q "Build task executed successfully"; then
     error "dela run poetry-build failed. Got: $output"
     exit 1
 fi

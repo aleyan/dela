@@ -1,15 +1,26 @@
 [project]
 name = "dela-test"
 version = "1.0.0"
+requires-python = ">=3.12"
+dependencies = []
 
 [project.scripts]
-uv-test = "echo \"UV test task executed successfully\""
-uv-build = "echo \"UV build task executed successfully\""
+uv-test = "example:main_test"
+uv-build = "example:main_build"
+
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [tool.poetry]
 name = "dela-test"
 version = "1.0.0"
+description = "Test package for dela"
+authors = ["Test <test@example.com>"]
+packages = [
+    { include = "example.py" }
+]
 
 [tool.poetry.scripts]
-poetry-test = "echo \"Poetry test task executed successfully\""
-poetry-build = "echo \"Poetry build task executed successfully\"" 
+poetry-test = "example:main_test"
+poetry-build = "example:main_build" 
