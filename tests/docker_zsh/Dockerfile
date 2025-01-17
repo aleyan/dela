@@ -38,14 +38,11 @@ RUN apk add --no-cache \
 RUN adduser -D -s /bin/zsh testuser
 
 # Set up basic zsh configuration
-COPY tests/docker/zshrc.test /home/testuser/.zshrc
+COPY tests/docker_zsh/zshrc.test /home/testuser/.zshrc
 RUN chown testuser:testuser /home/testuser/.zshrc
 
 # Copy test files
-COPY tests/docker/Makefile.test /home/testuser/Makefile
-COPY tests/docker/package.json.test /home/testuser/package.json
-COPY tests/docker/pyproject.toml.test /home/testuser/pyproject.toml
-COPY tests/docker/example.py.test /home/testuser/example.py
+COPY tests/task_definitions /home/testuser/
 RUN chown -R testuser:testuser /home/testuser
 
 # Copy the compiled binary from the builder stage

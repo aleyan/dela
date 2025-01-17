@@ -14,10 +14,10 @@ test:
 test_shells:
 	@if [ "$(VERBOSE)" = "1" ]; then \
 		echo "Running shell integration tests (verbose)..."; \
-		VERBOSE=1 ./tests/docker/run_tests.sh; \
+		VERBOSE=1 ./tests/run_tests.sh; \
 	else \
 		echo "Running shell integration tests..."; \
-		VERBOSE=0 ./tests/docker/run_tests.sh; \
+		VERBOSE=0 ./tests/run_tests.sh; \
 	fi
 
 install:

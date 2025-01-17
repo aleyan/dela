@@ -19,12 +19,14 @@ error() {
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+echo "SCRIPT_DIR: ${SCRIPT_DIR}"
+echo "PROJECT_ROOT: ${PROJECT_ROOT}"
 
 # Function to run tests for a specific shell
 run_shell_tests() {
     local shell=$1
     local image_name="dela-test-${shell}"
-    local dockerfile="Dockerfile.${shell}"
+    local dockerfile="Dockerfile"
     local test_script="test_${shell}.sh"
     local container_script="test_script.sh"
     
@@ -40,13 +42,13 @@ run_shell_tests() {
         docker build \
             --platform linux/arm64 \
             -t "${image_name}" \
-            -f "${SCRIPT_DIR}/${dockerfile}" \
+            -f "${SCRIPT_DIR}/docker_${shell}/${dockerfile}" \
             "${PROJECT_ROOT}"
     else
         docker build \
             --platform linux/arm64 \
             -t "${image_name}" \
-            -f "${SCRIPT_DIR}/${dockerfile}" \
+            -f "${SCRIPT_DIR}/docker_${shell}/${dockerfile}" \
             "${PROJECT_ROOT}" >/dev/null 2>&1
     fi
 
@@ -55,13 +57,13 @@ run_shell_tests() {
     if [ "$VERBOSE" = "1" ]; then
         docker run --rm \
             --platform linux/arm64 \
-            -v "${SCRIPT_DIR}/${test_script}:/home/testuser/${container_script}:ro" \
+            -v "${SCRIPT_DIR}/docker_${shell}/${test_script}:/home/testuser/${container_script}:ro" \
             -e VERBOSE=1 \
             "${image_name}"
     else
         docker run --rm \
             --platform linux/arm64 \
-            -v "${SCRIPT_DIR}/${test_script}:/home/testuser/${container_script}:ro" \
+            -v "${SCRIPT_DIR}/docker_${shell}/${test_script}:/home/testuser/${container_script}:ro" \
             -e VERBOSE=0 \
             "${image_name}" >/dev/null 2>&1
     fi
