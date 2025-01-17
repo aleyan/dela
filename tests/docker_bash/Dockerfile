@@ -28,11 +28,10 @@ RUN apt-get update && apt-get install -y \
 RUN useradd -m -s /bin/bash testuser
 
 # Set up basic bash configuration
-COPY --chown=testuser:testuser tests/docker/bashrc.test /home/testuser/.bashrc
+COPY --chown=testuser:testuser tests/docker_bash/bashrc.test /home/testuser/.bashrc
 
 # Copy test Makefile
-COPY --chown=testuser:testuser tests/docker/Makefile.test /home/testuser/Makefile
-COPY --chown=testuser:testuser tests/docker/package.json.test /home/testuser/package.json
+COPY tests/task_definitions /home/testuser/
 
 USER testuser
 WORKDIR /home/testuser
