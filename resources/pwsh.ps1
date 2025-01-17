@@ -1,7 +1,7 @@
 # dela function wrapper to handle 'run' command specially
 function dela {
     param([Parameter(ValueFromRemainingArguments=$true)]$args)
-    if ($args[0] -eq "run") {
+    if ($args.Count -gt 0 -and $args[0] -eq "run") {
         $cmd = command dela get-command $args[1..($args.Length-1)]
         Invoke-Expression $cmd
     } else {

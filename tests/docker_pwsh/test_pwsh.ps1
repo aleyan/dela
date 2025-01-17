@@ -76,19 +76,24 @@ try {
 # Verify shell integration was loaded
 try {
     $output = dela configure-shell
+    Invoke-Expression $output
 } catch {
     Write-Error "dela configure-shell failed with output: $_"
 }
 
 # Test dela list command
 Write-Log "Testing dela list command..."
-if (-not (dela list | Select-String "test-task")) {
+$listOutput = dela list
+Write-Host "Debug - dela list output:"
+Write-Host $listOutput
+Write-Host "Debug - End of dela list output"
+if (-not ($listOutput -match "test-task")) {
     Write-Error "test-task not found in dela list"
 }
-if (-not (dela list | Select-String "npm-test")) {
+if (-not ($listOutput -match "npm-test")) {
     Write-Error "npm-test not found in dela list"
 }
-if (-not (dela list | Select-String "npm-build")) {
+if (-not ($listOutput -match "npm-build")) {
     Write-Error "npm-build not found in dela list"
 }
 
