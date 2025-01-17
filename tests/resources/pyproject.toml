@@ -1,26 +1,30 @@
 [project]
-name = "dela-test"
+name = "assets_py"
 version = "1.0.0"
 requires-python = ">=3.12"
+description = "Example project to demonstrate entry points"
 dependencies = []
 
 [project.scripts]
-uv-test = "example:main_test"
-uv-build = "example:main_build"
+uv-build = "assets_py.main:main_build"
+uv-test = "assets_py.main:main_test"
+
+[tool.poetry]
+name = "assets_py"
+version = "0.1.0"
+description = "Example project to demonstrate Poetry scripts"
+authors = ["Alex"]
+package-mode = false
+
+
+[tool.poetry.dependencies]
+python = ">=3.12,<3.13"
+
+[tool.poetry.scripts]
+poetry-build = "assets_py.main:main_build"
+poetry-test = "assets_py.main:main_test"
+
 
 [build-system]
 requires = ["setuptools>=42", "wheel"]
 build-backend = "setuptools.build_meta"
-
-[tool.poetry]
-name = "dela-test"
-version = "1.0.0"
-description = "Test package for dela"
-authors = ["Test <test@example.com>"]
-packages = [
-    { include = "example.py" }
-]
-
-[tool.poetry.scripts]
-poetry-test = "example:main_test"
-poetry-build = "example:main_build" 
