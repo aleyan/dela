@@ -23,7 +23,7 @@ COPY src ./src
 COPY resources ./resources
 RUN cargo build --release --all-features
     
-    # --- Stage 2: Test environment ---
+# --- Stage 2: Test environment ---
 FROM alpine:3.21
     
 # Install required packages
@@ -37,29 +37,25 @@ RUN apk add --no-cache \
 # Create test user
 RUN adduser -D -s /bin/pwsh testuser
 
-# Set up fish configuration directory and file
 # Create PowerShell profile directory and set up profile
 RUN mkdir -p /home/testuser/.config/powershell && \
     chown -R testuser:testuser /home/testuser/.config
 
 # Set up PowerShell profile
-COPY --chown=testuser:testuser tests/docker/Microsoft.PowerShell_profile.ps1 /home/testuser/.config/powershell/Microsoft.PowerShell_profile.ps1
-
+COPY --chown=testuser:testuser tests/docker_pwsh/Microsoft.PowerShell_profile.ps1 /home/testuser/.config/powershell/Microsoft.PowerShell_profile.ps1
 
 # Copy test files
 COPY tests/task_definitions /home/testuser/
 RUN chown -R testuser:testuser /home/testuser
 
-# Copy the compiled binary from the builder stage
-COPY --from=builder /app/target/release/dela /usr/local/bin/dela
-
-USER testuser
+# Set working directory
 WORKDIR /home/testuser
 
-# Set up environment variables
-ENV HOME=/home/testuser
-ENV SHELL=/bin/pwsh
-ENV PATH="/home/testuser/.local/bin:${PATH}"
+# Copy dela binary
+COPY --from=builder --chown=testuser:testuser /app/target/release/dela /usr/local/bin/dela
 
-# Entry point script will be mounted
-CMD ["pwsh", "/home/testuser/test_script.sh"]
+# Switch to test user
+USER testuser
+
+# Run the test script
+CMD ["pwsh", "./test_script.ps1"]
