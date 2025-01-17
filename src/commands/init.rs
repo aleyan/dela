@@ -53,7 +53,7 @@ fn add_shell_integration(config_path: &PathBuf) -> Result<(), String> {
     // Check if dela integration is already present, with shell-specific patterns
     let integration_pattern = match shell.as_str() {
         "fish" => "eval (dela configure-shell | string collect)",
-        "pwsh" => "Invoke-Expression (dela configure-shell)",
+        "pwsh" => "Invoke-Expression (dela configure-shell | Out-String)",
         _ => "eval \"$(dela configure-shell)\"",
     };
 
