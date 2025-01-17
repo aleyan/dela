@@ -60,7 +60,7 @@ if (-not (Test-Path ~/.dela)) {
 
 # Verify shell integration was added
 $profileContent = Get-Content $profilePath -Raw
-if (-not ($profileContent -match [regex]::Escape('& (dela configure-shell | Out-String)'))) {
+if (-not ($profileContent -match [regex]::Escape('Invoke-Expression (dela configure-shell | Out-String)'))) {
     Write-Error "Shell integration not found in PowerShell profile"
 }
 
