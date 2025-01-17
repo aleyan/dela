@@ -37,9 +37,10 @@ RUN apk add --no-cache \
 # Create test user
 RUN adduser -D -s /bin/fish testuser
 
-# Set up basic zsh configuration
-COPY tests/docker_fish/config.fish.test /home/testuser/config.fish
-RUN chown testuser:testuser /home/testuser/config.fish
+# Set up fish configuration directory and file
+RUN mkdir -p /home/testuser/.config/fish
+COPY tests/docker_fish/config.fish.test /home/testuser/.config/fish/config.fish
+RUN chown -R testuser:testuser /home/testuser/.config
 
 # Copy test files
 COPY tests/task_definitions /home/testuser/
