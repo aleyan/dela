@@ -40,29 +40,29 @@ This plan outlines the major development phases and tasks for building `dela`, a
 
 ## Phase 2: Shell Integration and Basic CLI
 
-- [ ] **Shell Integration**
+- [x] **Shell Integration**
   - [x] [DTKT-11] Modify `.zshrc` to invoke `dela` manually.
   - [x] [DTKT-12] Append/update `command_not_found_handle` manually.
   - [x] [DTKT-13] Implement `dela configure-shell` command to return the command_not_found_handle.
   - [x] [DTKT-14] Implement `dela init` command to automate creation of `~/.dela` and `~/.dela/allowlist.toml`.
   - [x] [DTKT-15] Modify `dela init` command add eval of `dela configure_shell`.
 
-- [ ] **Shell Execution Strategy**
+- [x] **Shell Execution Strategy**
   - [x] [DTKT-75] Implement shell function wrapper for `dela run` command
   - [x] [DTKT-76] Implement `get-command` to return shell-executable command string
-  - [ ] [DTKT-77] Ensure commands execute in actual shell environment
+  - [x] [DTKT-77] Ensure commands execute in actual shell environment
   - [ ] [DTKT-78] Support shell builtins (cd, source, etc.)
-  - [ ] [DTKT-79] Ensure environment modifications persist
-  - [ ] [DTKT-80] Make shell aliases and functions available to tasks
+  - [x] [DTKT-79] Ensure environment modifications persist
+  - [x] [DTKT-80] Make shell aliases and functions available to tasks
 
 - [ ] **Repository Preparation**
   - [ ] [DTKT-16] Confirm Rust workspace structure is stable.
   - [ ] [DTKT-17] Ensure code compiles and installs via `cargo install dela`.
 
 **Deliverables**
-- [ ] Shell fallback for unrecognized commands.
-- [ ] Working `dela init`.
-- [ ] Shell-aware task execution environment.
+- [x] Shell fallback for unrecognized commands.
+- [x] Working `dela init`.
+- [x] Shell-aware task execution environment.
 
 ---
 
@@ -117,15 +117,20 @@ This plan outlines the major development phases and tasks for building `dela`, a
 
 ---
 
-## Phase 5: Expand shell capabilities to support bash and fish
+## Phase 5: Expand shell capabilities to support bash, fish, and PowerShell
 
-- [ ] **Bash Support**
-  - [ ] [DTKT-35] Implement `dela configure_shell` for bash.
-  - [ ] [DTKT-36] Implement `dela init` for bash.
+- [x] **Bash Support**
+  - [x] [DTKT-35] Implement `dela configure_shell` for bash.
+  - [x] [DTKT-36] Implement `dela init` for bash.
 
-- [ ] **Fish Support**
-  - [ ] [DTKT-37] Implement `dela configure_shell` for fish.
-  - [ ] [DTKT-38] Implement `dela init` for fish.
+- [x] **Fish Support**
+  - [x] [DTKT-37] Implement `dela configure_shell` for fish.
+  - [x] [DTKT-38] Implement `dela init` for fish.
+
+- [x] **PowerShell Support**
+  - [x] [DTKT-89] Implement `dela configure_shell` for PowerShell.
+  - [x] [DTKT-90] Implement `dela init` for PowerShell.
+  - [x] [DTKT-91] Handle PowerShell-specific output formatting.
 
 ---
 
@@ -134,13 +139,13 @@ This plan outlines the major development phases and tasks for building `dela`, a
 - [ ] **Unit Tests**
 
 ### Dockerized Cross-Shell Testing
-- [ ] [DTKT-82] Build Docker images that contain multiple shells (zsh, bash, fish).
-- [ ] [DTKT-83] Automate a test workflow where each container:
+- [x] [DTKT-82] Build Docker images that contain multiple shells (zsh, bash, fish, PowerShell).
+- [x] [DTKT-83] Automate a test workflow where each container:
   - Installs `dela`.
   - Runs `dela init`.
   - Sources the relevant shell configuration.
   - Validates that tasks can be run both via bare command (through command_not_found_handler) and with `dela run <task>`.
-- [ ] [DTKT-84] Integrate these Docker-based tests into CI to confirm cross-shell compatibility.
+- [x] [DTKT-84] Integrate these Docker-based tests into CI to confirm cross-shell compatibility.
   - [ ] [DTKT-39] Cover each module: `shell_integration`, `task_discovery`, `allowlist`, `task_execution`.
 
 - [ ] **Integration Tests**
