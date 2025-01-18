@@ -239,6 +239,6 @@ mod tests {
 
         // Verify the content has the PowerShell-specific integration pattern
         let content = fs::read_to_string(&config_pwsh).unwrap();
-        assert!(content.contains("Invoke-Expression (dela configure-shell)"));
+        assert!(content.contains("Invoke-Expression (dela configure-shell | Out-String)"));
     }
 } 

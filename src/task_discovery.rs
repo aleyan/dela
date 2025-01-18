@@ -1,9 +1,6 @@
 use std::path::Path;
 use crate::types::{DiscoveredTasks, TaskFileStatus, TaskRunner};
-
-use crate::parse_makefile;
-use crate::parse_package_json;
-use crate::parse_pyproject_toml;
+use crate::parsers::{parse_makefile, parse_package_json, parse_pyproject_toml};
 
 /// Discovers tasks in the given directory
 pub fn discover_tasks(dir: &Path) -> DiscoveredTasks {
