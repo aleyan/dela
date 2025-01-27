@@ -83,18 +83,48 @@ dela list | grep -q "uv-build" || (error "uv-build not found in dela list" && ex
 dela list | grep -q "poetry-test" || (error "poetry-test not found in dela list" && exit 1)
 dela list | grep -q "poetry-build" || (error "poetry-build not found in dela list" && exit 1)
 
-log "4. Testing task execution..."
+log "4. Testing allowlist functionality..."
 
-# Test dela run command with Makefile task only
-log "Testing dela run command..."
-output=$(dela run test-task 2>&1)
+# Ensure we're in interactive mode for allowlist testing
+unset DELA_NON_INTERACTIVE
+unset DELA_AUTO_ALLOW
+
+# Reload shell integration with new environment
+source ~/.zshrc
+
+# Test that task is initially not allowed
+log "Testing task is initially blocked..."
+output=$(test-task 2>&1) || true
+if ! echo "$output" | grep -q "requires approval"; then
+    error "Expected task to be blocked with approval prompt, but got: $output"
+    exit 1
+fi
+
+# Allow the task using dela allow-command
+log "Testing dela allow-command..."
+export DELA_NON_INTERACTIVE=1
+export DELA_AUTO_ALLOW=1
+echo "2" | dela allow-command test-task || (error "Failed to allow test-task" && exit 1)
+unset DELA_NON_INTERACTIVE
+unset DELA_AUTO_ALLOW
+
+# Reload shell integration again
+source ~/.zshrc
+
+# Verify task is now allowed and runs
+log "Testing allowed task execution..."
+output=$(test-task 2>&1)
 if ! echo "$output" | grep -q "Test task executed successfully"; then
-    error "dela run test-task (Make) failed. Got: $output"
+    error "Task execution failed. Got: $output"
     exit 1
 fi
 
 # Test UV tasks
 log "Testing UV tasks..."
+export DELA_NON_INTERACTIVE=1
+echo "2" | dela allow-command uv-test || (error "Failed to allow uv-test" && exit 1)
+echo "2" | dela allow-command uv-build || (error "Failed to allow uv-build" && exit 1)
+
 output=$(dela run uv-test 2>&1)
 if ! echo "$output" | grep -q "Test task executed successfully"; then
     error "dela run uv-test failed. Got: $output"
@@ -107,8 +137,11 @@ if ! echo "$output" | grep -q "Build task executed successfully"; then
     exit 1
 fi
 
-# Test Poetry tasks
+# Allow and test Poetry tasks
 log "Testing Poetry tasks..."
+echo "2" | dela allow-command poetry-test || (error "Failed to allow poetry-test" && exit 1)
+echo "2" | dela allow-command poetry-build || (error "Failed to allow poetry-build" && exit 1)
+
 output=$(dela run poetry-test 2>&1)
 if ! echo "$output" | grep -q "Test task executed successfully"; then
     error "dela run poetry-test failed. Got: $output"
@@ -120,6 +153,7 @@ if ! echo "$output" | grep -q "Build task executed successfully"; then
     error "dela run poetry-build failed. Got: $output"
     exit 1
 fi
+unset DELA_NON_INTERACTIVE
 
 # Verify command_not_found_handler was properly replaced
 log "Testing final command_not_found_handler..."
