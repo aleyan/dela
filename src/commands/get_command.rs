@@ -1,5 +1,6 @@
 use std::env;
 use crate::task_discovery;
+use crate::allowlist;
 
 pub fn execute(task: &str) -> Result<(), String> {
     // TODO(DTKT-20): Implement shell environment inheritance for task execution
@@ -20,8 +21,14 @@ pub fn execute(task: &str) -> Result<(), String> {
             Err(format!("No task named '{}' found", task))
         }
         1 => {
-            // Single task found, return its command
+            // Single task found, check allowlist and return its command
             let task = matching_tasks[0];
+            
+            // Check if task is allowed
+            if !allowlist::check_task_allowed(task)? {
+                return Err(format!("Task '{}' was denied", task.name));
+            }
+            
             let command = task.runner.get_command(task);
             println!("{}", command);
             Ok(())

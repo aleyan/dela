@@ -1,20 +1,8 @@
-use std::path::Path;
-use crate::task_discovery;
-use crate::allowlist;
-
-pub fn execute(task_name: &str) -> Result<(), String> {
-    // Find the task
-    let discovered = task_discovery::discover_tasks(Path::new("."));
-    let task = discovered.tasks.iter()
-        .find(|t| t.name == task_name)
-        .ok_or_else(|| format!("Task '{}' not found", task_name))?;
-
-    // Check if task is allowed
-    if !allowlist::check_task_allowed(task)? {
-        return Err(format!("Task '{}' was denied", task_name));
-    }
-
-    // TODO(DTKT-23): Execute the task
-    println!("Task '{}' is allowed to run", task_name);
+pub fn execute(_task_name: &str) -> Result<(), String> {
+    println!("Note: The 'dela run' command is meant to be intercepted by shell integration.");
+    println!("If you're seeing this message, it means either:");
+    println!("1. Shell integration is not installed (run 'dela init' to set it up)");
+    println!("2. You're running dela directly instead of through the shell function");
+    // TODO(DTKT-97): Add native task execution when shell integration is not detected
     Ok(())
 } 

@@ -115,6 +115,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
 - [ ] **Runtime Checks**
   - [ ] [DTKT-96] Consult allowlist before executing tasks.
   - [ ] [DTKT-34] If disallowed, prompt or block execution.
+  - [ ] [DTKT-97] Add native task execution when shell integration is not detected
 
 **Deliverables**
 - [ ] Secure allowlist solution.
