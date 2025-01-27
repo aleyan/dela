@@ -31,7 +31,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
 - [ ] **CLI Implementation for `list`**
   - [x] [DTKT-9] Ensure `dela list` shows tasks from recognized files.
   - [x] [DTKT-10] Print tasks with references to the source file.
-  - [ ] [DTKT-] List which task runner will be used for each task.
+  - [ ] [DTKT-92] List which task runner will be used for each task.
 
 **Deliverables**
 - [x] Parsing logic for multiple file types.
@@ -47,7 +47,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [x] [DTKT-13] Implement `dela configure-shell` command to return the command_not_found_handle.
   - [x] [DTKT-14] Implement `dela init` command to automate creation of `~/.dela` and `~/.dela/allowlist.toml`.
   - [x] [DTKT-15] Modify `dela init` command add eval of `dela configure_shell`.
-  - [ ] [DTKT-] Have `dela init` take options options (eg no method missing) 
+  - [ ] [DTKT-93] Have `dela init` take options options (eg no method missing)
 
 - [x] **Shell Execution Strategy**
   - [x] [DTKT-75] Implement shell function wrapper for `dela run` command
@@ -72,7 +72,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
 
 - [ ] **Task Execution Logic**
   - [ ] [DTKT-18] Implement `task_execution.rs` to invoke tasks (e.g., `make <target>`, `npm run <script>`).
-  - [ ] [DTKT-] Pass arguments after the task name to the task
+  - [ ] [DTKT-94] Pass arguments after the task name to the task
   - [ ] [DTKT-19] Handle errors if required CLI tools are missing.
   - [ ] [DTKT-20] Implement shell environment inheritance for task execution.
   - [ ] [DTKT-21] Support both direct execution and subshell spawning based on task type.
@@ -87,7 +87,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [ ] [DTKT-23] Complete `dela run <task>` for direct execution.
   - [ ] [DTKT-24] Ensure bare commands invoke `dela` through the fallback.
   - [ ] [DTKT-25] Prompt user if multiple matching tasks exist.
-  - [ ] [DTLT-] Provide `dr` shell function to run dela tasks with --allow flag.
+  - [ ] [DTKT-95] Provide `dr` shell function to run dela tasks with --allow flag.
 
 - [ ] **Disambiguation**
   - [ ] [DTKT-26] Implement logic to handle multiple tasks with the same name.
