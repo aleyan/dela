@@ -58,8 +58,8 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [x] [DTKT-80] Make shell aliases and functions available to tasks
 
 - [ ] **Repository Preparation**
-  - [ ] [DTKT-16] Confirm Rust workspace structure is stable.
-  - [ ] [DTKT-17] Ensure code compiles and installs via `cargo install dela`.
+  - [x] [DTKT-16] Confirm Rust workspace structure is stable.
+  - [x] [DTKT-17] Ensure code compiles and installs via `cargo install dela`.
 
 **Deliverables**
 - [x] Shell fallback for unrecognized commands.
@@ -113,7 +113,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [ ] [DTKT-33] Have `dela run` take an optional `--allow` flag to allow a task without prompting.
 
 - [ ] **Runtime Checks**
-  - [ ] [DTKT-33] Consult allowlist before executing tasks.
+  - [ ] [DTKT-96] Consult allowlist before executing tasks.
   - [ ] [DTKT-34] If disallowed, prompt or block execution.
 
 **Deliverables**
