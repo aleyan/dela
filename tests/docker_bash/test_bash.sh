@@ -73,37 +73,90 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+# Verify the shell integration output contains the correct allowlist check
+if ! echo "$output" | grep -q "if ! dela allow-command \"\$1\""; then
+    error "Shell integration missing allowlist check"
+    error "Got: $output"
+    exit 1
+fi
+
 # Test dela list command
 log "Testing dela list command..."
 dela list | grep -q "test-task" || (error "test-task not found in dela list" && exit 1)
 dela list | grep -q "npm-test" || (error "npm-test not found in dela list" && exit 1)
 dela list | grep -q "npm-build" || (error "npm-build not found in dela list" && exit 1)
 
-log "4. Testing task execution..."
+log "4. Testing allowlist functionality..."
 
-# Test dela run command with Makefile task only
-log "Testing dela run command..."
-output=$(dela run test-task)
-echo "$output" | grep -q "Test task executed successfully" || {
-    error "dela run test-task failed. Got: $output"
-    exit 1
-}
+# Ensure we're in interactive mode for allowlist testing
+unset DELA_NON_INTERACTIVE
+unset DELA_AUTO_ALLOW
 
-# Test direct task invocation
-log "Testing direct task invocation..."
-output=$(test-task)
-echo "$output" | grep -q "Test task executed successfully" || {
-    error "Direct task invocation failed. Got: $output"
-    exit 1
-}
+# Reload shell integration with new environment
+source ~/.bashrc
 
-# Test another task
-log "Testing another task..."
-output=$(another-task)
-echo "$output" | grep -q "Another task executed successfully" || {
-    error "another-task failed. Got: $output"
+# Test that task is initially not allowed
+log "Testing task is initially blocked..."
+output=$(test-task 2>&1) || true
+if ! echo "$output" | grep -q "requires approval"; then
+    error "Expected task to be blocked with approval prompt, but got: $output"
     exit 1
-}
+fi
+
+# Allow the task using dela allow-command
+log "Testing dela allow-command..."
+export DELA_NON_INTERACTIVE=1
+export DELA_AUTO_ALLOW=1
+echo "2" | dela allow-command test-task || (error "Failed to allow test-task" && exit 1)
+unset DELA_NON_INTERACTIVE
+unset DELA_AUTO_ALLOW
+
+# Reload shell integration again
+source ~/.bashrc
+
+# Verify task is now allowed and runs
+log "Testing allowed task execution..."
+output=$(test-task 2>&1)
+if ! echo "$output" | grep -q "Test task executed successfully"; then
+    error "Task execution failed. Got: $output"
+    exit 1
+fi
+
+# Test UV tasks
+log "Testing UV tasks..."
+export DELA_NON_INTERACTIVE=1
+echo "2" | dela allow-command uv-test || (error "Failed to allow uv-test" && exit 1)
+echo "2" | dela allow-command uv-build || (error "Failed to allow uv-build" && exit 1)
+
+output=$(dela run uv-test 2>&1)
+if ! echo "$output" | grep -q "Test task executed successfully"; then
+    error "dela run uv-test failed. Got: $output"
+    exit 1
+fi
+
+output=$(dela run uv-build 2>&1)
+if ! echo "$output" | grep -q "Build task executed successfully"; then
+    error "dela run uv-build failed. Got: $output"
+    exit 1
+fi
+
+# Allow and test Poetry tasks
+log "Testing Poetry tasks..."
+echo "2" | dela allow-command poetry-test || (error "Failed to allow poetry-test" && exit 1)
+echo "2" | dela allow-command poetry-build || (error "Failed to allow poetry-build" && exit 1)
+
+output=$(dela run poetry-test 2>&1)
+if ! echo "$output" | grep -q "Test task executed successfully"; then
+    error "dela run poetry-test failed. Got: $output"
+    exit 1
+fi
+
+output=$(dela run poetry-build 2>&1)
+if ! echo "$output" | grep -q "Build task executed successfully"; then
+    error "dela run poetry-build failed. Got: $output"
+    exit 1
+fi
+unset DELA_NON_INTERACTIVE
 
 # Verify command_not_found_handle was properly replaced
 log "Testing final command_not_found_handle..."
