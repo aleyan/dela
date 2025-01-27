@@ -95,20 +95,115 @@ dela list | grep -q "npm-build"; or begin
     exit 1
 end
 
-log "4. Testing task execution..."
+log "4. Testing allowlist functionality..."
 
-# Test dela run command with Makefile task only
-log "Testing dela run command..."
-set output (dela run test-task)
-echo $output | grep -q "Test task executed successfully"; or begin
-    error "dela run test-task failed. Got: $output"
+# Ensure we're in interactive mode for allowlist testing
+set -e DELA_NON_INTERACTIVE
+set -e DELA_AUTO_ALLOW
+
+# Reload shell integration with new environment
+source ~/.config/fish/config.fish
+eval (dela configure-shell | string collect)
+
+# Test that task is initially blocked
+log "Testing task is initially blocked..."
+set output (fish -c "test-task" 2>&1); or true
+if not string match -q "*requires approval*" -- "$output"
+    error "Expected task to be blocked with approval prompt, but got: $output"
     exit 1
 end
 
+# Test dela allow-command
+log "Testing dela allow-command..."
+set -x DELA_NON_INTERACTIVE 1
+echo "2" | dela allow-command test-task; or begin
+    error "Failed to allow test-task"
+    exit 1
+end
+
+# Test allowed task execution
+log "Testing allowed task execution..."
+set -e DELA_NON_INTERACTIVE
+source ~/.config/fish/config.fish
+eval (dela configure-shell | string collect)
+
+# Create a temporary script to run the command
+echo '#!/usr/bin/fish
+test-task' > ~/run_test.fish
+chmod +x ~/run_test.fish
+set output (~/run_test.fish 2>&1)
+rm ~/run_test.fish
+
+if not string match -q "*Test task executed successfully*" -- "$output"
+    error "Task execution failed after allowing. Got: $output"
+    exit 1
+end
+
+# Test UV tasks
+log "Testing UV tasks..."
+set -x DELA_NON_INTERACTIVE 1
+echo "2" | dela allow-command uv-test
+echo "2" | dela allow-command uv-build
+
+# Create a temporary script for UV test
+echo '#!/usr/bin/fish
+uv-test' > ~/run_uv_test.fish
+chmod +x ~/run_uv_test.fish
+set output (~/run_uv_test.fish 2>&1)
+rm ~/run_uv_test.fish
+
+if not string match -q "*Test task executed successfully*" -- "$output"
+    error "UV test task failed. Got: $output"
+    exit 1
+end
+
+# Create a temporary script for UV build
+echo '#!/usr/bin/fish
+uv-build' > ~/run_uv_build.fish
+chmod +x ~/run_uv_build.fish
+set output (~/run_uv_build.fish 2>&1)
+rm ~/run_uv_build.fish
+
+if not string match -q "*Build task executed successfully*" -- "$output"
+    error "UV build task failed. Got: $output"
+    exit 1
+end
+
+# Test Poetry tasks
+log "Testing Poetry tasks..."
+echo "2" | dela allow-command poetry-test
+echo "2" | dela allow-command poetry-build
+
+# Create a temporary script for Poetry test
+echo '#!/usr/bin/fish
+poetry-test' > ~/run_poetry_test.fish
+chmod +x ~/run_poetry_test.fish
+set output (~/run_poetry_test.fish 2>&1)
+rm ~/run_poetry_test.fish
+
+if not string match -q "*Test task executed successfully*" -- "$output"
+    error "Poetry test task failed. Got: $output"
+    exit 1
+end
+
+# Create a temporary script for Poetry build
+echo '#!/usr/bin/fish
+poetry-build' > ~/run_poetry_build.fish
+chmod +x ~/run_poetry_build.fish
+set output (~/run_poetry_build.fish 2>&1)
+rm ~/run_poetry_build.fish
+
+if not string match -q "*Build task executed successfully*" -- "$output"
+    error "Poetry build task failed. Got: $output"
+    exit 1
+end
+
+set -e DELA_NON_INTERACTIVE
+
 # Verify command_not_found_handler was properly replaced
 log "Testing final command_not_found_handler..."
-set output (nonexistent_command 2>&1); or true
-if echo $output | grep -q "fish: Unknown command: nonexistent_command"
+set output (fish -c "nonexistent_command" 2>&1); or true
+if not string match -q "*fish: Unknown command: nonexistent_command*" -- "$output"
     error "Command not found handler wasn't properly replaced."
     error "Got: '$output'"
     exit 1
