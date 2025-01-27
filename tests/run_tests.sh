@@ -17,10 +17,21 @@ error() {
     echo "Error: $@" >&2
 }
 
+# Print usage information
+usage() {
+    echo "Usage: $0 [shell]"
+    echo "  shell: Optional. One of: zsh, bash, fish, pwsh"
+    echo "  If no shell is specified, tests all shells"
+    echo ""
+    echo "Environment variables:"
+    echo "  VERBOSE=1: Enable verbose output"
+    exit 1
+}
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-echo "SCRIPT_DIR: ${SCRIPT_DIR}"
-echo "PROJECT_ROOT: ${PROJECT_ROOT}"
+log "SCRIPT_DIR: ${SCRIPT_DIR}"
+log "PROJECT_ROOT: ${PROJECT_ROOT}"
 
 # Function to run tests for a specific shell
 run_shell_tests() {
@@ -71,12 +82,26 @@ run_shell_tests() {
     log "${shell} tests passed successfully!"
 }
 
-
-# Run tests for each shell. fish and pwsh are commented out.
-for shell in zsh bash fish pwsh; do
-    log "Testing ${shell} shell integration..."
-    run_shell_tests "${shell}"
-done
-
-# Only show success message if all tests pass
-echo "All shell integration tests passed successfully!" 
+# Check if a specific shell was requested
+if [ $# -eq 1 ]; then
+    shell=$1
+    # Validate shell argument
+    case $shell in
+        zsh|bash|fish|pwsh)
+            log "Testing ${shell} shell integration..."
+            run_shell_tests "${shell}"
+            echo "${shell} tests passed successfully!"
+            ;;
+        *)
+            error "Invalid shell: ${shell}"
+            usage
+            ;;
+    esac
+else
+    # Run tests for all shells if no argument provided
+    for shell in zsh bash fish pwsh; do
+        log "Testing ${shell} shell integration..."
+        run_shell_tests "${shell}"
+    done
+    echo "All shell integration tests passed successfully!"
+fi 
