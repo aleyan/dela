@@ -126,6 +126,7 @@ name = "dela"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "libc",
  "makefile-lossless",
  "serde",
  "serde_json",

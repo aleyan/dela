@@ -13,3 +13,4 @@ toml = "0.8.19"
 [dev-dependencies]
 tempfile = "3.10.1"
 serial_test = "3.2.0"
+libc = "0.2.153"

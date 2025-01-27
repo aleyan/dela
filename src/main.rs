@@ -4,6 +4,8 @@ mod types;
 mod task_discovery;
 mod parsers;
 mod commands;
+mod allowlist;
+mod prompt;
 
 /// dela - A task runner that delegates to others
 #[derive(Parser)]
@@ -57,11 +59,7 @@ fn main() {
         }
         Commands::List => commands::list::execute(),
         Commands::Run { task } => {
-            println!("Running task: {}", task);
-            // TODO(DTKT-23): Complete dela run <task> for direct execution
-            // TODO(DTKT-25): Prompt user if multiple matching tasks exist
-            // TODO(DTKT-26): Implement logic to handle multiple tasks with the same name
-            Ok(())
+            commands::run::execute(&task)
         }
         Commands::GetCommand { task } => commands::get_command::execute(&task),
     };
