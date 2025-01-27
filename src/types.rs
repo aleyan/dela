@@ -114,15 +114,32 @@ pub enum AllowScope {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AllowlistEntry {
     /// The file or directory path
+    #[serde(serialize_with = "serialize_path", deserialize_with = "deserialize_path")]
     pub path: PathBuf,
-    /// The scope of the user’s decision
+    /// The scope of the user's decision
     pub scope: AllowScope,
     /// If scope is Task, hold the list of allowed tasks
     pub tasks: Option<Vec<String>>,
 }
 
+fn serialize_path<S>(path: &PathBuf, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    serializer.serialize_str(&path.to_string_lossy())
+}
+
+fn deserialize_path<'de, D>(deserializer: D) -> Result<PathBuf, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    Ok(PathBuf::from(s))
+}
+
 /// The full allowlist with multiple entries
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct Allowlist {
+    #[serde(default)]
     pub entries: Vec<AllowlistEntry>,
 }

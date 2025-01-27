@@ -1,6 +1,5 @@
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::io::Write;
 use crate::types::{Allowlist, AllowlistEntry, AllowScope, Task, TaskRunner};
 use crate::prompt::{self, AllowDecision};
 
@@ -31,24 +30,14 @@ pub fn load_allowlist() -> Result<Allowlist, String> {
 /// Save the allowlist to ~/.dela/allowlist.toml
 pub fn save_allowlist(allowlist: &Allowlist) -> Result<(), String> {
     let path = allowlist_path()?;
-
-    // Ensure ~/.dela directory exists
+    
+    // Create .dela directory if it doesn't exist
     if let Some(parent) = path.parent() {
-        if !parent.exists() {
-            fs::create_dir_all(parent)
-                .map_err(|e| format!("Failed to create directory {}: {}", parent.display(), e))?;
-        }
+        fs::create_dir_all(parent).map_err(|e| format!("Failed to create .dela directory: {}", e))?;
     }
 
-    let toml_str = toml::to_string_pretty(allowlist)
-        .map_err(|e| format!("Failed to serialize allowlist: {}", e))?;
-
-    let mut file = fs::File::create(&path)
-        .map_err(|e| format!("Failed to create allowlist file: {}", e))?;
-
-    file.write_all(toml_str.as_bytes())
-        .map_err(|e| format!("Failed to write allowlist file: {}", e))?;
-
+    let toml = toml::to_string_pretty(&allowlist).map_err(|e| format!("Failed to serialize allowlist: {}", e))?;
+    fs::write(&path, toml).map_err(|e| format!("Failed to create allowlist file: {}", e))?;
     Ok(())
 }
 
@@ -148,10 +137,16 @@ mod tests {
     use super::*;
     use tempfile::TempDir;
     use std::env;
+    use std::fs;
+    use serial_test::serial;
 
     fn setup_test_env() -> (TempDir, Task) {
         let temp_dir = TempDir::new().unwrap();
         env::set_var("HOME", temp_dir.path());
+
+        // Create ~/.dela directory
+        fs::create_dir_all(temp_dir.path().join(".dela"))
+            .expect("Failed to create .dela directory");
 
         let task = Task {
             name: "test-task".to_string(),
@@ -165,6 +160,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_empty_allowlist() {
         let (_temp_dir, _task) = setup_test_env();
         let allowlist = load_allowlist().unwrap();
@@ -172,8 +168,9 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_save_and_load_allowlist() {
-        let (_temp_dir, _task) = setup_test_env();
+        let (temp_dir, _task) = setup_test_env();
         let mut allowlist = Allowlist::default();
         
         let entry = AllowlistEntry {
@@ -185,12 +182,28 @@ mod tests {
         allowlist.entries.push(entry);
         save_allowlist(&allowlist).unwrap();
 
+        // Debug output
+        let path = allowlist_path().unwrap();
+        println!("Allowlist path: {}", path.display());
+        println!("Allowlist exists: {}", path.exists());
+        if path.exists() {
+            let contents = std::fs::read_to_string(&path).unwrap();
+            println!("Allowlist contents: {}", contents);
+            let loaded_from_file: Allowlist = toml::from_str(&contents).unwrap();
+            println!("Loaded from file: {:?}", loaded_from_file);
+        }
+
         let loaded = load_allowlist().unwrap();
+        println!("Loaded from function: {:?}", loaded);
         assert_eq!(loaded.entries.len(), 1);
         assert_eq!(loaded.entries[0].scope, AllowScope::File);
+
+        // Keep temp_dir around until the end of the test
+        drop(temp_dir);
     }
 
     #[test]
+    #[serial]
     fn test_path_matches() {
         let base = PathBuf::from("/home/user/project");
         let file = base.join("Makefile");

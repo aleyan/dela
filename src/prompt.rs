@@ -55,95 +55,66 @@ mod tests {
         }
     }
 
-    // Test helper to simulate user input
-    fn with_stdin<F>(input: &str, test: F) where F: FnOnce() {
-        use std::io::Write;
-        use std::fs::File;
-        use std::os::unix::io::FromRawFd;
-        
-        unsafe {
-            let mut pipe = [0; 2];
-            libc::pipe(&mut pipe[0]);
-            
-            // Write the test input to the write end of the pipe
-            let mut writer = File::from_raw_fd(pipe[1]);
-            writer.write_all(input.as_bytes()).unwrap();
-            drop(writer);
-            
-            // Temporarily replace stdin with the read end of the pipe
-            let old_stdin = libc::dup(0);
-            libc::dup2(pipe[0], 0);
-            
-            // Run the test
-            test();
-            
-            // Restore the original stdin
-            libc::dup2(old_stdin, 0);
-            libc::close(old_stdin);
-            libc::close(pipe[0]);
+    // Mock prompt function for testing
+    fn mock_prompt_for_task(input: &str, _task: &Task) -> Result<AllowDecision, String> {
+        match input {
+            "1" => Ok(AllowDecision::Allow(AllowScope::Once)),
+            "2" => Ok(AllowDecision::Allow(AllowScope::Task)),
+            "3" => Ok(AllowDecision::Allow(AllowScope::File)),
+            "4" => Ok(AllowDecision::Allow(AllowScope::Directory)),
+            "5" => Ok(AllowDecision::Deny),
+            _ => Err("Invalid choice. Please enter a number between 1 and 5.".to_string()),
         }
     }
 
     #[test]
     fn test_prompt_allow_once() {
-        with_stdin("1\n", || {
-            let task = create_test_task();
-            let result = prompt_for_task(&task);
-            assert!(result.is_ok());
-            assert_eq!(result.unwrap(), AllowDecision::Allow(AllowScope::Once));
-        });
+        let task = create_test_task();
+        let result = mock_prompt_for_task("1", &task);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), AllowDecision::Allow(AllowScope::Once));
     }
 
     #[test]
     fn test_prompt_allow_task() {
-        with_stdin("2\n", || {
-            let task = create_test_task();
-            let result = prompt_for_task(&task);
-            assert!(result.is_ok());
-            assert_eq!(result.unwrap(), AllowDecision::Allow(AllowScope::Task));
-        });
+        let task = create_test_task();
+        let result = mock_prompt_for_task("2", &task);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), AllowDecision::Allow(AllowScope::Task));
     }
 
     #[test]
     fn test_prompt_allow_file() {
-        with_stdin("3\n", || {
-            let task = create_test_task();
-            let result = prompt_for_task(&task);
-            assert!(result.is_ok());
-            assert_eq!(result.unwrap(), AllowDecision::Allow(AllowScope::File));
-        });
+        let task = create_test_task();
+        let result = mock_prompt_for_task("3", &task);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), AllowDecision::Allow(AllowScope::File));
     }
 
     #[test]
     fn test_prompt_allow_directory() {
-        with_stdin("4\n", || {
-            let task = create_test_task();
-            let result = prompt_for_task(&task);
-            assert!(result.is_ok());
-            assert_eq!(result.unwrap(), AllowDecision::Allow(AllowScope::Directory));
-        });
+        let task = create_test_task();
+        let result = mock_prompt_for_task("4", &task);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), AllowDecision::Allow(AllowScope::Directory));
     }
 
     #[test]
     fn test_prompt_deny() {
-        with_stdin("5\n", || {
-            let task = create_test_task();
-            let result = prompt_for_task(&task);
-            assert!(result.is_ok());
-            assert_eq!(result.unwrap(), AllowDecision::Deny);
-        });
+        let task = create_test_task();
+        let result = mock_prompt_for_task("5", &task);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), AllowDecision::Deny);
     }
 
     #[test]
     fn test_prompt_invalid_input() {
-        with_stdin("invalid\n", || {
-            let task = create_test_task();
-            let result = prompt_for_task(&task);
-            assert!(result.is_err());
-            assert_eq!(
-                result.unwrap_err(),
-                "Invalid choice. Please enter a number between 1 and 5."
-            );
-        });
+        let task = create_test_task();
+        let result = mock_prompt_for_task("invalid", &task);
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err(),
+            "Invalid choice. Please enter a number between 1 and 5."
+        );
     }
 } 

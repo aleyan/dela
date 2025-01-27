@@ -78,14 +78,45 @@ pub fn execute() -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs::File;
+    use std::fs::{self, File};
     use std::io::Write;
     use tempfile::TempDir;
     use serial_test::serial;
 
-    fn setup_test_dir() -> TempDir {
-        let temp_dir = TempDir::new().expect("Failed to create temp directory");
+    fn setup_test_env() -> (TempDir, TempDir) {
+        // Create a temp dir for the project
+        let project_dir = TempDir::new().expect("Failed to create temp directory");
         
+        // Create a temp dir for HOME and set it up
+        let home_dir = TempDir::new().expect("Failed to create temp HOME directory");
+        env::set_var("HOME", home_dir.path());
+        
+        // Create ~/.dela directory
+        fs::create_dir_all(home_dir.path().join(".dela"))
+            .expect("Failed to create .dela directory");
+
+        (project_dir, home_dir)
+    }
+
+    #[test]
+    #[serial]
+    fn test_list_empty_directory() {
+        let (project_dir, home_dir) = setup_test_env();
+        env::set_current_dir(&project_dir).expect("Failed to change directory");
+
+        let result = execute();
+        assert!(result.is_ok());
+
+        drop(project_dir);
+        drop(home_dir);
+    }
+
+    #[test]
+    #[serial]
+    fn test_list_with_task_files() {
+        let (project_dir, home_dir) = setup_test_env();
+        env::set_current_dir(&project_dir).expect("Failed to change directory");
+
         // Create a test Makefile
         let makefile_content = "
 build: ## Building the project
@@ -94,63 +125,35 @@ build: ## Building the project
 test: ## Running tests
 \t@echo Testing...
 ";
-        let mut makefile = File::create(temp_dir.path().join("Makefile"))
+        let mut makefile = File::create(project_dir.path().join("Makefile"))
             .expect("Failed to create Makefile");
         makefile.write_all(makefile_content.as_bytes())
             .expect("Failed to write Makefile");
 
-        temp_dir
-    }
-
-    #[test]
-    #[serial]
-    fn test_list_with_task_files() {
-        let original_dir = env::current_dir().expect("Failed to get current directory");
-        let temp_dir = setup_test_dir();
-        env::set_current_dir(temp_dir.path()).expect("Failed to change directory");
-
         let result = execute();
-        assert!(result.is_ok(), "Should succeed with task files present");
+        assert!(result.is_ok());
 
-        // Restore directory before dropping temp_dir
-        env::set_current_dir(&original_dir).expect("Failed to restore directory");
-        drop(temp_dir);
-    }
-
-    #[test]
-    #[serial]
-    fn test_list_empty_directory() {
-        let original_dir = env::current_dir().expect("Failed to get current directory");
-        let temp_dir = TempDir::new().expect("Failed to create temp directory");
-        env::set_current_dir(temp_dir.path()).expect("Failed to change directory");
-
-        let result = execute();
-        assert!(result.is_ok(), "Should succeed with empty directory");
-
-        // Restore directory before dropping temp_dir
-        env::set_current_dir(&original_dir).expect("Failed to restore directory");
-        drop(temp_dir);
+        drop(project_dir);
+        drop(home_dir);
     }
 
     #[test]
     #[serial]
     fn test_list_with_invalid_makefile() {
-        let original_dir = env::current_dir().expect("Failed to get current directory");
-        let temp_dir = TempDir::new().expect("Failed to create temp directory");
-        env::set_current_dir(temp_dir.path()).expect("Failed to change directory");
+        let (project_dir, home_dir) = setup_test_env();
+        env::set_current_dir(&project_dir).expect("Failed to change directory");
 
         // Create an invalid Makefile
-        let makefile_content = "<invalid>makefile</invalid>";
-        let mut makefile = File::create(temp_dir.path().join("Makefile"))
+        let makefile_content = "invalid makefile content";
+        let mut makefile = File::create(project_dir.path().join("Makefile"))
             .expect("Failed to create Makefile");
         makefile.write_all(makefile_content.as_bytes())
             .expect("Failed to write Makefile");
 
         let result = execute();
-        assert!(result.is_ok(), "Should succeed with invalid Makefile");
+        assert!(result.is_ok());
 
-        // Restore directory before dropping temp_dir
-        env::set_current_dir(&original_dir).expect("Failed to restore directory");
-        drop(temp_dir);
+        drop(project_dir);
+        drop(home_dir);
     }
 } 

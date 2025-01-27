@@ -45,6 +45,13 @@ enum Commands {
         /// Name of the task to get the command for
         task: String,
     },
+
+    /// Check if a task is allowed to run (used internally by shell functions)
+    #[command(name = "allow-command")]
+    AllowCommand {
+        /// Name of the task to check
+        task: String,
+    },
 }
 
 fn main() {
@@ -62,6 +69,7 @@ fn main() {
             commands::run::execute(&task)
         }
         Commands::GetCommand { task } => commands::get_command::execute(&task),
+        Commands::AllowCommand { task } => commands::allow_command::execute(&task),
     };
 
     if let Err(err) = result {
