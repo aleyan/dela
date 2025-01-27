@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use serde::{Deserialize, Serialize};
 
 /// Status of a task definition file
 #[allow(dead_code)]
@@ -94,4 +95,34 @@ pub struct DiscoveredTasks {
     pub definitions: DiscoveredTaskDefinitions,
 }
 
-// TODO(DTKT-29): Add AllowlistEntry and related types 
+/// Represents the scope of user approval
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum AllowScope {
+    /// Allow only once (not persisted for future runs)
+    Once,
+    /// Allow only this specific task
+    Task,
+    /// Allow all tasks from a specific file
+    File,
+    /// Allow all tasks from a directory (recursively)
+    Directory,
+    /// Deny execution
+    Deny,
+}
+
+/// A single allowlist entry
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AllowlistEntry {
+    /// The file or directory path
+    pub path: PathBuf,
+    /// The scope of the user’s decision
+    pub scope: AllowScope,
+    /// If scope is Task, hold the list of allowed tasks
+    pub tasks: Option<Vec<String>>,
+}
+
+/// The full allowlist with multiple entries
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+pub struct Allowlist {
+    pub entries: Vec<AllowlistEntry>,
+}

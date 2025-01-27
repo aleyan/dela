@@ -127,6 +127,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "makefile-lossless",
+ "serde",
  "serde_json",
  "serial_test",
  "tempfile",
