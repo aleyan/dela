@@ -1,12 +1,20 @@
 # --- Stage 1: Builder ---
-FROM rust:slim-bookworm AS builder
+FROM rust:alpine3.21 AS builder
+
+# Install build dependencies
+RUN apk add --no-cache \
+    musl-dev \
+    gcc \
+    make \
+    openssl-dev \
+    pkgconfig
 
 # Set the working directory inside the container
 WORKDIR /app
-
+    
 # Copy Cargo definition files first (better Docker caching)
 COPY Cargo.toml Cargo.lock ./
-
+    
 # Pre-fetch dependencies (creates a build cache layer)
 RUN cargo fetch || true
 
@@ -16,32 +24,37 @@ COPY resources ./resources
 RUN cargo build --release --all-features
 
 # --- Stage 2: Test environment ---
-FROM debian:bookworm-slim
+FROM alpine:3.21
 
 # Install minimal required packages for testing
-RUN apt-get update && apt-get install -y \
+RUN apk add --no-cache \
     bash \
     make \
-    && rm -rf /var/lib/apt/lists/*
+    python3 \
+    uv \
+    poetry
 
 # Create test user
-RUN useradd -m -s /bin/bash testuser
+RUN adduser -D -s /bin/bash testuser
 
 # Set up basic bash configuration
-COPY --chown=testuser:testuser tests/docker_bash/bashrc.test /home/testuser/.bashrc
+COPY tests/docker_bash/bashrc.test /home/testuser/.bashrc
+RUN chown testuser:testuser /home/testuser/.bashrc
 
-# Copy test Makefile
+# Copy test files
 COPY tests/task_definitions /home/testuser/
+RUN chown -R testuser:testuser /home/testuser
+
+# Copy the compiled binary from the builder stage
+COPY --from=builder /app/target/release/dela /usr/local/bin/dela
 
 USER testuser
 WORKDIR /home/testuser
 
-# Copy the compiled binary from the builder stage
-COPY --from=builder --chown=testuser:testuser /app/target/release/dela /usr/local/bin/dela
-
-# Set up test environment
+# Set up environment variables
 ENV HOME=/home/testuser
 ENV SHELL=/bin/bash
+ENV PATH="/home/testuser/.local/bin:${PATH}"
 
 # Entry point script will be mounted
-CMD ["bash", "/home/testuser/test_script.sh"] 
+CMD ["bash", "/home/testuser/test_script.sh"]
