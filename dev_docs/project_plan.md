@@ -31,6 +31,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
 - [ ] **CLI Implementation for `list`**
   - [x] [DTKT-9] Ensure `dela list` shows tasks from recognized files.
   - [x] [DTKT-10] Print tasks with references to the source file.
+  - [ ] [DTKT-] List which task runner will be used for each task.
 
 **Deliverables**
 - [x] Parsing logic for multiple file types.
@@ -46,12 +47,13 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [x] [DTKT-13] Implement `dela configure-shell` command to return the command_not_found_handle.
   - [x] [DTKT-14] Implement `dela init` command to automate creation of `~/.dela` and `~/.dela/allowlist.toml`.
   - [x] [DTKT-15] Modify `dela init` command add eval of `dela configure_shell`.
+  - [ ] [DTKT-] Have `dela init` take options options (eg no method missing) 
 
 - [x] **Shell Execution Strategy**
   - [x] [DTKT-75] Implement shell function wrapper for `dela run` command
   - [x] [DTKT-76] Implement `get-command` to return shell-executable command string
   - [x] [DTKT-77] Ensure commands execute in actual shell environment
-  - [ ] [DTKT-78] Support shell builtins (cd, source, etc.)
+  - [ ] [DTKT-78] Indicate when tasks are shadowed by shell builtins (cd, source, etc.)
   - [x] [DTKT-79] Ensure environment modifications persist
   - [x] [DTKT-80] Make shell aliases and functions available to tasks
 
@@ -70,19 +72,22 @@ This plan outlines the major development phases and tasks for building `dela`, a
 
 - [ ] **Task Execution Logic**
   - [ ] [DTKT-18] Implement `task_execution.rs` to invoke tasks (e.g., `make <target>`, `npm run <script>`).
+  - [ ] [DTKT-] Pass arguments after the task name to the task
   - [ ] [DTKT-19] Handle errors if required CLI tools are missing.
   - [ ] [DTKT-20] Implement shell environment inheritance for task execution.
   - [ ] [DTKT-21] Support both direct execution and subshell spawning based on task type.
   - [ ] [DTKT-22] Ensure environment variables and working directory are properly propagated.
   - [ ] [DTKT-85] Design task name collision resolution strategy
+  - [ ] [DTKT-78] Indicate when tasks are shadowed by shell builtins (cd, source, etc.)
   - [ ] [DTKT-86] Implement task name collision resolution
-  - [ ] [DTKT-87] Implement tark runner installation detection
-  - [ ] [DTKT-88] Implement task runner disambiguation (npm vs yarn)
+  - [ ] [DTKT-87] Implement task runner installation detection
+  - [ ] [DTKT-88] Implement task runner disambiguation eg(npm vs yarn vs bun)
 
 - [ ] **`run` Command and Bare-Command Invocation**
   - [ ] [DTKT-23] Complete `dela run <task>` for direct execution.
   - [ ] [DTKT-24] Ensure bare commands invoke `dela` through the fallback.
   - [ ] [DTKT-25] Prompt user if multiple matching tasks exist.
+  - [ ] [DTLT-] Provide `dr` shell function to run dela tasks with --allow flag.
 
 - [ ] **Disambiguation**
   - [ ] [DTKT-26] Implement logic to handle multiple tasks with the same name.
@@ -105,6 +110,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [ ] [DTKT-30] Prompt user on first invocation of task from new file/directory.
   - [ ] [DTKT-31] Support "Allow once," "Allow this task," "Allow file," "Allow directory," and "Deny."
   - [ ] [DTKT-32] Persist decisions in the allowlist.
+  - [ ] [DTKT-33] Have `dela run` take an optional `--allow` flag to allow a task without prompting.
 
 - [ ] **Runtime Checks**
   - [ ] [DTKT-33] Consult allowlist before executing tasks.
