@@ -1,6 +1,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
-use crate::types::{Allowlist, AllowlistEntry, AllowScope, Task, TaskRunner};
+use crate::types::{Allowlist, AllowlistEntry, AllowScope, Task};
 use crate::prompt::{self, AllowDecision};
 
 /// Returns the path to ~/.dela/allowlist.toml
@@ -135,6 +135,7 @@ pub fn check_task_allowed(task: &Task) -> Result<bool, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::TaskRunner;
     use tempfile::TempDir;
     use std::env;
     use std::fs;
