@@ -14,7 +14,7 @@ test:
 # Build the base builder image
 builder:
 	@echo "Building base builder image..."
-	docker build -t dela-builder -f tests/docker_common/Dockerfile.builder .
+	docker build -t dela-builder -f tests/Dockerfile.builder .
 
 # Individual shell test targets
 test_zsh: builder
