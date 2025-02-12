@@ -18,40 +18,16 @@ builder:
 
 # Individual shell test targets
 test_zsh: builder
-	@if [ "$(VERBOSE)" = "1" ]; then \
-		echo "Running zsh integration tests (verbose)..."; \
-		VERBOSE=1 ./tests/run_tests.sh zsh; \
-	else \
-		echo "Running zsh integration tests..."; \
-		VERBOSE=0 ./tests/run_tests.sh zsh; \
-	fi
+	VERBOSE=$(VERBOSE) ./tests/run_tests.sh zsh;
 
 test_bash: builder
-	@if [ "$(VERBOSE)" = "1" ]; then \
-		echo "Running bash integration tests (verbose)..."; \
-		VERBOSE=1 ./tests/run_tests.sh bash; \
-	else \
-		echo "Running bash integration tests..."; \
-		VERBOSE=0 ./tests/run_tests.sh bash; \
-	fi
+	VERBOSE=$(VERBOSE) ./tests/run_tests.sh bash;
 
 test_fish: builder
-	@if [ "$(VERBOSE)" = "1" ]; then \
-		echo "Running fish integration tests (verbose)..."; \
-		VERBOSE=1 ./tests/run_tests.sh fish; \
-	else \
-		echo "Running fish integration tests..."; \
-		VERBOSE=0 ./tests/run_tests.sh fish; \
-	fi
+	VERBOSE=$(VERBOSE) ./tests/run_tests.sh fish;
 
 test_pwsh: builder
-	@if [ "$(VERBOSE)" = "1" ]; then \
-		echo "Running PowerShell integration tests (verbose)..."; \
-		VERBOSE=1 ./tests/run_tests.sh pwsh; \
-	else \
-		echo "Running PowerShell integration tests..."; \
-		VERBOSE=0 ./tests/run_tests.sh pwsh; \
-	fi
+	VERBOSE=$(VERBOSE) ./tests/run_tests.sh pwsh;
 
 # Run all shell tests
 test_shells: builder test_zsh test_bash test_fish test_pwsh
