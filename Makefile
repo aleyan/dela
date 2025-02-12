@@ -1,7 +1,10 @@
-.PHONY: build test test_shells test_zsh test_bash test_fish test_pwsh run install builder
+.PHONY: build test test_shells test_zsh test_bash test_fish test_pwsh run install builder publish
 
 # Default to non-verbose output
 VERBOSE ?= 0
+
+# Load environment variables from .env file if it exists
+-include .env
 
 build:
 	@echo "Building dela..."
@@ -38,4 +41,14 @@ install:
 
 run:
 	@echo "Running dela..."
-	cargo run 
+	cargo run
+
+# Publish to crates.io
+publish: test
+	@if [ -z "$(CARGO_REGISTRY_TOKEN)" ]; then \
+		echo "Error: CARGO_REGISTRY_TOKEN is not set. Please add it to your .env file."; \
+		exit 1; \
+	fi
+	@echo "Publishing dela to crates.io..."
+	@cargo publish
+	
