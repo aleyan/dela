@@ -1,29 +1,7 @@
-# --- Stage 1: Builder ---
-FROM rust:alpine3.21 AS builder
+# Build stage using common builder
+FROM dela-builder AS builder
 
-# Install build dependencies
-RUN apk add --no-cache \
-    musl-dev \
-    gcc \
-    make \
-    openssl-dev \
-    pkgconfig
-
-# Set the working directory inside the container
-WORKDIR /app
-    
-# Copy Cargo definition files first (better Docker caching)
-COPY Cargo.toml Cargo.lock ./
-    
-# Pre-fetch dependencies (creates a build cache layer)
-RUN cargo fetch || true
-
-# Now copy source code and build
-COPY src ./src
-COPY resources ./resources
-RUN cargo build --release --all-features
-
-# --- Stage 2: Test environment ---
+# Test environment
 FROM alpine:3.21
 
 # Install minimal required packages for testing
@@ -39,7 +17,12 @@ RUN adduser -D -s /bin/bash testuser
 
 # Set up basic bash configuration
 COPY tests/docker_bash/bashrc.test /home/testuser/.bashrc
-RUN chown testuser:testuser /home/testuser/.bashrc
+RUN chown testuser:testuser /home/testuser/.bashrc && \
+    chmod 644 /home/testuser/.bashrc
+
+# Create dela directory with proper permissions
+RUN mkdir -p /home/testuser/.dela && \
+    chown -R testuser:testuser /home/testuser/.dela
 
 # Copy test files
 COPY tests/task_definitions /home/testuser/

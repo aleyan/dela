@@ -1,4 +1,4 @@
-.PHONY: build test test_shells test_zsh test_bash test_fish test_pwsh run install
+.PHONY: build test test_shells test_zsh test_bash test_fish test_pwsh run install builder
 
 # Default to non-verbose output
 VERBOSE ?= 0
@@ -11,8 +11,13 @@ test:
 	@echo "Running tests..."
 	cargo test
 
+# Build the base builder image
+builder:
+	@echo "Building base builder image..."
+	docker build -t dela-builder -f tests/docker_common/Dockerfile.builder .
+
 # Individual shell test targets
-test_zsh:
+test_zsh: builder
 	@if [ "$(VERBOSE)" = "1" ]; then \
 		echo "Running zsh integration tests (verbose)..."; \
 		VERBOSE=1 ./tests/run_tests.sh zsh; \
@@ -21,7 +26,7 @@ test_zsh:
 		VERBOSE=0 ./tests/run_tests.sh zsh; \
 	fi
 
-test_bash:
+test_bash: builder
 	@if [ "$(VERBOSE)" = "1" ]; then \
 		echo "Running bash integration tests (verbose)..."; \
 		VERBOSE=1 ./tests/run_tests.sh bash; \
@@ -30,7 +35,7 @@ test_bash:
 		VERBOSE=0 ./tests/run_tests.sh bash; \
 	fi
 
-test_fish:
+test_fish: builder
 	@if [ "$(VERBOSE)" = "1" ]; then \
 		echo "Running fish integration tests (verbose)..."; \
 		VERBOSE=1 ./tests/run_tests.sh fish; \
@@ -39,7 +44,7 @@ test_fish:
 		VERBOSE=0 ./tests/run_tests.sh fish; \
 	fi
 
-test_pwsh:
+test_pwsh: builder
 	@if [ "$(VERBOSE)" = "1" ]; then \
 		echo "Running PowerShell integration tests (verbose)..."; \
 		VERBOSE=1 ./tests/run_tests.sh pwsh; \
@@ -48,15 +53,8 @@ test_pwsh:
 		VERBOSE=0 ./tests/run_tests.sh pwsh; \
 	fi
 
-# Test all shells
-test_shells:
-	@if [ "$(VERBOSE)" = "1" ]; then \
-		echo "Running shell integration tests (verbose)..."; \
-		VERBOSE=1 ./tests/run_tests.sh; \
-	else \
-		echo "Running shell integration tests..."; \
-		VERBOSE=0 ./tests/run_tests.sh; \
-	fi
+# Run all shell tests
+test_shells: builder test_zsh test_bash test_fish test_pwsh
 
 install:
 	@echo "Installing dela locally..."
