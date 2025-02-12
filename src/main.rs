@@ -31,7 +31,11 @@ enum Commands {
     ConfigureShell,
     
     /// List all available tasks in the current directory
-    List,
+    List {
+        /// Show detailed information about task definition files
+        #[arg(short, long)]
+        verbose: bool,
+    },
     
     /// Run a specific task
     Run {
@@ -64,7 +68,7 @@ fn main() {
         Commands::ConfigureShell => {
             commands::configure_shell::execute()
         }
-        Commands::List => commands::list::execute(),
+        Commands::List { verbose } => commands::list::execute(verbose),
         Commands::Run { task } => {
             commands::run::execute(&task)
         }

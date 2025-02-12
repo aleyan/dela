@@ -3,41 +3,43 @@ use std::collections::HashMap;
 use crate::types::{Task, TaskFileStatus};
 use crate::task_discovery;
 
-pub fn execute() -> Result<(), String> {
+pub fn execute(verbose: bool) -> Result<(), String> {
     let current_dir = env::current_dir()
         .map_err(|e| format!("Failed to get current directory: {}", e))?;
     let discovered = task_discovery::discover_tasks(&current_dir);
     
-    // Display task definition files status
-    println!("Task definition files:");
-    if let Some(makefile) = &discovered.definitions.makefile {
-        match &makefile.status {
-            TaskFileStatus::Parsed => println!("  ✓ Makefile: Found and parsed"),
-            TaskFileStatus::NotImplemented => println!("  ! Makefile: Found but parsing not yet implemented"),
-            TaskFileStatus::ParseError(e) => println!("  ✗ Makefile: Error parsing: {}", e),
-            TaskFileStatus::NotReadable(e) => println!("  ✗ Makefile: Not readable: {}", e),
-            TaskFileStatus::NotFound => println!("  - Makefile: Not found"),
+    // Only show task definition files status in verbose mode
+    if verbose {
+        println!("Task definition files:");
+        if let Some(makefile) = &discovered.definitions.makefile {
+            match &makefile.status {
+                TaskFileStatus::Parsed => println!("  ✓ Makefile: Found and parsed"),
+                TaskFileStatus::NotImplemented => println!("  ! Makefile: Found but parsing not yet implemented"),
+                TaskFileStatus::ParseError(e) => println!("  ✗ Makefile: Error parsing: {}", e),
+                TaskFileStatus::NotReadable(e) => println!("  ✗ Makefile: Not readable: {}", e),
+                TaskFileStatus::NotFound => println!("  - Makefile: Not found"),
+            }
         }
-    }
-    if let Some(package_json) = &discovered.definitions.package_json {
-        match &package_json.status {
-            TaskFileStatus::Parsed => println!("  ✓ package.json: Found and parsed"),
-            TaskFileStatus::NotImplemented => println!("  ! package.json: Found but parsing not yet implemented"),
-            TaskFileStatus::ParseError(e) => println!("  ✗ package.json: Error parsing: {}", e),
-            TaskFileStatus::NotReadable(e) => println!("  ✗ package.json: Not readable: {}", e),
-            TaskFileStatus::NotFound => println!("  - package.json: Not found"),
+        if let Some(package_json) = &discovered.definitions.package_json {
+            match &package_json.status {
+                TaskFileStatus::Parsed => println!("  ✓ package.json: Found and parsed"),
+                TaskFileStatus::NotImplemented => println!("  ! package.json: Found but parsing not yet implemented"),
+                TaskFileStatus::ParseError(e) => println!("  ✗ package.json: Error parsing: {}", e),
+                TaskFileStatus::NotReadable(e) => println!("  ✗ package.json: Not readable: {}", e),
+                TaskFileStatus::NotFound => println!("  - package.json: Not found"),
+            }
         }
-    }
-    if let Some(pyproject_toml) = &discovered.definitions.pyproject_toml {
-        match &pyproject_toml.status {
-            TaskFileStatus::Parsed => println!("  ✓ pyproject.toml: Found and parsed"),
-            TaskFileStatus::NotImplemented => println!("  ! pyproject.toml: Found but parsing not yet implemented"),
-            TaskFileStatus::ParseError(e) => println!("  ✗ pyproject.toml: Error parsing: {}", e),
-            TaskFileStatus::NotReadable(e) => println!("  ✗ pyproject.toml: Not readable: {}", e),
-            TaskFileStatus::NotFound => println!("  - pyproject.toml: Not found"),
+        if let Some(pyproject_toml) = &discovered.definitions.pyproject_toml {
+            match &pyproject_toml.status {
+                TaskFileStatus::Parsed => println!("  ✓ pyproject.toml: Found and parsed"),
+                TaskFileStatus::NotImplemented => println!("  ! pyproject.toml: Found but parsing not yet implemented"),
+                TaskFileStatus::ParseError(e) => println!("  ✗ pyproject.toml: Error parsing: {}", e),
+                TaskFileStatus::NotReadable(e) => println!("  ✗ pyproject.toml: Not readable: {}", e),
+                TaskFileStatus::NotFound => println!("  - pyproject.toml: Not found"),
+            }
         }
+        println!();
     }
-    println!();
 
     if discovered.tasks.is_empty() {
         println!("No tasks found in the current directory.");
@@ -104,7 +106,7 @@ mod tests {
         let (project_dir, home_dir) = setup_test_env();
         env::set_current_dir(&project_dir).expect("Failed to change directory");
 
-        let result = execute();
+        let result = execute(false);
         assert!(result.is_ok());
 
         drop(project_dir);
@@ -130,7 +132,7 @@ test: ## Running tests
         makefile.write_all(makefile_content.as_bytes())
             .expect("Failed to write Makefile");
 
-        let result = execute();
+        let result = execute(false);
         assert!(result.is_ok());
 
         drop(project_dir);
@@ -150,7 +152,61 @@ test: ## Running tests
         makefile.write_all(makefile_content.as_bytes())
             .expect("Failed to write Makefile");
 
-        let result = execute();
+        let result = execute(false);
+        assert!(result.is_ok());
+
+        drop(project_dir);
+        drop(home_dir);
+    }
+
+    #[test]
+    #[serial]
+    fn test_list_verbose_mode() {
+        let (project_dir, home_dir) = setup_test_env();
+        env::set_current_dir(&project_dir).expect("Failed to change directory");
+
+        // Create a test Makefile
+        let makefile_content = "
+build: ## Building the project
+\t@echo Building...
+
+test: ## Running tests
+\t@echo Testing...
+";
+        let mut makefile = File::create(project_dir.path().join("Makefile"))
+            .expect("Failed to create Makefile");
+        makefile.write_all(makefile_content.as_bytes())
+            .expect("Failed to write Makefile");
+
+        // Test verbose output
+        let result = execute(true);
+        assert!(result.is_ok());
+
+        drop(project_dir);
+        drop(home_dir);
+    }
+
+    #[test]
+    #[serial]
+    fn test_list_non_verbose_mode() {
+        let (project_dir, home_dir) = setup_test_env();
+        env::set_current_dir(&project_dir).expect("Failed to change directory");
+
+        // Create a test Makefile
+        let makefile_content = "
+build: ## Building the project
+\t@echo Building...
+
+test: ## Running tests
+\t@echo Testing...
+";
+        let mut makefile = File::create(project_dir.path().join("Makefile"))
+            .expect("Failed to create Makefile");
+        makefile.write_all(makefile_content.as_bytes())
+            .expect("Failed to write Makefile");
+
+        // Test non-verbose output
+        let result = execute(false);
         assert!(result.is_ok());
 
         drop(project_dir);
