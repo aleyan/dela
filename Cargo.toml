@@ -1,9 +1,15 @@
 [package]
 name = "dela"
-version = "0.1.0"
+version = "0.0.1"
 edition = "2021"
 license = "MIT"
 authors = ["Alexander Yankov"]
+description = "A task runner that delegates to others, discovering tasks from Makefiles, package.json, and more"
+repository = "https://github.com/aleyan/dela"
+documentation = "https://github.com/aleyan/dela#readme"
+readme = "README.md"
+keywords = ["task-runner", "automation", "build", "make", "npm"]
+categories = ["command-line-utilities", "development-tools", "development-tools::build-utils"]
 
 [dependencies]
 clap = { version = "4.5.24", features = ["derive"] }
