@@ -90,6 +90,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [x] [DTKT-24] Ensure bare commands invoke `dela` through the fallback.
   - [ ] [DTKT-25] Prompt user if multiple matching tasks exist.
   - [ ] [DTKT-95] Provide `dr` shell function to run dela tasks with --allow flag.
+  - [ ] [DTKT-112] Remove `dela run` in favor of `dr` shell function.
 
 - [ ] **Disambiguation**
   - [ ] [DTKT-26] Implement logic to handle multiple tasks with the same name.
@@ -113,6 +114,9 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [x] [DTKT-31] Support "Allow once," "Allow this task," "Allow file," "Allow directory," and "Deny."
   - [x] [DTKT-32] Persist decisions in the allowlist.
   - [ ] [DTKT-33] Have `dela run` take an optional `--allow` flag to allow a task without prompting.
+  - [ ] [DTKT-109] Implement `dela allow` command to add allowlist entries.
+  - [ ] [DTKT-110] Implement `dela deny` command to add denylist entries.
+  - [ ] [DTKT-111] Implement `dela run --allow-once` command to run a command once.
 
 - [x] **Runtime Checks**
   - [x] [DTKT-96] Consult allowlist before executing tasks.
@@ -161,7 +165,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
 - [ ] **Integration Tests**
   - [x] [DTKT-40] Simulate user flows with different shells (Zsh, Bash, Fish).
   - [ ] [DTKT-41] Validate allowlist logic and parsing of different file types.
-  - [ ] [DTKT-108] Run integration tests in CI
+  - [x] [DTKT-108] Run integration tests in CI
 
 - [ ] **Cross-Shell Checks**
   - [ ] [DTKT-42] Test on macOS and Linux to ensure consistent behavior.
