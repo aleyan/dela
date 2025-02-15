@@ -5,4 +5,4 @@ pub fn execute(_task_name: &str) -> Result<(), String> {
     println!("2. You're running dela directly instead of through the shell function");
     // TODO(DTKT-97): Add native task execution when shell integration is not detected
     Ok(())
-} 
+}

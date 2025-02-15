@@ -34,9 +34,8 @@ impl Shell {
 
 pub fn execute() -> Result<(), String> {
     // Get the current shell from SHELL environment variable
-    let shell = env::var("SHELL")
-        .map_err(|_| "SHELL environment variable not set".to_string())?;
-    
+    let shell = env::var("SHELL").map_err(|_| "SHELL environment variable not set".to_string())?;
+
     // Parse the shell type
     let shell_type = Shell::from_path(&shell)?;
 
@@ -110,10 +109,7 @@ mod tests {
         setup_test_env("/bin/unknown");
         let result = execute();
         assert!(result.is_err());
-        assert_eq!(
-            result.unwrap_err(),
-            "Unsupported shell: unknown"
-        );
+        assert_eq!(result.unwrap_err(), "Unsupported shell: unknown");
     }
 
     #[test]
@@ -122,10 +118,7 @@ mod tests {
         setup_test_env("");
         let result = execute();
         assert!(result.is_err());
-        assert_eq!(
-            result.unwrap_err(),
-            "Invalid shell path"
-        );
+        assert_eq!(result.unwrap_err(), "Invalid shell path");
     }
 
     #[test]
@@ -134,9 +127,6 @@ mod tests {
         env::remove_var("SHELL");
         let result = execute();
         assert!(result.is_err());
-        assert_eq!(
-            result.unwrap_err(),
-            "SHELL environment variable not set"
-        );
+        assert_eq!(result.unwrap_err(), "SHELL environment variable not set");
     }
-} 
+}

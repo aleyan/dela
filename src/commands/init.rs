@@ -1,8 +1,8 @@
+use crate::types::Allowlist;
 use std::env;
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
-use crate::types::Allowlist;
 
 /// Get the current shell name by checking the parent process
 fn get_current_shell() -> Result<String, String> {
@@ -15,9 +15,8 @@ fn get_current_shell() -> Result<String, String> {
     }
 
     // Fallback to $SHELL if version variables aren't set
-    let shell = env::var("SHELL")
-        .map_err(|_| "SHELL environment variable not set".to_string())?;
-    
+    let shell = env::var("SHELL").map_err(|_| "SHELL environment variable not set".to_string())?;
+
     let shell_path = std::path::PathBuf::from(&shell);
     shell_path
         .file_name()
@@ -29,15 +28,17 @@ fn get_current_shell() -> Result<String, String> {
 /// Get the appropriate shell config path based on current shell
 fn get_shell_config_path() -> Result<PathBuf, String> {
     let shell_name = get_current_shell()?;
-    let home = env::var("HOME")
-        .map_err(|_| "HOME environment variable not set".to_string())?;
+    let home = env::var("HOME").map_err(|_| "HOME environment variable not set".to_string())?;
     let home_path = PathBuf::from(&home);
 
     match shell_name.as_str() {
         "zsh" => Ok(home_path.join(".zshrc")),
         "bash" => Ok(home_path.join(".bashrc")),
         "fish" => Ok(home_path.join(".config").join("fish").join("config.fish")),
-        "pwsh" => Ok(home_path.join(".config").join("powershell").join("Microsoft.PowerShell_profile.ps1")),
+        "pwsh" => Ok(home_path
+            .join(".config")
+            .join("powershell")
+            .join("Microsoft.PowerShell_profile.ps1")),
         name => Err(format!("Unsupported shell: {}", name)),
     }
 }
@@ -59,7 +60,10 @@ fn add_shell_integration(config_path: &PathBuf) -> Result<(), String> {
     };
 
     if content.contains(integration_pattern) {
-        println!("Shell integration already present in {}", config_path.display());
+        println!(
+            "Shell integration already present in {}",
+            config_path.display()
+        );
         return Ok(());
     }
 
@@ -80,8 +84,10 @@ fn add_shell_integration(config_path: &PathBuf) -> Result<(), String> {
 
     // Add dela integration with shell-specific syntax
     writeln!(file).map_err(|e| format!("Failed to write to shell config: {}", e))?;
-    writeln!(file, "# dela shell integration").map_err(|e| format!("Failed to write to shell config: {}", e))?;
-    writeln!(file, "{}", integration_pattern).map_err(|e| format!("Failed to write to shell config: {}", e))?;
+    writeln!(file, "# dela shell integration")
+        .map_err(|e| format!("Failed to write to shell config: {}", e))?;
+    writeln!(file, "{}", integration_pattern)
+        .map_err(|e| format!("Failed to write to shell config: {}", e))?;
 
     Ok(())
 }
@@ -93,19 +99,28 @@ pub fn execute() -> Result<(), String> {
     let config_path = get_shell_config_path()?;
     let shell_name = get_current_shell()?;
 
-    println!("Detected {} shell, configuring {}", shell_name, config_path.display());
+    println!(
+        "Detected {} shell, configuring {}",
+        shell_name,
+        config_path.display()
+    );
 
     // Create ~/.dela directory if it doesn't exist
-    let home = env::var("HOME")
-        .map_err(|_| "HOME environment variable not set".to_string())?;
+    let home = env::var("HOME").map_err(|_| "HOME environment variable not set".to_string())?;
     let dela_dir = PathBuf::from(&home).join(".dela");
-    
+
     if !dela_dir.exists() {
-        println!("Creating dela configuration directory at {}", dela_dir.display());
+        println!(
+            "Creating dela configuration directory at {}",
+            dela_dir.display()
+        );
         fs::create_dir_all(&dela_dir)
             .map_err(|e| format!("Failed to create ~/.dela directory: {}", e))?;
     } else {
-        println!("Using existing dela configuration directory at {}", dela_dir.display());
+        println!(
+            "Using existing dela configuration directory at {}",
+            dela_dir.display()
+        );
     }
 
     // Create empty allowlist.toml if it doesn't exist
@@ -133,8 +148,8 @@ pub fn execute() -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::TempDir;
     use serial_test::serial;
+    use tempfile::TempDir;
 
     fn setup_test_env(shell: &str, home: &PathBuf) -> Result<(), std::io::Error> {
         env::set_var("SHELL", shell);
@@ -170,14 +185,21 @@ mod tests {
 
         // Create .zshrc with existing integration
         let zshrc = home.join(".zshrc");
-        fs::write(&zshrc, "# existing config\neval \"$(dela configure-shell)\"\n").unwrap();
+        fs::write(
+            &zshrc,
+            "# existing config\neval \"$(dela configure-shell)\"\n",
+        )
+        .unwrap();
 
         let result = execute();
         assert!(result.is_ok());
 
         // Verify no duplicate integration was added
         let content = fs::read_to_string(&zshrc).unwrap();
-        assert_eq!(content.matches("eval \"$(dela configure-shell)\"").count(), 1);
+        assert_eq!(
+            content.matches("eval \"$(dela configure-shell)\"").count(),
+            1
+        );
     }
 
     #[test]
@@ -278,4 +300,4 @@ mod tests {
         let allowlist: Allowlist = toml::from_str(&content).unwrap();
         assert!(allowlist.entries.is_empty());
     }
-} 
+}

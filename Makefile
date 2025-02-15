@@ -51,3 +51,7 @@ publish: test
 		exit 1; \
 	fi
 	@cargo publish
+
+# Print git diff without pager
+pdiff:
+	@git --no-pager diff

@@ -1,5 +1,5 @@
-use std::io::{self, Write};
 use crate::types::{AllowScope, Task};
+use std::io::{self, Write};
 
 #[derive(Debug, PartialEq)]
 pub enum AllowDecision {
@@ -9,7 +9,11 @@ pub enum AllowDecision {
 
 /// Prompt the user for a decision about a task
 pub fn prompt_for_task(task: &Task) -> Result<AllowDecision, String> {
-    println!("\nTask '{}' from '{}' requires approval.", task.name, task.file_path.display());
+    println!(
+        "\nTask '{}' from '{}' requires approval.",
+        task.name,
+        task.file_path.display()
+    );
     if let Some(desc) = &task.description {
         println!("Description: {}", desc);
     }
@@ -19,15 +23,17 @@ pub fn prompt_for_task(task: &Task) -> Result<AllowDecision, String> {
     println!("3) Allow file (remember for all tasks in this file)");
     println!("4) Allow directory (remember for all tasks in this directory)");
     println!("5) Deny (don't run this task)");
-    
+
     print!("\nEnter your choice (1-5): ");
-    io::stdout().flush().map_err(|e| format!("Failed to flush stdout: {}", e))?;
-    
+    io::stdout()
+        .flush()
+        .map_err(|e| format!("Failed to flush stdout: {}", e))?;
+
     let mut input = String::new();
     io::stdin()
         .read_line(&mut input)
         .map_err(|e| format!("Failed to read input: {}", e))?;
-    
+
     match input.trim() {
         "1" => Ok(AllowDecision::Allow(AllowScope::Once)),
         "2" => Ok(AllowDecision::Allow(AllowScope::Task)),
@@ -41,8 +47,8 @@ pub fn prompt_for_task(task: &Task) -> Result<AllowDecision, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
     use crate::types::{Task, TaskRunner};
+    use std::path::PathBuf;
 
     // Helper function to create a test task
     fn create_test_task() -> Task {
@@ -52,6 +58,7 @@ mod tests {
             file_path: PathBuf::from("Makefile"),
             runner: TaskRunner::Make,
             source_name: "test-task".to_string(),
+            shadowed_by: None,
         }
     }
 
@@ -117,4 +124,4 @@ mod tests {
             "Invalid choice. Please enter a number between 1 and 5."
         );
     }
-} 
+}

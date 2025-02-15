@@ -1,5 +1,6 @@
-use std::path::PathBuf;
+use crate::task_shadowing::ShadowType;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 /// Status of a task definition file
 #[allow(dead_code)]
@@ -52,6 +53,8 @@ pub struct Task {
     pub source_name: String,
     /// Description of the task if available
     pub description: Option<String>,
+    /// Information about what shadows this task, if anything
+    pub shadowed_by: Option<ShadowType>,
 }
 
 /// Different types of task runners supported by dela
@@ -114,7 +117,10 @@ pub enum AllowScope {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AllowlistEntry {
     /// The file or directory path
-    #[serde(serialize_with = "serialize_path", deserialize_with = "deserialize_path")]
+    #[serde(
+        serialize_with = "serialize_path",
+        deserialize_with = "deserialize_path"
+    )]
     pub path: PathBuf,
     /// The scope of the user's decision
     pub scope: AllowScope,
