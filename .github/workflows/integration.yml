@@ -34,14 +34,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Cache Docker layers
-        uses: actions/cache@v4
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-
-
       - name: Build and push base image
         uses: docker/build-push-action@v5
         with:
@@ -50,14 +42,6 @@ jobs:
           platforms: ${{ env.PLATFORM }}
           tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
           push: true
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
-
-      # Temp fix for https://github.com/docker/build-push-action/issues/252
-      - name: Move cache
-        run: |
-          rm -rf /tmp/.buildx-cache
-          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
 
   shell-tests:
     name: Shell Tests
@@ -71,9 +55,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -81,30 +62,9 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Cache Docker layers
-        uses: actions/cache@v4
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-
-
-      - name: Update Dockerfile to use GHCR image
-        run: |
-          sed -i "s|FROM dela-builder|FROM ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ github.sha }}|" tests/docker_${{ matrix.shell }}/Dockerfile
-
-      - name: Build ${{ matrix.shell }} test image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: tests/docker_${{ matrix.shell }}/Dockerfile
-          platforms: ${{ env.PLATFORM }}
-          load: true
-          tags: dela-${{ matrix.shell }}-test:latest
-          cache-from: type=local,src=/tmp/.buildx-cache
-
       - name: Run ${{ matrix.shell }} tests
-        run: |
-          docker run --rm \
-            --platform ${{ env.PLATFORM }} \
-            dela-${{ matrix.shell }}-test:latest 
+        env:
+          VERBOSE: 1
+          DOCKER_PLATFORM: ${{ env.PLATFORM }}
+          BUILDER_IMAGE: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+        run: ./tests/run_tests.sh ${{ matrix.shell }} 
