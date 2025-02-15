@@ -408,17 +408,23 @@ serve = "uvicorn main:app --reload"
         assert_eq!(discovered.tasks.len(), 5);
 
         // Verify tasks from each file
-        let make_tasks: Vec<_> = discovered.tasks.iter()
+        let make_tasks: Vec<_> = discovered
+            .tasks
+            .iter()
             .filter(|t| t.runner == TaskRunner::Make)
             .collect();
         assert_eq!(make_tasks.len(), 2);
 
-        let npm_tasks: Vec<_> = discovered.tasks.iter()
+        let npm_tasks: Vec<_> = discovered
+            .tasks
+            .iter()
             .filter(|t| t.runner == TaskRunner::Npm)
             .collect();
         assert_eq!(npm_tasks.len(), 2);
 
-        let python_tasks: Vec<_> = discovered.tasks.iter()
+        let python_tasks: Vec<_> = discovered
+            .tasks
+            .iter()
             .filter(|t| t.runner == TaskRunner::PythonUv)
             .collect();
         assert_eq!(python_tasks.len(), 1);
@@ -450,12 +456,19 @@ test:
         assert_eq!(discovered.tasks.len(), 2);
 
         // Verify both test tasks exist with different runners
-        let make_test = discovered.tasks.iter()
+        let make_test = discovered
+            .tasks
+            .iter()
             .find(|t| t.runner == TaskRunner::Make && t.name == "test")
             .unwrap();
-        assert_eq!(make_test.description, Some("Running make tests".to_string()));
+        assert_eq!(
+            make_test.description,
+            Some("Running make tests".to_string())
+        );
 
-        let npm_test = discovered.tasks.iter()
+        let npm_test = discovered
+            .tasks
+            .iter()
             .find(|t| t.runner == TaskRunner::Npm && t.name == "test")
             .unwrap();
         assert_eq!(npm_test.description, Some("npm script: jest".to_string()));
@@ -482,7 +495,11 @@ echo:
 
         // Verify shadowing information
         for task in &discovered.tasks {
-            assert!(task.shadowed_by.is_some(), "Task {} should be shadowed", task.name);
+            assert!(
+                task.shadowed_by.is_some(),
+                "Task {} should be shadowed",
+                task.name
+            );
             assert!(matches!(
                 task.shadowed_by.as_ref().unwrap(),
                 task_shadowing::ShadowType::ShellBuiltin(_)
