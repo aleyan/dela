@@ -254,9 +254,10 @@ fn check_fish_builtin(name: &str) -> Option<ShadowType> {
 
 /// Check if a name is a PowerShell builtin
 fn check_pwsh_builtin(name: &str) -> Option<ShadowType> {
+    #[rustfmt::skip]
     const PWSH_BUILTINS: &[&str] = &[
         "cd",
-        "echo",
+        "echo", 
         "pwd",
         "export",
         "alias",
