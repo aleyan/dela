@@ -14,8 +14,8 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   REGISTRY: ghcr.io
-  # Make image name lowercase as required by GHCR
   IMAGE_NAME: dela-builder
+  PLATFORM: linux/amd64
 
 jobs:
   build-base:
@@ -47,7 +47,8 @@ jobs:
         with:
           context: .
           file: tests/Dockerfile.builder
-          tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/dela-builder:${{ github.sha }}
+          platforms: ${{ env.PLATFORM }}
+          tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
           push: true
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
@@ -82,7 +83,9 @@ jobs:
 
       - name: Update Dockerfile to use GHCR image
         run: |
-          sed -i "s|FROM dela-builder|FROM ${{ env.REGISTRY }}/${{ github.repository_owner }}/dela-builder:${{ github.sha }}|" tests/docker_${{ matrix.shell }}/Dockerfile
+          sed -i "s|FROM dela-builder|FROM ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ github.sha }}|" tests/docker_${{ matrix.shell }}/Dockerfile
 
       - name: Run ${{ matrix.shell }} tests
+        env:
+          DOCKER_DEFAULT_PLATFORM: ${{ env.PLATFORM }}
         run: VERBOSE=1 ./tests/run_tests.sh ${{ matrix.shell }} 
