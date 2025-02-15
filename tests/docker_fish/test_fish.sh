@@ -95,6 +95,49 @@ dela list | grep -q "npm-build"; or begin
     error "npm-build not found in dela list"
     exit 1
 end
+if not dela list | grep -q "poetry-build"
+    error "poetry-build not found in dela list"
+    exit 1
+end
+
+log "Testing task shadowing detection..."
+
+# Create a custom executable in PATH
+log "Creating custom executable..."
+mkdir -p ~/.local/bin
+echo '#!/bin/sh' > ~/.local/bin/custom-exe
+echo 'echo "Custom executable in PATH"' >> ~/.local/bin/custom-exe
+chmod +x ~/.local/bin/custom-exe
+
+# Test that dela list shows shadowing symbols
+log "Testing shadow detection in dela list..."
+set output (dela list)
+
+# Check for shell builtin shadowing (cd)
+if not string match -q "*cd †*" "$output"
+    error "Shell builtin shadowing symbol not found for 'cd' task"
+    error "Got output: $output"
+    exit 1
+end
+
+if not string match -q "*† task 'cd' shadowed by fish shell builtin*" "$output"
+    error "Shell builtin shadow info not found for 'cd' task"
+    error "Got output: $output"
+    exit 1
+end
+
+# Check for PATH executable shadowing (custom-exe)
+if not string match -q "*custom-exe ‡*" "$output"
+    error "PATH executable shadowing symbol not found for 'custom-exe' task"
+    error "Got output: $output"
+    exit 1
+end
+
+if not string match -q "*‡ task 'custom-exe' shadowed by executable at*custom-exe*" "$output"
+    error "PATH executable shadow info not found for 'custom-exe' task"
+    error "Got output: $output"
+    exit 1
+end
 
 log "4. Testing allowlist functionality..."
 

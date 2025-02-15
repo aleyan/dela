@@ -33,6 +33,7 @@ fn check_shell_builtin(name: &str) -> Option<ShadowType> {
         "zsh" => check_zsh_builtin(name),
         "bash" => check_bash_builtin(name),
         "fish" => check_fish_builtin(name),
+        "pwsh" => check_pwsh_builtin(name),
         _ => None,
     }
 }
@@ -246,6 +247,57 @@ fn check_fish_builtin(name: &str) -> Option<ShadowType> {
 
     if FISH_BUILTINS.contains(&name) {
         Some(ShadowType::ShellBuiltin("fish".to_string()))
+    } else {
+        None
+    }
+}
+
+/// Check if a name is a PowerShell builtin
+fn check_pwsh_builtin(name: &str) -> Option<ShadowType> {
+    const PWSH_BUILTINS: &[&str] = &[
+        "cd",
+        "echo",
+        "pwd",
+        "export",
+        "alias",
+        "clear",
+        "copy",
+        "del",
+        "dir",
+        "exit",
+        "get",
+        "help",
+        "history",
+        "kill",
+        "mkdir",
+        "move",
+        "popd",
+        "pushd",
+        "pwd",
+        "read",
+        "remove",
+        "rename",
+        "set",
+        "start",
+        "test",
+        "type",
+        "wait",
+        "where",
+        "write",
+        "ls",
+        "rm",
+        "cp",
+        "mv",
+        "cat",
+        "clear",
+        "sleep",
+        "sort",
+        "tee",
+        "write",
+    ];
+
+    if PWSH_BUILTINS.contains(&name) {
+        Some(ShadowType::ShellBuiltin("pwsh".to_string()))
     } else {
         None
     }
