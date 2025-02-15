@@ -23,6 +23,8 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [x] [DTKT-4] Implement Makefile parser (using `makefile-lossless` or similar).
   - [x] [DTKT-5] Implement parser for `package.json` scripts (`package-json` or `package_json_schema`).
   - [x] [DTKT-6] Implement parser for `pyproject.toml` scripts (`pyproject-toml`).
+  - [ ] [DTKT-] For `package.json`, detect if `npm` or `yarn` or `bun` is installed and use that to run tasks.
+  - [ ] [DTKT-104] Update makefile-lossless to new version supporting trailing text.
 
 - [ ] **Structs and Runners**
   - [x] [DTKT-7] Define `Task` and `TaskRunner` enums in `types.rs`.
@@ -48,6 +50,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [x] [DTKT-14] Implement `dela init` command to automate creation of `~/.dela` and `~/.dela/allowlist.toml`.
   - [x] [DTKT-15] Modify `dela init` command add eval of `dela configure_shell`.
   - [ ] [DTKT-93] Have `dela init` take options options (eg no method missing)
+  - [ ] [DTKT-105] Update `dela init` to cleanup the output.
 
 - [x] **Shell Execution Strategy**
   - [x] [DTKT-75] Implement shell function wrapper for `dela run` command
@@ -154,10 +157,12 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - Validates that tasks can be run both via bare command (through command_not_found_handler) and with `dela run <task>`.
 - [x] [DTKT-84] Integrate these Docker-based tests into CI to confirm cross-shell compatibility.
   - [ ] [DTKT-39] Cover each module: `shell_integration`, `task_discovery`, `allowlist`, `task_execution`.
+- [ ] [DTKT-] Run unit tests in CI
 
 - [ ] **Integration Tests**
   - [ ] [DTKT-40] Simulate user flows with different shells (Zsh, Bash, Fish).
   - [ ] [DTKT-41] Validate allowlist logic and parsing of different file types.
+  - [ ] [DTKT-] Run integration tests in CI
 
 - [ ] **Cross-Shell Checks**
   - [ ] [DTKT-42] Test on macOS and Linux to ensure consistent behavior.

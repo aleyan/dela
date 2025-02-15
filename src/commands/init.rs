@@ -2,6 +2,7 @@ use std::env;
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
+use crate::types::Allowlist;
 
 /// Get the current shell name by checking the parent process
 fn get_current_shell() -> Result<String, String> {
@@ -105,6 +106,17 @@ pub fn execute() -> Result<(), String> {
             .map_err(|e| format!("Failed to create ~/.dela directory: {}", e))?;
     } else {
         println!("Using existing dela configuration directory at {}", dela_dir.display());
+    }
+
+    // Create empty allowlist.toml if it doesn't exist
+    let allowlist_path = dela_dir.join("allowlist.toml");
+    if !allowlist_path.exists() {
+        println!("Creating empty allowlist at {}", allowlist_path.display());
+        let empty_allowlist = Allowlist::default();
+        let toml = toml::to_string_pretty(&empty_allowlist)
+            .map_err(|e| format!("Failed to serialize empty allowlist: {}", e))?;
+        fs::write(&allowlist_path, toml)
+            .map_err(|e| format!("Failed to create allowlist file: {}", e))?;
     }
 
     // Add shell integration
@@ -240,5 +252,30 @@ mod tests {
         // Verify the content has the PowerShell-specific integration pattern
         let content = fs::read_to_string(&config_pwsh).unwrap();
         assert!(content.contains("Invoke-Expression (dela configure-shell | Out-String)"));
+    }
+
+    #[test]
+    #[serial]
+    fn test_init_creates_allowlist() {
+        let temp_dir = TempDir::new().unwrap();
+        let home = temp_dir.path().to_path_buf();
+        setup_test_env("/bin/zsh", &home).unwrap();
+
+        // Create a minimal .zshrc
+        let zshrc = home.join(".zshrc");
+        fs::write(&zshrc, "# existing zsh config\n").unwrap();
+
+        let result = execute();
+        assert!(result.is_ok());
+
+        // Verify allowlist.toml was created
+        let allowlist_path = home.join(".dela").join("allowlist.toml");
+        assert!(allowlist_path.exists());
+        assert!(allowlist_path.is_file());
+
+        // Verify it contains valid TOML for an empty allowlist
+        let content = fs::read_to_string(&allowlist_path).unwrap();
+        let allowlist: Allowlist = toml::from_str(&content).unwrap();
+        assert!(allowlist.entries.is_empty());
     }
 } 

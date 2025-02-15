@@ -11,7 +11,7 @@ dela() {
 # Command not found handler to delegate unknown commands to dela
 command_not_found_handler() {
     # First check if the task is allowed
-    if ! dela allow-command "$1" 2>/dev/null; then
+    if ! dela allow-command "$1"; then
         return 127
     fi
     

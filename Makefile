@@ -51,4 +51,3 @@ publish: test
 	fi
 	@echo "Publishing dela to crates.io..."
 	@cargo publish
-	

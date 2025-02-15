@@ -22,7 +22,7 @@ pub fn execute(task: &str) -> Result<(), String> {
             // Single task found, check allowlist
             let task = matching_tasks[0];
             if !allowlist::check_task_allowed(task)? {
-                return Err(format!("Task '{}' was denied", task.name));
+                return Err(format!("Dela task '{}' was denied by the ~/.dela/allowlist.toml", task.name));
             }
             Ok(())
         }

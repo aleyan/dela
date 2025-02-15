@@ -72,14 +72,19 @@ run_shell_tests() {
             -e VERBOSE=1 \
             "${image_name}"
     else
-        docker run --rm \
+        # Run tests in non-verbose mode and capture output
+        output=$(docker run --rm \
             --platform linux/arm64 \
             -v "${SCRIPT_DIR}/docker_${shell}/${test_script}:/home/testuser/${container_script}:ro" \
             -e VERBOSE=0 \
-            "${image_name}" >/dev/null 2>&1
+            "${image_name}" 2>&1) || {
+            echo "Test failed. Output:"
+            echo "$output"
+            return 1
+        }
     fi
 
-    log "${shell} tests passed successfully!"
+    echo "${shell} tests passed successfully!"
 }
 
 # Check if a specific shell was requested
@@ -90,7 +95,6 @@ if [ $# -eq 1 ]; then
         zsh|bash|fish|pwsh)
             log "Testing ${shell} shell integration..."
             run_shell_tests "${shell}"
-            echo "${shell} tests passed successfully!"
             ;;
         *)
             error "Invalid shell: ${shell}"
@@ -98,10 +102,9 @@ if [ $# -eq 1 ]; then
             ;;
     esac
 else
-    # Run tests for all shells if no argument provided
+    # Test all shells
     for shell in zsh bash fish pwsh; do
         log "Testing ${shell} shell integration..."
         run_shell_tests "${shell}"
     done
-    echo "All shell integration tests passed successfully!"
 fi 

@@ -23,7 +23,7 @@ command_not_found_handle() {
     fi
 
     # Then check if it's allowed
-    if ! dela allow-command "$1" 2>/dev/null; then
+    if ! dela allow-command "$1"; then
         return 127
     fi
     
