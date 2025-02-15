@@ -1,11 +1,12 @@
 use clap::{Parser, Subcommand};
 
-mod types;
-mod task_discovery;
-mod parsers;
-mod commands;
 mod allowlist;
+mod commands;
+mod parsers;
 mod prompt;
+mod task_discovery;
+mod task_shadowing;
+mod types;
 
 /// dela - A task runner that delegates to others
 #[derive(Parser)]
@@ -25,24 +26,24 @@ struct Cli {
 enum Commands {
     /// Initialize dela and configure shell integration
     Init,
-    
+
     /// Configure shell integration (used internally by init)
     #[command(name = "configure-shell")]
     ConfigureShell,
-    
+
     /// List all available tasks in the current directory
     List {
         /// Show detailed information about task definition files
         #[arg(short, long)]
         verbose: bool,
     },
-    
+
     /// Run a specific task
     Run {
         /// Name of the task to run
         task: String,
     },
-    
+
     /// Get the shell command for a task (used internally by shell functions)
     #[command(name = "get-command")]
     GetCommand {
@@ -62,16 +63,10 @@ fn main() {
     let cli = Cli::parse();
 
     let result = match cli.command {
-        Commands::Init => {
-            commands::init::execute()
-        }
-        Commands::ConfigureShell => {
-            commands::configure_shell::execute()
-        }
+        Commands::Init => commands::init::execute(),
+        Commands::ConfigureShell => commands::configure_shell::execute(),
         Commands::List { verbose } => commands::list::execute(verbose),
-        Commands::Run { task } => {
-            commands::run::execute(&task)
-        }
+        Commands::Run { task } => commands::run::execute(&task),
         Commands::GetCommand { task } => commands::get_command::execute(&task),
         Commands::AllowCommand { task } => commands::allow_command::execute(&task),
     };

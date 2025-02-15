@@ -23,6 +23,8 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [x] [DTKT-4] Implement Makefile parser (using `makefile-lossless` or similar).
   - [x] [DTKT-5] Implement parser for `package.json` scripts (`package-json` or `package_json_schema`).
   - [x] [DTKT-6] Implement parser for `pyproject.toml` scripts (`pyproject-toml`).
+  - [ ] [DTKT-106] For `package.json`, detect if `npm` or `yarn` or `bun` is installed and use that to run tasks.
+  - [ ] [DTKT-104] Update makefile-lossless to new version supporting trailing text.
 
 - [ ] **Structs and Runners**
   - [x] [DTKT-7] Define `Task` and `TaskRunner` enums in `types.rs`.
@@ -31,7 +33,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
 - [ ] **CLI Implementation for `list`**
   - [x] [DTKT-9] Ensure `dela list` shows tasks from recognized files.
   - [x] [DTKT-10] Print tasks with references to the source file.
-  - [ ] [DTKT-92] List which task runner will be used for each task.
+  - [x] [DTKT-92] List which task runner will be used for each task.
 
 **Deliverables**
 - [x] Parsing logic for multiple file types.
@@ -48,12 +50,13 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [x] [DTKT-14] Implement `dela init` command to automate creation of `~/.dela` and `~/.dela/allowlist.toml`.
   - [x] [DTKT-15] Modify `dela init` command add eval of `dela configure_shell`.
   - [ ] [DTKT-93] Have `dela init` take options options (eg no method missing)
+  - [ ] [DTKT-105] Update `dela init` to cleanup the output.
 
 - [x] **Shell Execution Strategy**
   - [x] [DTKT-75] Implement shell function wrapper for `dela run` command
   - [x] [DTKT-76] Implement `get-command` to return shell-executable command string
   - [x] [DTKT-77] Ensure commands execute in actual shell environment
-  - [ ] [DTKT-78] Indicate when tasks are shadowed by shell builtins (cd, source, etc.)
+  - [x] [DTKT-78] Indicate when tasks are shadowed by shell builtins (cd, source, etc.)
   - [x] [DTKT-79] Ensure environment modifications persist
   - [x] [DTKT-80] Make shell aliases and functions available to tasks
 
@@ -78,14 +81,13 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [ ] [DTKT-21] Support both direct execution and subshell spawning based on task type.
   - [ ] [DTKT-22] Ensure environment variables and working directory are properly propagated.
   - [ ] [DTKT-85] Design task name collision resolution strategy
-  - [ ] [DTKT-78] Indicate when tasks are shadowed by shell builtins (cd, source, etc.)
   - [ ] [DTKT-86] Implement task name collision resolution
   - [ ] [DTKT-87] Implement task runner installation detection
   - [ ] [DTKT-88] Implement task runner disambiguation eg(npm vs yarn vs bun)
 
 - [ ] **`run` Command and Bare-Command Invocation**
-  - [ ] [DTKT-23] Complete `dela run <task>` for direct execution.
-  - [ ] [DTKT-24] Ensure bare commands invoke `dela` through the fallback.
+  - [x] [DTKT-23] Complete `dela run <task>` for direct execution.
+  - [x] [DTKT-24] Ensure bare commands invoke `dela` through the fallback.
   - [ ] [DTKT-25] Prompt user if multiple matching tasks exist.
   - [ ] [DTKT-95] Provide `dr` shell function to run dela tasks with --allow flag.
 
@@ -102,19 +104,19 @@ This plan outlines the major development phases and tasks for building `dela`, a
 
 ## Phase 4: Security & Allowlist Management
 
-- [ ] **Allowlist Data Structures**
-  - [ ] [DTKT-28] Implement `allowlist.rs` to read/write `~/.dela/allowlist.toml`.
-  - [ ] [DTKT-29] Define `AllowlistEntry` with `file`/`directory` scopes.
+- [x] **Allowlist Data Structures**
+  - [x] [DTKT-28] Implement `allowlist.rs` to read/write `~/.dela/allowlist.toml`.
+  - [x] [DTKT-29] Define `AllowlistEntry` with `file`/`directory` scopes.
 
-- [ ] **User Prompts**
-  - [ ] [DTKT-30] Prompt user on first invocation of task from new file/directory.
-  - [ ] [DTKT-31] Support "Allow once," "Allow this task," "Allow file," "Allow directory," and "Deny."
-  - [ ] [DTKT-32] Persist decisions in the allowlist.
+- [x] **User Prompts**
+  - [x] [DTKT-30] Prompt user on first invocation of task from new file/directory.
+  - [x] [DTKT-31] Support "Allow once," "Allow this task," "Allow file," "Allow directory," and "Deny."
+  - [x] [DTKT-32] Persist decisions in the allowlist.
   - [ ] [DTKT-33] Have `dela run` take an optional `--allow` flag to allow a task without prompting.
 
-- [ ] **Runtime Checks**
-  - [ ] [DTKT-96] Consult allowlist before executing tasks.
-  - [ ] [DTKT-34] If disallowed, prompt or block execution.
+- [x] **Runtime Checks**
+  - [x] [DTKT-96] Consult allowlist before executing tasks.
+  - [x] [DTKT-34] If disallowed, prompt or block execution.
   - [ ] [DTKT-97] Add native task execution when shell integration is not detected
 
 **Deliverables**
@@ -144,6 +146,8 @@ This plan outlines the major development phases and tasks for building `dela`, a
 ## Phase 6: Testing & Quality Assurance
 
 - [ ] **Unit Tests**
+  - [ ] [DTKT-107] Run unit tests in CI
+  - [ ] [DTKT-39] Cover each module: `shell_integration`, `task_discovery`, `allowlist`, `task_execution`.
 
 ### Dockerized Cross-Shell Testing
 - [x] [DTKT-82] Build Docker images that contain multiple shells (zsh, bash, fish, PowerShell).
@@ -153,11 +157,11 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - Sources the relevant shell configuration.
   - Validates that tasks can be run both via bare command (through command_not_found_handler) and with `dela run <task>`.
 - [x] [DTKT-84] Integrate these Docker-based tests into CI to confirm cross-shell compatibility.
-  - [ ] [DTKT-39] Cover each module: `shell_integration`, `task_discovery`, `allowlist`, `task_execution`.
 
 - [ ] **Integration Tests**
   - [ ] [DTKT-40] Simulate user flows with different shells (Zsh, Bash, Fish).
   - [ ] [DTKT-41] Validate allowlist logic and parsing of different file types.
+  - [ ] [DTKT-108] Run integration tests in CI
 
 - [ ] **Cross-Shell Checks**
   - [ ] [DTKT-42] Test on macOS and Linux to ensure consistent behavior.

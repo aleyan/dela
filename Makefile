@@ -45,10 +45,13 @@ run:
 
 # Publish to crates.io
 publish: test
+	@echo "Publishing dela to crates.io"
 	@if [ -z "$(CARGO_REGISTRY_TOKEN)" ]; then \
 		echo "Error: CARGO_REGISTRY_TOKEN is not set. Please add it to your .env file."; \
 		exit 1; \
 	fi
-	@echo "Publishing dela to crates.io..."
 	@cargo publish
-	
+
+# Print git diff without pager
+pdiff:
+	@git --no-pager diff

@@ -12,4 +12,7 @@ set -x PATH /usr/local/bin /usr/bin /bin $PATH
 function fish_command_not_found
     echo "fish: Unknown command: $argv[1]" >&2
     return 127
-end 
+end
+
+# Allow sourcing in non-interactive mode
+status --is-interactive; or status --is-login; or true 

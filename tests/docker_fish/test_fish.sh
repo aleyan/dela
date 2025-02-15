@@ -1,8 +1,5 @@
 #!/usr/bin/fish
 
-# Exit on any error
-status --is-interactive; and exit 1
-
 # Default to non-verbose output
 set -q VERBOSE; or set VERBOSE 0
 
@@ -13,7 +10,11 @@ end
 
 function error
     echo "Error: $argv" >&2
+    exit 1
 end
+
+# Set up error handling
+status --is-interactive; and exit 1
 
 log "=== Testing dela shell integration for fish ==="
 
@@ -94,6 +95,49 @@ dela list | grep -q "npm-build"; or begin
     error "npm-build not found in dela list"
     exit 1
 end
+if not dela list | grep -q "poetry-build"
+    error "poetry-build not found in dela list"
+    exit 1
+end
+
+log "Testing task shadowing detection..."
+
+# Create a custom executable in PATH
+log "Creating custom executable..."
+mkdir -p ~/.local/bin
+echo '#!/bin/sh' > ~/.local/bin/custom-exe
+echo 'echo "Custom executable in PATH"' >> ~/.local/bin/custom-exe
+chmod +x ~/.local/bin/custom-exe
+
+# Test that dela list shows shadowing symbols
+log "Testing shadow detection in dela list..."
+set output (dela list)
+
+# Check for shell builtin shadowing (cd)
+if not string match -q "*cd †*" "$output"
+    error "Shell builtin shadowing symbol not found for 'cd' task"
+    error "Got output: $output"
+    exit 1
+end
+
+if not string match -q "*† task 'cd' shadowed by fish shell builtin*" "$output"
+    error "Shell builtin shadow info not found for 'cd' task"
+    error "Got output: $output"
+    exit 1
+end
+
+# Check for PATH executable shadowing (custom-exe)
+if not string match -q "*custom-exe ‡*" "$output"
+    error "PATH executable shadowing symbol not found for 'custom-exe' task"
+    error "Got output: $output"
+    exit 1
+end
+
+if not string match -q "*‡ task 'custom-exe' shadowed by executable at*custom-exe*" "$output"
+    error "PATH executable shadow info not found for 'custom-exe' task"
+    error "Got output: $output"
+    exit 1
+end
 
 log "4. Testing allowlist functionality..."
 
@@ -116,10 +160,7 @@ end
 # Test dela allow-command
 log "Testing dela allow-command..."
 set -x DELA_NON_INTERACTIVE 1
-echo "2" | dela allow-command test-task; or begin
-    error "Failed to allow test-task"
-    exit 1
-end
+printf "2\n" | dela allow-command test-task >/dev/null 2>&1; or error "Failed to allow test-task"
 
 # Test allowed task execution
 log "Testing allowed task execution..."
@@ -141,9 +182,8 @@ end
 
 # Test UV tasks
 log "Testing UV tasks..."
-set -x DELA_NON_INTERACTIVE 1
-echo "2" | dela allow-command uv-test
-echo "2" | dela allow-command uv-build
+printf "2\n" | dela allow-command uv-test >/dev/null 2>&1; or error "Failed to allow uv-test"
+printf "2\n" | dela allow-command uv-build >/dev/null 2>&1; or error "Failed to allow uv-build"
 
 # Create a temporary script for UV test
 echo '#!/usr/bin/fish
@@ -171,8 +211,8 @@ end
 
 # Test Poetry tasks
 log "Testing Poetry tasks..."
-echo "2" | dela allow-command poetry-test
-echo "2" | dela allow-command poetry-build
+printf "2\n" | dela allow-command poetry-test >/dev/null 2>&1; or error "Failed to allow poetry-test"
+printf "2\n" | dela allow-command poetry-build >/dev/null 2>&1; or error "Failed to allow poetry-build"
 
 # Create a temporary script for Poetry test
 echo '#!/usr/bin/fish
@@ -209,4 +249,5 @@ if not string match -q "*fish: Unknown command: nonexistent_command*" -- "$outpu
     exit 1
 end
 
-log "=== All tests passed successfully! ===" 
+log "=== All tests passed successfully! ==="
+exit 0 

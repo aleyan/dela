@@ -1,16 +1,15 @@
+use makefile_lossless::Makefile;
 use std::fs::File;
 use std::path::Path;
-use makefile_lossless::Makefile;
 
-use crate::types::{Task, TaskRunner, TaskDefinitionFile, TaskFileStatus};
+use crate::types::{Task, TaskDefinitionFile, TaskFileStatus, TaskRunner};
 
 /// Parse a Makefile at the given path and extract tasks
 pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
-    let file = File::open(path)
-        .map_err(|e| format!("Failed to open Makefile: {}", e))?;
+    let file = File::open(path).map_err(|e| format!("Failed to open Makefile: {}", e))?;
 
-    let makefile = Makefile::read(file)
-        .map_err(|e| format!("Failed to read/parse Makefile: {}", e))?;
+    let makefile =
+        Makefile::read(file).map_err(|e| format!("Failed to read/parse Makefile: {}", e))?;
 
     let mut tasks = Vec::new();
     for rule in makefile.rules() {
@@ -29,6 +28,7 @@ pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
             runner: TaskRunner::Make,
             source_name: target.to_string(),
             description,
+            shadowed_by: None, // This will be filled in by task_discovery
         });
     }
 
@@ -50,7 +50,8 @@ fn extract_task_description(rule: &makefile_lossless::Rule) -> Option<String> {
     for cmd in rule.recipes() {
         let cmd = cmd.trim();
         if cmd.starts_with("@echo") || cmd.starts_with("echo") {
-            let desc = cmd.trim_start_matches("@echo")
+            let desc = cmd
+                .trim_start_matches("@echo")
                 .trim_start_matches("echo")
                 .trim()
                 .trim_matches('"')
@@ -81,7 +82,7 @@ mod tests {
     fn test_parse_empty_makefile() {
         let temp_dir = TempDir::new().unwrap();
         let makefile_path = create_test_makefile(temp_dir.path(), "");
-        
+
         let tasks = parse(&makefile_path).unwrap();
         assert!(tasks.is_empty());
     }
@@ -99,14 +100,17 @@ test:
 	@echo "Running tests"
 	cargo test"#;
         let makefile_path = create_test_makefile(temp_dir.path(), content);
-        
+
         let tasks = parse(&makefile_path).unwrap();
         assert_eq!(tasks.len(), 2);
 
         let build_task = tasks.iter().find(|t| t.name == "build").unwrap();
         assert_eq!(build_task.runner, TaskRunner::Make);
         assert_eq!(build_task.source_name, "build");
-        assert_eq!(build_task.description, Some("Building the project".to_string()));
+        assert_eq!(
+            build_task.description,
+            Some("Building the project".to_string())
+        );
 
         let test_task = tasks.iter().find(|t| t.name == "test").unwrap();
         assert_eq!(test_task.runner, TaskRunner::Make);
@@ -120,7 +124,7 @@ test:
         let content = r#"clean:
 	rm -rf target/"#;
         let makefile_path = create_test_makefile(temp_dir.path(), content);
-        
+
         let tasks = parse(&makefile_path).unwrap();
         assert_eq!(tasks.len(), 1);
 
@@ -143,7 +147,7 @@ test:
 .c.o:
 	gcc -c $< -o $@"#;
         let makefile_path = create_test_makefile(temp_dir.path(), content);
-        
+
         let tasks = parse(&makefile_path).unwrap();
         assert_eq!(tasks.len(), 1);
         assert_eq!(tasks[0].name, "build");
@@ -159,9 +163,9 @@ all:
 	@echo "Building all"
 	make build"#;
         let makefile_path = create_test_makefile(temp_dir.path(), content);
-        
+
         let tasks = parse(&makefile_path).unwrap();
         assert_eq!(tasks.len(), 1);
         assert_eq!(tasks[0].name, "all");
     }
-} 
+}

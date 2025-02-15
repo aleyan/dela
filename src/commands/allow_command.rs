@@ -1,17 +1,14 @@
-use std::env;
-use crate::task_discovery;
 use crate::allowlist;
+use crate::task_discovery;
+use std::env;
 
 pub fn execute(task: &str) -> Result<(), String> {
-    let current_dir = env::current_dir()
-        .map_err(|e| format!("Failed to get current directory: {}", e))?;
+    let current_dir =
+        env::current_dir().map_err(|e| format!("Failed to get current directory: {}", e))?;
     let discovered = task_discovery::discover_tasks(&current_dir);
-    
+
     // Find all tasks with the given name
-    let matching_tasks: Vec<_> = discovered.tasks
-        .iter()
-        .filter(|t| t.name == task)
-        .collect();
+    let matching_tasks: Vec<_> = discovered.tasks.iter().filter(|t| t.name == task).collect();
 
     match matching_tasks.len() {
         0 => {
@@ -22,7 +19,10 @@ pub fn execute(task: &str) -> Result<(), String> {
             // Single task found, check allowlist
             let task = matching_tasks[0];
             if !allowlist::check_task_allowed(task)? {
-                return Err(format!("Task '{}' was denied", task.name));
+                return Err(format!(
+                    "Dela task '{}' was denied by the ~/.dela/allowlist.toml",
+                    task.name
+                ));
             }
             Ok(())
         }
@@ -41,33 +41,36 @@ pub fn execute(task: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
     use std::fs::{self, File};
     use std::io::Write;
     use tempfile::TempDir;
-    use serial_test::serial;
 
     // Test helper to simulate user input (copied from prompt.rs)
-    fn with_stdin<F>(input: &str, test: F) where F: FnOnce() {
-        use std::io::Write;
+    fn with_stdin<F>(input: &str, test: F)
+    where
+        F: FnOnce(),
+    {
         use std::fs::File;
+        use std::io::Write;
         use std::os::unix::io::FromRawFd;
-        
+
         unsafe {
             let mut pipe = [0; 2];
             libc::pipe(&mut pipe[0]);
-            
+
             // Write the test input to the write end of the pipe
             let mut writer = File::from_raw_fd(pipe[1]);
             writer.write_all(input.as_bytes()).unwrap();
             drop(writer);
-            
+
             // Temporarily replace stdin with the read end of the pipe
             let old_stdin = libc::dup(0);
             libc::dup2(pipe[0], 0);
-            
+
             // Run the test
             test();
-            
+
             // Restore the original stdin
             libc::dup2(old_stdin, 0);
             libc::close(old_stdin);
@@ -78,7 +81,7 @@ mod tests {
     fn setup_test_env() -> (TempDir, TempDir) {
         // Create a temp dir for the project
         let project_dir = TempDir::new().expect("Failed to create temp directory");
-        
+
         // Create a test Makefile
         let makefile_content = "
 build: ## Building the project
@@ -87,15 +90,16 @@ build: ## Building the project
 test: ## Running tests
 \t@echo Testing...
 ";
-        let mut makefile = File::create(project_dir.path().join("Makefile"))
-            .expect("Failed to create Makefile");
-        makefile.write_all(makefile_content.as_bytes())
+        let mut makefile =
+            File::create(project_dir.path().join("Makefile")).expect("Failed to create Makefile");
+        makefile
+            .write_all(makefile_content.as_bytes())
             .expect("Failed to write Makefile");
 
         // Create a temp dir for HOME and set it up
         let home_dir = TempDir::new().expect("Failed to create temp HOME directory");
         env::set_var("HOME", home_dir.path());
-        
+
         // Create ~/.dela directory
         fs::create_dir_all(home_dir.path().join(".dela"))
             .expect("Failed to create .dela directory");
@@ -129,7 +133,10 @@ test: ## Running tests
         with_stdin("5\n", || {
             let result = execute("test");
             assert!(result.is_err(), "Should fail when task is denied");
-            assert_eq!(result.unwrap_err(), "Task 'test' was denied");
+            assert_eq!(
+                result.unwrap_err(),
+                "Dela task 'test' was denied by the ~/.dela/allowlist.toml"
+            );
         });
 
         drop(project_dir);
@@ -144,12 +151,9 @@ test: ## Running tests
 
         let result = execute("nonexistent");
         assert!(result.is_err(), "Should fail when no task found");
-        assert_eq!(
-            result.unwrap_err(),
-            "No task named 'nonexistent' found"
-        );
+        assert_eq!(result.unwrap_err(), "No task named 'nonexistent' found");
 
         drop(project_dir);
         drop(home_dir);
     }
-} 
+}

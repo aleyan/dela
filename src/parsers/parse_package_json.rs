@@ -1,22 +1,17 @@
+use crate::types::{Task, TaskDefinitionFile, TaskFileStatus, TaskRunner};
+use serde_json::Value;
 use std::fs;
 use std::path::Path;
-use serde_json::Value;
-use crate::types::{
-    Task, 
-    TaskRunner,
-    TaskDefinitionFile,
-    TaskFileStatus,
-};
 
 /// Parse a package.json file at the given path and extract tasks
 pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
     // Read and parse the package.json file
-    let content = fs::read_to_string(path)
-        .map_err(|e| format!("Failed to read package.json: {}", e))?;
-    
+    let content =
+        fs::read_to_string(path).map_err(|e| format!("Failed to read package.json: {}", e))?;
+
     let json: Value = serde_json::from_str(&content)
         .map_err(|e| format!("Failed to parse package.json: {}", e))?;
-    
+
     // Extract the scripts section
     let scripts = match json.get("scripts") {
         Some(Value::Object(scripts)) => scripts,
@@ -34,6 +29,7 @@ pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
                 runner: TaskRunner::Npm,
                 source_name: name.clone(),
                 description: Some(format!("npm script: {}", cmd)),
+                shadowed_by: None, // This will be filled in by task_discovery
             });
         }
     }
@@ -61,7 +57,7 @@ mod tests {
     fn test_parse_valid_package_json() {
         let temp_dir = TempDir::new().unwrap();
         let package_json = temp_dir.path().join("package.json");
-        
+
         let content = r#"{
             "name": "test-package",
             "scripts": {
@@ -70,21 +66,21 @@ mod tests {
                 "start": "node dist/index.js"
             }
         }"#;
-        
+
         File::create(&package_json)
             .unwrap()
             .write_all(content.as_bytes())
             .unwrap();
 
         let tasks = parse(&package_json).unwrap();
-        
+
         assert_eq!(tasks.len(), 3);
-        
+
         let test_task = tasks.iter().find(|t| t.name == "test").unwrap();
         assert_eq!(test_task.runner, TaskRunner::Npm);
         assert_eq!(test_task.source_name, "test");
         assert_eq!(test_task.description, Some("npm script: jest".to_string()));
-        
+
         let build_task = tasks.iter().find(|t| t.name == "build").unwrap();
         assert_eq!(build_task.runner, TaskRunner::Npm);
         assert_eq!(build_task.source_name, "build");
@@ -95,11 +91,11 @@ mod tests {
     fn test_parse_package_json_no_scripts() {
         let temp_dir = TempDir::new().unwrap();
         let package_json = temp_dir.path().join("package.json");
-        
+
         let content = r#"{
             "name": "test-package"
         }"#;
-        
+
         File::create(&package_json)
             .unwrap()
             .write_all(content.as_bytes())
@@ -113,12 +109,12 @@ mod tests {
     fn test_parse_invalid_package_json() {
         let temp_dir = TempDir::new().unwrap();
         let package_json = temp_dir.path().join("package.json");
-        
+
         let content = r#"{
             "name": "test-package",
             "scripts": "invalid"
         }"#;
-        
+
         File::create(&package_json)
             .unwrap()
             .write_all(content.as_bytes())
@@ -128,4 +124,4 @@ mod tests {
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("'scripts' must be an object"));
     }
-} 
+}

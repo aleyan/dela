@@ -85,6 +85,48 @@ log "Testing dela list command..."
 dela list | grep -q "test-task" || (error "test-task not found in dela list" && exit 1)
 dela list | grep -q "npm-test" || (error "npm-test not found in dela list" && exit 1)
 dela list | grep -q "npm-build" || (error "npm-build not found in dela list" && exit 1)
+dela list | grep -q "poetry-build" || (error "poetry-build not found in dela list" && exit 1)
+
+log "Testing task shadowing detection..."
+
+# Create a custom executable in PATH
+log "Creating custom executable..."
+mkdir -p ~/.local/bin
+cat > ~/.local/bin/custom-exe << 'EOF'
+#!/bin/sh
+echo "Custom executable in PATH"
+EOF
+chmod +x ~/.local/bin/custom-exe
+
+# Test that dela list shows shadowing symbols
+log "Testing shadow detection in dela list..."
+output=$(dela list)
+
+# Check for shell builtin shadowing (cd)
+if ! echo "$output" | grep -q "cd †"; then
+    error "Shell builtin shadowing symbol not found for 'cd' task"
+    error "Got output: $output"
+    exit 1
+fi
+
+if ! echo "$output" | grep -q "† task 'cd' shadowed by bash shell builtin"; then
+    error "Shell builtin shadow info not found for 'cd' task"
+    error "Got output: $output"
+    exit 1
+fi
+
+# Check for PATH executable shadowing (custom-exe)
+if ! echo "$output" | grep -q "custom-exe ‡"; then
+    error "PATH executable shadowing symbol not found for 'custom-exe' task"
+    error "Got output: $output"
+    exit 1
+fi
+
+if ! echo "$output" | grep -q "‡ task 'custom-exe' shadowed by executable at.*custom-exe"; then
+    error "PATH executable shadow info not found for 'custom-exe' task"
+    error "Got output: $output"
+    exit 1
+fi
 
 log "4. Testing allowlist functionality..."
 

@@ -97,6 +97,85 @@ if (-not ($listOutput -match "npm-build")) {
     Write-Error "npm-build not found in dela list"
 }
 
+if (!(dela list | Select-String -Quiet "poetry-build")) {
+    Write-Error "poetry-build not found in dela list"
+    exit 1
+}
+
+Write-Log "Testing task shadowing detection..."
+
+# Create a custom executable in PATH
+Write-Log "Creating custom executable..."
+$localBinPath = Join-Path $HOME ".local" "bin"
+if (-not (Test-Path $localBinPath)) {
+    New-Item -ItemType Directory -Path $localBinPath -Force | Out-Null
+}
+
+# Create a custom executable
+$customExePath = Join-Path $localBinPath "custom-exe"
+Set-Content -Path $customExePath -Value @"
+#!/bin/sh
+echo "I am a custom executable"
+"@
+
+# Make the file executable using chmod (since we're in a Linux container)
+& chmod +x $customExePath
+
+# Add ~/.local/bin to PATH if not already present
+$localBinPath = (Resolve-Path $localBinPath).Path
+if (-not ($env:PATH -split ':' -contains $localBinPath)) {
+    $env:PATH = "${localBinPath}:$env:PATH"
+}
+
+# Verify the executable exists and is executable
+if (-not (Test-Path $customExePath)) {
+    Write-Error "Failed to create custom executable at $customExePath"
+}
+
+Write-Log "Testing if custom-exe is in PATH..."
+Write-Log "Current PATH: $env:PATH"
+Write-Log "Executable path: $customExePath"
+$customExeExists = Get-Command custom-exe -ErrorAction SilentlyContinue
+if (-not $customExeExists) {
+    Write-Error "custom-exe not found in PATH"
+}
+
+# Test that dela list shows shadowing symbols
+Write-Log "Testing shadow detection in dela list..."
+$output = dela list | Out-String
+
+Write-Log "Debug - dela list output:"
+Write-Host $output
+Write-Log "Debug - End of dela list output"
+
+# Check for shell builtin shadowing (cd)
+if (!(Select-String -InputObject $output -Pattern "cd †" -Quiet)) {
+    Write-Error "Shell builtin shadowing symbol not found for 'cd' task"
+    Write-Error "Got output: $output"
+    exit 1
+}
+
+if (!(Select-String -InputObject $output -Pattern "† task 'cd' shadowed by pwsh shell builtin" -Quiet)) {
+    Write-Error "Shell builtin shadow info not found for 'cd' task"
+    Write-Error "Got output: $output"
+    exit 1
+}
+
+# Check for PATH executable shadowing (custom-exe)
+if (!(Select-String -InputObject $output -Pattern "custom-exe ‡" -Quiet)) {
+    Write-Error "PATH executable shadowing symbol not found for 'custom-exe' task"
+    Write-Error "Got output: $output"
+    exit 1
+}
+
+if (!(Select-String -InputObject $output -Pattern "‡ task 'custom-exe' shadowed by executable at" -Quiet)) {
+    Write-Error "PATH executable shadow info not found for 'custom-exe' task"
+    Write-Error "Got output: $output"
+    exit 1
+}
+
+Write-Log "4. Testing allowlist functionality..."
+
 Write-Log "4. Testing task execution..."
 
 # Test dela run command with Makefile task only
