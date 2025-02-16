@@ -81,6 +81,10 @@ Currently, `dela` supports Make, npm, uv, and poetry.
 
 Currently, `dela` supports macOS and Linux.
 
+### Is dela production ready?
+
+`dela` is not at 0.1 yet and its cli is subject to change.
+
 ## Development
 
 To use a dev version of the rust binary locally, build and install it with the following command.
