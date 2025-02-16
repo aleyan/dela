@@ -1,6 +1,6 @@
 # Dela!
 
-Dela is a lightweight task runner that automatically discovers tasks in your current directory, let's you execute a task by its name without specifying the runner, and delegates their execution to tools like Make, npm, uv, and others.
+Dela is a lightweight task runner that provides discovery for task definitions in various formats, and lets you execute tasks without specifying the runner while delegating their execution to your existing tools like Make, npm, uv, and others.
 
 ## Installation
 
@@ -14,7 +14,7 @@ $ dela init
 ## Usage
 
 ### Discovering tasks
-The `dela` command will list all the tasks defined.
+The `dela list` command will list all the tasks defined.
 
 ```sh
 $ dela list
@@ -53,7 +53,7 @@ $ dr build
 
 ### What happens if a task shares the same name with a command?
 
-Then the bare command will be executed instead of the task. To execute the task, you can use `dr <task_name>`.
+Then the bare command will be executed instead of the task. To execute the task, you can use `dr <task_name>` to bypass the shadowed command but still make use of `dela`'s task runner disambiguation.
 
 ### How do I add a new task?
 
@@ -71,6 +71,10 @@ Currently, `dela` supports zsh, bash, fish, and PowerShell.
 
 Currently, `dela` supports Make, npm, uv, and poetry.
 
+### Which platforms are supported?
+
+Currently, `dela` supports macOS and Linux.
+
 ## Development
 
 To use a dev version of the rust binary locally, build and install it with the following command.
@@ -83,4 +87,17 @@ You can also source the shell integration directly from the `resources` director
 
 ```sh
 source resources/zsh.sh
+```
+
+## Testing
+Run integration tests with `dr test`, it requires `Make`, `cargo`, and `dela` to be installed.
+
+```sh
+dr test
+```
+
+Run integrations test with `test_shells`, it requires `Make`, `Docker`, and `dela` to be installed.
+
+```sh
+test_shells
 ```
