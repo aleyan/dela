@@ -55,3 +55,6 @@ publish: test
 # Print git diff without pager
 pdiff:
 	@git --no-pager diff
+
+format:
+	cargo fmt --all
