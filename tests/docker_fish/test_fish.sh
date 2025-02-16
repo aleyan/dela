@@ -170,7 +170,7 @@ eval (dela configure-shell | string collect)
 
 # Create a temporary script to run the command
 echo '#!/usr/bin/fish
-test-task' > ~/run_test.fish
+dr test-task' > ~/run_test.fish
 chmod +x ~/run_test.fish
 set output (~/run_test.fish 2>&1)
 rm ~/run_test.fish
@@ -187,7 +187,7 @@ printf "2\n" | dela allow-command uv-build >/dev/null 2>&1; or error "Failed to 
 
 # Create a temporary script for UV test
 echo '#!/usr/bin/fish
-uv-test' > ~/run_uv_test.fish
+dr uv-test' > ~/run_uv_test.fish
 chmod +x ~/run_uv_test.fish
 set output (~/run_uv_test.fish 2>&1)
 rm ~/run_uv_test.fish
@@ -199,7 +199,7 @@ end
 
 # Create a temporary script for UV build
 echo '#!/usr/bin/fish
-uv-build' > ~/run_uv_build.fish
+dr uv-build' > ~/run_uv_build.fish
 chmod +x ~/run_uv_build.fish
 set output (~/run_uv_build.fish 2>&1)
 rm ~/run_uv_build.fish
@@ -216,7 +216,7 @@ printf "2\n" | dela allow-command poetry-build >/dev/null 2>&1; or error "Failed
 
 # Create a temporary script for Poetry test
 echo '#!/usr/bin/fish
-poetry-test' > ~/run_poetry_test.fish
+dr poetry-test' > ~/run_poetry_test.fish
 chmod +x ~/run_poetry_test.fish
 set output (~/run_poetry_test.fish 2>&1)
 rm ~/run_poetry_test.fish
@@ -228,7 +228,7 @@ end
 
 # Create a temporary script for Poetry build
 echo '#!/usr/bin/fish
-poetry-build' > ~/run_poetry_build.fish
+dr poetry-build' > ~/run_poetry_build.fish
 chmod +x ~/run_poetry_build.fish
 set output (~/run_poetry_build.fish 2>&1)
 rm ~/run_poetry_build.fish

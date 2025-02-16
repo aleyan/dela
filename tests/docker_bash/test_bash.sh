@@ -170,15 +170,15 @@ export DELA_NON_INTERACTIVE=1
 echo "2" | dela allow-command uv-test || (error "Failed to allow uv-test" && exit 1)
 echo "2" | dela allow-command uv-build || (error "Failed to allow uv-build" && exit 1)
 
-output=$(dela run uv-test 2>&1)
+output=$(dr uv-test 2>&1)
 if ! echo "$output" | grep -q "Test task executed successfully"; then
-    error "dela run uv-test failed. Got: $output"
+    error "dr uv-test failed. Got: $output"
     exit 1
 fi
 
-output=$(dela run uv-build 2>&1)
+output=$(dr uv-build 2>&1)
 if ! echo "$output" | grep -q "Build task executed successfully"; then
-    error "dela run uv-build failed. Got: $output"
+    error "dr uv-build failed. Got: $output"
     exit 1
 fi
 
@@ -187,15 +187,15 @@ log "Testing Poetry tasks..."
 echo "2" | dela allow-command poetry-test || (error "Failed to allow poetry-test" && exit 1)
 echo "2" | dela allow-command poetry-build || (error "Failed to allow poetry-build" && exit 1)
 
-output=$(dela run poetry-test 2>&1)
+output=$(dr poetry-test 2>&1)
 if ! echo "$output" | grep -q "Test task executed successfully"; then
-    error "dela run poetry-test failed. Got: $output"
+    error "dr poetry-test failed. Got: $output"
     exit 1
 fi
 
-output=$(dela run poetry-build 2>&1)
+output=$(dr poetry-build 2>&1)
 if ! echo "$output" | grep -q "Build task executed successfully"; then
-    error "dela run poetry-build failed. Got: $output"
+    error "dr poetry-build failed. Got: $output"
     exit 1
 fi
 unset DELA_NON_INTERACTIVE
