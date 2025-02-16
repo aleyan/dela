@@ -1,15 +1,11 @@
-# dela function wrapper to handle 'run' command specially
-function dela
-    if test "$argv[1]" = "run"
-        set -l cmd (command dela get-command $argv[2..-1])
-        if test $status -eq 0
-            set -x DELA_TASK_RUNNING 1
-            eval $cmd
-            set -e DELA_TASK_RUNNING
-            return $status
-        end
-    else
-        command dela $argv
+# dr function to handle task execution
+function dr
+    set -l cmd (command dela get-command $argv)
+    if test $status -eq 0
+        set -x DELA_TASK_RUNNING 1
+        eval $cmd
+        set -e DELA_TASK_RUNNING
+        return $status
     end
 end
 

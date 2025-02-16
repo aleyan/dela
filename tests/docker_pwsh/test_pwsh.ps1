@@ -75,7 +75,10 @@ try {
 
 # Verify shell integration was loaded
 try {
-    $output = dela configure-shell
+    $output = dela configure-shell 2>&1
+    if ($output -is [array]) {
+        $output = $output -join "`n"
+    }
     Invoke-Expression $output
 } catch {
     Write-Error "dela configure-shell failed with output: $_"
@@ -178,12 +181,49 @@ Write-Log "4. Testing allowlist functionality..."
 
 Write-Log "4. Testing task execution..."
 
-# Test dela run command with Makefile task only
-Write-Log "Testing dela run command..."
-$output = dela run test-task
-if (-not ($output -match "Test task executed successfully")) {
-    Write-Error "dela run test-task failed. Got: $output"
+# Test UV tasks
+Write-Log "Testing UV tasks..."
+$env:DELA_NON_INTERACTIVE = 1
+"2" | dela allow-command uv-test
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Failed to allow uv-test"
 }
+"2" | dela allow-command uv-build
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Failed to allow uv-build"
+}
+
+$output = dr uv-test
+if (-not ($output -match "Test task executed successfully")) {
+    Write-Error "dr uv-test failed. Got: $output"
+}
+
+$output = dr uv-build
+if (-not ($output -match "Build task executed successfully")) {
+    Write-Error "dr uv-build failed. Got: $output"
+}
+
+# Test Poetry tasks
+Write-Log "Testing Poetry tasks..."
+"2" | dela allow-command poetry-test
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Failed to allow poetry-test"
+}
+"2" | dela allow-command poetry-build
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Failed to allow poetry-build"
+}
+
+$output = dr poetry-test
+if (-not ($output -match "Test task executed successfully")) {
+    Write-Error "dr poetry-test failed. Got: $output"
+}
+
+$output = dr poetry-build
+if (-not ($output -match "Build task executed successfully")) {
+    Write-Error "dr poetry-build failed. Got: $output"
+}
+$env:DELA_NON_INTERACTIVE = 0
 
 # Verify command not found handler was properly replaced
 Write-Log "Testing final command_not_found_handler..."

@@ -1,11 +1,7 @@
-# dela function wrapper to handle 'run' command specially
-dela() {
-    if [[ $1 == "run" ]]; then
-        cmd=$(command dela get-command "${@:2}")
-        DELA_TASK_RUNNING=1 eval "$cmd"
-    else
-        command dela "$@"
-    fi
+# dr function to handle task execution
+dr() {
+    cmd=$(command dela get-command "$@")
+    DELA_TASK_RUNNING=1 eval "$cmd"
 }
 
 # Command not found handler to delegate unknown commands to dela
