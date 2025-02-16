@@ -20,6 +20,9 @@ builder:
 	docker build -t dela-builder -f tests/Dockerfile.builder .
 
 # Individual shell test targets
+test_noinit: builder
+	VERBOSE=$(VERBOSE) ./tests/run_tests.sh noinit;
+
 test_zsh: builder
 	VERBOSE=$(VERBOSE) ./tests/run_tests.sh zsh;
 
@@ -33,7 +36,7 @@ test_pwsh: builder
 	VERBOSE=$(VERBOSE) ./tests/run_tests.sh pwsh;
 
 # Run all shell tests
-test_shells: builder test_zsh test_bash test_fish test_pwsh
+test_shells: builder test_noinit test_zsh test_bash test_fish test_pwsh
 
 install:
 	@echo "Installing dela locally..."
