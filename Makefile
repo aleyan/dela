@@ -1,4 +1,4 @@
-.PHONY: build test test_shells test_zsh test_bash test_fish test_pwsh run install builder publish
+.PHONY: build tests tests_integration test_noinit test_zsh test_bash test_fish test_pwsh run install builder publish
 
 # Default to non-verbose output
 VERBOSE ?= 0
@@ -10,7 +10,7 @@ build:
 	@echo "Building dela..."
 	cargo build
 
-test:
+tests:
 	@echo "Running tests..."
 	cargo test
 
@@ -36,7 +36,7 @@ test_pwsh: builder
 	VERBOSE=$(VERBOSE) ./tests/run_tests.sh pwsh;
 
 # Run all shell tests
-test_shells: builder test_noinit test_zsh test_bash test_fish test_pwsh
+tests_integration: builder test_noinit test_zsh test_bash test_fish test_pwsh
 
 install:
 	@echo "Installing dela locally..."
