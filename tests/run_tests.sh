@@ -24,7 +24,7 @@ error() {
 # Print usage information
 usage() {
     echo "Usage: $0 [shell]"
-    echo "  shell: Optional. One of: zsh, bash, fish, pwsh"
+    echo "  shell: Optional. One of: zsh, bash, fish, pwsh, noinit"
     echo "  If no shell is specified, tests all shells"
     echo ""
     echo "Environment variables:"
@@ -109,7 +109,7 @@ if [ $# -eq 1 ]; then
     shell=$1
     # Validate shell argument
     case $shell in
-        zsh|bash|fish|pwsh)
+        zsh|bash|fish|pwsh|noinit)
             log "Testing ${shell} shell integration..."
             run_shell_tests "${shell}"
             ;;
@@ -120,7 +120,7 @@ if [ $# -eq 1 ]; then
     esac
 else
     # Test all shells
-    for shell in zsh bash fish pwsh; do
+    for shell in noinit zsh bash fish pwsh; do
         log "Testing ${shell} shell integration..."
         run_shell_tests "${shell}"
     done

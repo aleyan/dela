@@ -2,6 +2,7 @@ use clap::{Parser, Subcommand};
 
 mod allowlist;
 mod commands;
+mod package_manager;
 mod parsers;
 mod prompt;
 mod task_discovery;

@@ -49,7 +49,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        shell: [zsh, bash, fish, pwsh]
+        shell: [noinit, zsh, bash, fish, pwsh]
       fail-fast: false
 
     steps:

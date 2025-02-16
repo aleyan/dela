@@ -1,6 +1,6 @@
 # Dela!
 
-A task runner that delegates the work to others. For your current working directory, it will scan the task definition files for tasks and allow you to invoke them directly from your shell. Dela simplifies discovery and execution of tasks in projects.
+Dela is a lightweight task runner that automatically discovers tasks in your current directory, let's you execute a task by its name without specifying the runner, and delegates their execution to tools like Make, npm, uv, and others.
 
 ## Installation
 
@@ -13,12 +13,14 @@ dela init
 
 ## Usage
 
+### Discovering tasks
 The `dela` command will list all the tasks defined.
 
 ```sh
 dela list
 ```
 
+### Running tasks
 You can invoke a task just by its name. For example here `build` task is defined in `Makefile` and is invoked.
 
 ```sh
@@ -55,11 +57,19 @@ Then the bare command will be executed instead of the task. To execute the task,
 
 ### How do I add a new task?
 
-You can add a new task by adding a new task definition file. The task definition file can be a Makefile, a pyproject.toml, a package.json, or a shell script.
+You can add a new task by adding a new task definition file. The task definition file can be a Makefile, a pyproject.toml, or a package.json.
 
 ### What shell environment are tasks executed in?
 
 Tasks are executed in the same shell environment as the command you are running.
+
+### Which shell integrations are supported?
+
+Currently, `dela` supports zsh, bash, fish, and PowerShell.
+
+### Which task runners are supported?
+
+Currently, `dela` supports Make, npm, uv, and poetry.
 
 ## Development
 

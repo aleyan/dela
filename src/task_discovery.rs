@@ -290,12 +290,18 @@ test:
         assert_eq!(discovered.tasks.len(), 2);
 
         let test_task = discovered.tasks.iter().find(|t| t.name == "test").unwrap();
-        assert_eq!(test_task.runner, TaskRunner::Npm);
-        assert_eq!(test_task.description, Some("npm script: jest".to_string()));
+        match &test_task.runner {
+            TaskRunner::Node(_) => (),
+            _ => panic!("Expected Node task runner"),
+        }
+        assert_eq!(test_task.description, Some("node script: jest".to_string()));
 
         let build_task = discovered.tasks.iter().find(|t| t.name == "build").unwrap();
-        assert_eq!(build_task.runner, TaskRunner::Npm);
-        assert_eq!(build_task.description, Some("npm script: tsc".to_string()));
+        match &build_task.runner {
+            TaskRunner::Node(_) => (),
+            _ => panic!("Expected Node task runner"),
+        }
+        assert_eq!(build_task.description, Some("node script: tsc".to_string()));
     }
 
     #[test]
@@ -351,6 +357,212 @@ serve = "uvicorn main:app --reload"
         assert_eq!(
             serve_task.description,
             Some("python script: uvicorn main:app --reload".to_string())
+        );
+    }
+
+    #[test]
+    fn test_discover_tasks_multiple_files() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create Makefile
+        let makefile_content = r#".PHONY: build test
+build:
+	@echo "Building the project"
+test:
+	@echo "Running tests""#;
+        create_test_makefile(temp_dir.path(), makefile_content);
+
+        // Create package.json
+        let package_json_content = r#"{
+            "name": "test-package",
+            "scripts": {
+                "start": "node index.js",
+                "lint": "eslint ."
+            }
+        }"#;
+        let mut package_json = File::create(temp_dir.path().join("package.json")).unwrap();
+        write!(package_json, "{}", package_json_content).unwrap();
+
+        // Create pyproject.toml
+        let pyproject_content = r#"
+[project]
+name = "test-project"
+
+[project.scripts]
+serve = "uvicorn main:app --reload"
+"#;
+        let mut pyproject = File::create(temp_dir.path().join("pyproject.toml")).unwrap();
+        write!(pyproject, "{}", pyproject_content).unwrap();
+
+        let discovered = discover_tasks(temp_dir.path());
+
+        // Verify all task files were parsed
+        assert!(matches!(
+            discovered.definitions.makefile.unwrap().status,
+            TaskFileStatus::Parsed
+        ));
+        assert!(matches!(
+            discovered.definitions.package_json.unwrap().status,
+            TaskFileStatus::Parsed
+        ));
+        assert!(matches!(
+            discovered.definitions.pyproject_toml.unwrap().status,
+            TaskFileStatus::Parsed
+        ));
+
+        // Verify all tasks were discovered
+        assert_eq!(discovered.tasks.len(), 5);
+
+        // Verify tasks from each file
+        let make_tasks: Vec<_> = discovered
+            .tasks
+            .iter()
+            .filter(|t| matches!(t.runner, TaskRunner::Make))
+            .collect();
+        assert_eq!(make_tasks.len(), 2);
+
+        let node_tasks: Vec<_> = discovered
+            .tasks
+            .iter()
+            .filter(|t| matches!(t.runner, TaskRunner::Node(_)))
+            .collect();
+        assert_eq!(node_tasks.len(), 2);
+
+        let python_tasks: Vec<_> = discovered
+            .tasks
+            .iter()
+            .filter(|t| matches!(t.runner, TaskRunner::PythonUv))
+            .collect();
+        assert_eq!(python_tasks.len(), 1);
+    }
+
+    #[test]
+    fn test_discover_tasks_with_name_collision() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create Makefile with 'test' task
+        let makefile_content = r#".PHONY: test
+test:
+	@echo "Running make tests""#;
+        create_test_makefile(temp_dir.path(), makefile_content);
+
+        // Create package.json with 'test' task
+        let package_json_content = r#"{
+            "name": "test-package",
+            "scripts": {
+                "test": "jest"
+            }
+        }"#;
+        let mut package_json = File::create(temp_dir.path().join("package.json")).unwrap();
+        write!(package_json, "{}", package_json_content).unwrap();
+
+        let discovered = discover_tasks(temp_dir.path());
+
+        // Both tasks should be discovered
+        assert_eq!(discovered.tasks.len(), 2);
+
+        // Verify both test tasks exist with different runners
+        let make_test = discovered
+            .tasks
+            .iter()
+            .find(|t| matches!(t.runner, TaskRunner::Make) && t.name == "test")
+            .unwrap();
+        assert_eq!(
+            make_test.description,
+            Some("Running make tests".to_string())
+        );
+
+        let node_test = discovered
+            .tasks
+            .iter()
+            .find(|t| matches!(t.runner, TaskRunner::Node(_)) && t.name == "test")
+            .unwrap();
+        assert_eq!(node_test.description, Some("node script: jest".to_string()));
+    }
+
+    #[test]
+    fn test_discover_tasks_with_shadowing() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create Makefile with tasks that shadow shell builtins
+        let makefile_content = r#".PHONY: cd ls echo
+cd:
+	@echo "Change directory"
+ls:
+	@echo "List files"
+echo:
+	@echo "Echo text""#;
+        create_test_makefile(temp_dir.path(), makefile_content);
+
+        let discovered = discover_tasks(temp_dir.path());
+
+        // All tasks should be discovered
+        assert_eq!(discovered.tasks.len(), 3);
+
+        // Verify shadowing information
+        for task in &discovered.tasks {
+            assert!(
+                task.shadowed_by.is_some(),
+                "Task {} should be shadowed",
+                task.name
+            );
+            assert!(matches!(
+                task.shadowed_by.as_ref().unwrap(),
+                task_shadowing::ShadowType::ShellBuiltin(_)
+            ));
+        }
+    }
+
+    #[test]
+    fn test_discover_python_poetry_tasks() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create pyproject.toml with Poetry scripts
+        let content = r#"
+[tool.poetry]
+name = "test-project"
+
+[tool.poetry.scripts]
+serve = "uvicorn main:app --reload"
+test = "pytest"
+lint = "flake8"
+"#;
+
+        let pyproject_path = temp_dir.path().join("pyproject.toml");
+        let mut file = File::create(&pyproject_path).unwrap();
+        write!(file, "{}", content).unwrap();
+
+        let discovered = discover_tasks(temp_dir.path());
+
+        // Check pyproject.toml status
+        let pyproject_def = discovered.definitions.pyproject_toml.unwrap();
+        assert_eq!(pyproject_def.status, TaskFileStatus::Parsed);
+
+        // Verify tasks were discovered
+        assert_eq!(discovered.tasks.len(), 3);
+
+        // Verify all tasks use PythonPoetry runner
+        for task in &discovered.tasks {
+            assert_eq!(task.runner, TaskRunner::PythonPoetry);
+        }
+
+        // Verify specific tasks
+        let serve_task = discovered.tasks.iter().find(|t| t.name == "serve").unwrap();
+        assert_eq!(
+            serve_task.description,
+            Some("python script: uvicorn main:app --reload".to_string())
+        );
+
+        let test_task = discovered.tasks.iter().find(|t| t.name == "test").unwrap();
+        assert_eq!(
+            test_task.description,
+            Some("python script: pytest".to_string())
+        );
+
+        let lint_task = discovered.tasks.iter().find(|t| t.name == "lint").unwrap();
+        assert_eq!(
+            lint_task.description,
+            Some("python script: flake8".to_string())
         );
     }
 }
