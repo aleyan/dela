@@ -439,12 +439,34 @@ mod tests {
     #[test]
     #[serial]
     fn test_check_shadowing_precedence() {
-        let temp_dir = TempDir::new().unwrap();
-        let _cd_path = create_fake_executable(temp_dir.path(), "cd");
+        // Save original environment
+        let original_shell = env::var("SHELL").ok();
+        let original_path = env::var("PATH").unwrap_or_default();
 
-        // Builtin should take precedence over PATH executable
+        // Set up test environment with a known shell
+        env::set_var("SHELL", "/bin/zsh");
+
+        // Create a temporary directory and add it to PATH
+        let temp_dir = TempDir::new().unwrap();
+        let cd_path = create_fake_executable(temp_dir.path(), "cd");
+        env::set_var(
+            "PATH",
+            format!("{}:{}", temp_dir.path().display(), original_path),
+        );
+
+        // Verify the fake executable exists and is in PATH
+        assert!(cd_path.exists());
+
+        // Test that builtin takes precedence
         let result = check_shadowing("cd");
-        assert!(matches!(result, Some(ShadowType::ShellBuiltin(_))));
+        assert!(matches!(result, Some(ShadowType::ShellBuiltin(shell)) if shell == "zsh"));
+
+        // Clean up environment
+        match original_shell {
+            Some(shell) => env::set_var("SHELL", shell),
+            None => env::remove_var("SHELL"),
+        }
+        env::set_var("PATH", original_path);
     }
 
     #[test]
