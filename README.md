@@ -21,7 +21,7 @@ $ dela list
 ```
 
 ### Running tasks
-You can invoke a task just by its name. For example here `build` task is defined in `Makefile` and is invoked directly.
+You can invoke a task just by its name from the shell via `<task>`. For example here `build` task is defined in `Makefile` and is invoked directly.
 
 ```sh
 $ build
@@ -39,10 +39,16 @@ Running build from ~/Projects/dela/Makefile for the first time. Allow?
 4) Deny
 ```
 
-You can also call dela run directly with the task name, in which case it will execute the task directly, unless it is specified in multiple files.
+You can also call request dela explicitly with `dr <task>`.
 
 ```sh
 $ dr build
+```
+
+If you don't have dela shell integration, you can use `dela run <task>` to run a task. This will execute the task in a subshell environment.
+
+```sh
+$ dela run build
 ```
 
 ## Frequently Asked Questions
@@ -61,7 +67,7 @@ You can add a new task by adding a new task definition file. The task definition
 
 ### What shell environment are tasks executed in?
 
-Tasks are executed in the same shell environment as the command you are running.
+When executing bare tasks or via `dr`, tasks are executed in the current shell environment. When running tasks via `dela run`, tasks are executed in a subshell environment.
 
 ### Which shell integrations are supported?
 
@@ -80,24 +86,24 @@ Currently, `dela` supports macOS and Linux.
 To use a dev version of the rust binary locally, build and install it with the following command.
 
 ```sh
-cargo install --path .
+$ cargo install --path .
 ```
 
 You can also source the shell integration directly from the `resources` directory.
 
 ```sh
-source resources/zsh.sh
+$ source resources/zsh.sh
 ```
 
 ## Testing
 Run integration tests with `dr test`, it requires `Make`, `cargo`, and `dela` to be installed.
 
 ```sh
-dr test
+$ tests
 ```
 
 Run integrations test with `test_shells`, it requires `Make`, `Docker`, and `dela` to be installed.
 
 ```sh
-test_shells
+$ tests_integration
 ```
