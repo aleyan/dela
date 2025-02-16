@@ -47,7 +47,7 @@ run:
 	cargo run
 
 # Publish to crates.io
-publish: test
+publish: tests tests_integration
 	@echo "Publishing dela to crates.io"
 	@if [ -z "$(CARGO_REGISTRY_TOKEN)" ]; then \
 		echo "Error: CARGO_REGISTRY_TOKEN is not set. Please add it to your .env file."; \
