@@ -445,7 +445,7 @@ mod tests {
 
         // Set up test environment with a known shell
         env::set_var("SHELL", "/bin/zsh");
-        
+
         // Create a temporary directory and add it to PATH
         let temp_dir = TempDir::new().unwrap();
         let cd_path = create_fake_executable(temp_dir.path(), "cd");
