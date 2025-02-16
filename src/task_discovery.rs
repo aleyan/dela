@@ -290,12 +290,18 @@ test:
         assert_eq!(discovered.tasks.len(), 2);
 
         let test_task = discovered.tasks.iter().find(|t| t.name == "test").unwrap();
-        assert_eq!(test_task.runner, TaskRunner::Npm);
-        assert_eq!(test_task.description, Some("npm script: jest".to_string()));
+        match &test_task.runner {
+            TaskRunner::Node(_) => (),
+            _ => panic!("Expected Node task runner"),
+        }
+        assert_eq!(test_task.description, Some("node script: jest".to_string()));
 
         let build_task = discovered.tasks.iter().find(|t| t.name == "build").unwrap();
-        assert_eq!(build_task.runner, TaskRunner::Npm);
-        assert_eq!(build_task.description, Some("npm script: tsc".to_string()));
+        match &build_task.runner {
+            TaskRunner::Node(_) => (),
+            _ => panic!("Expected Node task runner"),
+        }
+        assert_eq!(build_task.description, Some("node script: tsc".to_string()));
     }
 
     #[test]
@@ -411,21 +417,21 @@ serve = "uvicorn main:app --reload"
         let make_tasks: Vec<_> = discovered
             .tasks
             .iter()
-            .filter(|t| t.runner == TaskRunner::Make)
+            .filter(|t| matches!(t.runner, TaskRunner::Make))
             .collect();
         assert_eq!(make_tasks.len(), 2);
 
-        let npm_tasks: Vec<_> = discovered
+        let node_tasks: Vec<_> = discovered
             .tasks
             .iter()
-            .filter(|t| t.runner == TaskRunner::Npm)
+            .filter(|t| matches!(t.runner, TaskRunner::Node(_)))
             .collect();
-        assert_eq!(npm_tasks.len(), 2);
+        assert_eq!(node_tasks.len(), 2);
 
         let python_tasks: Vec<_> = discovered
             .tasks
             .iter()
-            .filter(|t| t.runner == TaskRunner::PythonUv)
+            .filter(|t| matches!(t.runner, TaskRunner::PythonUv))
             .collect();
         assert_eq!(python_tasks.len(), 1);
     }
@@ -459,19 +465,19 @@ test:
         let make_test = discovered
             .tasks
             .iter()
-            .find(|t| t.runner == TaskRunner::Make && t.name == "test")
+            .find(|t| matches!(t.runner, TaskRunner::Make) && t.name == "test")
             .unwrap();
         assert_eq!(
             make_test.description,
             Some("Running make tests".to_string())
         );
 
-        let npm_test = discovered
+        let node_test = discovered
             .tasks
             .iter()
-            .find(|t| t.runner == TaskRunner::Npm && t.name == "test")
+            .find(|t| matches!(t.runner, TaskRunner::Node(_)) && t.name == "test")
             .unwrap();
-        assert_eq!(npm_test.description, Some("npm script: jest".to_string()));
+        assert_eq!(node_test.description, Some("node script: jest".to_string()));
     }
 
     #[test]

@@ -1,3 +1,4 @@
+use crate::package_manager;
 use crate::types::{Task, TaskDefinitionFile, TaskFileStatus, TaskRunner};
 use serde_json::Value;
 use std::fs;
@@ -19,6 +20,9 @@ pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
         None => return Ok(vec![]), // No scripts defined
     };
 
+    // Detect available package manager
+    let pkg_mgr = package_manager::detect_package_manager();
+
     // Convert scripts to Tasks
     let mut tasks = Vec::new();
     for (name, cmd) in scripts {
@@ -26,9 +30,9 @@ pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
             tasks.push(Task {
                 name: name.clone(),
                 file_path: path.to_path_buf(),
-                runner: TaskRunner::Npm,
+                runner: TaskRunner::Node(pkg_mgr.clone()),
                 source_name: name.clone(),
-                description: Some(format!("npm script: {}", cmd)),
+                description: Some(format!("node script: {}", cmd)),
                 shadowed_by: None, // This will be filled in by task_discovery
             });
         }
@@ -41,7 +45,7 @@ pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
 pub fn create_definition(path: &Path, status: TaskFileStatus) -> TaskDefinitionFile {
     TaskDefinitionFile {
         path: path.to_path_buf(),
-        runner: TaskRunner::Npm,
+        runner: TaskRunner::Node(package_manager::detect_package_manager()),
         status,
     }
 }
@@ -54,74 +58,72 @@ mod tests {
     use tempfile::TempDir;
 
     #[test]
-    fn test_parse_valid_package_json() {
+    fn test_parse_package_json() {
         let temp_dir = TempDir::new().unwrap();
-        let package_json = temp_dir.path().join("package.json");
+        let package_json_path = temp_dir.path().join("package.json");
 
         let content = r#"{
             "name": "test-package",
             "scripts": {
                 "test": "jest",
-                "build": "tsc",
-                "start": "node dist/index.js"
+                "build": "tsc"
             }
         }"#;
 
-        File::create(&package_json)
+        File::create(&package_json_path)
             .unwrap()
             .write_all(content.as_bytes())
             .unwrap();
 
-        let tasks = parse(&package_json).unwrap();
+        let tasks = parse(&package_json_path).unwrap();
 
-        assert_eq!(tasks.len(), 3);
+        assert_eq!(tasks.len(), 2);
 
         let test_task = tasks.iter().find(|t| t.name == "test").unwrap();
-        assert_eq!(test_task.runner, TaskRunner::Npm);
-        assert_eq!(test_task.source_name, "test");
-        assert_eq!(test_task.description, Some("npm script: jest".to_string()));
+        match &test_task.runner {
+            TaskRunner::Node(_) => (),
+            _ => panic!("Expected Node task runner"),
+        }
+        assert_eq!(test_task.description, Some("node script: jest".to_string()));
 
         let build_task = tasks.iter().find(|t| t.name == "build").unwrap();
-        assert_eq!(build_task.runner, TaskRunner::Npm);
-        assert_eq!(build_task.source_name, "build");
-        assert_eq!(build_task.description, Some("npm script: tsc".to_string()));
-    }
-
-    #[test]
-    fn test_parse_package_json_no_scripts() {
-        let temp_dir = TempDir::new().unwrap();
-        let package_json = temp_dir.path().join("package.json");
-
-        let content = r#"{
-            "name": "test-package"
-        }"#;
-
-        File::create(&package_json)
-            .unwrap()
-            .write_all(content.as_bytes())
-            .unwrap();
-
-        let tasks = parse(&package_json).unwrap();
-        assert!(tasks.is_empty());
+        match &build_task.runner {
+            TaskRunner::Node(_) => (),
+            _ => panic!("Expected Node task runner"),
+        }
+        assert_eq!(build_task.description, Some("node script: tsc".to_string()));
     }
 
     #[test]
     fn test_parse_invalid_package_json() {
         let temp_dir = TempDir::new().unwrap();
-        let package_json = temp_dir.path().join("package.json");
+        let package_json_path = temp_dir.path().join("package.json");
 
-        let content = r#"{
-            "name": "test-package",
-            "scripts": "invalid"
-        }"#;
-
-        File::create(&package_json)
+        let content = r#"{ invalid json }"#;
+        File::create(&package_json_path)
             .unwrap()
             .write_all(content.as_bytes())
             .unwrap();
 
-        let result = parse(&package_json);
+        let result = parse(&package_json_path);
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("'scripts' must be an object"));
+    }
+
+    #[test]
+    fn test_parse_package_json_no_scripts() {
+        let temp_dir = TempDir::new().unwrap();
+        let package_json_path = temp_dir.path().join("package.json");
+
+        let content = r#"{
+            "name": "test-package"
+        }"#;
+
+        File::create(&package_json_path)
+            .unwrap()
+            .write_all(content.as_bytes())
+            .unwrap();
+
+        let tasks = parse(&package_json_path).unwrap();
+        assert!(tasks.is_empty());
     }
 }

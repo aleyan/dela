@@ -1,3 +1,4 @@
+use crate::package_manager::PackageManager;
 use crate::task_shadowing::ShadowType;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -63,8 +64,8 @@ pub struct Task {
 pub enum TaskRunner {
     /// Make tasks from Makefile
     Make,
-    /// npm scripts from package.json
-    Npm,
+    /// Node.js package manager scripts from package.json
+    Node(Option<PackageManager>),
     /// Python scripts from pyproject.toml using uv
     PythonUv,
     /// Python scripts from pyproject.toml using poetry
@@ -79,7 +80,8 @@ impl TaskRunner {
     pub fn get_command(&self, task: &Task) -> String {
         match self {
             TaskRunner::Make => format!("make {}", task.source_name),
-            TaskRunner::Npm => format!("npm run {}", task.source_name),
+            TaskRunner::Node(Some(pkg_mgr)) => pkg_mgr.get_run_command(&task.source_name),
+            TaskRunner::Node(None) => format!("npm run {}", task.source_name), // Fallback to npm if no package manager detected
             TaskRunner::PythonUv => format!("uv run {}", task.source_name),
             TaskRunner::PythonPoetry => format!("poetry run {}", task.source_name),
             TaskRunner::ShellScript => format!("./{}", task.source_name),
