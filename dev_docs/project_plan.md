@@ -90,7 +90,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [x] [DTKT-24] Ensure bare commands invoke `dela` through the fallback.
   - [ ] [DTKT-25] Prompt user if multiple matching tasks exist.
   - [ ] [DTKT-95] Provide `dr` shell function to run dela tasks with --allow flag.
-  - [ ] [DTKT-112] Remove `dela run` in favor of `dr` shell function.
+  - [x] [DTKT-112] Remove `dela run` in favor of `dr` shell function.
 
 - [ ] **Disambiguation**
   - [ ] [DTKT-26] Implement logic to handle multiple tasks with the same name.
