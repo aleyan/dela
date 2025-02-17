@@ -1,8 +1,10 @@
 use crate::task_discovery;
 use crate::task_shadowing::ShadowType;
 use crate::types::{Task, TaskFileStatus};
+use crate::runner::is_runner_available;
 use std::collections::HashMap;
 use std::env;
+use std::io::{self, Write};
 
 pub fn execute(verbose: bool) -> Result<(), String> {
     let current_dir =
@@ -52,74 +54,61 @@ pub fn execute(verbose: bool) -> Result<(), String> {
         println!();
     }
 
-    if discovered.tasks.is_empty() {
-        println!("No tasks found in the current directory.");
-        return Ok(());
-    }
-
-    // Group tasks by their source file for better organization
+    // Group tasks by file for better organization
     let mut tasks_by_file: HashMap<String, Vec<&Task>> = HashMap::new();
     for task in &discovered.tasks {
-        tasks_by_file
-            .entry(task.file_path.display().to_string())
-            .or_default()
-            .push(task);
+        let file_path = task.file_path.to_string_lossy().to_string();
+        tasks_by_file.entry(file_path).or_default().push(task);
     }
 
-    // Collect shadowing information for the footer
-    let mut shadow_infos = Vec::new();
-
-    println!("Available tasks:");
-    for (file, tasks) in tasks_by_file {
-        println!("\nFrom {}:", file);
-        for task in tasks {
-            let shadow_symbol = if task.shadowed_by.is_some() {
-                match task.shadowed_by.as_ref().unwrap() {
-                    ShadowType::ShellBuiltin(_) => " †",
-                    ShadowType::PathExecutable(_) => " ‡",
+    // Print tasks grouped by file
+    if tasks_by_file.is_empty() {
+        println!("No tasks found in the current directory.");
+    } else {
+        for (file, tasks) in tasks_by_file {
+            println!("\nTasks from {}:", file);
+            for task in tasks {
+                let mut output = String::new();
+                
+                // Basic task name
+                output.push_str(&format!("  • {}", task.name));
+                
+                // Add runner info and availability
+                if !is_runner_available(&task.runner) {
+                    output.push_str(&format!(" (requires {}, not found)", task.runner.name()));
                 }
-            } else {
-                ""
-            };
-
-            // Add shadow info to footer if task is shadowed
-            if let Some(shadow_type) = &task.shadowed_by {
-                let info = match shadow_type {
-                    ShadowType::ShellBuiltin(shell) => {
-                        format!("† task '{}' shadowed by {} shell builtin", task.name, shell)
-                    }
-                    ShadowType::PathExecutable(path) => {
-                        format!("‡ task '{}' shadowed by executable at {}", task.name, path)
-                    }
-                };
-                shadow_infos.push(info);
-            }
-
-            if let Some(desc) = &task.description {
-                println!("  • {}{} - {}", task.name, shadow_symbol, desc);
-            } else {
-                println!("  • {}{}", task.name, shadow_symbol);
+                
+                // Add shadow info if present
+                if let Some(shadow_info) = format_shadow_info(task) {
+                    output.push_str(&format!(" ({})", shadow_info));
+                }
+                
+                // Add source name if different from task name
+                if task.name != task.source_name {
+                    output.push_str(&format!(" (source: {})", task.source_name));
+                }
+                
+                println!("{}", output);
             }
         }
     }
 
-    // Print warnings if any
+    // Show any errors encountered during discovery
     if !discovered.errors.is_empty() {
-        println!("\nWarnings:");
+        println!("\nErrors encountered:");
         for error in discovered.errors {
-            println!("  ! {}", error);
-        }
-    }
-
-    // Print shadow information footer if any tasks are shadowed
-    if !shadow_infos.is_empty() {
-        println!("\nShadowed tasks:");
-        for info in shadow_infos {
-            println!("  {}", info);
+            println!("  • {}", error);
         }
     }
 
     Ok(())
+}
+
+fn format_shadow_info(task: &Task) -> Option<String> {
+    task.shadowed_by.as_ref().map(|shadow_type| match shadow_type {
+        ShadowType::ShellBuiltin(name) => format!("shadowed by shell builtin '{}'", name),
+        ShadowType::PathExecutable(path) => format!("shadowed by '{}'", path),
+    })
 }
 
 #[cfg(test)]

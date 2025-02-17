@@ -5,6 +5,7 @@ mod commands;
 mod package_manager;
 mod parsers;
 mod prompt;
+mod runner;
 mod task_discovery;
 mod task_shadowing;
 mod types;

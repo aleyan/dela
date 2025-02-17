@@ -304,8 +304,8 @@ fn check_pwsh_builtin(name: &str) -> Option<ShadowType> {
     }
 }
 
-/// Check if a name exists as an executable in PATH
-fn check_path_executable(name: &str) -> Option<ShadowType> {
+/// Check if a command exists in PATH
+pub fn check_path_executable(name: &str) -> Option<ShadowType> {
     // Use 'which' command to find executable in PATH
     let output = Command::new("which").arg(name).output().ok()?;
 

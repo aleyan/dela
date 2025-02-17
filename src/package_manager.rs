@@ -8,6 +8,14 @@ pub enum PackageManager {
 }
 
 impl PackageManager {
+    pub fn command(&self) -> &'static str {
+        match self {
+            PackageManager::Bun => "bun",
+            PackageManager::Yarn => "yarn",
+            PackageManager::Npm => "npm",
+        }
+    }
+
     pub fn get_run_command(&self, script_name: &str) -> String {
         match self {
             PackageManager::Bun => format!("bun run {}", script_name),

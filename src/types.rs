@@ -1,5 +1,5 @@
 use crate::package_manager::PackageManager;
-use crate::task_shadowing::ShadowType;
+use crate::task_shadowing::{ShadowType};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -80,11 +80,22 @@ impl TaskRunner {
     pub fn get_command(&self, task: &Task) -> String {
         match self {
             TaskRunner::Make => format!("make {}", task.source_name),
-            TaskRunner::Node(Some(pkg_mgr)) => pkg_mgr.get_run_command(&task.source_name),
-            TaskRunner::Node(None) => format!("npm run {}", task.source_name), // Fallback to npm if no package manager detected
+            TaskRunner::Node(Some(pm)) => format!("{} run {}", pm.command(), task.source_name),
+            TaskRunner::Node(None) => format!("npm run {}", task.source_name),
             TaskRunner::PythonUv => format!("uv run {}", task.source_name),
             TaskRunner::PythonPoetry => format!("poetry run {}", task.source_name),
             TaskRunner::ShellScript => format!("./{}", task.source_name),
+        }
+    }
+
+    pub fn name(&self) -> &'static str {
+        match self {
+            TaskRunner::Make => "make",
+            TaskRunner::Node(Some(pm)) => pm.command(),
+            TaskRunner::Node(None) => "npm",
+            TaskRunner::PythonUv => "uv",
+            TaskRunner::PythonPoetry => "poetry",
+            TaskRunner::ShellScript => "shell",
         }
     }
 }
