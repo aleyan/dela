@@ -15,7 +15,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
     - [x] [DTKT-58] Implement `run` command structure and help text
     - [x] [DTKT-59] Implement `get_command` command structure and help text
     - [ ] [DTKT-60] Add command-line options for verbosity and debug output
-    - [ ] [DTKT-61] Add `--help` text for each subcommand
+    - [x] [DTKT-61] Add `--help` text for each subcommand
     - [ ] [DTKT-62] Add `--version` flag to show version information
 
 - [ ] **Task Definition Parsers**
