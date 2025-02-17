@@ -34,7 +34,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [x] [DTKT-9] Ensure `dela list` shows tasks from recognized files.
   - [x] [DTKT-10] Print tasks with references to the source file.
   - [x] [DTKT-92] List which task runner will be used for each task.
-  - [ ] [DTKT-] Indicate which commands have duplicate names.
+  - [ ] [DTKT-113] Indicate which commands have duplicate names.
 
 **Deliverables**
 - [x] Parsing logic for multiple file types.
@@ -185,13 +185,13 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [ ] [DTKT-44] Update `README.md` with usage instructions and examples.
   - [ ] [DTKT-45] Provide short tutorials or usage demos.
   - [ ] [DTKT-46] Consider additional docs folder or GitHub Pages for extended guides.
-  - [ ] [DTKT_] Publish docs to read the docs.
+  - [ ] [DTKT-114] Publish docs to read the docs.
 
 - [ ] **Versioning and Release**
   - [ ] [DTKT-47] Bump version in `Cargo.toml`.
   - [ ] [DTKT-48] Publish to crates.io.
   - [ ] [DTKT-49] Tag a stable release in the repository.
-  - [ ] [DTKT-] Mark realeses on github.
+  - [ ] [DTKT-115] Mark realeses on github.
 
 - [ ] **Community Feedback**
   - [ ] [DTKT-50] Collect user feedback on command discovery and allowlist features.
