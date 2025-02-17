@@ -42,8 +42,8 @@ At a high level, `dela` operates by intercepting commands in your shell that wou
 1. **Shell Invocation**
    - Once a matching task is found, `dela` instructs the shell to run the appropriate command. For example, if the task is in a Makefile, it runs `make <task>`. For a Node-based task, it might run `npm run <task>`, and so on.
 
-2. **Direct vs. `dela run`**
-   - Users can invoke tasks by calling them directly (`build`), which triggers the "command not found" handler. Or they can use `dela run build`, which bypasses the shell's "command not found" mechanism and directly invokes the runner logic.
+2. **Bare vs. `dr`**
+   - Users can invoke tasks by calling the bare command without a tool eg (`build`), which triggers the "command not found" handler. Or they can use `dr build`, which bypasses the shell's "command not found" mechanism and directly invokes the runner logic.
 
 3. **Shell Execution Strategy**
    - Rather than executing commands directly from Rust, `dela` returns commands to the shell for execution.
@@ -65,14 +65,14 @@ At a high level, `dela` operates by intercepting commands in your shell that wou
      - Shell aliases and functions are available
 
 4. **Extensibility**
-   - The architecture supports adding new task definition modules for various technologies. Each module implements a function to detect tasks and a strategy to execute them.
+   - The architecture supports adding new task definition modules for various technologies. Each module implements a function to detect tasks and a strategy to execute them. These extensions are simply additional rust files in parsers directory.
 
 ---
 
 ## Allowlist Management & Security
 
 1. **Allowlists**
-   - `dela` tracks user-approved tasks or task definition files in `~/.dela/allowlists`. This ensures that tasks cannot execute code from an untrusted directory or file without explicit permission.
+   - `dela` tracks user-approved tasks or task definition files in `~/.dela/allowlists`. This ensures that tasks cannot execute code from an untrusted directory or file without explicit permission when a user typos a command.
 
 2. **Prompting**
    - When a task is run for the first time from a new directory or new file, the user is prompted to allow or deny that command. This approach helps prevent accidental or malicious commands from executing automatically.
