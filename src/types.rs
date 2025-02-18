@@ -3,6 +3,34 @@ use crate::task_shadowing::{ShadowType};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+/// Different types of task definition files supported by dela
+#[derive(Debug, Clone, PartialEq)]
+pub enum TaskDefinitionType {
+    /// Makefile
+    Makefile,
+    /// package.json scripts
+    PackageJson,
+    /// pyproject.toml scripts
+    PyprojectToml,
+    /// Shell script
+    ShellScript,
+}
+
+/// Different types of task runners supported by dela
+#[derive(Debug, Clone, PartialEq)]
+pub enum TaskRunner {
+    /// Make tasks from Makefile
+    Make,
+    /// Node.js package manager
+    Node(PackageManager),
+    /// Python uv package manager
+    PythonUv,
+    /// Python poetry package manager
+    PythonPoetry,
+    /// Direct shell script execution
+    ShellScript,
+}
+
 /// Status of a task definition file
 #[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
@@ -24,8 +52,8 @@ pub enum TaskFileStatus {
 pub struct TaskDefinitionFile {
     /// Path to the task definition file
     pub path: PathBuf,
-    /// Type of the task runner for this file
-    pub runner: TaskRunner,
+    /// Type of the task definition file
+    pub definition_type: TaskDefinitionType,
     /// Status of the file
     pub status: TaskFileStatus,
 }
@@ -48,6 +76,8 @@ pub struct Task {
     pub name: String,
     /// Path to the file containing this task
     pub file_path: PathBuf,
+    /// The type of definition file this task came from
+    pub definition_type: TaskDefinitionType,
     /// The type of runner needed for this task
     pub runner: TaskRunner,
     /// Original task name in the source file (might be different from name)
@@ -58,30 +88,12 @@ pub struct Task {
     pub shadowed_by: Option<ShadowType>,
 }
 
-/// Different types of task runners supported by dela
-#[allow(dead_code)]
-#[derive(Debug, Clone, PartialEq)]
-pub enum TaskRunner {
-    /// Make tasks from Makefile
-    Make,
-    /// Node.js package manager scripts from package.json
-    Node(Option<PackageManager>),
-    /// Python scripts from pyproject.toml using uv
-    PythonUv,
-    /// Python scripts from pyproject.toml using poetry
-    PythonPoetry,
-    /// Direct shell script execution
-    ShellScript,
-    // TODO(DTKT-52): Add plugin support for custom runners
-}
-
 impl TaskRunner {
     /// Get the command to run a task with this runner
     pub fn get_command(&self, task: &Task) -> String {
         match self {
             TaskRunner::Make => format!("make {}", task.source_name),
-            TaskRunner::Node(Some(pm)) => format!("{} run {}", pm.command(), task.source_name),
-            TaskRunner::Node(None) => format!("npm run {}", task.source_name),
+            TaskRunner::Node(pm) => format!("{} run {}", pm.command(), task.source_name),
             TaskRunner::PythonUv => format!("uv run {}", task.source_name),
             TaskRunner::PythonPoetry => format!("poetry run {}", task.source_name),
             TaskRunner::ShellScript => format!("./{}", task.source_name),
@@ -91,8 +103,7 @@ impl TaskRunner {
     pub fn name(&self) -> &'static str {
         match self {
             TaskRunner::Make => "make",
-            TaskRunner::Node(Some(pm)) => pm.command(),
-            TaskRunner::Node(None) => "npm",
+            TaskRunner::Node(pm) => pm.command(),
             TaskRunner::PythonUv => "uv",
             TaskRunner::PythonPoetry => "poetry",
             TaskRunner::ShellScript => "shell",

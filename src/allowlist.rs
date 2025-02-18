@@ -1,5 +1,5 @@
 use crate::prompt::{self, AllowDecision};
-use crate::types::{AllowScope, Allowlist, AllowlistEntry, Task};
+use crate::types::{AllowScope, Allowlist, AllowlistEntry, Task, TaskDefinitionType, TaskRunner};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -137,11 +137,23 @@ pub fn check_task_allowed(task: &Task) -> Result<bool, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::TaskRunner;
+    use crate::types::{Task, TaskDefinitionType, TaskRunner};
     use serial_test::serial;
     use std::env;
     use std::fs;
     use tempfile::TempDir;
+
+    fn create_test_task(name: &str, file_path: PathBuf) -> Task {
+        Task {
+            name: name.to_string(),
+            file_path,
+            definition_type: TaskDefinitionType::Makefile,
+            runner: TaskRunner::Make,
+            source_name: name.to_string(),
+            description: None,
+            shadowed_by: None,
+        }
+    }
 
     fn setup_test_env() -> (TempDir, Task) {
         let temp_dir = TempDir::new().unwrap();
@@ -151,14 +163,7 @@ mod tests {
         fs::create_dir_all(temp_dir.path().join(".dela"))
             .expect("Failed to create .dela directory");
 
-        let task = Task {
-            name: "test-task".to_string(),
-            description: Some("A test task".to_string()),
-            file_path: PathBuf::from("Makefile"),
-            runner: TaskRunner::Make,
-            source_name: "test-task".to_string(),
-            shadowed_by: None,
-        };
+        let task = create_test_task("test-task", PathBuf::from("Makefile"));
 
         (temp_dir, task)
     }

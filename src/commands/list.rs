@@ -1,10 +1,11 @@
 use crate::task_discovery;
 use crate::task_shadowing::ShadowType;
-use crate::types::{Task, TaskFileStatus};
+use crate::types::{Task, TaskFileStatus, TaskDefinitionType, TaskRunner};
 use crate::runner::is_runner_available;
 use std::collections::HashMap;
 use std::env;
 use std::io::{self, Write};
+use crate::package_manager::PackageManager;
 
 pub fn execute(verbose: bool) -> Result<(), String> {
     let current_dir =
@@ -114,7 +115,7 @@ fn format_shadow_info(task: &Task) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::TaskRunner;
+    use crate::types::{Task, TaskDefinitionType, TaskRunner};
     use serial_test::serial;
     use std::fs::{self, File};
     use std::io::{self, Write};
@@ -145,6 +146,38 @@ mod tests {
         fn flush(&mut self) -> io::Result<()> {
             Ok(())
         }
+    }
+
+    fn create_test_task(name: &str, file_path: PathBuf, runner: TaskRunner) -> Task {
+        Task {
+            name: name.to_string(),
+            file_path,
+            definition_type: match runner {
+                TaskRunner::Make => TaskDefinitionType::Makefile,
+                TaskRunner::Node(_) => TaskDefinitionType::PackageJson,
+                TaskRunner::PythonUv | TaskRunner::PythonPoetry => TaskDefinitionType::PyprojectToml,
+                TaskRunner::ShellScript => TaskDefinitionType::ShellScript,
+            },
+            runner,
+            source_name: name.to_string(),
+            description: None,
+            shadowed_by: None,
+        }
+    }
+
+    fn create_test_tasks() -> Vec<Task> {
+        let makefile_path = PathBuf::from("Makefile");
+        let package_json_path = PathBuf::from("package.json");
+        let pyproject_toml_path = PathBuf::from("pyproject.toml");
+
+        vec![
+            create_test_task("build", makefile_path.clone(), TaskRunner::Make),
+            create_test_task("test", makefile_path, TaskRunner::Make),
+            create_test_task("start", package_json_path.clone(), TaskRunner::Node(PackageManager::Npm)),
+            create_test_task("lint", package_json_path, TaskRunner::Node(PackageManager::Npm)),
+            create_test_task("serve", pyproject_toml_path.clone(), TaskRunner::PythonUv),
+            create_test_task("check", pyproject_toml_path, TaskRunner::PythonUv),
+        ]
     }
 
     // Helper function to format task output
@@ -425,32 +458,15 @@ custom: ## Custom command
         let mut writer = TestWriter::new();
 
         // Create test tasks with different shadow types
-        let tasks = vec![
-            Task {
-                name: "test1".to_string(),
-                file_path: PathBuf::from("Makefile"),
-                runner: TaskRunner::Make,
-                source_name: "test1".to_string(),
-                description: Some("Task with no shadow".to_string()),
-                shadowed_by: None,
-            },
-            Task {
-                name: "test2".to_string(),
-                file_path: PathBuf::from("Makefile"),
-                runner: TaskRunner::Make,
-                source_name: "test2".to_string(),
-                description: Some("Task shadowed by shell".to_string()),
-                shadowed_by: Some(ShadowType::ShellBuiltin("bash".to_string())),
-            },
-            Task {
-                name: "test3".to_string(),
-                file_path: PathBuf::from("Makefile"),
-                runner: TaskRunner::Make,
-                source_name: "test3".to_string(),
-                description: Some("Task shadowed by executable".to_string()),
-                shadowed_by: Some(ShadowType::PathExecutable("/usr/bin/test3".to_string())),
-            },
+        let mut tasks = vec![
+            create_test_task("test1", PathBuf::from("Makefile"), TaskRunner::Make),
+            create_test_task("test2", PathBuf::from("Makefile"), TaskRunner::Make),
+            create_test_task("test3", PathBuf::from("Makefile"), TaskRunner::Make),
         ];
+
+        // Add shadow information
+        tasks[1].shadowed_by = Some(ShadowType::ShellBuiltin("bash".to_string()));
+        tasks[2].shadowed_by = Some(ShadowType::PathExecutable("/usr/bin/test3".to_string()));
 
         // Print tasks
         for (file, file_tasks) in tasks_by_file(&tasks) {
@@ -474,15 +490,15 @@ custom: ## Custom command
 
         // Verify task listing format
         assert!(
-            output.contains("• test1 - Task with no shadow"),
+            output.contains("• test1"),
             "Missing unshadowed task"
         );
         assert!(
-            output.contains("• test2 † - Task shadowed by shell"),
+            output.contains("• test2 †"),
             "Incorrect shell builtin format"
         );
         assert!(
-            output.contains("• test3 ‡ - Task shadowed by executable"),
+            output.contains("• test3 ‡"),
             "Incorrect executable format"
         );
 

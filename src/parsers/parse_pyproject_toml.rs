@@ -1,89 +1,67 @@
-use crate::types::{Task, TaskDefinitionFile, TaskFileStatus, TaskRunner};
+use crate::types::{Task, TaskDefinitionFile, TaskDefinitionType, TaskFileStatus, TaskRunner};
 use std::fs;
 use std::path::Path;
 use toml::Value;
 
 /// Create a TaskDefinitionFile for a pyproject.toml
-pub fn create_definition(
-    path: &Path,
-    status: TaskFileStatus,
-    runner: TaskRunner,
-) -> TaskDefinitionFile {
+pub fn create_definition(path: &Path, status: TaskFileStatus) -> TaskDefinitionFile {
     TaskDefinitionFile {
         path: path.to_path_buf(),
-        runner,
+        definition_type: TaskDefinitionType::PyprojectToml,
         status,
     }
 }
 
 /// Parse a pyproject.toml file at the given path and extract tasks
-pub fn parse(path: &Path) -> Result<(Vec<Task>, TaskRunner), String> {
-    // Read and parse the pyproject.toml file
-    let content =
-        fs::read_to_string(path).map_err(|e| format!("Failed to read pyproject.toml: {}", e))?;
+pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
+    let content = std::fs::read_to_string(path)
+        .map_err(|e| format!("Failed to read pyproject.toml: {}", e))?;
 
-    let toml: Value = content
-        .parse()
+    let toml: toml::Value = toml::from_str(&content)
         .map_err(|e| format!("Failed to parse pyproject.toml: {}", e))?;
 
-    let mut all_tasks = Vec::new();
-    let mut selected_runner = TaskRunner::PythonUv; // Default to UV
-
-    // Try to find poetry scripts
-    if let Some(poetry_scripts) = toml
-        .get("tool")
-        .and_then(|t| t.get("poetry"))
-        .and_then(|p| p.get("scripts"))
-        .and_then(|s| s.as_table())
-    {
-        let tasks = extract_tasks(poetry_scripts, path, TaskRunner::PythonPoetry)?;
-        if !tasks.is_empty() {
-            all_tasks.extend(tasks);
-            selected_runner = TaskRunner::PythonPoetry;
-        }
-    }
-
-    // Try to find project scripts (uv)
-    if let Some(project_scripts) = toml
-        .get("project")
-        .and_then(|p| p.get("scripts"))
-        .and_then(|s| s.as_table())
-    {
-        let tasks = extract_tasks(project_scripts, path, TaskRunner::PythonUv)?;
-        if !tasks.is_empty() {
-            all_tasks.extend(tasks);
-            // Keep Poetry as selected runner if it was found, otherwise use UV
-        }
-    }
-
-    Ok((all_tasks, selected_runner))
-}
-
-fn extract_tasks(
-    scripts: &toml::map::Map<String, Value>,
-    path: &Path,
-    runner: TaskRunner,
-) -> Result<Vec<Task>, String> {
     let mut tasks = Vec::new();
+    let mut runner = TaskRunner::PythonUv; // Default to uv
 
-    for (name, cmd) in scripts {
-        let description = match cmd {
-            Value::String(cmd) => Some(format!("python script: {}", cmd)),
-            Value::Table(table) => table
-                .get("description")
-                .and_then(|d| d.as_str())
-                .map(|s| s.to_string()),
-            _ => None,
-        };
+    // Check for poetry configuration
+    if let Some(tool) = toml.get("tool") {
+        if let Some(poetry) = tool.get("poetry") {
+            if let Some(scripts) = poetry.get("scripts") {
+                if let Some(scripts_table) = scripts.as_table() {
+                    runner = TaskRunner::PythonPoetry;
+                    for (name, cmd) in scripts_table {
+                        tasks.push(Task {
+                            name: name.clone(),
+                            file_path: path.to_path_buf(),
+                            definition_type: TaskDefinitionType::PyprojectToml,
+                            runner: TaskRunner::PythonPoetry,
+                            source_name: name.clone(),
+                            description: cmd.as_str().map(|s| format!("python script: {}", s)),
+                            shadowed_by: None,
+                        });
+                    }
+                }
+            }
+        }
+    }
 
-        tasks.push(Task {
-            name: name.clone(),
-            file_path: path.to_path_buf(),
-            runner: runner.clone(),
-            source_name: name.clone(),
-            description,
-            shadowed_by: None, // This will be filled in by task_discovery
-        });
+    // Check for uv configuration
+    if let Some(project) = toml.get("project") {
+        if let Some(scripts) = project.get("scripts") {
+            if let Some(scripts_table) = scripts.as_table() {
+                for (name, cmd) in scripts_table {
+                    tasks.push(Task {
+                        name: name.clone(),
+                        file_path: path.to_path_buf(),
+                        definition_type: TaskDefinitionType::PyprojectToml,
+                        runner: TaskRunner::PythonUv,
+                        source_name: name.clone(),
+                        description: cmd.as_str().map(|s| format!("python script: {}", s)),
+                        shadowed_by: None,
+                    });
+                }
+            }
+        }
     }
 
     Ok(tasks)
@@ -115,9 +93,8 @@ lint = "flake8"
             .write_all(content.as_bytes())
             .unwrap();
 
-        let (tasks, runner) = parse(&pyproject_path).unwrap();
+        let tasks = parse(&pyproject_path).unwrap();
 
-        assert_eq!(runner, TaskRunner::PythonPoetry);
         assert_eq!(tasks.len(), 2);
 
         let test_task = tasks.iter().find(|t| t.name == "test").unwrap();
@@ -147,9 +124,8 @@ test = "pytest"
             .write_all(content.as_bytes())
             .unwrap();
 
-        let (tasks, runner) = parse(&pyproject_path).unwrap();
+        let tasks = parse(&pyproject_path).unwrap();
 
-        assert_eq!(runner, TaskRunner::PythonUv);
         assert_eq!(tasks.len(), 2);
 
         let serve_task = tasks.iter().find(|t| t.name == "serve").unwrap();
@@ -186,7 +162,7 @@ poetry-test = "pytest"
             .write_all(content.as_bytes())
             .unwrap();
 
-        let (tasks, runner) = parse(&pyproject_path).unwrap();
+        let tasks = parse(&pyproject_path).unwrap();
 
         // We should get all 4 tasks
         assert_eq!(tasks.len(), 4);
@@ -220,8 +196,5 @@ poetry-test = "pytest"
             poetry_test.description,
             Some("python script: pytest".to_string())
         );
-
-        // Runner should be Poetry since it was found last
-        assert_eq!(runner, TaskRunner::PythonPoetry);
     }
 }

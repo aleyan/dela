@@ -1,40 +1,36 @@
-use crate::package_manager;
-use crate::types::{Task, TaskDefinitionFile, TaskFileStatus, TaskRunner};
+use crate::package_manager::{self, PackageManager};
+use crate::types::{Task, TaskDefinitionFile, TaskDefinitionType, TaskFileStatus, TaskRunner};
 use serde_json::Value;
 use std::fs;
-use std::path::Path;
+use std::path::PathBuf;
 
 /// Parse a package.json file at the given path and extract tasks
-pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
-    // Read and parse the package.json file
-    let content =
-        fs::read_to_string(path).map_err(|e| format!("Failed to read package.json: {}", e))?;
+pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
+    let contents = std::fs::read_to_string(path)
+        .map_err(|e| format!("Failed to read package.json: {}", e))?;
 
-    let json: Value = serde_json::from_str(&content)
+    let json: serde_json::Value = serde_json::from_str(&contents)
         .map_err(|e| format!("Failed to parse package.json: {}", e))?;
 
-    // Extract the scripts section
-    let scripts = match json.get("scripts") {
-        Some(Value::Object(scripts)) => scripts,
-        Some(_) => return Err("'scripts' must be an object".to_string()),
-        None => return Ok(vec![]), // No scripts defined
-    };
-
-    // Detect available package manager
-    let pkg_mgr = package_manager::detect_package_manager();
-
-    // Convert scripts to Tasks
     let mut tasks = Vec::new();
-    for (name, cmd) in scripts {
-        if let Value::String(cmd) = cmd {
-            tasks.push(Task {
-                name: name.clone(),
-                file_path: path.to_path_buf(),
-                runner: TaskRunner::Node(pkg_mgr.clone()),
-                source_name: name.clone(),
-                description: Some(format!("node script: {}", cmd)),
-                shadowed_by: None, // This will be filled in by task_discovery
-            });
+
+    // Get the package manager to use
+    let pkg_mgr = package_manager::detect_package_manager()
+        .ok_or_else(|| "No package manager found".to_string())?;
+
+    if let Some(scripts) = json.get("scripts") {
+        if let Some(scripts_obj) = scripts.as_object() {
+            for (name, cmd) in scripts_obj {
+                tasks.push(Task {
+                    name: name.clone(),
+                    file_path: path.clone(),
+                    definition_type: TaskDefinitionType::PackageJson,
+                    runner: TaskRunner::Node(pkg_mgr.clone()),
+                    source_name: name.clone(),
+                    description: cmd.as_str().map(|s| format!("node script: {}", s)),
+                    shadowed_by: None,
+                });
+            }
         }
     }
 
@@ -42,10 +38,10 @@ pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
 }
 
 /// Create a TaskDefinitionFile for a package.json
-pub fn create_definition(path: &Path, status: TaskFileStatus) -> TaskDefinitionFile {
+pub fn create_definition(path: &PathBuf, status: TaskFileStatus) -> TaskDefinitionFile {
     TaskDefinitionFile {
-        path: path.to_path_buf(),
-        runner: TaskRunner::Node(package_manager::detect_package_manager()),
+        path: path.clone(),
+        definition_type: TaskDefinitionType::PackageJson,
         status,
     }
 }
