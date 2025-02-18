@@ -1,6 +1,6 @@
 use crate::types::{Task, TaskDefinitionType, TaskRunner};
 use makefile_lossless::Makefile;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 /// Parse a Makefile at the given path and extract tasks
 pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
@@ -54,6 +54,7 @@ mod tests {
     use super::*;
     use std::fs::File;
     use std::io::Write;
+    use std::path::PathBuf;
     use tempfile::TempDir;
 
     fn create_test_makefile(dir: &Path, content: &str) -> PathBuf {

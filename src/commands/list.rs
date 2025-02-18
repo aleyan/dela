@@ -195,6 +195,7 @@ mod tests {
         }
     }
 
+    #[allow(dead_code)]
     fn create_test_tasks() -> Vec<Task> {
         let makefile_path = PathBuf::from("Makefile");
         let package_json_path = PathBuf::from("package.json");

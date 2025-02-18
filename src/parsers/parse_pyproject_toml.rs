@@ -1,5 +1,5 @@
 use crate::task_shadowing::check_path_executable;
-use crate::types::{Task, TaskDefinitionFile, TaskDefinitionType, TaskFileStatus, TaskRunner};
+use crate::types::{Task, TaskDefinitionType, TaskRunner};
 use std::path::Path;
 
 /// Parse a pyproject.toml file at the given path and extract tasks

@@ -551,7 +551,7 @@ cd:
             .write_all(content.as_bytes())
             .unwrap();
 
-        let mut discovered = discover_tasks(temp_dir.path());
+        let discovered = discover_tasks(temp_dir.path());
 
         // Verify that the cd task is marked as shadowed
         let cd_task = discovered

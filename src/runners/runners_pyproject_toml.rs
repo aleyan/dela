@@ -1,9 +1,8 @@
 use crate::task_shadowing::check_path_executable;
-use crate::types::{Task, TaskDefinitionFile, TaskDefinitionType, TaskFileStatus, TaskRunner};
-use std::fs;
+use crate::types::{Task, TaskRunner};
 use std::path::Path;
 
-/// Parse a pyproject.toml file at the given path and extract tasks
+#[allow(dead_code)]
 pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
     let _content = std::fs::read_to_string(path)
         .map_err(|e| format!("Failed to read pyproject.toml: {}", e))?;
@@ -13,6 +12,7 @@ pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
 }
 
 /// Detect which Python package manager to use based on lock files and available commands
+#[allow(dead_code)]
 pub fn detect_package_manager(dir: &Path) -> Option<TaskRunner> {
     // First check for available package managers
     let has_poetry = check_path_executable("poetry").is_some();

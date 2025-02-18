@@ -1,7 +1,6 @@
 use crate::allowlist;
 use crate::task_discovery;
 use std::env;
-use std::path::PathBuf;
 
 pub fn execute(task: &str) -> Result<(), String> {
     let current_dir =
