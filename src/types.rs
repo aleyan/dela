@@ -32,6 +32,8 @@ pub enum TaskRunner {
     PythonUv,
     /// Python tasks using poetry
     PythonPoetry,
+    /// Python tasks using poethepoet
+    PythonPoe,
     /// Shell script tasks
     ShellScript,
 }
@@ -104,6 +106,7 @@ impl TaskRunner {
             TaskRunner::NodeBun => format!("bun run {}", task.source_name),
             TaskRunner::PythonUv => format!("uv run {}", task.source_name),
             TaskRunner::PythonPoetry => format!("poetry run {}", task.source_name),
+            TaskRunner::PythonPoe => format!("poe {}", task.source_name),
             TaskRunner::ShellScript => format!("./{}", task.source_name),
         }
     }
@@ -117,6 +120,7 @@ impl TaskRunner {
             TaskRunner::NodeBun => "bun",
             TaskRunner::PythonUv => "uv",
             TaskRunner::PythonPoetry => "poetry",
+            TaskRunner::PythonPoe => "poe",
             TaskRunner::ShellScript => "shell",
         }
     }

@@ -1,6 +1,7 @@
 use crate::allowlist;
 use crate::task_discovery;
 use std::env;
+use std::path::PathBuf;
 
 pub fn execute(task: &str) -> Result<(), String> {
     let current_dir =
@@ -12,13 +13,14 @@ pub fn execute(task: &str) -> Result<(), String> {
 
     match matching_tasks.len() {
         0 => {
-            println!("No task named '{}' found in the current directory.", task);
+            eprintln!("No task named '{}' found in the current directory.", task);
             Err(format!("No task named '{}' found", task))
         }
         1 => {
             // Single task found, check allowlist
             let task = matching_tasks[0];
             if !allowlist::check_task_allowed(task)? {
+                eprintln!("Task '{}' was denied by the allowlist.", task.name);
                 return Err(format!(
                     "Dela task '{}' was denied by the ~/.dela/allowlist.toml",
                     task.name
@@ -27,12 +29,11 @@ pub fn execute(task: &str) -> Result<(), String> {
             Ok(())
         }
         _ => {
-            // Multiple tasks found, print error and list them
-            println!("Multiple tasks named '{}' found:", task);
+            eprintln!("Multiple tasks named '{}' found:", task);
             for task in matching_tasks {
-                println!("  • {} (from {})", task.name, task.file_path.display());
+                eprintln!("  • {} (from {})", task.name, task.file_path.display());
             }
-            println!("Please use 'dela run {}' to choose which one to run.", task);
+            eprintln!("Please use 'dela run {}' to choose which one to run.", task);
             Err(format!("Multiple tasks named '{}' found", task))
         }
     }
@@ -152,6 +153,49 @@ test: ## Running tests
         let result = execute("nonexistent");
         assert!(result.is_err(), "Should fail when no task found");
         assert_eq!(result.unwrap_err(), "No task named 'nonexistent' found");
+
+        drop(project_dir);
+        drop(home_dir);
+    }
+
+    #[test]
+    #[serial]
+    fn test_allow_command_uninitialized() {
+        // Create a temp dir for HOME but don't create .dela directory
+        let home_dir = TempDir::new().expect("Failed to create temp HOME directory");
+        env::set_var("HOME", home_dir.path());
+
+        // Create a temp dir for the project
+        let project_dir = TempDir::new().expect("Failed to create temp directory");
+        env::set_current_dir(&project_dir).expect("Failed to change directory");
+
+        // Create a test Makefile
+        let makefile_content = "
+test: ## Running tests
+\t@echo Testing...
+";
+        let mut makefile =
+            File::create(project_dir.path().join("Makefile")).expect("Failed to create Makefile");
+        makefile
+            .write_all(makefile_content.as_bytes())
+            .expect("Failed to write Makefile");
+
+        // Try to allow a task without .dela directory
+        let result = execute("test");
+        assert!(
+            result.is_err(),
+            "Should fail when .dela directory doesn't exist"
+        );
+        assert_eq!(
+            result.unwrap_err(),
+            "Dela is not initialized. Please run 'dela init' first."
+        );
+
+        // Verify .dela directory wasn't created
+        assert!(
+            !home_dir.path().join(".dela").exists(),
+            ".dela directory should not be created"
+        );
 
         drop(project_dir);
         drop(home_dir);

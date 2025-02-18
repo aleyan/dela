@@ -1,6 +1,6 @@
 use crate::types::{Task, TaskDefinitionType, TaskRunner};
 use makefile_lossless::Makefile;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// Parse a Makefile at the given path and extract tasks
 pub fn parse(path: &Path) -> Result<Vec<Task>, String> {

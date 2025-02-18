@@ -14,6 +14,14 @@ fn allowlist_path() -> Result<PathBuf, String> {
 /// If the file does not exist, return an empty allowlist.
 pub fn load_allowlist() -> Result<Allowlist, String> {
     let path = allowlist_path()?;
+    let dela_dir = path.parent().ok_or("Invalid allowlist path")?;
+
+    // Check if ~/.dela exists
+    if !dela_dir.exists() {
+        return Err("Dela is not initialized. Please run 'dela init' first.".to_string());
+    }
+
+    // If allowlist file doesn't exist but ~/.dela does, return empty allowlist
     if !path.exists() {
         return Ok(Allowlist::default());
     }
@@ -55,10 +63,18 @@ fn path_matches(task_path: &Path, allowlist_path: &Path, allow_subdirs: bool) ->
 /// Check if a given task is allowed, based on the loaded allowlist
 /// If the task is not in the allowlist, prompt the user for a decision
 pub fn check_task_allowed(task: &Task) -> Result<bool, String> {
-    // 1. Load the allowlist from disk
+    // Check if ~/.dela exists FIRST, before any other operations
+    let home =
+        std::env::var("HOME").map_err(|_| "HOME environment variable not set".to_string())?;
+    let dela_dir = PathBuf::from(home).join(".dela");
+    if !dela_dir.exists() {
+        return Err("Dela is not initialized. Please run 'dela init' first.".to_string());
+    }
+
+    // Only proceed with allowlist operations if dela is initialized
     let mut allowlist = load_allowlist()?;
 
-    // 2. Check each entry to see if it matches
+    // Check each entry to see if it matches
     for entry in &allowlist.entries {
         match entry.scope {
             AllowScope::Deny => {
@@ -92,7 +108,7 @@ pub fn check_task_allowed(task: &Task) -> Result<bool, String> {
         }
     }
 
-    // 3. If no matching entry found, prompt the user
+    // If no matching entry found, prompt the user
     match prompt::prompt_for_task(task)? {
         AllowDecision::Allow(scope) => {
             match scope {

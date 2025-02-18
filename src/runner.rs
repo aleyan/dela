@@ -10,6 +10,7 @@ pub fn is_runner_available(runner: &TaskRunner) -> bool {
         TaskRunner::NodeBun => check_path_executable("bun").is_some(),
         TaskRunner::PythonUv => check_path_executable("uv").is_some(),
         TaskRunner::PythonPoetry => check_path_executable("poetry").is_some(),
+        TaskRunner::PythonPoe => check_path_executable("poe").is_some(),
         TaskRunner::ShellScript => true, // Shell scripts don't need a runner
     }
 }

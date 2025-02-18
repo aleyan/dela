@@ -11,7 +11,10 @@ pub fn detect_package_manager(dir: &Path) -> Option<TaskRunner> {
     let has_yarn = check_path_executable("yarn").is_some();
 
     // If only one package manager is available, use it
-    let available_count = [has_npm, has_bun, has_pnpm, has_yarn].iter().filter(|&&x| x).count();
+    let available_count = [has_npm, has_bun, has_pnpm, has_yarn]
+        .iter()
+        .filter(|&&x| x)
+        .count();
     if available_count == 1 {
         if has_npm {
             return Some(TaskRunner::NodeNpm);

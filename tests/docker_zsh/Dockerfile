@@ -9,6 +9,7 @@ RUN apk add --no-cache \
     zsh \
     make \
     python3 \
+    py3-pip \
     uv \
     poetry \
     npm

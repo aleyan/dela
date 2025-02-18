@@ -40,6 +40,7 @@ pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::TaskRunner;
     use std::fs::File;
     use std::io::Write;
     use tempfile::TempDir;

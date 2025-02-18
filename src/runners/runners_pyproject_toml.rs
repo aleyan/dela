@@ -12,6 +12,47 @@ pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
     Ok(tasks)
 }
 
+/// Detect which Python package manager to use based on lock files and available commands
+pub fn detect_package_manager(dir: &Path) -> Option<TaskRunner> {
+    // First check for available package managers
+    let has_poetry = check_path_executable("poetry").is_some();
+    let has_uv = check_path_executable("uv").is_some();
+    let has_poe = check_path_executable("poe").is_some();
+
+    // If only one package manager is available, use it
+    let available_count = [has_poetry, has_uv, has_poe].iter().filter(|&&x| x).count();
+    if available_count == 1 {
+        if has_poetry {
+            return Some(TaskRunner::PythonPoetry);
+        }
+        if has_uv {
+            return Some(TaskRunner::PythonUv);
+        }
+        if has_poe {
+            return Some(TaskRunner::PythonPoe);
+        }
+    }
+
+    // If multiple package managers are available, use lock files to disambiguate
+    if dir.join("poetry.lock").exists() && has_poetry {
+        return Some(TaskRunner::PythonPoetry);
+    }
+    if dir.join(".venv").exists() && has_uv {
+        return Some(TaskRunner::PythonUv);
+    }
+
+    // If no lock file but multiple package managers, use preferred order
+    if has_poetry {
+        Some(TaskRunner::PythonPoetry)
+    } else if has_uv {
+        Some(TaskRunner::PythonUv)
+    } else if has_poe {
+        Some(TaskRunner::PythonPoe)
+    } else {
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -62,7 +103,7 @@ mod tests {
         if let Some(runner) = result {
             assert!(matches!(
                 runner,
-                TaskRunner::PythonUv | TaskRunner::PythonPoetry
+                TaskRunner::PythonUv | TaskRunner::PythonPoetry | TaskRunner::PythonPoe
             ));
         }
     }

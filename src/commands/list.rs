@@ -124,8 +124,12 @@ fn format_shadow_info(task: &Task) -> Option<String> {
     task.shadowed_by
         .as_ref()
         .map(|shadow_type| match shadow_type {
-            ShadowType::ShellBuiltin(name) => format!("† task '{}' shadowed by {} shell builtin", task.name, name),
-            ShadowType::PathExecutable(path) => format!("‡ task '{}' shadowed by executable at {}", task.name, path),
+            ShadowType::ShellBuiltin(name) => {
+                format!("† task '{}' shadowed by {} shell builtin", task.name, name)
+            }
+            ShadowType::PathExecutable(path) => {
+                format!("‡ task '{}' shadowed by executable at {}", task.name, path)
+            }
         })
 }
 
@@ -179,7 +183,9 @@ mod tests {
                 | TaskRunner::NodeYarn
                 | TaskRunner::NodePnpm
                 | TaskRunner::NodeBun => TaskDefinitionType::PackageJson,
-                TaskRunner::PythonUv | TaskRunner::PythonPoetry => TaskDefinitionType::PyprojectToml,
+                TaskRunner::PythonUv | TaskRunner::PythonPoetry | TaskRunner::PythonPoe => {
+                    TaskDefinitionType::PyprojectToml
+                }
                 TaskRunner::ShellScript => TaskDefinitionType::ShellScript,
             },
             runner,
