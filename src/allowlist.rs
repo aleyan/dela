@@ -1,5 +1,5 @@
 use crate::prompt::{self, AllowDecision};
-use crate::types::{AllowScope, Allowlist, AllowlistEntry, Task, TaskDefinitionType, TaskRunner};
+use crate::types::{AllowScope, Allowlist, AllowlistEntry, Task};
 use std::fs;
 use std::path::{Path, PathBuf};
 

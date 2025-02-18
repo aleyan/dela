@@ -1,6 +1,6 @@
-use crate::types::{Task, TaskDefinitionFile, TaskDefinitionType, TaskFileStatus, TaskRunner};
+use crate::types::{Task, TaskDefinitionType, TaskRunner};
 use makefile_lossless::Makefile;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 /// Parse a Makefile at the given path and extract tasks
 pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
@@ -47,36 +47,6 @@ pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
     }
 
     Ok(tasks)
-}
-
-/// Create a TaskDefinitionFile for a Makefile
-pub fn create_definition(path: &Path, status: TaskFileStatus) -> TaskDefinitionFile {
-    TaskDefinitionFile {
-        path: path.to_path_buf(),
-        definition_type: TaskDefinitionType::Makefile,
-        status,
-    }
-}
-
-/// Extract a task description from a rule's commands
-fn extract_task_description(rule: &makefile_lossless::Rule) -> Option<String> {
-    // Look for echo commands that might be descriptions
-    for cmd in rule.recipes() {
-        let cmd = cmd.trim();
-        if cmd.starts_with("@echo") || cmd.starts_with("echo") {
-            let desc = cmd
-                .trim_start_matches("@echo")
-                .trim_start_matches("echo")
-                .trim()
-                .trim_matches('"')
-                .trim_matches('\'')
-                .to_string();
-            if !desc.is_empty() {
-                return Some(desc);
-            }
-        }
-    }
-    None
 }
 
 #[cfg(test)]

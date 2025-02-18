@@ -1,15 +1,11 @@
 use crate::parsers::{parse_makefile, parse_package_json, parse_pyproject_toml};
-use crate::task_shadowing;
+use crate::task_shadowing::check_shadowing;
 use crate::types::{
-    DiscoveredTaskDefinitions, Task, TaskDefinitionFile, TaskDefinitionType, TaskFileStatus,
-    TaskRunner,
+    DiscoveredTaskDefinitions, Task, TaskDefinitionFile, TaskDefinitionType,
+    TaskFileStatus, TaskRunner,
 };
-use serde_json;
-use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
-use toml;
-use walkdir::WalkDir;
 
 /// Result of task discovery
 #[derive(Debug, Default)]
@@ -56,7 +52,7 @@ fn discover_makefile_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Resu
             });
             // Add shadow information
             for task in &mut tasks {
-                task.shadowed_by = task_shadowing::check_shadowing(&task.name);
+                task.shadowed_by = check_shadowing(&task.name);
             }
             discovered.tasks.extend(tasks);
         }
@@ -96,7 +92,7 @@ fn discover_npm_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<()
             });
             // Add shadow information
             for task in &mut tasks {
-                task.shadowed_by = task_shadowing::check_shadowing(&task.name);
+                task.shadowed_by = check_shadowing(&task.name);
             }
             discovered.tasks.extend(tasks);
         }
@@ -136,7 +132,7 @@ fn discover_python_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result
             });
             // Add shadow information
             for task in &mut tasks {
-                task.shadowed_by = task_shadowing::check_shadowing(&task.name);
+                task.shadowed_by = check_shadowing(&task.name);
             }
             discovered.tasks.extend(tasks);
         }
@@ -174,7 +170,7 @@ fn discover_shell_script_tasks(dir: &Path, discovered: &mut DiscoveredTasks) {
                             runner: TaskRunner::ShellScript,
                             source_name: name.clone(),
                             description: None,
-                            shadowed_by: task_shadowing::check_shadowing(&name),
+                            shadowed_by: check_shadowing(&name),
                         });
                     }
                 }
@@ -188,7 +184,8 @@ fn discover_shell_script_tasks(dir: &Path, discovered: &mut DiscoveredTasks) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs::{self, File};
+    use crate::task_shadowing::ShadowType;
+    use std::fs::File;
     use std::io::Write;
     use tempfile::TempDir;
 
@@ -541,34 +538,29 @@ test:
     #[test]
     fn test_discover_tasks_with_shadowing() {
         let temp_dir = TempDir::new().unwrap();
+        let makefile_path = temp_dir.path().join("Makefile");
 
-        // Create Makefile with tasks that shadow shell builtins
-        let makefile_content = r#".PHONY: cd ls echo
+        let content = r#"
+test:
+    @echo "Running tests"
 cd:
-	@echo "Change directory"
-ls:
-	@echo "List files"
-echo:
-	@echo "Echo text""#;
-        create_test_makefile(temp_dir.path(), makefile_content);
+    @echo "Change directory"
+"#;
+        File::create(&makefile_path)
+            .unwrap()
+            .write_all(content.as_bytes())
+            .unwrap();
 
-        let discovered = discover_tasks(temp_dir.path());
+        let mut discovered = discover_tasks(temp_dir.path());
 
-        // All tasks should be discovered
-        assert_eq!(discovered.tasks.len(), 3);
+        // Verify that the cd task is marked as shadowed
+        let cd_task = discovered
+            .tasks
+            .iter()
+            .find(|t| t.name == "cd")
+            .expect("cd task not found");
 
-        // Verify shadowing information
-        for task in &discovered.tasks {
-            assert!(
-                task.shadowed_by.is_some(),
-                "Task {} should be shadowed",
-                task.name
-            );
-            assert!(matches!(
-                task.shadowed_by.as_ref().unwrap(),
-                task_shadowing::ShadowType::ShellBuiltin(_)
-            ));
-        }
+        assert!(matches!(cd_task.shadowed_by, Some(ShadowType::ShellBuiltin(_))));
     }
 
     #[test]

@@ -1,17 +1,6 @@
-use crate::runners::runners_pyproject_toml;
 use crate::task_shadowing::check_path_executable;
 use crate::types::{Task, TaskDefinitionFile, TaskDefinitionType, TaskFileStatus, TaskRunner};
-use std::fs;
 use std::path::Path;
-
-/// Create a TaskDefinitionFile for a pyproject.toml
-pub fn create_definition(path: &Path, status: TaskFileStatus) -> TaskDefinitionFile {
-    TaskDefinitionFile {
-        path: path.to_path_buf(),
-        definition_type: TaskDefinitionType::PyprojectToml,
-        status,
-    }
-}
 
 /// Parse a pyproject.toml file at the given path and extract tasks
 pub fn parse(path: &Path) -> Result<Vec<Task>, String> {

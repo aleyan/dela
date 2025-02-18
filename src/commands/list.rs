@@ -1,10 +1,9 @@
 use crate::runner::is_runner_available;
 use crate::task_discovery;
 use crate::task_shadowing::ShadowType;
-use crate::types::{Task, TaskDefinitionType, TaskFileStatus, TaskRunner};
+use crate::types::{Task, TaskFileStatus};
 use std::collections::HashMap;
 use std::env;
-use std::io;
 
 pub fn execute(verbose: bool) -> Result<(), String> {
     let current_dir =
@@ -65,6 +64,9 @@ pub fn execute(verbose: bool) -> Result<(), String> {
     if tasks_by_file.is_empty() {
         println!("No tasks found in the current directory.");
     } else {
+        // Collect all shadow info for footer
+        let mut shadow_infos = Vec::new();
+
         for (file, tasks) in tasks_by_file {
             println!("\nTasks from {}:", file);
             for task in tasks {
@@ -78,9 +80,15 @@ pub fn execute(verbose: bool) -> Result<(), String> {
                     output.push_str(&format!(" (requires {}, not found)", task.runner.name()));
                 }
 
-                // Add shadow info if present
-                if let Some(shadow_info) = format_shadow_info(task) {
-                    output.push_str(&format!(" ({})", shadow_info));
+                // Add shadow symbol if present
+                if let Some(ref shadow_type) = task.shadowed_by {
+                    match shadow_type {
+                        ShadowType::ShellBuiltin(_) => output.push_str(" †"),
+                        ShadowType::PathExecutable(_) => output.push_str(" ‡"),
+                    }
+                    if let Some(info) = format_shadow_info(task) {
+                        shadow_infos.push(info);
+                    }
                 }
 
                 // Add source name if different from task name
@@ -89,6 +97,14 @@ pub fn execute(verbose: bool) -> Result<(), String> {
                 }
 
                 println!("{}", output);
+            }
+        }
+
+        // Print shadow info footer
+        if !shadow_infos.is_empty() {
+            println!("\nShadowed tasks:");
+            for info in shadow_infos {
+                println!("  {}", info);
             }
         }
     }
@@ -108,23 +124,13 @@ fn format_shadow_info(task: &Task) -> Option<String> {
     task.shadowed_by
         .as_ref()
         .map(|shadow_type| match shadow_type {
-            ShadowType::ShellBuiltin(name) => format!("shadowed by shell builtin '{}'", name),
-            ShadowType::PathExecutable(path) => format!("shadowed by '{}'", path),
+            ShadowType::ShellBuiltin(name) => format!("† task '{}' shadowed by {} shell builtin", task.name, name),
+            ShadowType::PathExecutable(path) => format!("‡ task '{}' shadowed by executable at {}", task.name, path),
         })
 }
 
 impl Task {
-    fn get_definition_type(&self) -> TaskDefinitionType {
-        match self.runner {
-            TaskRunner::Make => TaskDefinitionType::Makefile,
-            TaskRunner::NodeNpm
-            | TaskRunner::NodeYarn
-            | TaskRunner::NodePnpm
-            | TaskRunner::NodeBun => TaskDefinitionType::PackageJson,
-            TaskRunner::PythonUv | TaskRunner::PythonPoetry => TaskDefinitionType::PyprojectToml,
-            TaskRunner::ShellScript => TaskDefinitionType::ShellScript,
-        }
-    }
+    // Removing unused method
 }
 
 #[cfg(test)]
@@ -173,9 +179,7 @@ mod tests {
                 | TaskRunner::NodeYarn
                 | TaskRunner::NodePnpm
                 | TaskRunner::NodeBun => TaskDefinitionType::PackageJson,
-                TaskRunner::PythonUv | TaskRunner::PythonPoetry => {
-                    TaskDefinitionType::PyprojectToml
-                }
+                TaskRunner::PythonUv | TaskRunner::PythonPoetry => TaskDefinitionType::PyprojectToml,
                 TaskRunner::ShellScript => TaskDefinitionType::ShellScript,
             },
             runner,
@@ -282,7 +286,7 @@ mod tests {
         let package_json_path = PathBuf::from("package.json");
         let pyproject_toml_path = PathBuf::from("pyproject.toml");
 
-        let tasks = vec![
+        let _tasks = vec![
             create_test_task("build", makefile_path.clone(), TaskRunner::Make),
             create_test_task("test", makefile_path, TaskRunner::Make),
             create_test_task("start", package_json_path.clone(), TaskRunner::NodeNpm),

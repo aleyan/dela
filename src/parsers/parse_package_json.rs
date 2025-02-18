@@ -1,7 +1,5 @@
 use crate::runners::runners_package_json;
-use crate::types::{Task, TaskDefinitionFile, TaskDefinitionType, TaskFileStatus, TaskRunner};
-use serde_json::Value;
-use std::fs;
+use crate::types::{Task, TaskDefinitionType};
 use std::path::PathBuf;
 
 /// Parse a package.json file at the given path and extract tasks
@@ -37,15 +35,6 @@ pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
     }
 
     Ok(tasks)
-}
-
-/// Create a TaskDefinitionFile for a package.json
-pub fn create_definition(path: &PathBuf, status: TaskFileStatus) -> TaskDefinitionFile {
-    TaskDefinitionFile {
-        path: path.clone(),
-        definition_type: TaskDefinitionType::PackageJson,
-        status,
-    }
 }
 
 #[cfg(test)]

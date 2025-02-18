@@ -1,41 +1,15 @@
 use crate::task_shadowing::check_path_executable;
-use crate::types::TaskRunner;
+use crate::types::{Task, TaskDefinitionFile, TaskDefinitionType, TaskFileStatus, TaskRunner};
 use std::fs;
 use std::path::Path;
 
-/// Detect which Python package manager to use based on project configuration and available commands
-pub fn detect_package_manager(dir: &Path) -> Option<TaskRunner> {
-    // Check for poetry.lock first
-    if dir.join("poetry.lock").exists() && check_path_executable("poetry").is_some() {
-        return Some(TaskRunner::PythonPoetry);
-    }
+/// Parse a pyproject.toml file at the given path and extract tasks
+pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
+    let _content = std::fs::read_to_string(path)
+        .map_err(|e| format!("Failed to read pyproject.toml: {}", e))?;
 
-    // Check pyproject.toml for Poetry or uv scripts
-    if let Ok(content) = fs::read_to_string(dir.join("pyproject.toml")) {
-        if content.contains("[tool.poetry.scripts]") && check_path_executable("poetry").is_some() {
-            return Some(TaskRunner::PythonPoetry);
-        }
-        if content.contains("[project.scripts]")
-            && !content.contains("[tool.poetry.scripts]")
-            && check_path_executable("uv").is_some()
-        {
-            return Some(TaskRunner::PythonUv);
-        }
-    }
-
-    // Check for .venv/pyvenv.cfg for uv
-    if dir.join(".venv/pyvenv.cfg").exists() && check_path_executable("uv").is_some() {
-        return Some(TaskRunner::PythonUv);
-    }
-
-    // If no specific markers found, check for available package managers in preferred order
-    if check_path_executable("poetry").is_some() {
-        Some(TaskRunner::PythonPoetry)
-    } else if check_path_executable("uv").is_some() {
-        Some(TaskRunner::PythonUv)
-    } else {
-        None
-    }
+    let tasks = Vec::new();
+    Ok(tasks)
 }
 
 #[cfg(test)]

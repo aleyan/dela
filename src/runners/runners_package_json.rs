@@ -1,70 +1,58 @@
 use crate::task_shadowing::check_path_executable;
 use crate::types::TaskRunner;
 use std::path::Path;
-use std::process::Command;
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum PackageManager {
-    Bun,
-    Yarn,
-    Npm,
-}
-
-impl PackageManager {
-    pub fn command(&self) -> &'static str {
-        match self {
-            PackageManager::Bun => "bun",
-            PackageManager::Yarn => "yarn",
-            PackageManager::Npm => "npm",
-        }
-    }
-
-    pub fn get_run_command(&self, script_name: &str) -> String {
-        match self {
-            PackageManager::Bun => format!("bun run {}", script_name),
-            PackageManager::Yarn => format!("yarn {}", script_name),
-            PackageManager::Npm => format!("npm run {}", script_name),
-        }
-    }
-}
 
 /// Detect which Node.js package manager to use based on lock files and available commands
 pub fn detect_package_manager(dir: &Path) -> Option<TaskRunner> {
-    // First check for lock files
-    if dir.join("package-lock.json").exists() && check_path_executable("npm").is_some() {
+    // First check for available package managers
+    let has_npm = check_path_executable("npm").is_some();
+    let has_bun = check_path_executable("bun").is_some();
+    let has_pnpm = check_path_executable("pnpm").is_some();
+    let has_yarn = check_path_executable("yarn").is_some();
+
+    // If only one package manager is available, use it
+    let available_count = [has_npm, has_bun, has_pnpm, has_yarn].iter().filter(|&&x| x).count();
+    if available_count == 1 {
+        if has_npm {
+            return Some(TaskRunner::NodeNpm);
+        }
+        if has_bun {
+            return Some(TaskRunner::NodeBun);
+        }
+        if has_pnpm {
+            return Some(TaskRunner::NodePnpm);
+        }
+        if has_yarn {
+            return Some(TaskRunner::NodeYarn);
+        }
+    }
+
+    // If multiple package managers are available, use lock files to disambiguate
+    if dir.join("package-lock.json").exists() && has_npm {
         return Some(TaskRunner::NodeNpm);
     }
-    if dir.join("bun.lockb").exists() && check_path_executable("bun").is_some() {
+    if dir.join("bun.lockb").exists() && has_bun {
         return Some(TaskRunner::NodeBun);
     }
-    if dir.join("pnpm-lock.yaml").exists() && check_path_executable("pnpm").is_some() {
+    if dir.join("pnpm-lock.yaml").exists() && has_pnpm {
         return Some(TaskRunner::NodePnpm);
     }
-    if dir.join("yarn.lock").exists() && check_path_executable("yarn").is_some() {
+    if dir.join("yarn.lock").exists() && has_yarn {
         return Some(TaskRunner::NodeYarn);
     }
 
-    // If no lock file, check for available package managers in preferred order
-    if check_path_executable("npm").is_some() {
+    // If no lock file but multiple package managers, use preferred order
+    if has_npm {
         Some(TaskRunner::NodeNpm)
-    } else if check_path_executable("bun").is_some() {
+    } else if has_bun {
         Some(TaskRunner::NodeBun)
-    } else if check_path_executable("pnpm").is_some() {
+    } else if has_pnpm {
         Some(TaskRunner::NodePnpm)
-    } else if check_path_executable("yarn").is_some() {
+    } else if has_yarn {
         Some(TaskRunner::NodeYarn)
     } else {
         None
     }
-}
-
-/// Check if an executable exists in PATH
-fn check_executable(name: &str) -> bool {
-    Command::new("which")
-        .arg(name)
-        .output()
-        .map(|output| output.status.success())
-        .unwrap_or(false)
 }
 
 #[cfg(test)]
