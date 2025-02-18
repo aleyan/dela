@@ -2,10 +2,13 @@ use clap::{Parser, Subcommand};
 
 mod allowlist;
 mod commands;
-mod package_manager;
 mod parsers;
 mod prompt;
 mod runner;
+mod runners {
+    pub mod runners_package_json;
+    pub mod runners_pyproject_toml;
+}
 mod task_discovery;
 mod task_shadowing;
 mod types;

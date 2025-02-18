@@ -1,4 +1,4 @@
-use crate::package_manager::{self, PackageManager};
+use crate::runners::runners_package_json;
 use crate::types::{Task, TaskDefinitionFile, TaskDefinitionType, TaskFileStatus, TaskRunner};
 use serde_json::Value;
 use std::fs;
@@ -6,8 +6,8 @@ use std::path::PathBuf;
 
 /// Parse a package.json file at the given path and extract tasks
 pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
-    let contents = std::fs::read_to_string(path)
-        .map_err(|e| format!("Failed to read package.json: {}", e))?;
+    let contents =
+        std::fs::read_to_string(path).map_err(|e| format!("Failed to read package.json: {}", e))?;
 
     let json: serde_json::Value = serde_json::from_str(&contents)
         .map_err(|e| format!("Failed to parse package.json: {}", e))?;
@@ -15,8 +15,10 @@ pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
     let mut tasks = Vec::new();
 
     // Get the package manager to use
-    let pkg_mgr = package_manager::detect_package_manager()
-        .ok_or_else(|| "No package manager found".to_string())?;
+    let pkg_mgr = runners_package_json::detect_package_manager(
+        path.parent().unwrap_or_else(|| path.as_ref()),
+    )
+    .ok_or_else(|| "No package manager found".to_string())?;
 
     if let Some(scripts) = json.get("scripts") {
         if let Some(scripts_obj) = scripts.as_object() {
@@ -25,9 +27,9 @@ pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
                     name: name.clone(),
                     file_path: path.clone(),
                     definition_type: TaskDefinitionType::PackageJson,
-                    runner: TaskRunner::Node(pkg_mgr.clone()),
+                    runner: pkg_mgr.clone(),
                     source_name: name.clone(),
-                    description: cmd.as_str().map(|s| format!("node script: {}", s)),
+                    description: cmd.as_str().map(|s| s.to_string()),
                     shadowed_by: None,
                 });
             }
@@ -76,18 +78,18 @@ mod tests {
         assert_eq!(tasks.len(), 2);
 
         let test_task = tasks.iter().find(|t| t.name == "test").unwrap();
-        match &test_task.runner {
-            TaskRunner::Node(_) => (),
-            _ => panic!("Expected Node task runner"),
-        }
-        assert_eq!(test_task.description, Some("node script: jest".to_string()));
+        assert!(matches!(
+            test_task.runner,
+            TaskRunner::NodeNpm | TaskRunner::NodeYarn | TaskRunner::NodePnpm | TaskRunner::NodeBun
+        ));
+        assert_eq!(test_task.description, Some("jest".to_string()));
 
         let build_task = tasks.iter().find(|t| t.name == "build").unwrap();
-        match &build_task.runner {
-            TaskRunner::Node(_) => (),
-            _ => panic!("Expected Node task runner"),
-        }
-        assert_eq!(build_task.description, Some("node script: tsc".to_string()));
+        assert!(matches!(
+            build_task.runner,
+            TaskRunner::NodeNpm | TaskRunner::NodeYarn | TaskRunner::NodePnpm | TaskRunner::NodeBun
+        ));
+        assert_eq!(build_task.description, Some("tsc".to_string()));
     }
 
     #[test]

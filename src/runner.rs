@@ -1,6 +1,6 @@
+use crate::runners::runners_package_json;
 use crate::task_shadowing::check_path_executable;
-use crate::types::{TaskRunner, TaskDefinitionType};
-use crate::package_manager::{PackageManager, detect_package_manager};
+use crate::types::{TaskDefinitionType, TaskRunner};
 
 /// Get all available runners for a given task definition type
 pub fn get_available_runners(definition_type: &TaskDefinitionType) -> Vec<TaskRunner> {
@@ -14,11 +14,13 @@ pub fn get_available_runners(definition_type: &TaskDefinitionType) -> Vec<TaskRu
         }
         TaskDefinitionType::PackageJson => {
             // Check all Node.js package managers
-            let mut available = vec![];
-            if let Some(pm) = detect_package_manager() {
-                available.push(TaskRunner::Node(pm));
+            if let Some(runner) =
+                runners_package_json::detect_package_manager(std::path::Path::new("."))
+            {
+                vec![runner]
+            } else {
+                vec![]
             }
-            available
         }
         TaskDefinitionType::PyprojectToml => {
             let mut available = vec![];
@@ -40,7 +42,10 @@ pub fn get_available_runners(definition_type: &TaskDefinitionType) -> Vec<TaskRu
 pub fn is_runner_available(runner: &TaskRunner) -> bool {
     match runner {
         TaskRunner::Make => check_path_executable("make").is_some(),
-        TaskRunner::Node(pm) => check_path_executable(pm.command()).is_some(),
+        TaskRunner::NodeNpm => check_path_executable("npm").is_some(),
+        TaskRunner::NodeYarn => check_path_executable("yarn").is_some(),
+        TaskRunner::NodePnpm => check_path_executable("pnpm").is_some(),
+        TaskRunner::NodeBun => check_path_executable("bun").is_some(),
         TaskRunner::PythonUv => check_path_executable("uv").is_some(),
         TaskRunner::PythonPoetry => check_path_executable("poetry").is_some(),
         TaskRunner::ShellScript => true, // Shell scripts don't need a runner
@@ -64,7 +69,7 @@ mod tests {
         // Test make availability (depends on system)
         let make_available = check_path_executable("make").is_some();
         assert_eq!(is_runner_available(&TaskRunner::Make), make_available);
-        
+
         let available = get_available_runners(&TaskDefinitionType::Makefile);
         if make_available {
             assert_eq!(available, vec![TaskRunner::Make]);
@@ -76,20 +81,21 @@ mod tests {
     #[test]
     fn test_node_package_managers() {
         // Test all package managers
-        for pm in [PackageManager::Npm, PackageManager::Yarn, PackageManager::Bun] {
-            let pm_available = check_path_executable(pm.command()).is_some();
-            assert_eq!(
-                is_runner_available(&TaskRunner::Node(pm.clone())),
-                pm_available,
-                "Availability check failed for package manager: {:?}",
-                pm
-            );
-        }
+        let npm_available = check_path_executable("npm").is_some();
+        assert_eq!(is_runner_available(&TaskRunner::NodeNpm), npm_available);
+
+        let yarn_available = check_path_executable("yarn").is_some();
+        assert_eq!(is_runner_available(&TaskRunner::NodeYarn), yarn_available);
+
+        let bun_available = check_path_executable("bun").is_some();
+        assert_eq!(is_runner_available(&TaskRunner::NodeBun), bun_available);
 
         // Test available runners for package.json
         let available = get_available_runners(&TaskDefinitionType::PackageJson);
-        if let Some(pm) = detect_package_manager() {
-            assert_eq!(available, vec![TaskRunner::Node(pm)]);
+        if let Some(runner) =
+            runners_package_json::detect_package_manager(std::path::Path::new("."))
+        {
+            assert_eq!(available, vec![runner]);
         } else {
             assert!(available.is_empty());
         }
@@ -118,4 +124,4 @@ mod tests {
         }
         assert_eq!(available, expected);
     }
-} 
+}

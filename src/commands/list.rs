@@ -1,11 +1,10 @@
+use crate::runner::is_runner_available;
 use crate::task_discovery;
 use crate::task_shadowing::ShadowType;
-use crate::types::{Task, TaskFileStatus, TaskDefinitionType, TaskRunner};
-use crate::runner::is_runner_available;
+use crate::types::{Task, TaskDefinitionType, TaskFileStatus, TaskRunner};
 use std::collections::HashMap;
 use std::env;
-use std::io::{self, Write};
-use crate::package_manager::PackageManager;
+use std::io;
 
 pub fn execute(verbose: bool) -> Result<(), String> {
     let current_dir =
@@ -70,25 +69,25 @@ pub fn execute(verbose: bool) -> Result<(), String> {
             println!("\nTasks from {}:", file);
             for task in tasks {
                 let mut output = String::new();
-                
+
                 // Basic task name
                 output.push_str(&format!("  • {}", task.name));
-                
+
                 // Add runner info and availability
                 if !is_runner_available(&task.runner) {
                     output.push_str(&format!(" (requires {}, not found)", task.runner.name()));
                 }
-                
+
                 // Add shadow info if present
                 if let Some(shadow_info) = format_shadow_info(task) {
                     output.push_str(&format!(" ({})", shadow_info));
                 }
-                
+
                 // Add source name if different from task name
                 if task.name != task.source_name {
                     output.push_str(&format!(" (source: {})", task.source_name));
                 }
-                
+
                 println!("{}", output);
             }
         }
@@ -106,10 +105,26 @@ pub fn execute(verbose: bool) -> Result<(), String> {
 }
 
 fn format_shadow_info(task: &Task) -> Option<String> {
-    task.shadowed_by.as_ref().map(|shadow_type| match shadow_type {
-        ShadowType::ShellBuiltin(name) => format!("shadowed by shell builtin '{}'", name),
-        ShadowType::PathExecutable(path) => format!("shadowed by '{}'", path),
-    })
+    task.shadowed_by
+        .as_ref()
+        .map(|shadow_type| match shadow_type {
+            ShadowType::ShellBuiltin(name) => format!("shadowed by shell builtin '{}'", name),
+            ShadowType::PathExecutable(path) => format!("shadowed by '{}'", path),
+        })
+}
+
+impl Task {
+    fn get_definition_type(&self) -> TaskDefinitionType {
+        match self.runner {
+            TaskRunner::Make => TaskDefinitionType::Makefile,
+            TaskRunner::NodeNpm
+            | TaskRunner::NodeYarn
+            | TaskRunner::NodePnpm
+            | TaskRunner::NodeBun => TaskDefinitionType::PackageJson,
+            TaskRunner::PythonUv | TaskRunner::PythonPoetry => TaskDefinitionType::PyprojectToml,
+            TaskRunner::ShellScript => TaskDefinitionType::ShellScript,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -154,8 +169,13 @@ mod tests {
             file_path,
             definition_type: match runner {
                 TaskRunner::Make => TaskDefinitionType::Makefile,
-                TaskRunner::Node(_) => TaskDefinitionType::PackageJson,
-                TaskRunner::PythonUv | TaskRunner::PythonPoetry => TaskDefinitionType::PyprojectToml,
+                TaskRunner::NodeNpm
+                | TaskRunner::NodeYarn
+                | TaskRunner::NodePnpm
+                | TaskRunner::NodeBun => TaskDefinitionType::PackageJson,
+                TaskRunner::PythonUv | TaskRunner::PythonPoetry => {
+                    TaskDefinitionType::PyprojectToml
+                }
                 TaskRunner::ShellScript => TaskDefinitionType::ShellScript,
             },
             runner,
@@ -173,8 +193,8 @@ mod tests {
         vec![
             create_test_task("build", makefile_path.clone(), TaskRunner::Make),
             create_test_task("test", makefile_path, TaskRunner::Make),
-            create_test_task("start", package_json_path.clone(), TaskRunner::Node(PackageManager::Npm)),
-            create_test_task("lint", package_json_path, TaskRunner::Node(PackageManager::Npm)),
+            create_test_task("start", package_json_path.clone(), TaskRunner::NodeNpm),
+            create_test_task("lint", package_json_path, TaskRunner::NodeNpm),
             create_test_task("serve", pyproject_toml_path.clone(), TaskRunner::PythonUv),
             create_test_task("check", pyproject_toml_path, TaskRunner::PythonUv),
         ]
@@ -258,19 +278,18 @@ mod tests {
         let (project_dir, home_dir) = setup_test_env();
         env::set_current_dir(&project_dir).expect("Failed to change directory");
 
-        // Create a test Makefile
-        let makefile_content = "
-build: ## Building the project
-\t@echo Building...
+        let makefile_path = PathBuf::from("Makefile");
+        let package_json_path = PathBuf::from("package.json");
+        let pyproject_toml_path = PathBuf::from("pyproject.toml");
 
-test: ## Running tests
-\t@echo Testing...
-";
-        let mut makefile =
-            File::create(project_dir.path().join("Makefile")).expect("Failed to create Makefile");
-        makefile
-            .write_all(makefile_content.as_bytes())
-            .expect("Failed to write Makefile");
+        let tasks = vec![
+            create_test_task("build", makefile_path.clone(), TaskRunner::Make),
+            create_test_task("test", makefile_path, TaskRunner::Make),
+            create_test_task("start", package_json_path.clone(), TaskRunner::NodeNpm),
+            create_test_task("lint", package_json_path, TaskRunner::NodeNpm),
+            create_test_task("serve", pyproject_toml_path.clone(), TaskRunner::PythonUv),
+            create_test_task("check", pyproject_toml_path, TaskRunner::PythonUv),
+        ];
 
         let result = execute(false);
         assert!(result.is_ok());
@@ -489,18 +508,12 @@ custom: ## Custom command
         let output = writer.get_output();
 
         // Verify task listing format
-        assert!(
-            output.contains("• test1"),
-            "Missing unshadowed task"
-        );
+        assert!(output.contains("• test1"), "Missing unshadowed task");
         assert!(
             output.contains("• test2 †"),
             "Incorrect shell builtin format"
         );
-        assert!(
-            output.contains("• test3 ‡"),
-            "Incorrect executable format"
-        );
+        assert!(output.contains("• test3 ‡"), "Incorrect executable format");
 
         // Verify shadow information format
         assert!(

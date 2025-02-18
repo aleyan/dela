@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 
 /// Parse a Makefile at the given path and extract tasks
 pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
-    let content = std::fs::read_to_string(path)
-        .map_err(|e| format!("Failed to read Makefile: {}", e))?;
+    let content =
+        std::fs::read_to_string(path).map_err(|e| format!("Failed to read Makefile: {}", e))?;
 
     let makefile = Makefile::read(std::io::Cursor::new(content))
         .map_err(|e| format!("Failed to parse Makefile: {}", e))?;

@@ -1,14 +1,15 @@
 use crate::parsers::{parse_makefile, parse_package_json, parse_pyproject_toml};
 use crate::task_shadowing;
 use crate::types::{
-    DiscoveredTaskDefinitions, Task, TaskDefinitionFile, TaskDefinitionType, TaskFileStatus, TaskRunner,
+    DiscoveredTaskDefinitions, Task, TaskDefinitionFile, TaskDefinitionType, TaskFileStatus,
+    TaskRunner,
 };
-use std::path::Path;
-use crate::package_manager::{detect_package_manager, PackageManager};
-use crate::runner::get_available_runners;
-use std::fs;
 use serde_json;
+use std::collections::HashMap;
+use std::fs;
+use std::path::Path;
 use toml;
+use walkdir::WalkDir;
 
 /// Result of task discovery
 #[derive(Debug, Default)]
@@ -65,7 +66,9 @@ fn discover_makefile_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Resu
                 definition_type: TaskDefinitionType::Makefile,
                 status: TaskFileStatus::ParseError(e.clone()),
             });
-            discovered.errors.push(format!("Failed to parse Makefile: {}", e));
+            discovered
+                .errors
+                .push(format!("Failed to parse Makefile: {}", e));
         }
     }
 
@@ -103,7 +106,9 @@ fn discover_npm_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<()
                 definition_type: TaskDefinitionType::PackageJson,
                 status: TaskFileStatus::ParseError(e.clone()),
             });
-            discovered.errors.push(format!("Failed to parse package.json: {}", e));
+            discovered
+                .errors
+                .push(format!("Failed to parse package.json: {}", e));
         }
     }
 
@@ -141,7 +146,9 @@ fn discover_python_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result
                 definition_type: TaskDefinitionType::PyprojectToml,
                 status: TaskFileStatus::ParseError(e.clone()),
             });
-            discovered.errors.push(format!("Failed to parse pyproject.toml: {}", e));
+            discovered
+                .errors
+                .push(format!("Failed to parse pyproject.toml: {}", e));
         }
     }
 
@@ -181,7 +188,7 @@ fn discover_shell_script_tasks(dir: &Path, discovered: &mut DiscoveredTasks) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs::File;
+    use std::fs::{self, File};
     use std::io::Write;
     use tempfile::TempDir;
 
@@ -325,18 +332,18 @@ test:
         assert_eq!(discovered.tasks.len(), 2);
 
         let test_task = discovered.tasks.iter().find(|t| t.name == "test").unwrap();
-        match &test_task.runner {
-            TaskRunner::Node(_) => (),
-            _ => panic!("Expected Node task runner"),
-        }
-        assert_eq!(test_task.description, Some("node script: jest".to_string()));
+        assert!(matches!(
+            test_task.runner,
+            TaskRunner::NodeNpm | TaskRunner::NodeYarn | TaskRunner::NodePnpm | TaskRunner::NodeBun
+        ));
+        assert_eq!(test_task.description, Some("jest".to_string()));
 
         let build_task = discovered.tasks.iter().find(|t| t.name == "build").unwrap();
-        match &build_task.runner {
-            TaskRunner::Node(_) => (),
-            _ => panic!("Expected Node task runner"),
-        }
-        assert_eq!(build_task.description, Some("node script: tsc".to_string()));
+        assert!(matches!(
+            build_task.runner,
+            TaskRunner::NodeNpm | TaskRunner::NodeYarn | TaskRunner::NodePnpm | TaskRunner::NodeBun
+        ));
+        assert_eq!(build_task.description, Some("tsc".to_string()));
     }
 
     #[test]
@@ -459,7 +466,15 @@ serve = "uvicorn main:app --reload"
         let node_tasks: Vec<_> = discovered
             .tasks
             .iter()
-            .filter(|t| matches!(t.runner, TaskRunner::Node(_)))
+            .filter(|t| {
+                matches!(
+                    t.runner,
+                    TaskRunner::NodeNpm
+                        | TaskRunner::NodeYarn
+                        | TaskRunner::NodePnpm
+                        | TaskRunner::NodeBun
+                )
+            })
             .collect();
         assert_eq!(node_tasks.len(), 2);
 
@@ -510,9 +525,17 @@ test:
         let node_test = discovered
             .tasks
             .iter()
-            .find(|t| matches!(t.runner, TaskRunner::Node(_)) && t.name == "test")
+            .find(|t| {
+                matches!(
+                    t.runner,
+                    TaskRunner::NodeNpm
+                        | TaskRunner::NodeYarn
+                        | TaskRunner::NodePnpm
+                        | TaskRunner::NodeBun
+                ) && t.name == "test"
+            })
             .unwrap();
-        assert_eq!(node_test.description, Some("node script: jest".to_string()));
+        assert_eq!(node_test.description, Some("jest".to_string()));
     }
 
     #[test]
@@ -599,5 +622,93 @@ lint = "flake8"
             lint_task.description,
             Some("python script: flake8".to_string())
         );
+    }
+
+    #[test]
+    fn test_discover_tasks() {
+        let temp_dir = TempDir::new().unwrap();
+        let project_dir = temp_dir.path();
+
+        // Create test files
+        let makefile_content = "test:\n\t@echo Testing\n";
+        let mut makefile = File::create(project_dir.join("Makefile")).unwrap();
+        makefile.write_all(makefile_content.as_bytes()).unwrap();
+
+        let package_json_content = r#"{
+            "scripts": {
+                "build": "echo Building",
+                "test": "echo Testing"
+            }
+        }"#;
+        let mut package_json = File::create(project_dir.join("package.json")).unwrap();
+        package_json
+            .write_all(package_json_content.as_bytes())
+            .unwrap();
+
+        let pyproject_toml_content = r#"
+[tool.poetry.scripts]
+serve = "echo Serving"
+"#;
+        let mut pyproject_toml = File::create(project_dir.join("pyproject.toml")).unwrap();
+        pyproject_toml
+            .write_all(pyproject_toml_content.as_bytes())
+            .unwrap();
+
+        let tasks = discover_tasks(project_dir);
+
+        // Verify tasks were discovered correctly
+        assert!(tasks
+            .tasks
+            .iter()
+            .any(|t| t.name == "test" && matches!(t.runner, TaskRunner::Make)));
+        assert!(tasks
+            .tasks
+            .iter()
+            .any(|t| t.name == "build" && matches!(t.runner, TaskRunner::NodeNpm)));
+        assert!(tasks
+            .tasks
+            .iter()
+            .any(|t| t.name == "test" && matches!(t.runner, TaskRunner::NodeNpm)));
+        assert!(tasks
+            .tasks
+            .iter()
+            .any(|t| t.name == "serve" && matches!(t.runner, TaskRunner::PythonPoetry)));
+    }
+
+    #[test]
+    fn test_parse_package_json() {
+        let temp_dir = TempDir::new().unwrap();
+        let package_json_path = temp_dir.path().join("package.json");
+
+        let content = r#"{
+            "name": "test-package",
+            "scripts": {
+                "test": "jest",
+                "build": "tsc"
+            }
+        }"#;
+
+        File::create(&package_json_path)
+            .unwrap()
+            .write_all(content.as_bytes())
+            .unwrap();
+
+        let tasks = parse_package_json::parse(&package_json_path).unwrap();
+
+        assert_eq!(tasks.len(), 2);
+
+        let test_task = tasks.iter().find(|t| t.name == "test").unwrap();
+        assert!(matches!(
+            test_task.runner,
+            TaskRunner::NodeNpm | TaskRunner::NodeYarn | TaskRunner::NodePnpm | TaskRunner::NodeBun
+        ));
+        assert_eq!(test_task.description, Some("jest".to_string()));
+
+        let build_task = tasks.iter().find(|t| t.name == "build").unwrap();
+        assert!(matches!(
+            build_task.runner,
+            TaskRunner::NodeNpm | TaskRunner::NodeYarn | TaskRunner::NodePnpm | TaskRunner::NodeBun
+        ));
+        assert_eq!(build_task.description, Some("tsc".to_string()));
     }
 }

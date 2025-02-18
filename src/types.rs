@@ -1,5 +1,4 @@
-use crate::package_manager::PackageManager;
-use crate::task_shadowing::{ShadowType};
+use crate::task_shadowing::ShadowType;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -17,17 +16,23 @@ pub enum TaskDefinitionType {
 }
 
 /// Different types of task runners supported by dela
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TaskRunner {
     /// Make tasks from Makefile
     Make,
-    /// Node.js package manager
-    Node(PackageManager),
-    /// Python uv package manager
+    /// Node.js tasks using npm
+    NodeNpm,
+    /// Node.js tasks using yarn
+    NodeYarn,
+    /// Node.js tasks using pnpm
+    NodePnpm,
+    /// Node.js tasks using bun
+    NodeBun,
+    /// Python tasks using uv
     PythonUv,
-    /// Python poetry package manager
+    /// Python tasks using poetry
     PythonPoetry,
-    /// Direct shell script execution
+    /// Shell script tasks
     ShellScript,
 }
 
@@ -93,7 +98,10 @@ impl TaskRunner {
     pub fn get_command(&self, task: &Task) -> String {
         match self {
             TaskRunner::Make => format!("make {}", task.source_name),
-            TaskRunner::Node(pm) => format!("{} run {}", pm.command(), task.source_name),
+            TaskRunner::NodeNpm => format!("npm run {}", task.source_name),
+            TaskRunner::NodeYarn => format!("yarn run {}", task.source_name),
+            TaskRunner::NodePnpm => format!("pnpm run {}", task.source_name),
+            TaskRunner::NodeBun => format!("bun run {}", task.source_name),
             TaskRunner::PythonUv => format!("uv run {}", task.source_name),
             TaskRunner::PythonPoetry => format!("poetry run {}", task.source_name),
             TaskRunner::ShellScript => format!("./{}", task.source_name),
@@ -103,7 +111,10 @@ impl TaskRunner {
     pub fn name(&self) -> &'static str {
         match self {
             TaskRunner::Make => "make",
-            TaskRunner::Node(pm) => pm.command(),
+            TaskRunner::NodeNpm => "npm",
+            TaskRunner::NodeYarn => "yarn",
+            TaskRunner::NodePnpm => "pnpm",
+            TaskRunner::NodeBun => "bun",
             TaskRunner::PythonUv => "uv",
             TaskRunner::PythonPoetry => "poetry",
             TaskRunner::ShellScript => "shell",
