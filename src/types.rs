@@ -15,26 +15,37 @@ pub enum TaskDefinitionType {
     ShellScript,
 }
 
-/// Different types of task runners supported by dela
+/// Different types of task runners supported by dela.
+/// Each variant represents a specific task runner that can execute tasks.
+/// The runner is selected based on the task definition file type and available commands.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TaskRunner {
     /// Make tasks from Makefile
+    /// Used when a Makefile is present in the project root
     Make,
     /// Node.js tasks using npm
+    /// Selected when package.json is present with package-lock.json, or npm is the only available runner
     NodeNpm,
     /// Node.js tasks using yarn
+    /// Selected when yarn.lock is present, or yarn is the preferred available runner
     NodeYarn,
     /// Node.js tasks using pnpm
+    /// Selected when pnpm-lock.yaml is present, or pnpm is the preferred available runner
     NodePnpm,
     /// Node.js tasks using bun
+    /// Selected when bun.lockb is present, or bun is the preferred available runner
     NodeBun,
     /// Python tasks using uv
+    /// Selected when .venv directory is present, or uv is the preferred available runner
     PythonUv,
     /// Python tasks using poetry
+    /// Selected when poetry.lock is present, or poetry is the preferred available runner
     PythonPoetry,
     /// Python tasks using poethepoet
+    /// Selected when poe is available and no other Python runner is preferred
     PythonPoe,
     /// Shell script tasks
+    /// Used for direct execution of shell scripts
     ShellScript,
 }
 

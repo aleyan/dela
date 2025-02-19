@@ -6,6 +6,7 @@ use crate::types::{
 };
 use std::fs;
 use std::path::Path;
+use std::path::PathBuf;
 
 /// Result of task discovery
 #[derive(Debug, Default)]
@@ -31,6 +32,55 @@ pub fn discover_tasks(dir: &Path) -> DiscoveredTasks {
     discovered
 }
 
+/// Helper function to set task definition based on type
+fn set_definition(
+    discovered: &mut DiscoveredTasks,
+    definition: TaskDefinitionFile,
+) {
+    match definition.definition_type {
+        TaskDefinitionType::Makefile => discovered.definitions.makefile = Some(definition),
+        TaskDefinitionType::PackageJson => discovered.definitions.package_json = Some(definition),
+        TaskDefinitionType::PyprojectToml => discovered.definitions.pyproject_toml = Some(definition),
+        _ => {}
+    }
+}
+
+/// Helper function to handle task file discovery errors
+fn handle_discovery_error(
+    error: String,
+    file_path: PathBuf,
+    definition_type: TaskDefinitionType,
+    discovered: &mut DiscoveredTasks,
+) {
+    discovered.errors.push(format!("Failed to parse {}: {}", file_path.display(), error));
+    let definition = TaskDefinitionFile {
+        path: file_path,
+        definition_type,
+        status: TaskFileStatus::ParseError(error),
+    };
+    set_definition(discovered, definition);
+}
+
+/// Helper function to handle successful task discovery
+fn handle_discovery_success(
+    mut tasks: Vec<Task>,
+    file_path: PathBuf,
+    definition_type: TaskDefinitionType,
+    discovered: &mut DiscoveredTasks,
+) {
+    // Add shadow information
+    for task in &mut tasks {
+        task.shadowed_by = check_shadowing(&task.name);
+    }
+    let definition = TaskDefinitionFile {
+        path: file_path,
+        definition_type,
+        status: TaskFileStatus::Parsed,
+    };
+    set_definition(discovered, definition);
+    discovered.tasks.extend(tasks);
+}
+
 fn discover_makefile_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<(), String> {
     let makefile_path = dir.join("Makefile");
 
@@ -44,27 +94,21 @@ fn discover_makefile_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Resu
     }
 
     match parse_makefile::parse(&makefile_path) {
-        Ok(mut tasks) => {
-            discovered.definitions.makefile = Some(TaskDefinitionFile {
-                path: makefile_path.clone(),
-                definition_type: TaskDefinitionType::Makefile,
-                status: TaskFileStatus::Parsed,
-            });
-            // Add shadow information
-            for task in &mut tasks {
-                task.shadowed_by = check_shadowing(&task.name);
-            }
-            discovered.tasks.extend(tasks);
+        Ok(tasks) => {
+            handle_discovery_success(
+                tasks,
+                makefile_path,
+                TaskDefinitionType::Makefile,
+                discovered,
+            );
         }
         Err(e) => {
-            discovered.definitions.makefile = Some(TaskDefinitionFile {
-                path: makefile_path,
-                definition_type: TaskDefinitionType::Makefile,
-                status: TaskFileStatus::ParseError(e.clone()),
-            });
-            discovered
-                .errors
-                .push(format!("Failed to parse Makefile: {}", e));
+            handle_discovery_error(
+                e,
+                makefile_path,
+                TaskDefinitionType::Makefile,
+                discovered,
+            );
         }
     }
 
@@ -84,27 +128,21 @@ fn discover_npm_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<()
     }
 
     match parse_package_json::parse(&package_json) {
-        Ok(mut tasks) => {
-            discovered.definitions.package_json = Some(TaskDefinitionFile {
-                path: package_json.clone(),
-                definition_type: TaskDefinitionType::PackageJson,
-                status: TaskFileStatus::Parsed,
-            });
-            // Add shadow information
-            for task in &mut tasks {
-                task.shadowed_by = check_shadowing(&task.name);
-            }
-            discovered.tasks.extend(tasks);
+        Ok(tasks) => {
+            handle_discovery_success(
+                tasks,
+                package_json,
+                TaskDefinitionType::PackageJson,
+                discovered,
+            );
         }
         Err(e) => {
-            discovered.definitions.package_json = Some(TaskDefinitionFile {
-                path: package_json,
-                definition_type: TaskDefinitionType::PackageJson,
-                status: TaskFileStatus::ParseError(e.clone()),
-            });
-            discovered
-                .errors
-                .push(format!("Failed to parse package.json: {}", e));
+            handle_discovery_error(
+                e,
+                package_json,
+                TaskDefinitionType::PackageJson,
+                discovered,
+            );
         }
     }
 
@@ -124,27 +162,21 @@ fn discover_python_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result
     }
 
     match parse_pyproject_toml::parse(&pyproject_toml) {
-        Ok(mut tasks) => {
-            discovered.definitions.pyproject_toml = Some(TaskDefinitionFile {
-                path: pyproject_toml.clone(),
-                definition_type: TaskDefinitionType::PyprojectToml,
-                status: TaskFileStatus::Parsed,
-            });
-            // Add shadow information
-            for task in &mut tasks {
-                task.shadowed_by = check_shadowing(&task.name);
-            }
-            discovered.tasks.extend(tasks);
+        Ok(tasks) => {
+            handle_discovery_success(
+                tasks,
+                pyproject_toml,
+                TaskDefinitionType::PyprojectToml,
+                discovered,
+            );
         }
         Err(e) => {
-            discovered.definitions.pyproject_toml = Some(TaskDefinitionFile {
-                path: pyproject_toml,
-                definition_type: TaskDefinitionType::PyprojectToml,
-                status: TaskFileStatus::ParseError(e.clone()),
-            });
-            discovered
-                .errors
-                .push(format!("Failed to parse pyproject.toml: {}", e));
+            handle_discovery_error(
+                e,
+                pyproject_toml,
+                TaskDefinitionType::PyprojectToml,
+                discovered,
+            );
         }
     }
 
