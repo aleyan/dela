@@ -124,6 +124,20 @@ impl TaskRunner {
 
     pub fn name(&self) -> &'static str {
         match self {
+            TaskRunner::Make => "Make",
+            TaskRunner::NodeNpm => "NPM",
+            TaskRunner::NodeYarn => "Yarn",
+            TaskRunner::NodePnpm => "PNPM",
+            TaskRunner::NodeBun => "Bun",
+            TaskRunner::PythonUv => "UV",
+            TaskRunner::PythonPoetry => "Poetry",
+            TaskRunner::PythonPoe => "Poe",
+            TaskRunner::ShellScript => "Shell Script",
+        }
+    }
+
+    pub fn short_name(&self) -> &'static str {
+        match self {
             TaskRunner::Make => "make",
             TaskRunner::NodeNpm => "npm",
             TaskRunner::NodeYarn => "yarn",
@@ -132,7 +146,7 @@ impl TaskRunner {
             TaskRunner::PythonUv => "uv",
             TaskRunner::PythonPoetry => "poetry",
             TaskRunner::PythonPoe => "poe",
-            TaskRunner::ShellScript => "shell",
+            TaskRunner::ShellScript => "sh",
         }
     }
 }

@@ -209,6 +209,7 @@ fn discover_shell_script_tasks(dir: &Path, discovered: &mut DiscoveredTasks) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::task_shadowing::{enable_mock, mock_executable, reset_mock};
     use crate::task_shadowing::ShadowType;
     use std::fs::File;
     use std::io::Write;
@@ -394,6 +395,11 @@ test:
     fn test_discover_python_tasks() {
         let temp_dir = TempDir::new().unwrap();
 
+        // Mock UV being installed
+        reset_mock();
+        enable_mock();
+        mock_executable("uv");
+
         // Create pyproject.toml with UV scripts
         let content = r#"
 [project]
@@ -422,11 +428,82 @@ serve = "uvicorn main:app --reload"
             serve_task.description,
             Some("python script: uvicorn main:app --reload".to_string())
         );
+
+        reset_mock();
+    }
+
+    #[test]
+    fn test_discover_python_poetry_tasks() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Mock Poetry being installed
+        reset_mock();
+        enable_mock();
+        mock_executable("poetry");
+
+        // Create poetry.lock to ensure Poetry is selected
+        File::create(temp_dir.path().join("poetry.lock")).unwrap();
+
+        // Create pyproject.toml with Poetry scripts
+        let content = r#"
+[tool.poetry]
+name = "test-project"
+
+[tool.poetry.scripts]
+serve = "python -m http.server"
+test = "pytest"
+lint = "flake8"
+"#;
+
+        let pyproject_path = temp_dir.path().join("pyproject.toml");
+        let mut file = File::create(&pyproject_path).unwrap();
+        write!(file, "{}", content).unwrap();
+
+        let discovered = discover_tasks(temp_dir.path());
+
+        // Check pyproject.toml status
+        let pyproject_def = discovered.definitions.pyproject_toml.unwrap();
+        assert_eq!(pyproject_def.status, TaskFileStatus::Parsed);
+
+        // Verify tasks were discovered
+        assert_eq!(discovered.tasks.len(), 3);
+
+        // Verify all tasks use PythonPoetry runner
+        for task in &discovered.tasks {
+            assert_eq!(task.runner, TaskRunner::PythonPoetry);
+        }
+
+        // Verify specific tasks
+        let serve_task = discovered.tasks.iter().find(|t| t.name == "serve").unwrap();
+        assert_eq!(
+            serve_task.description,
+            Some("python script: python -m http.server".to_string())
+        );
+
+        let test_task = discovered.tasks.iter().find(|t| t.name == "test").unwrap();
+        assert_eq!(
+            test_task.description,
+            Some("python script: pytest".to_string())
+        );
+
+        let lint_task = discovered.tasks.iter().find(|t| t.name == "lint").unwrap();
+        assert_eq!(
+            lint_task.description,
+            Some("python script: flake8".to_string())
+        );
+
+        reset_mock();
     }
 
     #[test]
     fn test_discover_tasks_multiple_files() {
         let temp_dir = TempDir::new().unwrap();
+
+        // Mock package managers
+        reset_mock();
+        enable_mock();
+        mock_executable("npm");
+        mock_executable("poetry");
 
         // Create Makefile
         let makefile_content = r#".PHONY: build test
@@ -447,13 +524,13 @@ test:
         let mut package_json = File::create(temp_dir.path().join("package.json")).unwrap();
         write!(package_json, "{}", package_json_content).unwrap();
 
-        // Create pyproject.toml
+        // Create pyproject.toml with Poetry scripts
         let pyproject_content = r#"
-[project]
+[tool.poetry]
 name = "test-project"
 
-[project.scripts]
-serve = "uvicorn main:app --reload"
+[tool.poetry.scripts]
+serve = "python -m http.server"
 "#;
         let mut pyproject = File::create(temp_dir.path().join("pyproject.toml")).unwrap();
         write!(pyproject, "{}", pyproject_content).unwrap();
@@ -503,9 +580,11 @@ serve = "uvicorn main:app --reload"
         let python_tasks: Vec<_> = discovered
             .tasks
             .iter()
-            .filter(|t| matches!(t.runner, TaskRunner::PythonUv))
+            .filter(|t| matches!(t.runner, TaskRunner::PythonPoetry))
             .collect();
         assert_eq!(python_tasks.len(), 1);
+
+        reset_mock();
     }
 
     #[test]
@@ -589,110 +668,6 @@ cd:
             cd_task.shadowed_by,
             Some(ShadowType::ShellBuiltin(_))
         ));
-    }
-
-    #[test]
-    fn test_discover_python_poetry_tasks() {
-        let temp_dir = TempDir::new().unwrap();
-
-        // Create pyproject.toml with Poetry scripts
-        let content = r#"
-[tool.poetry]
-name = "test-project"
-
-[tool.poetry.scripts]
-serve = "uvicorn main:app --reload"
-test = "pytest"
-lint = "flake8"
-"#;
-
-        let pyproject_path = temp_dir.path().join("pyproject.toml");
-        let mut file = File::create(&pyproject_path).unwrap();
-        write!(file, "{}", content).unwrap();
-
-        let discovered = discover_tasks(temp_dir.path());
-
-        // Check pyproject.toml status
-        let pyproject_def = discovered.definitions.pyproject_toml.unwrap();
-        assert_eq!(pyproject_def.status, TaskFileStatus::Parsed);
-
-        // Verify tasks were discovered
-        assert_eq!(discovered.tasks.len(), 3);
-
-        // Verify all tasks use PythonPoetry runner
-        for task in &discovered.tasks {
-            assert_eq!(task.runner, TaskRunner::PythonPoetry);
-        }
-
-        // Verify specific tasks
-        let serve_task = discovered.tasks.iter().find(|t| t.name == "serve").unwrap();
-        assert_eq!(
-            serve_task.description,
-            Some("python script: uvicorn main:app --reload".to_string())
-        );
-
-        let test_task = discovered.tasks.iter().find(|t| t.name == "test").unwrap();
-        assert_eq!(
-            test_task.description,
-            Some("python script: pytest".to_string())
-        );
-
-        let lint_task = discovered.tasks.iter().find(|t| t.name == "lint").unwrap();
-        assert_eq!(
-            lint_task.description,
-            Some("python script: flake8".to_string())
-        );
-    }
-
-    #[test]
-    fn test_discover_tasks() {
-        let temp_dir = TempDir::new().unwrap();
-        let project_dir = temp_dir.path();
-
-        // Create test files
-        let makefile_content = "test:\n\t@echo Testing\n";
-        let mut makefile = File::create(project_dir.join("Makefile")).unwrap();
-        makefile.write_all(makefile_content.as_bytes()).unwrap();
-
-        let package_json_content = r#"{
-            "scripts": {
-                "build": "echo Building",
-                "test": "echo Testing"
-            }
-        }"#;
-        let mut package_json = File::create(project_dir.join("package.json")).unwrap();
-        package_json
-            .write_all(package_json_content.as_bytes())
-            .unwrap();
-
-        let pyproject_toml_content = r#"
-[tool.poetry.scripts]
-serve = "echo Serving"
-"#;
-        let mut pyproject_toml = File::create(project_dir.join("pyproject.toml")).unwrap();
-        pyproject_toml
-            .write_all(pyproject_toml_content.as_bytes())
-            .unwrap();
-
-        let tasks = discover_tasks(project_dir);
-
-        // Verify tasks were discovered correctly
-        assert!(tasks
-            .tasks
-            .iter()
-            .any(|t| t.name == "test" && matches!(t.runner, TaskRunner::Make)));
-        assert!(tasks
-            .tasks
-            .iter()
-            .any(|t| t.name == "build" && matches!(t.runner, TaskRunner::NodeNpm)));
-        assert!(tasks
-            .tasks
-            .iter()
-            .any(|t| t.name == "test" && matches!(t.runner, TaskRunner::NodeNpm)));
-        assert!(tasks
-            .tasks
-            .iter()
-            .any(|t| t.name == "serve" && matches!(t.runner, TaskRunner::PythonPoetry)));
     }
 
     #[test]

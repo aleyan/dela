@@ -56,6 +56,7 @@ pub fn detect_package_manager(dir: &Path) -> Option<TaskRunner> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::task_shadowing::{enable_mock, mock_executable, reset_mock};
     use std::fs::{self, File};
     use tempfile::TempDir;
 
@@ -73,12 +74,17 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         create_poetry_lock(temp_dir.path());
 
-        if check_path_executable("poetry").is_some() {
-            assert_eq!(
-                detect_package_manager(temp_dir.path()),
-                Some(TaskRunner::PythonPoetry)
-            );
-        }
+        // Enable mocking and mock poetry
+        reset_mock();
+        enable_mock();
+        mock_executable("poetry");
+
+        assert_eq!(
+            detect_package_manager(temp_dir.path()),
+            Some(TaskRunner::PythonPoetry)
+        );
+
+        reset_mock();
     }
 
     #[test]
@@ -86,25 +92,29 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         create_venv(temp_dir.path());
 
-        if check_path_executable("uv").is_some() {
-            assert_eq!(
-                detect_package_manager(temp_dir.path()),
-                Some(TaskRunner::PythonUv)
-            );
-        }
+        // Enable mocking and mock UV
+        reset_mock();
+        enable_mock();
+        mock_executable("uv");
+
+        assert_eq!(
+            detect_package_manager(temp_dir.path()),
+            Some(TaskRunner::PythonUv)
+        );
+
+        reset_mock();
     }
 
     #[test]
     fn test_detect_package_manager_no_markers() {
         let temp_dir = TempDir::new().unwrap();
 
-        let result = detect_package_manager(temp_dir.path());
-        // Result depends on which package managers are installed
-        if let Some(runner) = result {
-            assert!(matches!(
-                runner,
-                TaskRunner::PythonUv | TaskRunner::PythonPoetry | TaskRunner::PythonPoe
-            ));
-        }
+        // Enable mocking but don't mock any package managers
+        reset_mock();
+        enable_mock();
+
+        assert_eq!(detect_package_manager(temp_dir.path()), None);
+
+        reset_mock();
     }
 }

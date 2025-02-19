@@ -4,6 +4,7 @@ use crate::task_shadowing::ShadowType;
 use crate::types::{Task, TaskFileStatus};
 use std::collections::HashMap;
 use std::env;
+use std::io;
 
 pub fn execute(verbose: bool) -> Result<(), String> {
     let current_dir =
@@ -70,40 +71,13 @@ pub fn execute(verbose: bool) -> Result<(), String> {
         for (file, tasks) in tasks_by_file {
             println!("\nTasks from {}:", file);
             for task in tasks {
-                let mut output = String::new();
-
-                // Basic task name
-                output.push_str(&format!("  • {}", task.name));
-
-                // Add runner info and availability
-                if !is_runner_available(&task.runner) {
-                    output.push_str(&format!(" (requires {}, not found)", task.runner.name()));
-                } else {
-                    output.push_str(&format!(" ({})", task.runner.name()));
-                }
-
-                // Add shadow symbol if present
+                format_task_output(task, &mut std::io::stdout())
+                    .map_err(|e| format!("Failed to write task output: {}", e))?;
                 if let Some(ref shadow_type) = task.shadowed_by {
-                    match shadow_type {
-                        ShadowType::ShellBuiltin(_) => output.push_str(" †"),
-                        ShadowType::PathExecutable(_) => output.push_str(" ‡"),
-                    }
                     if let Some(info) = format_shadow_info(task) {
                         shadow_infos.push(info);
                     }
                 }
-
-                // Add source name if different from task name
-                if task.name != task.source_name {
-                    output.push_str(&format!(" (source: {})", task.source_name));
-                }
-
-                // Add description if present
-                if let Some(desc) = &task.description {
-                    output.push_str(&format!(" - {}", desc));
-                }
-
-                println!("{}", output);
             }
         }
 
@@ -127,12 +101,40 @@ pub fn execute(verbose: bool) -> Result<(), String> {
     Ok(())
 }
 
+fn format_task_output(task: &Task, writer: &mut impl io::Write) -> io::Result<()> {
+    let shadow_symbol = if task.shadowed_by.is_some() {
+        match task.shadowed_by.as_ref().unwrap() {
+            ShadowType::ShellBuiltin(_) => " †",
+            ShadowType::PathExecutable(_) => " ‡",
+        }
+    } else {
+        ""
+    };
+
+    let mut output = format!("  • {}{}", task.name, shadow_symbol);
+
+    // Add runner info with short name
+    if !is_runner_available(&task.runner) {
+        output.push_str(&format!(" (requires {}, not found)", task.runner.short_name()));
+    } else {
+        output.push_str(&format!(" ({})", task.runner.short_name()));
+    }
+
+    // Add description if present
+    if let Some(desc) = &task.description {
+        output.push_str(&format!(" - {}", desc));
+    }
+
+    writeln!(writer, "{}", output)
+}
+
+// Helper function to format shadow info
 fn format_shadow_info(task: &Task) -> Option<String> {
     task.shadowed_by
         .as_ref()
         .map(|shadow_type| match shadow_type {
-            ShadowType::ShellBuiltin(name) => {
-                format!("† task '{}' shadowed by {} shell builtin", task.name, name)
+            ShadowType::ShellBuiltin(shell) => {
+                format!("† task '{}' shadowed by {} shell builtin", task.name, shell)
             }
             ShadowType::PathExecutable(path) => {
                 format!("‡ task '{}' shadowed by executable at {}", task.name, path)
@@ -147,6 +149,7 @@ impl Task {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::task_shadowing::{enable_mock, mock_executable, reset_mock};
     use crate::types::{Task, TaskDefinitionType, TaskRunner};
     use serial_test::serial;
     use std::fs::{self, File};
@@ -231,11 +234,11 @@ mod tests {
 
         let mut output = format!("  • {}{}", task.name, shadow_symbol);
 
-        // Add runner info
+        // Add runner info with short name
         if !is_runner_available(&task.runner) {
-            output.push_str(&format!(" (requires {}, not found)", task.runner.name()));
+            output.push_str(&format!(" (requires {}, not found)", task.runner.short_name()));
         } else {
-            output.push_str(&format!(" ({})", task.runner.name()));
+            output.push_str(&format!(" ({})", task.runner.short_name()));
         }
 
         // Add description if present
@@ -558,6 +561,13 @@ custom: ## Custom command
     fn test_task_description_formatting() {
         let mut writer = TestWriter::new();
 
+        // Mock package managers
+        reset_mock();
+        enable_mock();
+        mock_executable("npm");
+        mock_executable("uv");
+        mock_executable("make");
+
         // Create test tasks with descriptions
         let tasks = vec![
             Task {
@@ -610,21 +620,23 @@ custom: ## Custom command
 
         // Verify task descriptions are properly formatted
         assert!(
-            output.contains("• build (make) - Building the project"),
+            output.contains("  • build (make) - Building the project"),
             "Missing or incorrect Makefile task description"
         );
         assert!(
-            output.contains("• test (npm) - jest --coverage"),
+            output.contains("  • test (npm) - jest --coverage"),
             "Missing or incorrect package.json task description"
         );
         assert!(
-            output.contains("• serve (uv) - python script: server.py"),
+            output.contains("  • serve (uv) - python script: server.py"),
             "Missing or incorrect pyproject.toml task description"
         );
         assert!(
-            output.contains("• clean (make)"),
+            output.contains("  • clean (make)"),
             "Task without description should not have a hyphen"
         );
+
+        reset_mock();
     }
 
     #[test]

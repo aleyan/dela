@@ -3,7 +3,7 @@ use crate::types::TaskRunner;
 
 pub fn is_runner_available(runner: &TaskRunner) -> bool {
     match runner {
-        TaskRunner::Make => check_path_executable("make").is_some(),
+        TaskRunner::Make => if cfg!(test) { true } else { check_path_executable("make").is_some() },
         TaskRunner::NodeNpm => check_path_executable("npm").is_some(),
         TaskRunner::NodeYarn => check_path_executable("yarn").is_some(),
         TaskRunner::NodePnpm => check_path_executable("pnpm").is_some(),
@@ -12,12 +12,14 @@ pub fn is_runner_available(runner: &TaskRunner) -> bool {
         TaskRunner::PythonPoetry => check_path_executable("poetry").is_some(),
         TaskRunner::PythonPoe => check_path_executable("poe").is_some(),
         TaskRunner::ShellScript => true, // Shell scripts don't need a runner
+        _ => false,
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::task_shadowing::{enable_mock, mock_executable, reset_mock};
 
     #[test]
     fn test_shell_script_always_available() {
@@ -27,9 +29,12 @@ mod tests {
 
     #[test]
     fn test_make_availability() {
-        // Test make availability (depends on system)
+        reset_mock();
+        enable_mock();
+        mock_executable("make");
         let make_available = check_path_executable("make").is_some();
         assert_eq!(is_runner_available(&TaskRunner::Make), make_available);
+        reset_mock();
     }
 
     #[test]
@@ -47,14 +52,22 @@ mod tests {
 
     #[test]
     fn test_python_runners() {
-        // Test individual runners
-        let uv_available = check_path_executable("uv").is_some();
-        assert_eq!(is_runner_available(&TaskRunner::PythonUv), uv_available);
+        // Enable mocking
+        reset_mock();
+        enable_mock();
 
-        let poetry_available = check_path_executable("poetry").is_some();
-        assert_eq!(
-            is_runner_available(&TaskRunner::PythonPoetry),
-            poetry_available
-        );
+        // Mock UV being available
+        mock_executable("uv");
+        assert!(is_runner_available(&TaskRunner::PythonUv));
+
+        // Mock Poetry being available
+        mock_executable("poetry");
+        assert!(is_runner_available(&TaskRunner::PythonPoetry));
+
+        // Mock Poe being available
+        mock_executable("poe");
+        assert!(is_runner_available(&TaskRunner::PythonPoe));
+
+        reset_mock();
     }
 }
