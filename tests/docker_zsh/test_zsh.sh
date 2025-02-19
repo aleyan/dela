@@ -99,7 +99,7 @@ log "Testing shadow detection in dela list..."
 output=$(dela list)
 
 # Check for shell builtin shadowing (cd)
-if ! echo "$output" | grep -q "cd †"; then
+if ! echo "$output" | grep -q "cd (make) †"; then
     error "Shell builtin shadowing symbol not found for 'cd' task"
     error "Got output: $output"
     exit 1
@@ -112,7 +112,7 @@ if ! echo "$output" | grep -q "† task 'cd' shadowed by zsh shell builtin"; the
 fi
 
 # Check for PATH executable shadowing (custom-exe)
-if ! echo "$output" | grep -q "custom-exe ‡"; then
+if ! echo "$output" | grep -q "custom-exe (make) ‡"; then
     error "PATH executable shadowing symbol not found for 'custom-exe' task"
     error "Got output: $output"
     exit 1

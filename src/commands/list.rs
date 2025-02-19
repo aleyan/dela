@@ -78,6 +78,8 @@ pub fn execute(verbose: bool) -> Result<(), String> {
                 // Add runner info and availability
                 if !is_runner_available(&task.runner) {
                     output.push_str(&format!(" (requires {}, not found)", task.runner.name()));
+                } else {
+                    output.push_str(&format!(" ({})", task.runner.name()));
                 }
 
                 // Add shadow symbol if present
@@ -227,11 +229,21 @@ mod tests {
             ""
         };
 
-        if let Some(desc) = &task.description {
-            writeln!(writer, "  • {}{} - {}", task.name, shadow_symbol, desc)
+        let mut output = format!("  • {}{}", task.name, shadow_symbol);
+
+        // Add runner info
+        if !is_runner_available(&task.runner) {
+            output.push_str(&format!(" (requires {}, not found)", task.runner.name()));
         } else {
-            writeln!(writer, "  • {}{}", task.name, shadow_symbol)
+            output.push_str(&format!(" ({})", task.runner.name()));
         }
+
+        // Add description if present
+        if let Some(desc) = &task.description {
+            output.push_str(&format!(" - {}", desc));
+        }
+
+        writeln!(writer, "{}", output)
     }
 
     // Helper function to format shadow info
@@ -598,19 +610,19 @@ custom: ## Custom command
 
         // Verify task descriptions are properly formatted
         assert!(
-            output.contains("• build - Building the project"),
+            output.contains("• build (make) - Building the project"),
             "Missing or incorrect Makefile task description"
         );
         assert!(
-            output.contains("• test - jest --coverage"),
+            output.contains("• test (npm) - jest --coverage"),
             "Missing or incorrect package.json task description"
         );
         assert!(
-            output.contains("• serve - python script: server.py"),
+            output.contains("• serve (uv) - python script: server.py"),
             "Missing or incorrect pyproject.toml task description"
         );
         assert!(
-            output.contains("• clean\n"),
+            output.contains("• clean (make)"),
             "Task without description should not have a hyphen"
         );
     }
@@ -632,8 +644,8 @@ test: ## Running tests
 clean:
     rm -rf target/
 "#;
-        let mut makefile = File::create(project_dir.path().join("Makefile"))
-            .expect("Failed to create Makefile");
+        let mut makefile =
+            File::create(project_dir.path().join("Makefile")).expect("Failed to create Makefile");
         makefile
             .write_all(makefile_content.as_bytes())
             .expect("Failed to write Makefile");
