@@ -128,6 +128,7 @@ impl TaskRunner {
 
 /// Result of task discovery in a directory
 #[derive(Debug, Default)]
+#[allow(dead_code)]
 pub struct DiscoveredTasks {
     /// All tasks found, grouped by name
     pub tasks: Vec<Task>,
