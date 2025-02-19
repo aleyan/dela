@@ -96,6 +96,11 @@ pub fn execute(verbose: bool) -> Result<(), String> {
                     output.push_str(&format!(" (source: {})", task.source_name));
                 }
 
+                // Add description if present
+                if let Some(desc) = &task.description {
+                    output.push_str(&format!(" - {}", desc));
+                }
+
                 println!("{}", output);
             }
         }
@@ -535,5 +540,137 @@ custom: ## Custom command
             output.contains("‡ task 'test3' shadowed by executable at /usr/bin/test3"),
             "Incorrect executable info"
         );
+    }
+
+    #[test]
+    fn test_task_description_formatting() {
+        let mut writer = TestWriter::new();
+
+        // Create test tasks with descriptions
+        let tasks = vec![
+            Task {
+                name: "build".to_string(),
+                file_path: PathBuf::from("Makefile"),
+                definition_type: TaskDefinitionType::Makefile,
+                runner: TaskRunner::Make,
+                source_name: "build".to_string(),
+                description: Some("Building the project".to_string()),
+                shadowed_by: None,
+            },
+            Task {
+                name: "test".to_string(),
+                file_path: PathBuf::from("package.json"),
+                definition_type: TaskDefinitionType::PackageJson,
+                runner: TaskRunner::NodeNpm,
+                source_name: "test".to_string(),
+                description: Some("jest --coverage".to_string()),
+                shadowed_by: None,
+            },
+            Task {
+                name: "serve".to_string(),
+                file_path: PathBuf::from("pyproject.toml"),
+                definition_type: TaskDefinitionType::PyprojectToml,
+                runner: TaskRunner::PythonUv,
+                source_name: "serve".to_string(),
+                description: Some("python script: server.py".to_string()),
+                shadowed_by: None,
+            },
+            Task {
+                name: "clean".to_string(),
+                file_path: PathBuf::from("Makefile"),
+                definition_type: TaskDefinitionType::Makefile,
+                runner: TaskRunner::Make,
+                source_name: "clean".to_string(),
+                description: None,
+                shadowed_by: None,
+            },
+        ];
+
+        // Print tasks
+        for (file, file_tasks) in tasks_by_file(&tasks) {
+            writeln!(writer, "\nFrom {}:", file).unwrap();
+            for task in file_tasks {
+                format_task_output(task, &mut writer).unwrap();
+            }
+        }
+
+        let output = writer.get_output();
+
+        // Verify task descriptions are properly formatted
+        assert!(
+            output.contains("• build - Building the project"),
+            "Missing or incorrect Makefile task description"
+        );
+        assert!(
+            output.contains("• test - jest --coverage"),
+            "Missing or incorrect package.json task description"
+        );
+        assert!(
+            output.contains("• serve - python script: server.py"),
+            "Missing or incorrect pyproject.toml task description"
+        );
+        assert!(
+            output.contains("• clean\n"),
+            "Task without description should not have a hyphen"
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn test_list_with_descriptions() {
+        let (project_dir, home_dir) = setup_test_env();
+        env::set_current_dir(&project_dir).expect("Failed to change directory");
+
+        // Create a test Makefile with descriptions
+        let makefile_content = r#"
+build: ## Building the project
+    @echo Building...
+
+test: ## Running tests
+    @echo Testing...
+
+clean:
+    rm -rf target/
+"#;
+        let mut makefile = File::create(project_dir.path().join("Makefile"))
+            .expect("Failed to create Makefile");
+        makefile
+            .write_all(makefile_content.as_bytes())
+            .expect("Failed to write Makefile");
+
+        // Create a test package.json with descriptions
+        let package_json_content = r#"{
+            "name": "test-package",
+            "scripts": {
+                "start": "node server.js",
+                "test": "jest --coverage"
+            }
+        }"#;
+        let mut package_json = File::create(project_dir.path().join("package.json"))
+            .expect("Failed to create package.json");
+        package_json
+            .write_all(package_json_content.as_bytes())
+            .expect("Failed to write package.json");
+
+        // Create a test pyproject.toml with descriptions
+        let pyproject_toml_content = r#"
+[tool.poe.tasks]
+serve = "python server.py"
+check = { script = "check.py" }
+"#;
+        let mut pyproject_toml = File::create(project_dir.path().join("pyproject.toml"))
+            .expect("Failed to create pyproject.toml");
+        pyproject_toml
+            .write_all(pyproject_toml_content.as_bytes())
+            .expect("Failed to write pyproject.toml");
+
+        let result = execute(false);
+        assert!(result.is_ok());
+
+        // TODO: Add assertions for the actual output once we have a way to capture stdout
+        // This would require modifying the execute function to take a writer parameter
+
+        drop(project_dir);
+        drop(home_dir);
     }
 }
