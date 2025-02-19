@@ -33,14 +33,13 @@ pub fn discover_tasks(dir: &Path) -> DiscoveredTasks {
 }
 
 /// Helper function to set task definition based on type
-fn set_definition(
-    discovered: &mut DiscoveredTasks,
-    definition: TaskDefinitionFile,
-) {
+fn set_definition(discovered: &mut DiscoveredTasks, definition: TaskDefinitionFile) {
     match definition.definition_type {
         TaskDefinitionType::Makefile => discovered.definitions.makefile = Some(definition),
         TaskDefinitionType::PackageJson => discovered.definitions.package_json = Some(definition),
-        TaskDefinitionType::PyprojectToml => discovered.definitions.pyproject_toml = Some(definition),
+        TaskDefinitionType::PyprojectToml => {
+            discovered.definitions.pyproject_toml = Some(definition)
+        }
         _ => {}
     }
 }
@@ -52,7 +51,11 @@ fn handle_discovery_error(
     definition_type: TaskDefinitionType,
     discovered: &mut DiscoveredTasks,
 ) {
-    discovered.errors.push(format!("Failed to parse {}: {}", file_path.display(), error));
+    discovered.errors.push(format!(
+        "Failed to parse {}: {}",
+        file_path.display(),
+        error
+    ));
     let definition = TaskDefinitionFile {
         path: file_path,
         definition_type,
@@ -103,12 +106,7 @@ fn discover_makefile_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Resu
             );
         }
         Err(e) => {
-            handle_discovery_error(
-                e,
-                makefile_path,
-                TaskDefinitionType::Makefile,
-                discovered,
-            );
+            handle_discovery_error(e, makefile_path, TaskDefinitionType::Makefile, discovered);
         }
     }
 
@@ -137,12 +135,7 @@ fn discover_npm_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<()
             );
         }
         Err(e) => {
-            handle_discovery_error(
-                e,
-                package_json,
-                TaskDefinitionType::PackageJson,
-                discovered,
-            );
+            handle_discovery_error(e, package_json, TaskDefinitionType::PackageJson, discovered);
         }
     }
 
