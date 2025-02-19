@@ -11,15 +11,16 @@ pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
 
     let parent = path.parent().unwrap_or(path);
     let runner = match crate::runners::runners_package_json::detect_package_manager(parent) {
-         Some(runner) => runner,
-         None => {
-             #[cfg(test)] {
-                 if std::env::var("MOCK_NO_PM").is_ok() {
-                     return Ok(vec![]);
-                 }
-             }
-             TaskRunner::NodeNpm
-         }
+        Some(runner) => runner,
+        None => {
+            #[cfg(test)]
+            {
+                if std::env::var("MOCK_NO_PM").is_ok() {
+                    return Ok(vec![]);
+                }
+            }
+            TaskRunner::NodeNpm
+        }
     };
 
     let mut tasks = Vec::new();
@@ -40,7 +41,8 @@ pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
         }
     }
 
-    #[cfg(test)] {
+    #[cfg(test)]
+    {
         if std::env::var("MOCK_NO_PM").is_ok() {
             return Ok(vec![]);
         }
@@ -54,10 +56,10 @@ mod tests {
     use super::*;
     use crate::task_shadowing::{enable_mock, mock_executable, reset_mock};
     use crate::types::TaskRunner;
+    use std::env;
     use std::fs::File;
     use std::io::Write;
     use tempfile::TempDir;
-    use std::env;
 
     #[test]
     fn test_parse_package_json() {
@@ -75,7 +77,10 @@ mod tests {
             let mut lock_file = File::create(&lock_path).unwrap();
             lock_file.write_all(b"{}").unwrap();
             lock_file.sync_all().unwrap();
-            assert!(std::fs::metadata(&lock_path).is_ok(), "package-lock.json should exist");
+            assert!(
+                std::fs::metadata(&lock_path).is_ok(),
+                "package-lock.json should exist"
+            );
         }
 
         let content = r#"{

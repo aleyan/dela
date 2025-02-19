@@ -18,7 +18,7 @@ package-mode = false
 
 
 [tool.poetry.dependencies]
-python = ">=3.12,<3.13"
+python = ">=3.12"
 
 [tool.poetry.scripts]
 poetry-build = "assets_py.main:main_build"

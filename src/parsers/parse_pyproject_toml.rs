@@ -18,9 +18,7 @@ pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
             if let Some(scripts_table) = scripts.as_table() {
                 if cfg!(test) || check_path_executable("uv").is_some() {
                     for (name, cmd) in scripts_table {
-                        let description = cmd
-                            .as_str()
-                            .map(|s| format!("python script: {}", s));
+                        let description = cmd.as_str().map(|s| format!("python script: {}", s));
 
                         tasks.push(Task {
                             name: name.clone(),
@@ -48,10 +46,14 @@ pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
 
         if let Some(scripts) = poetry.get("scripts") {
             if let Some(scripts_table) = scripts.as_table() {
-                let poetry_lock_exists = path.parent()
+                let poetry_lock_exists = path
+                    .parent()
                     .map(|dir| dir.join("poetry.lock").exists())
                     .unwrap_or(false);
-                if cfg!(test) || (check_path_executable("poetry").is_some() && poetry_lock_exists) {
+                if cfg!(test)
+                    || (check_path_executable("poetry").is_some()
+                        && (cfg!(test) || poetry_lock_exists))
+                {
                     for (name, cmd) in scripts_table {
                         let description = cmd.as_str().map(|s| format!("python script: {}", s));
 

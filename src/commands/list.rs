@@ -4,7 +4,7 @@ use crate::task_shadowing::ShadowType;
 use crate::types::{Task, TaskFileStatus};
 use std::collections::HashMap;
 use std::env;
-use std::io;
+use std::io::Write;
 
 #[cfg(test)]
 macro_rules! test_println {
@@ -25,29 +25,59 @@ pub fn execute(verbose: bool) -> Result<(), String> {
         test_println!("Task definition files:");
         if let Some(makefile) = &discovered.definitions.makefile {
             match &makefile.status {
-                TaskFileStatus::Parsed => { test_println!("  ✓ Makefile: Found and parsed"); },
-                TaskFileStatus::NotImplemented => { test_println!("  ! Makefile: Found but parsing not yet implemented"); },
-                TaskFileStatus::ParseError(_e) => { test_println!("  ✗ Makefile: Error parsing: {}", _e); },
-                TaskFileStatus::NotReadable(_e) => { test_println!("  ✗ Makefile: Not readable: {}", _e); },
-                TaskFileStatus::NotFound => { test_println!("  - Makefile: Not found"); },
+                TaskFileStatus::Parsed => {
+                    test_println!("  ✓ Makefile: Found and parsed");
+                }
+                TaskFileStatus::NotImplemented => {
+                    test_println!("  ! Makefile: Found but parsing not yet implemented");
+                }
+                TaskFileStatus::ParseError(_e) => {
+                    test_println!("  ✗ Makefile: Error parsing: {}", _e);
+                }
+                TaskFileStatus::NotReadable(_e) => {
+                    test_println!("  ✗ Makefile: Not readable: {}", _e);
+                }
+                TaskFileStatus::NotFound => {
+                    test_println!("  - Makefile: Not found");
+                }
             }
         }
         if let Some(package_json) = &discovered.definitions.package_json {
             match &package_json.status {
-                TaskFileStatus::Parsed => { test_println!("  ✓ package.json: Found and parsed"); },
-                TaskFileStatus::NotImplemented => { test_println!("  ! package.json: Found but parsing not yet implemented"); },
-                TaskFileStatus::ParseError(_e) => { test_println!("  ✗ package.json: Error parsing: {}", _e); },
-                TaskFileStatus::NotReadable(_e) => { test_println!("  ✗ package.json: Not readable: {}", _e); },
-                TaskFileStatus::NotFound => { test_println!("  - package.json: Not found"); },
+                TaskFileStatus::Parsed => {
+                    test_println!("  ✓ package.json: Found and parsed");
+                }
+                TaskFileStatus::NotImplemented => {
+                    test_println!("  ! package.json: Found but parsing not yet implemented");
+                }
+                TaskFileStatus::ParseError(_e) => {
+                    test_println!("  ✗ package.json: Error parsing: {}", _e);
+                }
+                TaskFileStatus::NotReadable(_e) => {
+                    test_println!("  ✗ package.json: Not readable: {}", _e);
+                }
+                TaskFileStatus::NotFound => {
+                    test_println!("  - package.json: Not found");
+                }
             }
         }
         if let Some(pyproject_toml) = &discovered.definitions.pyproject_toml {
             match &pyproject_toml.status {
-                TaskFileStatus::Parsed => { test_println!("  ✓ pyproject.toml: Found and parsed"); },
-                TaskFileStatus::NotImplemented => { test_println!("  ! pyproject.toml: Found but parsing not yet implemented"); },
-                TaskFileStatus::ParseError(_e) => { test_println!("  ✗ pyproject.toml: Error parsing: {}", _e); },
-                TaskFileStatus::NotReadable(_e) => { test_println!("  ✗ pyproject.toml: Not readable: {}", _e); },
-                TaskFileStatus::NotFound => { test_println!("  - pyproject.toml: Not found"); },
+                TaskFileStatus::Parsed => {
+                    test_println!("  ✓ pyproject.toml: Found and parsed");
+                }
+                TaskFileStatus::NotImplemented => {
+                    test_println!("  ! pyproject.toml: Found but parsing not yet implemented");
+                }
+                TaskFileStatus::ParseError(_e) => {
+                    test_println!("  ✗ pyproject.toml: Error parsing: {}", _e);
+                }
+                TaskFileStatus::NotReadable(_e) => {
+                    test_println!("  ✗ pyproject.toml: Not readable: {}", _e);
+                }
+                TaskFileStatus::NotFound => {
+                    test_println!("  - pyproject.toml: Not found");
+                }
             }
         }
         test_println!("");
@@ -66,17 +96,22 @@ pub fn execute(verbose: bool) -> Result<(), String> {
     } else {
         Box::new(std::io::stdout())
     };
+
+    let mut write_line = |line: &str| -> Result<(), String> {
+        writeln!(writer, "{}", line).map_err(|e| format!("Failed to write output: {}", e))
+    };
+
     if tasks_by_file.is_empty() {
-        test_println!("No tasks found in the current directory.");
+        write_line("No tasks found in the current directory.")?;
     } else {
         // Collect all shadow info for footer
         let mut shadow_infos = Vec::new();
 
         for (_file, tasks) in tasks_by_file {
-            test_println!("\nTasks from {}:", _file);
+            write_line(&format!("\nTasks from {}:", _file))?;
             for task in tasks {
-                format_task_output(task, &mut *writer)
-                    .map_err(|e| format!("Failed to write task output: {}", e))?;
+                let output = format_task_string(task);
+                write_line(&output)?;
                 if let Some(ref _shadow_type) = task.shadowed_by {
                     if let Some(info) = format_shadow_info(task) {
                         shadow_infos.push(info);
@@ -87,25 +122,25 @@ pub fn execute(verbose: bool) -> Result<(), String> {
 
         // Print shadow info footer
         if !shadow_infos.is_empty() {
-            test_println!("\nShadowed tasks:");
-            for _info in shadow_infos {
-                test_println!("  {}", _info);
+            write_line("\nShadowed tasks:")?;
+            for info in shadow_infos {
+                write_line(&format!("  {}", info))?;
             }
         }
     }
 
     // Show any errors encountered during discovery
     if !discovered.errors.is_empty() {
-        test_println!("\nErrors encountered:");
-        for _error in discovered.errors {
-            test_println!("  • {}", _error);
+        write_line("\nErrors encountered:")?;
+        for error in discovered.errors {
+            write_line(&format!("  • {}", error))?;
         }
     }
 
     Ok(())
 }
 
-fn format_task_output<W: io::Write + ?Sized>(task: &Task, writer: &mut W) -> io::Result<()> {
+fn format_task_string(task: &Task) -> String {
     let shadow_symbol = if task.shadowed_by.is_some() {
         match task.shadowed_by.as_ref().unwrap() {
             ShadowType::ShellBuiltin(_) => " †",
@@ -115,13 +150,16 @@ fn format_task_output<W: io::Write + ?Sized>(task: &Task, writer: &mut W) -> io:
         ""
     };
 
-    let mut output = format!("  • {}{}", task.name, shadow_symbol);
+    let mut output = format!("  • {}", task.name);
 
     // Add runner info with short name
     if !is_runner_available(&task.runner) {
-        output.push_str(&format!(" (requires {}, not found)", task.runner.short_name()));
+        output.push_str(&format!(
+            " (requires {}, not found)",
+            task.runner.short_name()
+        ));
     } else {
-        output.push_str(&format!(" ({})", task.runner.short_name()));
+        output.push_str(&format!(" ({}){}", task.runner.short_name(), shadow_symbol));
     }
 
     // Add description if present
@@ -129,7 +167,7 @@ fn format_task_output<W: io::Write + ?Sized>(task: &Task, writer: &mut W) -> io:
         output.push_str(&format!(" - {}", desc));
     }
 
-    writeln!(writer, "{}", output)
+    output
 }
 
 // Helper function to format shadow info
@@ -240,7 +278,10 @@ mod tests {
 
         // Add runner info with short name
         if !is_runner_available(&task.runner) {
-            output.push_str(&format!(" (requires {}, not found)", task.runner.short_name()));
+            output.push_str(&format!(
+                " (requires {}, not found)",
+                task.runner.short_name()
+            ));
         } else {
             output.push_str(&format!(" ({})", task.runner.short_name()));
         }

@@ -1,9 +1,9 @@
+use once_cell::sync::Lazy;
+use std::collections::HashSet;
 use std::env;
 use std::path::Path;
 use std::process::Command;
 use std::sync::Mutex;
-use std::collections::HashSet;
-use once_cell::sync::Lazy;
 
 // Global mock state for tests
 static MOCK_EXECUTABLES: Lazy<Mutex<HashSet<String>>> = Lazy::new(|| Mutex::new(HashSet::new()));
