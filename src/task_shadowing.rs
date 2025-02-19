@@ -14,7 +14,7 @@ pub fn mock_executable(name: &str) {
     MOCK_EXECUTABLES.lock().unwrap().insert(name.to_string());
 }
 
-#[cfg(test)]
+#[allow(dead_code)]
 pub fn unmock_executable(name: &str) {
     MOCK_EXECUTABLES.lock().unwrap().remove(name);
 }
@@ -24,7 +24,7 @@ pub fn enable_mock() {
     *USE_MOCK.lock().unwrap() = true;
 }
 
-#[cfg(test)]
+#[allow(dead_code)]
 pub fn disable_mock() {
     *USE_MOCK.lock().unwrap() = false;
 }

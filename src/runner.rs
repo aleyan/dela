@@ -1,5 +1,6 @@
 use crate::task_shadowing::check_path_executable;
 use crate::types::TaskRunner;
+#[cfg(test)]
 use serial_test::serial;
 
 pub fn is_runner_available(runner: &TaskRunner) -> bool {
