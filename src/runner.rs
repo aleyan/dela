@@ -1,5 +1,6 @@
 use crate::task_shadowing::check_path_executable;
 use crate::types::TaskRunner;
+use serial_test::serial;
 
 pub fn is_runner_available(runner: &TaskRunner) -> bool {
     match runner {
@@ -12,7 +13,6 @@ pub fn is_runner_available(runner: &TaskRunner) -> bool {
         TaskRunner::PythonPoetry => check_path_executable("poetry").is_some(),
         TaskRunner::PythonPoe => check_path_executable("poe").is_some(),
         TaskRunner::ShellScript => true, // Shell scripts don't need a runner
-        _ => false,
     }
 }
 
@@ -22,12 +22,14 @@ mod tests {
     use crate::task_shadowing::{enable_mock, mock_executable, reset_mock};
 
     #[test]
+    #[serial]
     fn test_shell_script_always_available() {
         // Shell scripts should always be available as they don't need a runner
         assert!(is_runner_available(&TaskRunner::ShellScript));
     }
 
     #[test]
+    #[serial]
     fn test_make_availability() {
         reset_mock();
         enable_mock();
@@ -38,6 +40,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_node_package_managers() {
         // Test all package managers
         let npm_available = check_path_executable("npm").is_some();
@@ -51,8 +54,8 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_python_runners() {
-        // Enable mocking
         reset_mock();
         enable_mock();
 

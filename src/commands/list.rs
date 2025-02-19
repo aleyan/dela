@@ -73,7 +73,7 @@ pub fn execute(verbose: bool) -> Result<(), String> {
             for task in tasks {
                 format_task_output(task, &mut std::io::stdout())
                     .map_err(|e| format!("Failed to write task output: {}", e))?;
-                if let Some(ref shadow_type) = task.shadowed_by {
+                if let Some(ref _shadow_type) = task.shadowed_by {
                     if let Some(info) = format_shadow_info(task) {
                         shadow_infos.push(info);
                     }

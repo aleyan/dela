@@ -122,6 +122,7 @@ impl TaskRunner {
         }
     }
 
+    #[allow(dead_code)]
     pub fn name(&self) -> &'static str {
         match self {
             TaskRunner::Make => "Make",

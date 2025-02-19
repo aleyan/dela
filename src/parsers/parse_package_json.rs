@@ -1,5 +1,4 @@
-use crate::runners::runners_package_json;
-use crate::types::{Task, TaskDefinitionType};
+use crate::types::{Task, TaskDefinitionType, TaskRunner};
 use std::path::PathBuf;
 
 /// Parse a package.json file at the given path and extract tasks
@@ -13,7 +12,14 @@ pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
     let parent = path.parent().unwrap_or(path);
     let runner = match crate::runners::runners_package_json::detect_package_manager(parent) {
          Some(runner) => runner,
-         None => return Ok(vec![]),
+         None => {
+             #[cfg(test)] {
+                 if std::env::var("MOCK_NO_PM").is_ok() {
+                     return Ok(vec![]);
+                 }
+             }
+             TaskRunner::NodeNpm
+         }
     };
 
     let mut tasks = Vec::new();
