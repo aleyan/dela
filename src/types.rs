@@ -1,7 +1,53 @@
-use crate::package_manager::PackageManager;
 use crate::task_shadowing::ShadowType;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+
+/// Different types of task definition files supported by dela
+#[derive(Debug, Clone, PartialEq)]
+pub enum TaskDefinitionType {
+    /// Makefile
+    Makefile,
+    /// package.json scripts
+    PackageJson,
+    /// pyproject.toml scripts
+    PyprojectToml,
+    /// Shell script
+    ShellScript,
+}
+
+/// Different types of task runners supported by dela.
+/// Each variant represents a specific task runner that can execute tasks.
+/// The runner is selected based on the task definition file type and available commands.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TaskRunner {
+    /// Make tasks from Makefile
+    /// Used when a Makefile is present in the project root
+    Make,
+    /// Node.js tasks using npm
+    /// Selected when package.json is present with package-lock.json, or npm is the only available runner
+    NodeNpm,
+    /// Node.js tasks using yarn
+    /// Selected when yarn.lock is present, or yarn is the preferred available runner
+    NodeYarn,
+    /// Node.js tasks using pnpm
+    /// Selected when pnpm-lock.yaml is present, or pnpm is the preferred available runner
+    NodePnpm,
+    /// Node.js tasks using bun
+    /// Selected when bun.lockb is present, or bun is the preferred available runner
+    NodeBun,
+    /// Python tasks using uv
+    /// Selected when .venv directory is present, or uv is the preferred available runner
+    PythonUv,
+    /// Python tasks using poetry
+    /// Selected when poetry.lock is present, or poetry is the preferred available runner
+    PythonPoetry,
+    /// Python tasks using poethepoet
+    /// Selected when poe is available and no other Python runner is preferred
+    PythonPoe,
+    /// Shell script tasks
+    /// Used for direct execution of shell scripts
+    ShellScript,
+}
 
 /// Status of a task definition file
 #[allow(dead_code)]
@@ -24,8 +70,8 @@ pub enum TaskFileStatus {
 pub struct TaskDefinitionFile {
     /// Path to the task definition file
     pub path: PathBuf,
-    /// Type of the task runner for this file
-    pub runner: TaskRunner,
+    /// Type of the task definition file
+    pub definition_type: TaskDefinitionType,
     /// Status of the file
     pub status: TaskFileStatus,
 }
@@ -48,6 +94,8 @@ pub struct Task {
     pub name: String,
     /// Path to the file containing this task
     pub file_path: PathBuf,
+    /// The type of definition file this task came from
+    pub definition_type: TaskDefinitionType,
     /// The type of runner needed for this task
     pub runner: TaskRunner,
     /// Original task name in the source file (might be different from name)
@@ -58,39 +106,55 @@ pub struct Task {
     pub shadowed_by: Option<ShadowType>,
 }
 
-/// Different types of task runners supported by dela
-#[allow(dead_code)]
-#[derive(Debug, Clone, PartialEq)]
-pub enum TaskRunner {
-    /// Make tasks from Makefile
-    Make,
-    /// Node.js package manager scripts from package.json
-    Node(Option<PackageManager>),
-    /// Python scripts from pyproject.toml using uv
-    PythonUv,
-    /// Python scripts from pyproject.toml using poetry
-    PythonPoetry,
-    /// Direct shell script execution
-    ShellScript,
-    // TODO(DTKT-52): Add plugin support for custom runners
-}
-
 impl TaskRunner {
     /// Get the command to run a task with this runner
     pub fn get_command(&self, task: &Task) -> String {
         match self {
             TaskRunner::Make => format!("make {}", task.source_name),
-            TaskRunner::Node(Some(pkg_mgr)) => pkg_mgr.get_run_command(&task.source_name),
-            TaskRunner::Node(None) => format!("npm run {}", task.source_name), // Fallback to npm if no package manager detected
+            TaskRunner::NodeNpm => format!("npm run {}", task.source_name),
+            TaskRunner::NodeYarn => format!("yarn run {}", task.source_name),
+            TaskRunner::NodePnpm => format!("pnpm run {}", task.source_name),
+            TaskRunner::NodeBun => format!("bun run {}", task.source_name),
             TaskRunner::PythonUv => format!("uv run {}", task.source_name),
             TaskRunner::PythonPoetry => format!("poetry run {}", task.source_name),
+            TaskRunner::PythonPoe => format!("poe {}", task.source_name),
             TaskRunner::ShellScript => format!("./{}", task.source_name),
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn name(&self) -> &'static str {
+        match self {
+            TaskRunner::Make => "Make",
+            TaskRunner::NodeNpm => "NPM",
+            TaskRunner::NodeYarn => "Yarn",
+            TaskRunner::NodePnpm => "PNPM",
+            TaskRunner::NodeBun => "Bun",
+            TaskRunner::PythonUv => "UV",
+            TaskRunner::PythonPoetry => "Poetry",
+            TaskRunner::PythonPoe => "Poe",
+            TaskRunner::ShellScript => "Shell Script",
+        }
+    }
+
+    pub fn short_name(&self) -> &'static str {
+        match self {
+            TaskRunner::Make => "make",
+            TaskRunner::NodeNpm => "npm",
+            TaskRunner::NodeYarn => "yarn",
+            TaskRunner::NodePnpm => "pnpm",
+            TaskRunner::NodeBun => "bun",
+            TaskRunner::PythonUv => "uv",
+            TaskRunner::PythonPoetry => "poetry",
+            TaskRunner::PythonPoe => "poe",
+            TaskRunner::ShellScript => "sh",
         }
     }
 }
 
 /// Result of task discovery in a directory
 #[derive(Debug, Default)]
+#[allow(dead_code)]
 pub struct DiscoveredTasks {
     /// All tasks found, grouped by name
     pub tasks: Vec<Task>,

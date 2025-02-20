@@ -47,17 +47,17 @@ pub fn prompt_for_task(task: &Task) -> Result<AllowDecision, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{Task, TaskRunner};
+    use crate::types::{Task, TaskDefinitionType, TaskRunner};
     use std::path::PathBuf;
 
-    // Helper function to create a test task
-    fn create_test_task() -> Task {
+    fn create_test_task(name: &str) -> Task {
         Task {
-            name: "test-task".to_string(),
-            description: Some("A test task".to_string()),
+            name: name.to_string(),
             file_path: PathBuf::from("Makefile"),
+            definition_type: TaskDefinitionType::Makefile,
             runner: TaskRunner::Make,
-            source_name: "test-task".to_string(),
+            source_name: name.to_string(),
+            description: None,
             shadowed_by: None,
         }
     }
@@ -76,7 +76,7 @@ mod tests {
 
     #[test]
     fn test_prompt_allow_once() {
-        let task = create_test_task();
+        let task = create_test_task("test-task");
         let result = mock_prompt_for_task("1", &task);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), AllowDecision::Allow(AllowScope::Once));
@@ -84,7 +84,7 @@ mod tests {
 
     #[test]
     fn test_prompt_allow_task() {
-        let task = create_test_task();
+        let task = create_test_task("test-task");
         let result = mock_prompt_for_task("2", &task);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), AllowDecision::Allow(AllowScope::Task));
@@ -92,7 +92,7 @@ mod tests {
 
     #[test]
     fn test_prompt_allow_file() {
-        let task = create_test_task();
+        let task = create_test_task("test-task");
         let result = mock_prompt_for_task("3", &task);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), AllowDecision::Allow(AllowScope::File));
@@ -100,7 +100,7 @@ mod tests {
 
     #[test]
     fn test_prompt_allow_directory() {
-        let task = create_test_task();
+        let task = create_test_task("test-task");
         let result = mock_prompt_for_task("4", &task);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), AllowDecision::Allow(AllowScope::Directory));
@@ -108,7 +108,7 @@ mod tests {
 
     #[test]
     fn test_prompt_deny() {
-        let task = create_test_task();
+        let task = create_test_task("test-task");
         let result = mock_prompt_for_task("5", &task);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), AllowDecision::Deny);
@@ -116,7 +116,7 @@ mod tests {
 
     #[test]
     fn test_prompt_invalid_input() {
-        let task = create_test_task();
+        let task = create_test_task("test-task");
         let result = mock_prompt_for_task("invalid", &task);
         assert!(result.is_err());
         assert_eq!(

@@ -1,17 +1,17 @@
+use crate::types::{Task, TaskDefinitionType, TaskRunner};
 use makefile_lossless::Makefile;
-use std::fs::File;
 use std::path::Path;
-
-use crate::types::{Task, TaskDefinitionFile, TaskFileStatus, TaskRunner};
 
 /// Parse a Makefile at the given path and extract tasks
 pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
-    let file = File::open(path).map_err(|e| format!("Failed to open Makefile: {}", e))?;
+    let content =
+        std::fs::read_to_string(path).map_err(|e| format!("Failed to read Makefile: {}", e))?;
 
-    let makefile =
-        Makefile::read(file).map_err(|e| format!("Failed to read/parse Makefile: {}", e))?;
+    let makefile = Makefile::read(std::io::Cursor::new(content))
+        .map_err(|e| format!("Failed to parse Makefile: {}", e))?;
 
     let mut tasks = Vec::new();
+
     for rule in makefile.rules() {
         // Skip pattern rules and those starting with '.'
         let targets = rule.targets().collect::<Vec<_>>();
@@ -19,59 +19,45 @@ pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
             continue;
         }
 
-        let target = &targets[0];
-        let description = extract_task_description(&rule);
+        let name = targets[0].to_string();
+        let description = rule.recipes().collect::<Vec<_>>().first().and_then(|line| {
+            if line.starts_with('#') {
+                Some(line.trim_start_matches('#').trim().to_string())
+            } else if line.contains("@echo") {
+                let parts: Vec<&str> = line.split("@echo").collect();
+                if parts.len() > 1 {
+                    Some(parts[1].trim().trim_matches('"').to_string())
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        });
 
         tasks.push(Task {
-            name: target.to_string(),
+            name: name.clone(),
             file_path: path.to_path_buf(),
+            definition_type: TaskDefinitionType::Makefile,
             runner: TaskRunner::Make,
-            source_name: target.to_string(),
+            source_name: name,
             description,
-            shadowed_by: None, // This will be filled in by task_discovery
+            shadowed_by: None,
         });
     }
 
     Ok(tasks)
 }
 
-/// Create a TaskDefinitionFile for a Makefile
-pub fn create_definition(path: &Path, status: TaskFileStatus) -> TaskDefinitionFile {
-    TaskDefinitionFile {
-        path: path.to_path_buf(),
-        runner: TaskRunner::Make,
-        status,
-    }
-}
-
-/// Extract a task description from a rule's commands
-fn extract_task_description(rule: &makefile_lossless::Rule) -> Option<String> {
-    // Look for echo commands that might be descriptions
-    for cmd in rule.recipes() {
-        let cmd = cmd.trim();
-        if cmd.starts_with("@echo") || cmd.starts_with("echo") {
-            let desc = cmd
-                .trim_start_matches("@echo")
-                .trim_start_matches("echo")
-                .trim()
-                .trim_matches('"')
-                .trim_matches('\'')
-                .to_string();
-            if !desc.is_empty() {
-                return Some(desc);
-            }
-        }
-    }
-    None
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs::File;
     use std::io::Write;
+    use std::path::PathBuf;
     use tempfile::TempDir;
 
-    fn create_test_makefile(dir: &Path, content: &str) -> std::path::PathBuf {
+    fn create_test_makefile(dir: &Path, content: &str) -> PathBuf {
         let makefile_path = dir.join("Makefile");
         let mut file = File::create(&makefile_path).unwrap();
         writeln!(file, "{}", content).unwrap();

@@ -14,6 +14,14 @@ fn allowlist_path() -> Result<PathBuf, String> {
 /// If the file does not exist, return an empty allowlist.
 pub fn load_allowlist() -> Result<Allowlist, String> {
     let path = allowlist_path()?;
+    let dela_dir = path.parent().ok_or("Invalid allowlist path")?;
+
+    // Check if ~/.dela exists
+    if !dela_dir.exists() {
+        return Err("Dela is not initialized. Please run 'dela init' first.".to_string());
+    }
+
+    // If allowlist file doesn't exist but ~/.dela does, return empty allowlist
     if !path.exists() {
         return Ok(Allowlist::default());
     }
@@ -55,10 +63,10 @@ fn path_matches(task_path: &Path, allowlist_path: &Path, allow_subdirs: bool) ->
 /// Check if a given task is allowed, based on the loaded allowlist
 /// If the task is not in the allowlist, prompt the user for a decision
 pub fn check_task_allowed(task: &Task) -> Result<bool, String> {
-    // 1. Load the allowlist from disk
+    // Only proceed with allowlist operations if dela is initialized
     let mut allowlist = load_allowlist()?;
 
-    // 2. Check each entry to see if it matches
+    // Check each entry to see if it matches
     for entry in &allowlist.entries {
         match entry.scope {
             AllowScope::Deny => {
@@ -92,7 +100,7 @@ pub fn check_task_allowed(task: &Task) -> Result<bool, String> {
         }
     }
 
-    // 3. If no matching entry found, prompt the user
+    // If no matching entry found, prompt the user
     match prompt::prompt_for_task(task)? {
         AllowDecision::Allow(scope) => {
             match scope {
@@ -137,11 +145,23 @@ pub fn check_task_allowed(task: &Task) -> Result<bool, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::TaskRunner;
+    use crate::types::{Task, TaskDefinitionType, TaskRunner};
     use serial_test::serial;
     use std::env;
     use std::fs;
     use tempfile::TempDir;
+
+    fn create_test_task(name: &str, file_path: PathBuf) -> Task {
+        Task {
+            name: name.to_string(),
+            file_path,
+            definition_type: TaskDefinitionType::Makefile,
+            runner: TaskRunner::Make,
+            source_name: name.to_string(),
+            description: None,
+            shadowed_by: None,
+        }
+    }
 
     fn setup_test_env() -> (TempDir, Task) {
         let temp_dir = TempDir::new().unwrap();
@@ -151,14 +171,7 @@ mod tests {
         fs::create_dir_all(temp_dir.path().join(".dela"))
             .expect("Failed to create .dela directory");
 
-        let task = Task {
-            name: "test-task".to_string(),
-            description: Some("A test task".to_string()),
-            file_path: PathBuf::from("Makefile"),
-            runner: TaskRunner::Make,
-            source_name: "test-task".to_string(),
-            shadowed_by: None,
-        };
+        let task = create_test_task("test-task", PathBuf::from("Makefile"));
 
         (temp_dir, task)
     }
