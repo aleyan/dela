@@ -1,9 +1,9 @@
+#[cfg(test)]
+use crate::environment::{reset_to_real_environment, set_test_environment, TestEnvironment};
 use crate::task_shadowing::check_path_executable;
 use crate::types::TaskRunner;
 #[cfg(test)]
 use serial_test::serial;
-#[cfg(test)]
-use crate::environment::{TestEnvironment, set_test_environment, reset_to_real_environment};
 
 pub fn is_runner_available(runner: &TaskRunner) -> bool {
     match runner {
