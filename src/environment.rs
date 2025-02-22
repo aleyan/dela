@@ -35,6 +35,7 @@ pub struct TestEnvironment {
     executables: HashSet<String>,
 }
 
+#[cfg(test)]
 impl TestEnvironment {
     pub fn new() -> Self {
         Self::default()

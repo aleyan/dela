@@ -3,7 +3,6 @@ use crate::environment::ENVIRONMENT;
 use crate::types::ShadowType;
 use once_cell::sync::Lazy;
 use std::collections::HashSet;
-use std::process::Command;
 use std::sync::Mutex;
 
 // Global mock state for tests
@@ -59,7 +58,7 @@ pub fn check_path_executable(name: &str) -> Option<ShadowType> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{reset_to_real_environment, set_test_environment, TestEnvironment};
+    use crate::environment::{reset_to_real_environment, set_test_environment, TestEnvironment};
     use serial_test::serial;
 
     #[test]
