@@ -109,7 +109,7 @@ if [ $# -eq 1 ]; then
     shell=$1
     # Validate shell argument
     case $shell in
-        zsh|bash|fish|pwsh|noinit)
+        zsh|bash|fish|pwsh|noinit|unit)
             log "Testing ${shell} shell integration..."
             run_shell_tests "${shell}"
             ;;
@@ -120,7 +120,7 @@ if [ $# -eq 1 ]; then
     esac
 else
     # Test all shells
-    for shell in noinit zsh bash fish pwsh; do
+    for shell in unit noinit zsh bash fish pwsh; do
         log "Testing ${shell} shell integration..."
         run_shell_tests "${shell}"
     done
