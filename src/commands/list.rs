@@ -1,6 +1,6 @@
 use crate::runner::is_runner_available;
 use crate::task_discovery;
-use crate::task_shadowing::ShadowType;
+use dela::builtins::ShadowType;
 use crate::types::{Task, TaskFileStatus};
 use std::collections::HashMap;
 use std::env;

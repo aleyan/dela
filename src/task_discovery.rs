@@ -209,7 +209,7 @@ fn discover_shell_script_tasks(dir: &Path, discovered: &mut DiscoveredTasks) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::task_shadowing::ShadowType;
+    use dela::builtins::ShadowType;
     use crate::task_shadowing::{enable_mock, mock_executable, reset_mock};
     use std::fs::File;
     use std::io::Write;

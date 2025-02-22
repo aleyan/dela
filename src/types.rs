@@ -1,4 +1,4 @@
-use crate::task_shadowing::ShadowType;
+use dela::builtins::ShadowType;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
