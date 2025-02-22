@@ -2,7 +2,7 @@ use once_cell::sync::Lazy;
 use std::collections::HashSet;
 use std::process::Command;
 use std::sync::Mutex;
-use dela::builtins::{check_shell_builtin, ShadowType};
+use crate::builtins::{check_shell_builtin, ShadowType};
 
 // Global mock state for tests
 static MOCK_EXECUTABLES: Lazy<Mutex<HashSet<String>>> = Lazy::new(|| Mutex::new(HashSet::new()));

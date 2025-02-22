@@ -1,4 +1,4 @@
-use dela::builtins::ShadowType;
+use crate::builtins::ShadowType;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
