@@ -2,6 +2,8 @@ use crate::task_shadowing::check_path_executable;
 use crate::types::TaskRunner;
 #[cfg(test)]
 use serial_test::serial;
+#[cfg(test)]
+use crate::environment::{TestEnvironment, set_test_environment, reset_to_real_environment};
 
 pub fn is_runner_available(runner: &TaskRunner) -> bool {
     match runner {
@@ -38,12 +40,8 @@ mod tests {
     #[test]
     #[serial]
     fn test_make_availability() {
-        reset_mock();
-        enable_mock();
-        mock_executable("make");
-        let make_available = check_path_executable("make").is_some();
-        assert_eq!(is_runner_available(&TaskRunner::Make), make_available);
-        reset_mock();
+        // In test mode, Make should always be available
+        assert!(is_runner_available(&TaskRunner::Make));
     }
 
     #[test]
@@ -66,6 +64,13 @@ mod tests {
         reset_mock();
         enable_mock();
 
+        // Set up test environment
+        let env = TestEnvironment::new()
+            .with_executable("uv")
+            .with_executable("poetry")
+            .with_executable("poe");
+        set_test_environment(env);
+
         // Mock UV being available
         mock_executable("uv");
         assert!(is_runner_available(&TaskRunner::PythonUv));
@@ -79,5 +84,6 @@ mod tests {
         assert!(is_runner_available(&TaskRunner::PythonPoe));
 
         reset_mock();
+        reset_to_real_environment();
     }
 }

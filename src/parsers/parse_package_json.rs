@@ -54,22 +54,24 @@ pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::environment::{reset_to_real_environment, set_test_environment, TestEnvironment};
     use crate::task_shadowing::{enable_mock, mock_executable, reset_mock};
-    use crate::types::TaskRunner;
+    use serial_test::serial;
     use std::env;
     use std::fs::File;
     use std::io::Write;
     use tempfile::TempDir;
 
     #[test]
+    #[serial]
     fn test_parse_package_json() {
         let temp_dir = TempDir::new().unwrap();
         let package_json_path = temp_dir.path().join("package.json");
 
-        // Enable mocking and mock npm
+        // Enable mocking and set up test environment
         reset_mock();
         enable_mock();
-        mock_executable("npm");
+        set_test_environment(TestEnvironment::new().with_executable("npm"));
 
         // Create and flush package-lock.json to ensure npm is selected
         {
@@ -109,6 +111,7 @@ mod tests {
         assert_eq!(build_task.description, Some("tsc".to_string()));
 
         reset_mock();
+        reset_to_real_environment();
     }
 
     #[test]

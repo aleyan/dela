@@ -145,15 +145,17 @@ mod tests {
     fn test_detect_package_manager_multiple_available() {
         let temp_dir = TempDir::new().unwrap();
 
-        // Enable mocking
+        // Enable mocking and set up test environment
         reset_mock();
         enable_mock();
 
-        // Mock multiple package managers being available
-        mock_executable("npm");
-        mock_executable("bun");
-        mock_executable("pnpm");
-        mock_executable("yarn");
+        // Set up test environment with all package managers
+        let env = TestEnvironment::new()
+            .with_executable("npm")
+            .with_executable("bun")
+            .with_executable("pnpm")
+            .with_executable("yarn");
+        set_test_environment(env);
 
         // Test preference order with no lock files
         assert_eq!(
@@ -169,5 +171,6 @@ mod tests {
         );
 
         reset_mock();
+        reset_to_real_environment();
     }
 }

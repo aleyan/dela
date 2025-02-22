@@ -14,34 +14,25 @@ pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
 /// Detect which Python package manager to use based on lock files and available commands
 #[allow(dead_code)]
 pub fn detect_package_manager(dir: &Path) -> Option<TaskRunner> {
-    // First check for available package managers
+    // Check for available package managers
     let has_poetry = check_path_executable("poetry").is_some();
     let has_uv = check_path_executable("uv").is_some();
     let has_poe = check_path_executable("poe").is_some();
 
-    // If only one package manager is available, use it
-    let available_count = [has_poetry, has_uv, has_poe].iter().filter(|&&x| x).count();
-    if available_count == 1 {
-        if has_poetry {
-            return Some(TaskRunner::PythonPoetry);
-        }
-        if has_uv {
-            return Some(TaskRunner::PythonUv);
-        }
-        if has_poe {
-            return Some(TaskRunner::PythonPoe);
-        }
+    // If no package managers are available, return None
+    if !has_poetry && !has_uv && !has_poe {
+        return None;
     }
 
-    // If multiple package managers are available, use lock files to disambiguate
+    // Check for lock files first
     if dir.join("poetry.lock").exists() && has_poetry {
         return Some(TaskRunner::PythonPoetry);
     }
-    if dir.join(".venv").exists() && has_uv {
+    if dir.join("uv.lock").exists() && has_uv {
         return Some(TaskRunner::PythonUv);
     }
 
-    // If no lock file but multiple package managers, use preferred order
+    // If no lock files, use preferred order
     if has_poetry {
         Some(TaskRunner::PythonPoetry)
     } else if has_uv {
@@ -56,6 +47,7 @@ pub fn detect_package_manager(dir: &Path) -> Option<TaskRunner> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::environment::{TestEnvironment, set_test_environment, reset_to_real_environment};
     use crate::task_shadowing::{enable_mock, mock_executable, reset_mock};
     use std::fs::{self, File};
     use tempfile::TempDir;
@@ -64,9 +56,8 @@ mod tests {
         File::create(dir.join("poetry.lock")).unwrap();
     }
 
-    fn create_venv(dir: &Path) {
-        fs::create_dir_all(dir.join(".venv")).unwrap();
-        File::create(dir.join(".venv/pyvenv.cfg")).unwrap();
+    fn create_uv_lock(dir: &Path) {
+        File::create(dir.join("uv.lock")).unwrap();
     }
 
     #[test]
@@ -79,23 +70,32 @@ mod tests {
         enable_mock();
         mock_executable("poetry");
 
+        // Set up test environment
+        let env = TestEnvironment::new().with_executable("poetry");
+        set_test_environment(env);
+
         assert_eq!(
             detect_package_manager(temp_dir.path()),
             Some(TaskRunner::PythonPoetry)
         );
 
         reset_mock();
+        reset_to_real_environment();
     }
 
     #[test]
     fn test_detect_package_manager_with_venv() {
         let temp_dir = TempDir::new().unwrap();
-        create_venv(temp_dir.path());
+        create_uv_lock(temp_dir.path());
 
         // Enable mocking and mock UV
         reset_mock();
         enable_mock();
         mock_executable("uv");
+
+        // Set up test environment
+        let env = TestEnvironment::new().with_executable("uv");
+        set_test_environment(env);
 
         assert_eq!(
             detect_package_manager(temp_dir.path()),
@@ -103,16 +103,20 @@ mod tests {
         );
 
         reset_mock();
+        reset_to_real_environment();
     }
 
     #[test]
     fn test_detect_package_manager_no_markers() {
         let temp_dir = TempDir::new().unwrap();
 
-        // Enable mocking and mock poetry
+        // Enable mocking and set up test environment
         reset_mock();
         enable_mock();
-        mock_executable("poetry");
+
+        // Set up test environment with poetry
+        let env = TestEnvironment::new().with_executable("poetry");
+        set_test_environment(env);
 
         assert_eq!(
             detect_package_manager(temp_dir.path()),
@@ -120,5 +124,6 @@ mod tests {
         );
 
         reset_mock();
+        reset_to_real_environment();
     }
 }
