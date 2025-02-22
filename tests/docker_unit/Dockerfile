@@ -1,15 +1,26 @@
-# Build stage using common builder
-FROM dela-builder AS builder
+FROM rust:alpine3.21
 
-# Test environment
-FROM alpine:3.21
-
-# Install minimal required packages for testing
+# Install build dependencies
 RUN apk add --no-cache \
+    musl-dev \
+    gcc \
+    make \
+    openssl-dev \
+    pkgconfig \
     bash
 
-# Copy the compiled binary from the builder stage
-COPY --from=builder /app/target/release/dela /usr/local/bin/dela
+# Create test user and directory
+RUN adduser -D testuser
+WORKDIR /home/testuser
+
+# Copy project files
+COPY . .
+
+# Set ownership
+RUN chown -R testuser:testuser .
+
+# Switch to test user
+USER testuser
 
 # Entry point script will be mounted
-CMD ["bash", "/home/testuser/test_unit.sh"]
+CMD ["bash", "/home/testuser/test_script.sh"]
