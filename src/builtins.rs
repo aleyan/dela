@@ -1,14 +1,6 @@
 use std::env;
 use std::path::Path;
-
-/// Information about what shadows a task name
-#[derive(Debug, Clone, PartialEq)]
-pub enum ShadowType {
-    /// Task is shadowed by a shell builtin
-    ShellBuiltin(String), // shell name
-    /// Task is shadowed by an executable in PATH
-    PathExecutable(String), // full path
-}
+use crate::types::ShadowType;
 
 /// Check if a name is a shell builtin
 pub fn check_shell_builtin(name: &str) -> Option<ShadowType> {

@@ -2,7 +2,7 @@ use crate::parsers::{parse_makefile, parse_package_json, parse_pyproject_toml};
 use crate::task_shadowing::check_shadowing;
 use crate::types::{
     DiscoveredTaskDefinitions, Task, TaskDefinitionFile, TaskDefinitionType, TaskFileStatus,
-    TaskRunner,
+    TaskRunner, ShadowType,
 };
 use std::fs;
 use std::path::Path;
@@ -209,7 +209,6 @@ fn discover_shell_script_tasks(dir: &Path, discovered: &mut DiscoveredTasks) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::builtins::ShadowType;
     use crate::task_shadowing::{enable_mock, mock_executable, reset_mock};
     use std::fs::File;
     use std::io::Write;
