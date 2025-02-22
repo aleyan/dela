@@ -2,7 +2,6 @@ use crate::parsers::{parse_makefile, parse_package_json, parse_pyproject_toml};
 use crate::task_shadowing::check_shadowing;
 use crate::types::{
     DiscoveredTaskDefinitions, Task, TaskDefinitionFile, TaskDefinitionType, TaskFileStatus, TaskRunner,
-    ShadowType,
 };
 use std::fs;
 use std::path::Path;
@@ -211,6 +210,7 @@ mod tests {
     use super::*;
     use crate::environment::{reset_to_real_environment, set_test_environment, TestEnvironment};
     use crate::task_shadowing::{enable_mock, mock_executable, reset_mock};
+    use crate::types::ShadowType;
     use serial_test::serial;
     use std::fs::File;
     use std::io::Write;
