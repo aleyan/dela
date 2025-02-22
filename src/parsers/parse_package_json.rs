@@ -55,7 +55,7 @@ pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
 mod tests {
     use super::*;
     use crate::environment::{reset_to_real_environment, set_test_environment, TestEnvironment};
-    use crate::task_shadowing::{enable_mock, mock_executable, reset_mock};
+    use crate::task_shadowing::{enable_mock, reset_mock};
     use serial_test::serial;
     use std::env;
     use std::fs::File;
@@ -122,7 +122,6 @@ mod tests {
         // Enable mocking and mock npm
         reset_mock();
         enable_mock();
-        mock_executable("npm");
 
         // Create package-lock.json to ensure npm is selected
         File::create(temp_dir.path().join("package-lock.json")).unwrap();

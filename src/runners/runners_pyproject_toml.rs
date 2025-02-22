@@ -49,7 +49,7 @@ mod tests {
     use super::*;
     use crate::environment::{reset_to_real_environment, set_test_environment, TestEnvironment};
     use crate::task_shadowing::{enable_mock, mock_executable, reset_mock};
-    use std::fs::{self, File};
+    use std::fs::File;
     use tempfile::TempDir;
 
     fn create_poetry_lock(dir: &Path) {
