@@ -1,8 +1,8 @@
 use crate::parsers::{parse_makefile, parse_package_json, parse_pyproject_toml};
 use crate::task_shadowing::check_shadowing;
 use crate::types::{
-    DiscoveredTaskDefinitions, Task, TaskDefinitionFile, TaskDefinitionType, TaskFileStatus,
-    TaskRunner, ShadowType, TestEnvironment, set_test_environment, reset_to_real_environment,
+    reset_to_real_environment, set_test_environment, DiscoveredTaskDefinitions, ShadowType, Task,
+    TaskDefinitionFile, TaskDefinitionType, TaskFileStatus, TaskRunner, TestEnvironment,
 };
 use std::fs;
 use std::path::Path;
@@ -210,10 +210,10 @@ fn discover_shell_script_tasks(dir: &Path, discovered: &mut DiscoveredTasks) {
 mod tests {
     use super::*;
     use crate::task_shadowing::{enable_mock, mock_executable, reset_mock};
+    use serial_test::serial;
     use std::fs::File;
     use std::io::Write;
     use tempfile::TempDir;
-    use serial_test::serial;
 
     fn create_test_makefile(dir: &Path, content: &str) {
         let mut file = File::create(dir.join("Makefile")).unwrap();

@@ -35,11 +35,11 @@ pub fn detect_package_manager(dir: &Path) -> Option<TaskRunner> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::task_shadowing::{enable_mock, mock_executable, reset_mock, disable_mock};
+    use crate::environment::{reset_to_real_environment, set_test_environment, TestEnvironment};
+    use crate::task_shadowing::{disable_mock, enable_mock, mock_executable, reset_mock};
+    use serial_test::serial;
     use std::fs::File;
     use tempfile::TempDir;
-    use serial_test::serial;
-    use crate::types::{TestEnvironment, set_test_environment, reset_to_real_environment};
 
     fn create_lock_file(dir: &Path, filename: &str) {
         File::create(dir.join(filename)).unwrap();

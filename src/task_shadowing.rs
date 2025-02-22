@@ -1,9 +1,10 @@
+use crate::builtins::check_shell_builtin;
+use crate::environment::ENVIRONMENT;
+use crate::types::ShadowType;
 use once_cell::sync::Lazy;
 use std::collections::HashSet;
 use std::process::Command;
 use std::sync::Mutex;
-use crate::builtins::check_shell_builtin;
-use crate::types::{ShadowType, ENVIRONMENT};
 
 // Global mock state for tests
 static MOCK_EXECUTABLES: Lazy<Mutex<HashSet<String>>> = Lazy::new(|| Mutex::new(HashSet::new()));
@@ -48,7 +49,9 @@ pub fn check_shadowing(task_name: &str) -> Option<ShadowType> {
 
 /// Check if a command exists in PATH
 pub fn check_path_executable(name: &str) -> Option<ShadowType> {
-    ENVIRONMENT.lock().unwrap()
+    ENVIRONMENT
+        .lock()
+        .unwrap()
         .check_executable(name)
         .map(ShadowType::PathExecutable)
 }
@@ -56,7 +59,7 @@ pub fn check_path_executable(name: &str) -> Option<ShadowType> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{TestEnvironment, set_test_environment, reset_to_real_environment};
+    use crate::types::{reset_to_real_environment, set_test_environment, TestEnvironment};
     use serial_test::serial;
 
     #[test]
@@ -71,11 +74,15 @@ mod tests {
         // Test existing executables
         assert_eq!(
             check_path_executable("test_exe1"),
-            Some(ShadowType::PathExecutable("/mock/bin/test_exe1".to_string()))
+            Some(ShadowType::PathExecutable(
+                "/mock/bin/test_exe1".to_string()
+            ))
         );
         assert_eq!(
             check_path_executable("test_exe2"),
-            Some(ShadowType::PathExecutable("/mock/bin/test_exe2".to_string()))
+            Some(ShadowType::PathExecutable(
+                "/mock/bin/test_exe2".to_string()
+            ))
         );
 
         // Test non-existent executable
