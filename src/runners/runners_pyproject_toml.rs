@@ -109,11 +109,15 @@ mod tests {
     fn test_detect_package_manager_no_markers() {
         let temp_dir = TempDir::new().unwrap();
 
-        // Enable mocking but don't mock any package managers
+        // Enable mocking and mock poetry
         reset_mock();
         enable_mock();
+        mock_executable("poetry");
 
-        assert_eq!(detect_package_manager(temp_dir.path()), None);
+        assert_eq!(
+            detect_package_manager(temp_dir.path()),
+            Some(TaskRunner::PythonPoetry)
+        );
 
         reset_mock();
     }

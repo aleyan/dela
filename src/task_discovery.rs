@@ -2,7 +2,7 @@ use crate::parsers::{parse_makefile, parse_package_json, parse_pyproject_toml};
 use crate::task_shadowing::check_shadowing;
 use crate::types::{
     DiscoveredTaskDefinitions, Task, TaskDefinitionFile, TaskDefinitionType, TaskFileStatus,
-    TaskRunner, ShadowType,
+    TaskRunner, ShadowType, TestEnvironment, set_test_environment, reset_to_real_environment,
 };
 use std::fs;
 use std::path::Path;
@@ -213,6 +213,7 @@ mod tests {
     use std::fs::File;
     use std::io::Write;
     use tempfile::TempDir;
+    use serial_test::serial;
 
     fn create_test_makefile(dir: &Path, content: &str) {
         let mut file = File::create(dir.join("Makefile")).unwrap();
@@ -639,9 +640,14 @@ test:
     }
 
     #[test]
+    #[serial]
     fn test_discover_tasks_with_shadowing() {
         let temp_dir = TempDir::new().unwrap();
         let makefile_path = temp_dir.path().join("Makefile");
+
+        // Set up test environment with zsh shell
+        let env = TestEnvironment::new().with_shell("/bin/zsh");
+        set_test_environment(env);
 
         let content = r#"
 test:
@@ -667,6 +673,8 @@ cd:
             cd_task.shadowed_by,
             Some(ShadowType::ShellBuiltin(_))
         ));
+
+        reset_to_real_environment();
     }
 
     #[test]

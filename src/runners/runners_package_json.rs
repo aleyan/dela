@@ -19,14 +19,14 @@ pub fn detect_package_manager(dir: &Path) -> Option<TaskRunner> {
         return Some(TaskRunner::NodeBun);
     }
 
-    if has_npm {
+    if has_bun {
+        Some(TaskRunner::NodeBun)
+    } else if has_npm {
         Some(TaskRunner::NodeNpm)
     } else if has_pnpm {
         Some(TaskRunner::NodePnpm)
     } else if has_yarn {
         Some(TaskRunner::NodeYarn)
-    } else if has_bun {
-        Some(TaskRunner::NodeBun)
     } else {
         None
     }
@@ -35,9 +35,11 @@ pub fn detect_package_manager(dir: &Path) -> Option<TaskRunner> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::task_shadowing::{enable_mock, mock_executable, reset_mock};
+    use crate::task_shadowing::{enable_mock, mock_executable, reset_mock, disable_mock};
     use std::fs::File;
     use tempfile::TempDir;
+    use serial_test::serial;
+    use crate::types::{TestEnvironment, set_test_environment, reset_to_real_environment};
 
     fn create_lock_file(dir: &Path, filename: &str) {
         File::create(dir.join(filename)).unwrap();
@@ -99,35 +101,44 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_detect_package_manager_no_lock_files() {
         let temp_dir = TempDir::new().unwrap();
 
-        // Enable mocking
-        reset_mock();
-        enable_mock();
-
-        // Test with only npm available
-        mock_executable("npm");
-        assert_eq!(
-            detect_package_manager(temp_dir.path()),
-            Some(TaskRunner::NodeNpm)
-        );
-
         // Test with only bun available
-        reset_mock();
-        enable_mock();
-        mock_executable("bun");
+        let env = TestEnvironment::new().with_executable("bun");
+        set_test_environment(env);
         assert_eq!(
             detect_package_manager(temp_dir.path()),
             Some(TaskRunner::NodeBun)
         );
+        reset_to_real_environment();
+
+        // Test with only npm available - should return NodeNpm since bun is not available
+        let env = TestEnvironment::new().with_executable("npm");
+        set_test_environment(env);
+        assert_eq!(
+            detect_package_manager(temp_dir.path()),
+            Some(TaskRunner::NodeNpm)
+        );
+        reset_to_real_environment();
+
+        // Test with both bun and npm available - should prefer bun
+        let env = TestEnvironment::new()
+            .with_executable("bun")
+            .with_executable("npm");
+        set_test_environment(env);
+        assert_eq!(
+            detect_package_manager(temp_dir.path()),
+            Some(TaskRunner::NodeBun)
+        );
+        reset_to_real_environment();
 
         // Test with no package managers
-        reset_mock();
-        enable_mock();
+        let env = TestEnvironment::new();
+        set_test_environment(env);
         assert_eq!(detect_package_manager(temp_dir.path()), None);
-
-        reset_mock();
+        reset_to_real_environment();
     }
 
     #[test]
@@ -147,14 +158,14 @@ mod tests {
         // Test preference order with no lock files
         assert_eq!(
             detect_package_manager(temp_dir.path()),
-            Some(TaskRunner::NodeNpm)
+            Some(TaskRunner::NodeBun)
         );
 
         // Test that lock files take precedence
-        create_lock_file(temp_dir.path(), "bun.lockb");
+        create_lock_file(temp_dir.path(), "package-lock.json");
         assert_eq!(
             detect_package_manager(temp_dir.path()),
-            Some(TaskRunner::NodeBun)
+            Some(TaskRunner::NodeNpm)
         );
 
         reset_mock();

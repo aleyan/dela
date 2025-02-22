@@ -1,11 +1,10 @@
-use std::env;
 use std::path::Path;
-use crate::types::ShadowType;
+use crate::types::{ShadowType, ENVIRONMENT};
 
 /// Check if a name is a shell builtin
 pub fn check_shell_builtin(name: &str) -> Option<ShadowType> {
     // Get current shell
-    let shell = env::var("SHELL").ok()?;
+    let shell = ENVIRONMENT.lock().unwrap().get_shell()?;
     let shell_path = Path::new(&shell);
     let shell_name = shell_path.file_name()?.to_str()?;
 
@@ -101,26 +100,13 @@ fn check_pwsh_builtin(name: &str) -> Option<ShadowType> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::{TestEnvironment, set_test_environment, reset_to_real_environment};
     use serial_test::serial;
-
-    fn setup_test_env(shell: &str) -> String {
-        let original_shell = env::var("SHELL").ok();
-        env::set_var("SHELL", shell);
-        original_shell.unwrap_or_default()
-    }
-
-    fn cleanup_test_env(original_shell: &str) {
-        if original_shell.is_empty() {
-            env::remove_var("SHELL");
-        } else {
-            env::set_var("SHELL", original_shell);
-        }
-    }
 
     #[test]
     #[serial]
     fn test_check_zsh_builtin() {
-        let original_shell = setup_test_env("/bin/zsh");
+        set_test_environment(TestEnvironment::new().with_shell("/bin/zsh"));
 
         // Test common zsh builtins
         for builtin in ["cd", "echo", "pwd", "export"] {
@@ -132,13 +118,13 @@ mod tests {
         // Test non-builtin
         assert!(check_zsh_builtin("definitely_not_a_builtin_123").is_none());
 
-        cleanup_test_env(&original_shell);
+        reset_to_real_environment();
     }
 
     #[test]
     #[serial]
     fn test_check_bash_builtin() {
-        let original_shell = setup_test_env("/bin/bash");
+        set_test_environment(TestEnvironment::new().with_shell("/bin/bash"));
 
         // Test common bash builtins
         for builtin in ["cd", "echo", "pwd", "export"] {
@@ -157,13 +143,13 @@ mod tests {
         // Test non-builtin
         assert!(check_bash_builtin("definitely_not_a_builtin_123").is_none());
 
-        cleanup_test_env(&original_shell);
+        reset_to_real_environment();
     }
 
     #[test]
     #[serial]
     fn test_check_fish_builtin() {
-        let original_shell = setup_test_env("/usr/bin/fish");
+        set_test_environment(TestEnvironment::new().with_shell("/usr/bin/fish"));
 
         // Test common fish builtins
         for builtin in ["cd", "echo", "pwd", "set"] {
@@ -182,13 +168,13 @@ mod tests {
         // Test non-builtin
         assert!(check_fish_builtin("definitely_not_a_builtin_123").is_none());
 
-        cleanup_test_env(&original_shell);
+        reset_to_real_environment();
     }
 
     #[test]
     #[serial]
     fn test_check_pwsh_builtin() {
-        let original_shell = setup_test_env("/usr/bin/pwsh");
+        set_test_environment(TestEnvironment::new().with_shell("/usr/bin/pwsh"));
 
         // Test common PowerShell builtins
         for builtin in ["cd", "echo", "pwd", "get"] {
@@ -207,47 +193,47 @@ mod tests {
         // Test non-builtin
         assert!(check_pwsh_builtin("definitely_not_a_builtin_123").is_none());
 
-        cleanup_test_env(&original_shell);
+        reset_to_real_environment();
     }
 
     #[test]
     #[serial]
     fn test_check_shell_builtin() {
         // Test with zsh
-        let original_shell = setup_test_env("/bin/zsh");
+        set_test_environment(TestEnvironment::new().with_shell("/bin/zsh"));
         assert!(matches!(
             check_shell_builtin("cd"),
             Some(ShadowType::ShellBuiltin(shell)) if shell == "zsh"
         ));
-        cleanup_test_env(&original_shell);
+        reset_to_real_environment();
 
         // Test with bash
-        let original_shell = setup_test_env("/bin/bash");
+        set_test_environment(TestEnvironment::new().with_shell("/bin/bash"));
         assert!(matches!(
             check_shell_builtin("cd"),
             Some(ShadowType::ShellBuiltin(shell)) if shell == "bash"
         ));
-        cleanup_test_env(&original_shell);
+        reset_to_real_environment();
 
         // Test with fish
-        let original_shell = setup_test_env("/usr/bin/fish");
+        set_test_environment(TestEnvironment::new().with_shell("/usr/bin/fish"));
         assert!(matches!(
             check_shell_builtin("cd"),
             Some(ShadowType::ShellBuiltin(shell)) if shell == "fish"
         ));
-        cleanup_test_env(&original_shell);
+        reset_to_real_environment();
 
         // Test with pwsh
-        let original_shell = setup_test_env("/usr/bin/pwsh");
+        set_test_environment(TestEnvironment::new().with_shell("/usr/bin/pwsh"));
         assert!(matches!(
             check_shell_builtin("cd"),
             Some(ShadowType::ShellBuiltin(shell)) if shell == "pwsh"
         ));
-        cleanup_test_env(&original_shell);
+        reset_to_real_environment();
 
         // Test with unknown shell
-        let original_shell = setup_test_env("/bin/unknown_shell");
+        set_test_environment(TestEnvironment::new().with_shell("/bin/unknown_shell"));
         assert!(check_shell_builtin("cd").is_none());
-        cleanup_test_env(&original_shell);
+        reset_to_real_environment();
     }
 }
