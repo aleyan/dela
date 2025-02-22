@@ -1,7 +1,8 @@
 use crate::parsers::{parse_makefile, parse_package_json, parse_pyproject_toml};
 use crate::task_shadowing::check_shadowing;
 use crate::types::{
-    DiscoveredTaskDefinitions, Task, TaskDefinitionFile, TaskDefinitionType, TaskFileStatus, TaskRunner,
+    DiscoveredTaskDefinitions, Task, TaskDefinitionFile, TaskDefinitionType, TaskFileStatus,
+    TaskRunner,
 };
 use std::fs;
 use std::path::Path;
