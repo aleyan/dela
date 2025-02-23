@@ -46,6 +46,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_detect_package_manager_with_lock_files() {
         let temp_dir = TempDir::new().unwrap();
 
