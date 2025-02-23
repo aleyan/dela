@@ -266,33 +266,7 @@ mod tests {
 
     // Helper function to format task output
     fn format_task_output(task: &Task, writer: &mut impl io::Write) -> io::Result<()> {
-        let shadow_symbol = if task.shadowed_by.is_some() {
-            match task.shadowed_by.as_ref().unwrap() {
-                ShadowType::ShellBuiltin(_) => " †",
-                ShadowType::PathExecutable(_) => " ‡",
-            }
-        } else {
-            ""
-        };
-
-        let mut output = format!("  • {}{}", task.name, shadow_symbol);
-
-        // Add runner info with short name
-        if !is_runner_available(&task.runner) {
-            output.push_str(&format!(
-                " (requires {}, not found)",
-                task.runner.short_name()
-            ));
-        } else {
-            output.push_str(&format!(" ({})", task.runner.short_name()));
-        }
-
-        // Add description if present
-        if let Some(desc) = &task.description {
-            output.push_str(&format!(" - {}", desc));
-        }
-
-        writeln!(writer, "{}", output)
+        writeln!(writer, "{}", format_task_string(task))
     }
 
     // Helper function to format shadow info
@@ -455,114 +429,38 @@ test: ## Running tests
     #[test]
     #[serial]
     fn test_list_with_shadowed_tasks_direct() {
-        let (project_dir, home_dir) = setup_test_env();
-        env::set_current_dir(&project_dir).expect("Failed to change directory");
-
-        // Create a Makefile with tasks that will be shadowed
-        let makefile_content = r#"
-cd: ## Change directory
-    @echo "This shadows the cd builtin"
-
-ls: ## List files
-    @echo "This shadows the ls command"
-
-custom: ## Custom command
-    @echo "This shadows a PATH executable"
-"#;
-        let mut file =
-            File::create(project_dir.path().join("Makefile")).expect("Failed to create Makefile");
-        file.write_all(makefile_content.as_bytes())
-            .expect("Failed to write Makefile");
-
-        // Discover tasks and manually set shadow information
-        let mut discovered = task_discovery::discover_tasks(project_dir.path());
-
-        // Set shadow information for each task
-        for task in &mut discovered.tasks {
-            match task.name.as_str() {
-                "cd" => task.shadowed_by = Some(ShadowType::ShellBuiltin("zsh".to_string())),
-                "ls" => task.shadowed_by = Some(ShadowType::ShellBuiltin("zsh".to_string())),
-                "custom" => {
-                    task.shadowed_by =
-                        Some(ShadowType::PathExecutable("/usr/bin/custom".to_string()))
-                }
-                _ => {}
-            }
-        }
-
         let mut writer = TestWriter::new();
 
-        // Print tasks
-        writeln!(writer, "Available tasks:").unwrap();
-        for (file, tasks) in tasks_by_file(&discovered.tasks) {
-            writeln!(writer, "\nFrom {}:", file).unwrap();
-            for task in tasks {
-                format_task_output(task, &mut writer).unwrap();
-            }
-        }
+        // Mock package managers
+        reset_mock();
+        enable_mock();
+        mock_executable("make");
 
-        // Print shadow information footer
-        let shadow_infos: Vec<_> = discovered
-            .tasks
-            .iter()
-            .filter_map(format_shadow_info)
-            .collect();
+        // Set up test environment
+        let env = TestEnvironment::new().with_executable("make");
+        set_test_environment(env);
 
-        if !shadow_infos.is_empty() {
-            writeln!(writer, "\nShadowed tasks:").unwrap();
-            for _info in shadow_infos {
-                writeln!(writer, "  {}", _info).unwrap();
-            }
-        }
-
-        let output = writer.get_output();
-
-        // Verify shell builtin shadowing
-        assert!(
-            output.contains("cd †"),
-            "Output missing cd task with shell builtin symbol"
-        );
-        assert!(
-            output.contains("ls †"),
-            "Output missing ls task with shell builtin symbol"
-        );
-        assert!(
-            output.contains("† task 'cd' shadowed by zsh shell builtin"),
-            "Output missing cd shell builtin shadow info"
-        );
-        assert!(
-            output.contains("† task 'ls' shadowed by zsh shell builtin"),
-            "Output missing ls shell builtin shadow info"
-        );
-
-        // Verify PATH executable shadowing
-        assert!(
-            output.contains("custom ‡"),
-            "Output missing custom task with executable symbol"
-        );
-        assert!(
-            output.contains("‡ task 'custom' shadowed by executable at /usr/bin/custom"),
-            "Output missing custom executable shadow info"
-        );
-
-        drop(project_dir);
-        drop(home_dir);
-    }
-
-    #[test]
-    fn test_shadow_formatting() {
-        let mut writer = TestWriter::new();
-
-        // Create test tasks with different shadow types
-        let mut tasks = vec![
-            create_test_task("test1", PathBuf::from("Makefile"), TaskRunner::Make),
-            create_test_task("test2", PathBuf::from("Makefile"), TaskRunner::Make),
-            create_test_task("test3", PathBuf::from("Makefile"), TaskRunner::Make),
+        // Create test tasks with shadowing
+        let tasks = vec![
+            Task {
+                name: "cd".to_string(),
+                file_path: PathBuf::from("Makefile"),
+                definition_type: TaskDefinitionType::Makefile,
+                runner: TaskRunner::Make,
+                source_name: "cd".to_string(),
+                description: None,
+                shadowed_by: Some(ShadowType::ShellBuiltin("zsh".to_string())),
+            },
+            Task {
+                name: "test".to_string(),
+                file_path: PathBuf::from("Makefile"),
+                definition_type: TaskDefinitionType::Makefile,
+                runner: TaskRunner::Make,
+                source_name: "test".to_string(),
+                description: None,
+                shadowed_by: None,
+            },
         ];
-
-        // Add shadow information
-        tasks[1].shadowed_by = Some(ShadowType::ShellBuiltin("bash".to_string()));
-        tasks[2].shadowed_by = Some(ShadowType::PathExecutable("/usr/bin/test3".to_string()));
 
         // Print tasks
         for (file, file_tasks) in tasks_by_file(&tasks) {
@@ -574,23 +472,156 @@ custom: ## Custom command
 
         // Print shadow information
         let shadow_infos: Vec<_> = tasks.iter().filter_map(format_shadow_info).collect();
-
         if !shadow_infos.is_empty() {
             writeln!(writer, "\nShadowed tasks:").unwrap();
-            for _info in shadow_infos {
-                writeln!(writer, "  {}", _info).unwrap();
+            for info in shadow_infos {
+                writeln!(writer, "  {}", info).unwrap();
+            }
+        }
+
+        let output = writer.get_output();
+
+        // Verify that the output contains the cd task with shell builtin symbol
+        assert!(
+            output.contains("  • cd (make) †"),
+            "Output missing cd task with shell builtin symbol"
+        );
+        assert!(
+            output.contains("† task 'cd' shadowed by zsh shell builtin"),
+            "Output missing cd shell builtin shadow info"
+        );
+
+        reset_mock();
+        reset_to_real_environment();
+    }
+
+    #[test]
+    fn test_missing_runner_indication() {
+        let mut writer = TestWriter::new();
+
+        // Mock package managers - don't mock any to simulate missing runners
+        reset_mock();
+        enable_mock();
+
+        // Set up test environment with no executables
+        let env = TestEnvironment::new();
+        set_test_environment(env);
+
+        // Create test tasks
+        let tasks = vec![
+            Task {
+                name: "build".to_string(),
+                file_path: PathBuf::from("Makefile"),
+                definition_type: TaskDefinitionType::Makefile,
+                runner: TaskRunner::Make,
+                source_name: "build".to_string(),
+                description: None,
+                shadowed_by: None,
+            },
+            Task {
+                name: "test".to_string(),
+                file_path: PathBuf::from("package.json"),
+                definition_type: TaskDefinitionType::PackageJson,
+                runner: TaskRunner::NodeNpm,
+                source_name: "test".to_string(),
+                description: None,
+                shadowed_by: None,
+            },
+        ];
+
+        // Print tasks
+        for (file, file_tasks) in tasks_by_file(&tasks) {
+            writeln!(writer, "\nFrom {}:", file).unwrap();
+            for task in file_tasks {
+                format_task_output(task, &mut writer).unwrap();
+            }
+        }
+
+        let output = writer.get_output();
+        println!("Actual output:\n{}", output);
+
+        // Verify missing runner indications
+        assert!(
+            output.contains("  • build (requires make, not found)"),
+            "Missing runner indication for make"
+        );
+        assert!(
+            output.contains("  • test (requires npm, not found)"),
+            "Missing runner indication for npm"
+        );
+
+        reset_mock();
+        reset_to_real_environment();
+    }
+
+    #[test]
+    fn test_shadow_formatting() {
+        let mut writer = TestWriter::new();
+
+        // Create test tasks with different shadow types
+        let tasks = vec![
+            create_test_task("test1", PathBuf::from("Makefile"), TaskRunner::Make),
+            Task {
+                name: "test2".to_string(),
+                file_path: PathBuf::from("Makefile"),
+                definition_type: TaskDefinitionType::Makefile,
+                runner: TaskRunner::Make,
+                source_name: "test2".to_string(),
+                description: None,
+                shadowed_by: Some(ShadowType::ShellBuiltin("bash".to_string())),
+            },
+            Task {
+                name: "test3".to_string(),
+                file_path: PathBuf::from("Makefile"),
+                definition_type: TaskDefinitionType::Makefile,
+                runner: TaskRunner::Make,
+                source_name: "test3".to_string(),
+                description: None,
+                shadowed_by: Some(ShadowType::PathExecutable("/usr/bin/test3".to_string())),
+            },
+        ];
+
+        // Mock package managers to make runners available
+        reset_mock();
+        enable_mock();
+        mock_executable("make");
+
+        // Set up test environment
+        let env = TestEnvironment::new().with_executable("make");
+        set_test_environment(env);
+
+        // Print tasks
+        for (file, file_tasks) in tasks_by_file(&tasks) {
+            writeln!(writer, "\nFrom {}:", file).unwrap();
+            for task in file_tasks {
+                format_task_output(task, &mut writer).unwrap();
+            }
+        }
+
+        // Print shadow information
+        let shadow_infos: Vec<_> = tasks.iter().filter_map(format_shadow_info).collect();
+        if !shadow_infos.is_empty() {
+            writeln!(writer, "\nShadowed tasks:").unwrap();
+            for info in shadow_infos {
+                writeln!(writer, "  {}", info).unwrap();
             }
         }
 
         let output = writer.get_output();
 
         // Verify task listing format
-        assert!(output.contains("• test1"), "Missing unshadowed task");
         assert!(
-            output.contains("• test2 †"),
+            output.contains("  • test1 (make)"),
+            "Missing unshadowed task"
+        );
+        assert!(
+            output.contains("  • test2 (make) †"),
             "Incorrect shell builtin format"
         );
-        assert!(output.contains("• test3 ‡"), "Incorrect executable format");
+        assert!(
+            output.contains("  • test3 (make) ‡"),
+            "Incorrect executable format"
+        );
 
         // Verify shadow information format
         assert!(
@@ -601,6 +632,9 @@ custom: ## Custom command
             output.contains("‡ task 'test3' shadowed by executable at /usr/bin/test3"),
             "Incorrect executable info"
         );
+
+        reset_mock();
+        reset_to_real_environment();
     }
 
     #[test]

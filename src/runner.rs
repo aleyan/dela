@@ -7,13 +7,7 @@ use serial_test::serial;
 
 pub fn is_runner_available(runner: &TaskRunner) -> bool {
     match runner {
-        TaskRunner::Make => {
-            if cfg!(test) {
-                true
-            } else {
-                check_path_executable("make").is_some()
-            }
-        }
+        TaskRunner::Make => check_path_executable("make").is_some(),
         TaskRunner::NodeNpm => check_path_executable("npm").is_some(),
         TaskRunner::NodeYarn => check_path_executable("yarn").is_some(),
         TaskRunner::NodePnpm => check_path_executable("pnpm").is_some(),
