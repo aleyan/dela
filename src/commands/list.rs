@@ -194,7 +194,11 @@ fn format_shadow_info(task: &Task) -> Option<String> {
 // Helper function to format missing runner info
 fn format_missing_runner_info(task: &Task) -> Option<String> {
     if !is_runner_available(&task.runner) {
-        Some(format!("* task '{}' requires {} (not found)", task.name, task.runner.short_name()))
+        Some(format!(
+            "* task '{}' requires {} (not found)",
+            task.name,
+            task.runner.short_name()
+        ))
     } else {
         None
     }
@@ -554,7 +558,10 @@ test: ## Running tests
         }
 
         // Print missing runner info
-        let missing_runner_infos: Vec<_> = tasks.iter().filter_map(format_missing_runner_info).collect();
+        let missing_runner_infos: Vec<_> = tasks
+            .iter()
+            .filter_map(format_missing_runner_info)
+            .collect();
         if !missing_runner_infos.is_empty() {
             writeln!(writer, "\nMissing runners:").unwrap();
             for info in missing_runner_infos {
