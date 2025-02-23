@@ -204,12 +204,12 @@ if (-not ($output -match "Build task executed successfully")) {
 }
 
 # Test Poetry tasks
-Write-Log "Testing Poetry tasks..."
-"2" | dela allow-command poetry-test
+Write-Log "Testing Poetry tasks with --allow flag..."
+dela allow-command poetry-test --allow 2
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Failed to allow poetry-test"
 }
-"2" | dela allow-command poetry-build
+dela allow-command poetry-build --allow 2
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Failed to allow poetry-build"
 }
@@ -223,7 +223,6 @@ $output = dr poetry-build
 if (-not ($output -match "Build task executed successfully")) {
     Write-Error "dr poetry-build failed. Got: $output"
 }
-$env:DELA_NON_INTERACTIVE = 0
 
 # Verify command not found handler was properly replaced
 Write-Log "Testing final command_not_found_handler..."

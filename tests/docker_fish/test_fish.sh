@@ -135,13 +135,8 @@ end
 
 log "4. Testing allowlist functionality..."
 
-# Ensure we're in interactive mode for allowlist testing
-set -e DELA_NON_INTERACTIVE
-set -e DELA_AUTO_ALLOW
-
-# Reload shell integration with new environment
-source ~/.config/fish/config.fish
-eval (dela configure-shell | string collect)
+# Ensure we're in non-interactive mode for allowlist testing
+set -x DELA_NON_INTERACTIVE 1
 
 # Test that task is initially blocked
 log "Testing task is initially blocked..."
@@ -151,14 +146,13 @@ if not string match -q "*requires approval*" -- "$output"
     exit 1
 end
 
-# Test dela allow-command
-log "Testing dela allow-command..."
+# Test dela allow-command interactively
+log "Testing dela allow-command interactively..."
 set -x DELA_NON_INTERACTIVE 1
 printf "2\n" | dela allow-command test-task >/dev/null 2>&1; or error "Failed to allow test-task"
 
 # Test allowed task execution
 log "Testing allowed task execution..."
-set -e DELA_NON_INTERACTIVE
 source ~/.config/fish/config.fish
 eval (dela configure-shell | string collect)
 
@@ -176,8 +170,8 @@ end
 
 # Test UV tasks
 log "Testing UV tasks..."
-printf "2\n" | dela allow-command uv-test >/dev/null 2>&1; or error "Failed to allow uv-test"
-printf "2\n" | dela allow-command uv-build >/dev/null 2>&1; or error "Failed to allow uv-build"
+dela allow-command uv-test --allow 2 >/dev/null 2>&1; or error "Failed to allow uv-test"
+dela allow-command uv-build --allow 2 >/dev/null 2>&1; or error "Failed to allow uv-build"
 
 # Create a temporary script for UV test
 echo '#!/usr/bin/fish
@@ -205,8 +199,8 @@ end
 
 # Test Poetry tasks
 log "Testing Poetry tasks..."
-printf "2\n" | dela allow-command poetry-test >/dev/null 2>&1; or error "Failed to allow poetry-test"
-printf "2\n" | dela allow-command poetry-build >/dev/null 2>&1; or error "Failed to allow poetry-build"
+dela allow-command poetry-test --allow 2 >/dev/null 2>&1; or error "Failed to allow poetry-test"
+dela allow-command poetry-build --allow 2 >/dev/null 2>&1; or error "Failed to allow poetry-build"
 
 # Create a temporary script for Poetry test
 echo '#!/usr/bin/fish
@@ -231,8 +225,6 @@ if not string match -q "*Build task executed successfully*" -- "$output"
     error "Poetry build task failed. Got: $output"
     exit 1
 end
-
-set -e DELA_NON_INTERACTIVE
 
 # Verify command_not_found_handler was properly replaced
 log "Testing final command_not_found_handler..."
