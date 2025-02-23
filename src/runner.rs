@@ -47,15 +47,24 @@ mod tests {
     #[test]
     #[serial]
     fn test_node_package_managers() {
-        // Test all package managers
-        let npm_available = check_path_executable("npm").is_some();
-        assert_eq!(is_runner_available(&TaskRunner::NodeNpm), npm_available);
+        let env = TestEnvironment::new()
+            .with_executable("npm")
+            .with_executable("yarn")
+            .with_executable("bun");
 
-        let yarn_available = check_path_executable("yarn").is_some();
-        assert_eq!(is_runner_available(&TaskRunner::NodeYarn), yarn_available);
+        set_test_environment(env.clone());
+        assert!(is_runner_available(&TaskRunner::NodeNpm));
+        reset_mock();
 
-        let bun_available = check_path_executable("bun").is_some();
-        assert_eq!(is_runner_available(&TaskRunner::NodeBun), bun_available);
+        set_test_environment(env.clone());
+        assert!(is_runner_available(&TaskRunner::NodeYarn));
+        reset_mock();
+
+        set_test_environment(env.clone());
+        assert!(is_runner_available(&TaskRunner::NodeBun));
+        reset_mock();
+
+        reset_to_real_environment();
     }
 
     #[test]

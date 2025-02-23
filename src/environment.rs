@@ -29,7 +29,7 @@ impl Environment for RealEnvironment {
 }
 
 /// Test environment implementation
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct TestEnvironment {
     shell: Option<String>,
     executables: HashSet<String>,
