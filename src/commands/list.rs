@@ -104,8 +104,9 @@ pub fn execute(verbose: bool) -> Result<(), String> {
     if tasks_by_file.is_empty() {
         write_line("No tasks found in the current directory.")?;
     } else {
-        // Collect all shadow info for footer
+        // Collect all shadow info and missing runner info for footer
         let mut shadow_infos = Vec::new();
+        let mut missing_runner_infos = Vec::new();
 
         for (_file, tasks) in tasks_by_file {
             write_line(&format!("\nTasks from {}:", _file))?;
@@ -117,6 +118,9 @@ pub fn execute(verbose: bool) -> Result<(), String> {
                         shadow_infos.push(info);
                     }
                 }
+                if let Some(info) = format_missing_runner_info(task) {
+                    missing_runner_infos.push(info);
+                }
             }
         }
 
@@ -124,6 +128,14 @@ pub fn execute(verbose: bool) -> Result<(), String> {
         if !shadow_infos.is_empty() {
             write_line("\nShadowed tasks:")?;
             for info in shadow_infos {
+                write_line(&format!("  {}", info))?;
+            }
+        }
+
+        // Print missing runner info footer
+        if !missing_runner_infos.is_empty() {
+            write_line("\nMissing runners:")?;
+            for info in missing_runner_infos {
                 write_line(&format!("  {}", info))?;
             }
         }
@@ -141,26 +153,21 @@ pub fn execute(verbose: bool) -> Result<(), String> {
 }
 
 fn format_task_string(task: &Task) -> String {
-    let shadow_symbol = if task.shadowed_by.is_some() {
+    let symbol = if task.shadowed_by.is_some() {
         match task.shadowed_by.as_ref().unwrap() {
-            ShadowType::ShellBuiltin(_) => " †",
-            ShadowType::PathExecutable(_) => " ‡",
+            ShadowType::ShellBuiltin(_) => " †".to_string(),
+            ShadowType::PathExecutable(_) => " ‡".to_string(),
         }
+    } else if !is_runner_available(&task.runner) {
+        " *".to_string()
     } else {
-        ""
+        String::new()
     };
 
     let mut output = format!("  • {}", task.name);
 
     // Add runner info with short name
-    if !is_runner_available(&task.runner) {
-        output.push_str(&format!(
-            " (requires {}, not found)",
-            task.runner.short_name()
-        ));
-    } else {
-        output.push_str(&format!(" ({}){}", task.runner.short_name(), shadow_symbol));
-    }
+    output.push_str(&format!(" ({}){}", task.runner.short_name(), symbol));
 
     // Add description if present
     if let Some(desc) = &task.description {
@@ -182,6 +189,15 @@ fn format_shadow_info(task: &Task) -> Option<String> {
                 format!("‡ task '{}' shadowed by executable at {}", task.name, path)
             }
         })
+}
+
+// Helper function to format missing runner info
+fn format_missing_runner_info(task: &Task) -> Option<String> {
+    if !is_runner_available(&task.runner) {
+        Some(format!("* task '{}' requires {} (not found)", task.name, task.runner.short_name()))
+    } else {
+        None
+    }
 }
 
 impl Task {
@@ -537,17 +553,34 @@ test: ## Running tests
             }
         }
 
+        // Print missing runner info
+        let missing_runner_infos: Vec<_> = tasks.iter().filter_map(format_missing_runner_info).collect();
+        if !missing_runner_infos.is_empty() {
+            writeln!(writer, "\nMissing runners:").unwrap();
+            for info in missing_runner_infos {
+                writeln!(writer, "  {}", info).unwrap();
+            }
+        }
+
         let output = writer.get_output();
         println!("Actual output:\n{}", output);
 
         // Verify missing runner indications
         assert!(
-            output.contains("  • build (requires make, not found)"),
-            "Missing runner indication for make"
+            output.contains("  • build (make) *"),
+            "Missing runner asterisk for make"
         );
         assert!(
-            output.contains("  • test (requires npm, not found)"),
-            "Missing runner indication for npm"
+            output.contains("  • test (npm) *"),
+            "Missing runner asterisk for npm"
+        );
+        assert!(
+            output.contains("* task 'build' requires make (not found)"),
+            "Missing runner info for make"
+        );
+        assert!(
+            output.contains("* task 'test' requires npm (not found)"),
+            "Missing runner info for npm"
         );
 
         reset_mock();
