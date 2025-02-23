@@ -1,5 +1,5 @@
 use crate::task_shadowing::check_path_executable;
-use crate::types::{ShadowType, Task, TaskRunner};
+use crate::types::{Task, TaskRunner};
 use std::path::Path;
 
 #[cfg(test)]
@@ -77,6 +77,7 @@ pub fn detect_package_manager(dir: &Path) -> Option<TaskRunner> {
 mod tests {
     use super::*;
     use crate::environment::{reset_to_real_environment, set_test_environment, TestEnvironment};
+    use crate::types::ShadowType;
     use std::fs::File;
     use tempfile::TempDir;
 

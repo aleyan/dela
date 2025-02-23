@@ -35,7 +35,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [x] [DTKT-10] Print tasks with references to the source file.
   - [x] [DTKT-92] List which task runner will be used for each task.
   - [ ] [DTKT-113] Indicate which commands have duplicate names.
-  - [ ] [DTKT-116] Indicate when a command is missing a runner.
+  - [x] [DTKT-116] Indicate when a command is missing a runner.
 
 **Deliverables**
 - [x] Parsing logic for multiple file types.
@@ -61,6 +61,8 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [x] [DTKT-78] Indicate when tasks are shadowed by shell builtins (cd, source, etc.)
   - [x] [DTKT-79] Ensure environment modifications persist
   - [x] [DTKT-80] Make shell aliases and functions available to tasks
+  - [ ] [DTKT-117] Pass arguments after the task name to the task for base execution
+  - [ ] [DTKT-118] Pass arguments after the task name to the task for `dr` execution
 
 - [ ] **Repository Preparation**
   - [x] [DTKT-16] Confirm Rust workspace structure is stable.
