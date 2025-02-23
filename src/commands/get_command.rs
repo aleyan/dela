@@ -1,3 +1,4 @@
+use crate::runner::is_runner_available;
 use crate::task_discovery;
 use std::env;
 
@@ -17,8 +18,11 @@ pub fn execute(task: &str) -> Result<(), String> {
             Err(format!("No task named '{}' found", task))
         }
         1 => {
-            // Single task found, return its command
+            // Single task found, check if runner is available
             let task = matching_tasks[0];
+            if !is_runner_available(&task.runner) {
+                return Err(format!("Runner '{}' not found", task.runner.short_name()));
+            }
             let command = task.runner.get_command(task);
             println!("{}", command);
             Ok(())
@@ -38,6 +42,8 @@ pub fn execute(task: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::environment::{reset_to_real_environment, set_test_environment, TestEnvironment};
+    use crate::task_shadowing::{enable_mock, reset_mock};
     use serial_test::serial;
     use std::fs::{self, File};
     use std::io::Write;
@@ -78,9 +84,17 @@ test: ## Running tests
         let (project_dir, home_dir) = setup_test_env();
         env::set_current_dir(&project_dir).expect("Failed to change directory");
 
+        // Mock make being available
+        reset_mock();
+        enable_mock();
+        let env = TestEnvironment::new().with_executable("make");
+        set_test_environment(env);
+
         let result = execute("test");
         assert!(result.is_ok(), "Should succeed for a single task");
 
+        reset_mock();
+        reset_to_real_environment();
         drop(project_dir);
         drop(home_dir);
     }
@@ -95,6 +109,28 @@ test: ## Running tests
         assert!(result.is_err(), "Should fail when no task found");
         assert_eq!(result.unwrap_err(), "No task named 'nonexistent' found");
 
+        drop(project_dir);
+        drop(home_dir);
+    }
+
+    #[test]
+    #[serial]
+    fn test_get_command_missing_runner() {
+        let (project_dir, home_dir) = setup_test_env();
+        env::set_current_dir(&project_dir).expect("Failed to change directory");
+
+        // Set up test environment with no executables to simulate missing make
+        reset_mock();
+        enable_mock();
+        let env = TestEnvironment::new();
+        set_test_environment(env);
+
+        let result = execute("test");
+        assert!(result.is_err(), "Should fail when runner is missing");
+        assert_eq!(result.unwrap_err(), "Runner 'make' not found");
+
+        reset_mock();
+        reset_to_real_environment();
         drop(project_dir);
         drop(home_dir);
     }
