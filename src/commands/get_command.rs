@@ -2,20 +2,22 @@ use crate::runner::is_runner_available;
 use crate::task_discovery;
 use std::env;
 
-pub fn execute(task: &str) -> Result<(), String> {
-    // TODO(DTKT-20): Implement shell environment inheritance for task execution
-    // TODO(DTKT-21): Support both direct execution and subshell spawning based on task type
+pub fn execute(task_with_args: &str) -> Result<(), String> {
+    let mut parts = task_with_args.split_whitespace();
+    let task_name = parts.next().ok_or_else(|| "No task name provided".to_string())?;
+    let args: Vec<&str> = parts.collect();
+
     let current_dir =
         env::current_dir().map_err(|e| format!("Failed to get current directory: {}", e))?;
     let discovered = task_discovery::discover_tasks(&current_dir);
 
     // Find all tasks with the given name
-    let matching_tasks: Vec<_> = discovered.tasks.iter().filter(|t| t.name == task).collect();
+    let matching_tasks: Vec<_> = discovered.tasks.iter().filter(|t| t.name == task_name).collect();
 
     match matching_tasks.len() {
         0 => {
-            println!("No task named '{}' found in the current directory.", task);
-            Err(format!("No task named '{}' found", task))
+            println!("No task named '{}' found in the current directory.", task_name);
+            Err(format!("No task named '{}' found", task_name))
         }
         1 => {
             // Single task found, check if runner is available
@@ -23,18 +25,22 @@ pub fn execute(task: &str) -> Result<(), String> {
             if !is_runner_available(&task.runner) {
                 return Err(format!("Runner '{}' not found", task.runner.short_name()));
             }
-            let command = task.runner.get_command(task);
+            let mut command = task.runner.get_command(task);
+            if !args.is_empty() {
+                command.push(' ');
+                command.push_str(&args.join(" "));
+            }
             println!("{}", command);
             Ok(())
         }
         _ => {
             // Multiple tasks found, print error and list them
-            println!("Multiple tasks named '{}' found:", task);
+            println!("Multiple tasks named '{}' found:", task_name);
             for task in matching_tasks {
                 println!("  • {} (from {})", task.name, task.file_path.display());
             }
-            println!("Please use 'dela run {}' to choose which one to run.", task);
-            Err(format!("Multiple tasks named '{}' found", task))
+            println!("Please use 'dela run {}' to choose which one to run.", task_name);
+            Err(format!("Multiple tasks named '{}' found", task_name))
         }
     }
 }
@@ -92,6 +98,27 @@ test: ## Running tests
 
         let result = execute("test");
         assert!(result.is_ok(), "Should succeed for a single task");
+
+        reset_mock();
+        reset_to_real_environment();
+        drop(project_dir);
+        drop(home_dir);
+    }
+
+    #[test]
+    #[serial]
+    fn test_get_command_with_args() {
+        let (project_dir, home_dir) = setup_test_env();
+        env::set_current_dir(&project_dir).expect("Failed to change directory");
+
+        // Mock make being available
+        reset_mock();
+        enable_mock();
+        let env = TestEnvironment::new().with_executable("make");
+        set_test_environment(env);
+
+        let result = execute("test --verbose --coverage");
+        assert!(result.is_ok(), "Should succeed for task with arguments");
 
         reset_mock();
         reset_to_real_environment();
