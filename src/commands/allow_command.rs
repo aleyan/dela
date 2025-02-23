@@ -57,7 +57,7 @@ pub fn execute(task_with_args: &str, allow: Option<u8>) -> Result<(), String> {
                     _ => Err(format!(
                         "Invalid allow choice {}. Please use a number between 2 and 5.",
                         choice
-                    ))
+                    )),
                 }
             } else {
                 // Otherwise, use the interactive prompt
@@ -215,9 +215,18 @@ test: ## Running tests
         env::set_current_dir(&project_dir).expect("Failed to change directory");
 
         // Test with valid allow options
-        assert!(execute("test", Some(2)).is_ok(), "Should succeed with allow=2");
-        assert!(execute("test", Some(3)).is_ok(), "Should succeed with allow=3");
-        assert!(execute("test", Some(4)).is_ok(), "Should succeed with allow=4");
+        assert!(
+            execute("test", Some(2)).is_ok(),
+            "Should succeed with allow=2"
+        );
+        assert!(
+            execute("test", Some(3)).is_ok(),
+            "Should succeed with allow=3"
+        );
+        assert!(
+            execute("test", Some(4)).is_ok(),
+            "Should succeed with allow=4"
+        );
 
         // Test with deny option
         let result = execute("test", Some(5));
