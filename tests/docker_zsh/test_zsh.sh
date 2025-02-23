@@ -137,13 +137,11 @@ if ! echo "$output" | grep -q "requires approval"; then
     exit 1
 fi
 
-# Allow the task using dela allow-command interactively
-log "Testing dela allow-command..."
-export DELA_NON_INTERACTIVE=1
-export DELA_AUTO_ALLOW=1
-echo "2" | dela allow-command test-task || (error "Failed to allow test-task" && exit 1)
+# Test interactive allow-command functionality
+log "Testing interactive allow-command functionality..."
 unset DELA_NON_INTERACTIVE
 unset DELA_AUTO_ALLOW
+echo "2" | dela allow-command test-task || (error "Failed to allow test-task" && exit 1)
 
 # Reload shell integration again
 source ~/.zshrc
@@ -156,8 +154,8 @@ if ! echo "$output" | grep -q "Test task executed successfully"; then
     exit 1
 fi
 
-# Test UV tasks
-log "Testing UV tasks..."
+# Test UV tasks with non-interactive mode
+log "Testing UV tasks with non-interactive mode..."
 dela allow-command uv-test --allow 2 || (error "Failed to allow uv-test" && exit 1)
 dela allow-command uv-build --allow 2 || (error "Failed to allow uv-build" && exit 1)
 

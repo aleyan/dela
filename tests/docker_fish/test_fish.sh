@@ -146,9 +146,9 @@ if not string match -q "*requires approval*" -- "$output"
     exit 1
 end
 
-# Test dela allow-command interactively
-log "Testing dela allow-command interactively..."
-set -x DELA_NON_INTERACTIVE 1
+# Test interactive allow-command functionality
+log "Testing interactive allow-command functionality..."
+set -e DELA_NON_INTERACTIVE
 printf "2\n" | dela allow-command test-task >/dev/null 2>&1; or error "Failed to allow test-task"
 
 # Test allowed task execution
@@ -168,8 +168,8 @@ if not string match -q "*Test task executed successfully*" -- "$output"
     exit 1
 end
 
-# Test UV tasks
-log "Testing UV tasks..."
+# Test UV tasks with non-interactive mode
+log "Testing UV tasks with non-interactive mode..."
 dela allow-command uv-test --allow 2 >/dev/null 2>&1; or error "Failed to allow uv-test"
 dela allow-command uv-build --allow 2 >/dev/null 2>&1; or error "Failed to allow uv-build"
 
