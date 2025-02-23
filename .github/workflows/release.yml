@@ -4,16 +4,49 @@ on:
   push:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+*'
+  workflow_dispatch:
+    inputs:
+      skip_github_release:
+        description: 'Skip GitHub release creation'
+        type: boolean
+        default: false
+      skip_binary_build:
+        description: 'Skip binary builds'
+        type: boolean
+        default: false
+      skip_crates_publish:
+        description: 'Skip publishing to crates.io'
+        type: boolean
+        default: false
 
 jobs:
   create-release:
     runs-on: ubuntu-latest
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
+    if: ${{ !inputs.skip_github_release }}
     steps:
       - uses: actions/checkout@v4
+      
+      # Check if release already exists
+      - name: Check existing release
+        id: check_release
+        run: |
+          TAG_NAME="${GITHUB_REF#refs/tags/}"
+          if gh release view "$TAG_NAME" &> /dev/null; then
+            echo "Release already exists"
+            UPLOAD_URL=$(gh release view "$TAG_NAME" --json uploadUrl -q .uploadUrl)
+            echo "upload_url=$UPLOAD_URL" >> $GITHUB_OUTPUT
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Create Release
         id: create_release
+        if: steps.check_release.outputs.exists != 'true'
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -26,6 +59,7 @@ jobs:
   build-release:
     name: Build Release
     needs: create-release
+    if: ${{ !inputs.skip_binary_build }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -55,6 +89,7 @@ jobs:
             rust: stable
             target: x86_64-pc-windows-msvc
             archive_name: dela-windows-amd64.zip
+      fail-fast: false
 
     steps:
     - uses: actions/checkout@v4
@@ -88,8 +123,24 @@ jobs:
         7z a ../../../${{ matrix.archive_name }} dela.exe
         cd -
 
+    # Check if asset already exists
+    - name: Check existing asset
+      id: check_asset
+      run: |
+        TAG_NAME="${GITHUB_REF#refs/tags/}"
+        if gh release view "$TAG_NAME" --json assets -q ".assets[].name" | grep -q "^${{ matrix.archive_name }}$"; then
+          echo "Asset already exists"
+          echo "exists=true" >> $GITHUB_OUTPUT
+        else
+          echo "exists=false" >> $GITHUB_OUTPUT
+        fi
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      shell: bash
+
     - name: Upload Release Asset
       uses: actions/upload-release-asset@v1
+      if: steps.check_asset.outputs.exists != 'true'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
@@ -101,6 +152,7 @@ jobs:
   publish-crate:
     name: Publish to crates.io
     needs: [create-release, build-release]
+    if: ${{ !inputs.skip_crates_publish }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -108,10 +160,24 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
+      # Check if version is already published
+      - name: Check if version exists on crates.io
+        id: check_version
+        run: |
+          VERSION=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version')
+          if cargo search dela --limit 1 | grep -q "dela = \"$VERSION\""; then
+            echo "Version $VERSION already exists on crates.io"
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Check package
+        if: steps.check_version.outputs.exists != 'true'
         run: cargo package --locked
 
       - name: Publish to crates.io
+        if: steps.check_version.outputs.exists != 'true'
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: cargo publish --locked 
