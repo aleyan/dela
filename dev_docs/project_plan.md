@@ -61,8 +61,8 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [x] [DTKT-78] Indicate when tasks are shadowed by shell builtins (cd, source, etc.)
   - [x] [DTKT-79] Ensure environment modifications persist
   - [x] [DTKT-80] Make shell aliases and functions available to tasks
-  - [ ] [DTKT-117] Pass arguments after the task name to the task for base execution
-  - [ ] [DTKT-118] Pass arguments after the task name to the task for `dr` execution
+  - [x] [DTKT-117] Pass arguments after the task name to the task for base execution
+  - [x] [DTKT-118] Pass arguments after the task name to the task for `dr` execution
 
 - [ ] **Repository Preparation**
   - [x] [DTKT-16] Confirm Rust workspace structure is stable.

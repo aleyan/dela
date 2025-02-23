@@ -2,18 +2,30 @@ use crate::allowlist;
 use crate::task_discovery;
 use std::env;
 
-pub fn execute(task: &str) -> Result<(), String> {
+pub fn execute(task_with_args: &str) -> Result<(), String> {
+    let task_name = task_with_args
+        .split_whitespace()
+        .next()
+        .ok_or_else(|| "No task name provided".to_string())?;
+
     let current_dir =
         env::current_dir().map_err(|e| format!("Failed to get current directory: {}", e))?;
     let discovered = task_discovery::discover_tasks(&current_dir);
 
     // Find all tasks with the given name
-    let matching_tasks: Vec<_> = discovered.tasks.iter().filter(|t| t.name == task).collect();
+    let matching_tasks: Vec<_> = discovered
+        .tasks
+        .iter()
+        .filter(|t| t.name == task_name)
+        .collect();
 
     match matching_tasks.len() {
         0 => {
-            eprintln!("No task named '{}' found in the current directory.", task);
-            Err(format!("No task named '{}' found", task))
+            eprintln!(
+                "No task named '{}' found in the current directory.",
+                task_name
+            );
+            Err(format!("No task named '{}' found", task_name))
         }
         1 => {
             // Single task found, check allowlist
@@ -28,12 +40,15 @@ pub fn execute(task: &str) -> Result<(), String> {
             Ok(())
         }
         _ => {
-            eprintln!("Multiple tasks named '{}' found:", task);
+            eprintln!("Multiple tasks named '{}' found:", task_name);
             for task in matching_tasks {
                 eprintln!("  • {} (from {})", task.name, task.file_path.display());
             }
-            eprintln!("Please use 'dela run {}' to choose which one to run.", task);
-            Err(format!("Multiple tasks named '{}' found", task))
+            eprintln!(
+                "Please use 'dela run {}' to choose which one to run.",
+                task_name
+            );
+            Err(format!("Multiple tasks named '{}' found", task_name))
         }
     }
 }
@@ -117,6 +132,22 @@ test: ## Running tests
         with_stdin("1\n", || {
             let result = execute("test");
             assert!(result.is_ok(), "Should succeed for a single task");
+        });
+
+        drop(project_dir);
+        drop(home_dir);
+    }
+
+    #[test]
+    #[serial]
+    fn test_allow_command_with_args() {
+        let (project_dir, home_dir) = setup_test_env();
+        env::set_current_dir(&project_dir).expect("Failed to change directory");
+
+        // Simulate user allowing the task
+        with_stdin("1\n", || {
+            let result = execute("test --verbose --coverage");
+            assert!(result.is_ok(), "Should succeed for task with arguments");
         });
 
         drop(project_dir);
