@@ -3,7 +3,9 @@ use crate::task_discovery;
 use std::env;
 
 pub fn execute(task_with_args: &str) -> Result<(), String> {
-    let task_name = task_with_args.split_whitespace().next()
+    let task_name = task_with_args
+        .split_whitespace()
+        .next()
         .ok_or_else(|| "No task name provided".to_string())?;
 
     let current_dir =
@@ -11,11 +13,18 @@ pub fn execute(task_with_args: &str) -> Result<(), String> {
     let discovered = task_discovery::discover_tasks(&current_dir);
 
     // Find all tasks with the given name
-    let matching_tasks: Vec<_> = discovered.tasks.iter().filter(|t| t.name == task_name).collect();
+    let matching_tasks: Vec<_> = discovered
+        .tasks
+        .iter()
+        .filter(|t| t.name == task_name)
+        .collect();
 
     match matching_tasks.len() {
         0 => {
-            eprintln!("No task named '{}' found in the current directory.", task_name);
+            eprintln!(
+                "No task named '{}' found in the current directory.",
+                task_name
+            );
             Err(format!("No task named '{}' found", task_name))
         }
         1 => {
@@ -35,7 +44,10 @@ pub fn execute(task_with_args: &str) -> Result<(), String> {
             for task in matching_tasks {
                 eprintln!("  • {} (from {})", task.name, task.file_path.display());
             }
-            eprintln!("Please use 'dela run {}' to choose which one to run.", task_name);
+            eprintln!(
+                "Please use 'dela run {}' to choose which one to run.",
+                task_name
+            );
             Err(format!("Multiple tasks named '{}' found", task_name))
         }
     }
