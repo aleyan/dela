@@ -1,9 +1,6 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+*'
   workflow_dispatch:
     inputs:
       skip_github_release:
@@ -20,11 +17,71 @@ on:
         default: false
 
 jobs:
-  create-release:
+  verify-version:
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check version consistency
+        run: |
+          # Get version from Cargo.toml
+          CARGO_VERSION=$(grep -m 1 '^version = ' Cargo.toml | cut -d '"' -f2)
+          echo "Cargo.toml version: $CARGO_VERSION"
+          
+          # Check if this version exists in CHANGELOG.md
+          if ! grep -q "^\## \[$CARGO_VERSION\]" CHANGELOG.md; then
+            echo "::error::Version $CARGO_VERSION not found in CHANGELOG.md"
+            exit 1
+          fi
+          
+          # Check if CHANGELOG version is marked as Unreleased
+          if grep -q "^\## \[$CARGO_VERSION\] - Unreleased" CHANGELOG.md; then
+            echo "::error::Version $CARGO_VERSION is still marked as Unreleased in CHANGELOG.md"
+            exit 1
+          fi
+          
+          # Check if CHANGELOG version has a date
+          if ! grep -q "^\## \[$CARGO_VERSION\] - [0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}" CHANGELOG.md; then
+            echo "::error::Version $CARGO_VERSION in CHANGELOG.md doesn't have a proper date (YYYY-MM-DD)"
+            exit 1
+          fi
+          
+          # Verify version follows semver
+          if ! echo "$CARGO_VERSION" | grep -q '^[0-9]\+\.[0-9]\+\.[0-9]\+$'; then
+            echo "::error::Version $CARGO_VERSION doesn't follow semantic versioning (X.Y.Z)"
+            exit 1
+          fi
+          
+          echo "Version verification passed!"
+
+  verify-workflow-status:
+    needs: verify-version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check workflow status
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Check the status of the last Rust workflow run
+          rust_status=$(gh run list --workflow=Rust --branch main --limit 1 --json conclusion -q '.[0].conclusion')
+          if [ "$rust_status" != "success" ]; then
+            echo "::error::Latest Rust workflow run did not succeed. Please ensure tests are passing."
+            exit 1
+          fi
+          
+          # Check the status of the last Integration Tests workflow run
+          integration_status=$(gh run list --workflow="Integration Tests" --branch main --limit 1 --json conclusion -q '.[0].conclusion')
+          if [ "$integration_status" != "success" ]; then
+            echo "::error::Latest Integration Tests workflow run did not succeed. Please ensure tests are passing."
+            exit 1
+          fi
+
+  create-release:
+    needs: [verify-version, verify-workflow-status]
+    runs-on: ubuntu-latest
+    if: ${{ !inputs.skip_github_release }}
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
-    if: ${{ !inputs.skip_github_release }}
     steps:
       - uses: actions/checkout@v4
       
