@@ -678,6 +678,7 @@ test: ## Running tests
     }
 
     #[test]
+    #[serial]
     fn test_task_description_formatting() {
         let mut writer = TestWriter::new();
         let temp_dir = TempDir::new().unwrap();
