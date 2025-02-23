@@ -8,6 +8,9 @@ test-task: ## Test task for basic functionality
 another-task: ## Another test task
 	@echo "Another task executed successfully"
 
+print-arg-task: ## Test task for basic functionality with args
+	@echo "Argument is: $(ARG)"
+
 cd: ## Task that will be shadowed by shell builtin
 	@echo "This task is shadowed by the cd shell builtin"
 
