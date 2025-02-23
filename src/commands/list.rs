@@ -696,15 +696,11 @@ test: ## Running tests
             .with_executable("make");
         set_test_environment(env);
 
-        // Create lock files to ensure correct package managers are selected
-        File::create(temp_dir.path().join("package-lock.json")).unwrap();
-        File::create(temp_dir.path().join("uv.lock")).unwrap();
-
         // Create test tasks with descriptions
         let tasks = vec![
             Task {
                 name: "build".to_string(),
-                file_path: PathBuf::from("Makefile"),
+                file_path: temp_dir.path().join("Makefile"),
                 definition_type: TaskDefinitionType::Makefile,
                 runner: TaskRunner::Make,
                 source_name: "build".to_string(),
@@ -713,7 +709,7 @@ test: ## Running tests
             },
             Task {
                 name: "test".to_string(),
-                file_path: PathBuf::from("package.json"),
+                file_path: temp_dir.path().join("package.json"),
                 definition_type: TaskDefinitionType::PackageJson,
                 runner: TaskRunner::NodeNpm,
                 source_name: "test".to_string(),
@@ -722,7 +718,7 @@ test: ## Running tests
             },
             Task {
                 name: "serve".to_string(),
-                file_path: PathBuf::from("pyproject.toml"),
+                file_path: temp_dir.path().join("pyproject.toml"),
                 definition_type: TaskDefinitionType::PyprojectToml,
                 runner: TaskRunner::PythonUv,
                 source_name: "serve".to_string(),
@@ -731,7 +727,7 @@ test: ## Running tests
             },
             Task {
                 name: "clean".to_string(),
-                file_path: PathBuf::from("Makefile"),
+                file_path: temp_dir.path().join("Makefile"),
                 definition_type: TaskDefinitionType::Makefile,
                 runner: TaskRunner::Make,
                 source_name: "clean".to_string(),
