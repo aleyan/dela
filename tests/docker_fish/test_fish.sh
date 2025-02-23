@@ -170,6 +170,7 @@ end
 
 # Test UV tasks with non-interactive mode
 log "Testing UV tasks with non-interactive mode..."
+set -x DELA_NON_INTERACTIVE 1
 dela allow-command uv-test --allow 2 >/dev/null 2>&1; or error "Failed to allow uv-test"
 dela allow-command uv-build --allow 2 >/dev/null 2>&1; or error "Failed to allow uv-build"
 
@@ -197,8 +198,8 @@ if not string match -q "*Build task executed successfully*" -- "$output"
     exit 1
 end
 
-# Test Poetry tasks
-log "Testing Poetry tasks..."
+# Test Poetry tasks with non-interactive mode
+log "Testing Poetry tasks with non-interactive mode..."
 dela allow-command poetry-test --allow 2 >/dev/null 2>&1; or error "Failed to allow poetry-test"
 dela allow-command poetry-build --allow 2 >/dev/null 2>&1; or error "Failed to allow poetry-build"
 
