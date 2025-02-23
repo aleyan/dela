@@ -142,6 +142,29 @@ pub fn check_task_allowed(task: &Task) -> Result<bool, String> {
     }
 }
 
+/// Check if a given task is allowed with a specific scope, without prompting
+pub fn check_task_allowed_with_scope(task: &Task, scope: AllowScope) -> Result<bool, String> {
+    // Only proceed with allowlist operations if dela is initialized
+    let mut allowlist = load_allowlist()?;
+
+    // Create a new allowlist entry
+    let mut entry = AllowlistEntry {
+        path: task.file_path.clone(),
+        scope: scope.clone(),
+        tasks: None,
+    };
+
+    // For Task scope, add the specific task name
+    if scope == AllowScope::Task {
+        entry.tasks = Some(vec![task.name.clone()]);
+    }
+
+    // Add the entry and save
+    allowlist.entries.push(entry);
+    save_allowlist(&allowlist)?;
+    Ok(true)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
