@@ -142,6 +142,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_detect_package_manager_multiple_available() {
         let temp_dir = TempDir::new().unwrap();
 
