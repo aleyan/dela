@@ -1,6 +1,14 @@
-use crate::task_shadowing::ShadowType;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+
+/// Information about what shadows a task name
+#[derive(Debug, Clone, PartialEq)]
+pub enum ShadowType {
+    /// Task is shadowed by a shell builtin
+    ShellBuiltin(String), // shell name
+    /// Task is shadowed by an executable in PATH
+    PathExecutable(String), // full path
+}
 
 /// Different types of task definition files supported by dela
 #[derive(Debug, Clone, PartialEq)]

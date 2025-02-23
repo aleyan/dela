@@ -1,4 +1,4 @@
-.PHONY: build tests tests_integration test_noinit test_zsh test_bash test_fish test_pwsh run install builder publish
+.PHONY: build tests tests_integration test_unit test_noinit test_zsh test_bash test_fish test_pwsh run install builder publish
 
 # Default to non-verbose output
 VERBOSE ?= 0
@@ -20,6 +20,9 @@ builder:
 	docker build -t dela-builder -f tests/Dockerfile.builder .
 
 # Individual shell test targets
+test_unit: builder
+	VERBOSE=$(VERBOSE) ./tests/run_tests.sh unit;
+
 test_noinit: builder
 	VERBOSE=$(VERBOSE) ./tests/run_tests.sh noinit;
 
@@ -36,7 +39,7 @@ test_pwsh: builder
 	VERBOSE=$(VERBOSE) ./tests/run_tests.sh pwsh;
 
 # Run all shell tests
-tests_integration: builder test_noinit test_zsh test_bash test_fish test_pwsh
+tests_integration: builder test_unit test_noinit test_zsh test_bash test_fish test_pwsh
 
 install:
 	@echo "Installing dela locally..."

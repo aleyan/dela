@@ -209,8 +209,10 @@ fn discover_shell_script_tasks(dir: &Path, discovered: &mut DiscoveredTasks) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::task_shadowing::ShadowType;
+    use crate::environment::{reset_to_real_environment, set_test_environment, TestEnvironment};
     use crate::task_shadowing::{enable_mock, mock_executable, reset_mock};
+    use crate::types::ShadowType;
+    use serial_test::serial;
     use std::fs::File;
     use std::io::Write;
     use tempfile::TempDir;
@@ -640,9 +642,14 @@ test:
     }
 
     #[test]
+    #[serial]
     fn test_discover_tasks_with_shadowing() {
         let temp_dir = TempDir::new().unwrap();
         let makefile_path = temp_dir.path().join("Makefile");
+
+        // Set up test environment with zsh shell
+        let env = TestEnvironment::new().with_shell("/bin/zsh");
+        set_test_environment(env);
 
         let content = r#"
 test:
@@ -668,6 +675,8 @@ cd:
             cd_task.shadowed_by,
             Some(ShadowType::ShellBuiltin(_))
         ));
+
+        reset_to_real_environment();
     }
 
     #[test]

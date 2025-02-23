@@ -1,6 +1,6 @@
 use crate::runner::is_runner_available;
 use crate::task_discovery;
-use crate::task_shadowing::ShadowType;
+use crate::types::ShadowType;
 use crate::types::{Task, TaskFileStatus};
 use std::collections::HashMap;
 use std::env;
@@ -191,6 +191,7 @@ impl Task {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::environment::{reset_to_real_environment, set_test_environment, TestEnvironment};
     use crate::task_shadowing::{enable_mock, mock_executable, reset_mock};
     use crate::types::{Task, TaskDefinitionType, TaskRunner};
     use serial_test::serial;
@@ -605,6 +606,7 @@ custom: ## Custom command
     #[test]
     fn test_task_description_formatting() {
         let mut writer = TestWriter::new();
+        let temp_dir = TempDir::new().unwrap();
 
         // Mock package managers
         reset_mock();
@@ -612,6 +614,17 @@ custom: ## Custom command
         mock_executable("npm");
         mock_executable("uv");
         mock_executable("make");
+
+        // Set up test environment
+        let env = TestEnvironment::new()
+            .with_executable("npm")
+            .with_executable("uv")
+            .with_executable("make");
+        set_test_environment(env);
+
+        // Create lock files to ensure correct package managers are selected
+        File::create(temp_dir.path().join("package-lock.json")).unwrap();
+        File::create(temp_dir.path().join("uv.lock")).unwrap();
 
         // Create test tasks with descriptions
         let tasks = vec![
@@ -682,6 +695,7 @@ custom: ## Custom command
         );
 
         reset_mock();
+        reset_to_real_environment();
     }
 
     #[test]

@@ -11,3 +11,5 @@ You are often going to be generating code that is not complete. Leave TODOs and 
 When adding new dependencies, show or run the command for the package manger to install the dependency rather than modifying the dependencies definitions directly.
 
 Implementation for individual cli subcommands should be in the src/commands/ subfolder.
+
+When writing tests that mock files, always set them to `#[serial]`.

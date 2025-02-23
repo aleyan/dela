@@ -1,7 +1,9 @@
 use clap::{Parser, Subcommand};
 
 mod allowlist;
+mod builtins;
 mod commands;
+mod environment;
 mod parsers;
 mod prompt;
 mod runner;
