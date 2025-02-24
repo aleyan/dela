@@ -16,6 +16,7 @@ pub fn is_runner_available(runner: &TaskRunner) -> bool {
         TaskRunner::PythonPoetry => check_path_executable("poetry").is_some(),
         TaskRunner::PythonPoe => check_path_executable("poe").is_some(),
         TaskRunner::ShellScript => true, // Shell scripts don't need a runner
+        TaskRunner::Task => check_path_executable("task").is_some(),
     }
 }
 

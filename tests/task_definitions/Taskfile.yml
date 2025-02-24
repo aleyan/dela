@@ -1,0 +1,19 @@
+version: '3'
+
+tasks:
+  task-test:
+    desc: Test task for basic functionality
+    cmds:
+      - echo "Test task executed successfully"
+
+  task-build:
+    desc: Build task for basic functionality
+    cmds:
+      - echo "Build task executed successfully"
+
+  task-deps:
+    desc: Task with dependencies
+    deps:
+      - task-test
+    cmds:
+      - echo "Dependency task executed successfully" 

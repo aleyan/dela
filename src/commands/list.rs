@@ -260,6 +260,7 @@ mod tests {
                     TaskDefinitionType::PyprojectToml
                 }
                 TaskRunner::ShellScript => TaskDefinitionType::ShellScript,
+                TaskRunner::Task => TaskDefinitionType::Taskfile,
             },
             runner,
             source_name: name.to_string(),

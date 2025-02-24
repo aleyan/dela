@@ -21,6 +21,8 @@ pub enum TaskDefinitionType {
     PyprojectToml,
     /// Shell script
     ShellScript,
+    /// Taskfile.yml
+    Taskfile,
 }
 
 /// Different types of task runners supported by dela.
@@ -55,6 +57,9 @@ pub enum TaskRunner {
     /// Shell script tasks
     /// Used for direct execution of shell scripts
     ShellScript,
+    /// Task runner for Taskfile.yml
+    /// Used when Taskfile.yml is present
+    Task,
 }
 
 /// Status of a task definition file
@@ -93,6 +98,8 @@ pub struct DiscoveredTaskDefinitions {
     pub package_json: Option<TaskDefinitionFile>,
     /// pyproject.toml if found
     pub pyproject_toml: Option<TaskDefinitionFile>,
+    /// Taskfile.yml if found
+    pub taskfile: Option<TaskDefinitionFile>,
 }
 
 /// Represents a discovered task that can be executed
@@ -127,6 +134,7 @@ impl TaskRunner {
             TaskRunner::PythonPoetry => format!("poetry run {}", task.source_name),
             TaskRunner::PythonPoe => format!("poe {}", task.source_name),
             TaskRunner::ShellScript => format!("./{}", task.source_name),
+            TaskRunner::Task => format!("task {}", task.source_name),
         }
     }
 
@@ -142,6 +150,7 @@ impl TaskRunner {
             TaskRunner::PythonPoetry => "Poetry",
             TaskRunner::PythonPoe => "Poe",
             TaskRunner::ShellScript => "Shell Script",
+            TaskRunner::Task => "Taskfile",
         }
     }
 
@@ -156,6 +165,7 @@ impl TaskRunner {
             TaskRunner::PythonPoetry => "poetry",
             TaskRunner::PythonPoe => "poe",
             TaskRunner::ShellScript => "sh",
+            TaskRunner::Task => "task",
         }
     }
 }
