@@ -16,6 +16,7 @@ clap = { version = "4.5.24", features = ["derive"] }
 makefile-lossless = { git = "https://github.com/jelmer/makefile-lossless", rev = "16e8c2d30b4f9d12bd5d688b4b2363191ab864ec" }
 serde = { version = "1.0.217", features = ["derive"] }
 serde_json = "1.0.135"
+serde_yaml = "0.9.32"
 toml = "0.8.19"
 once_cell = "1.20.3"
 

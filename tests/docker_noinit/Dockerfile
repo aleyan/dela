@@ -12,7 +12,8 @@ RUN apk add --no-cache \
     uv \
     poetry \
     nodejs \
-    npm
+    npm \
+    task
 
 # Create test user
 RUN adduser -D -s /bin/zsh testuser
@@ -40,6 +41,7 @@ COPY tests/task_definitions/Makefile /home/testuser/test_project/
 COPY tests/task_definitions/package.json /home/testuser/test_project/
 COPY tests/task_definitions/pyproject.toml /home/testuser/test_project/
 COPY tests/task_definitions/uv.lock /home/testuser/test_project/
+COPY tests/task_definitions/Taskfile.yml /home/testuser/test_project/
 RUN chown -R testuser:testuser /home/testuser/test_project
 
 # Copy the compiled binary from the builder stage

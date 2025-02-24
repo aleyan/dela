@@ -1,4 +1,4 @@
-use crate::parsers::{parse_makefile, parse_package_json, parse_pyproject_toml};
+use crate::parsers::{parse_makefile, parse_package_json, parse_pyproject_toml, parse_taskfile};
 use crate::task_shadowing::check_shadowing;
 use crate::types::{
     DiscoveredTaskDefinitions, Task, TaskDefinitionFile, TaskDefinitionType, TaskFileStatus,
@@ -27,6 +27,7 @@ pub fn discover_tasks(dir: &Path) -> DiscoveredTasks {
     let _ = discover_makefile_tasks(dir, &mut discovered);
     let _ = discover_npm_tasks(dir, &mut discovered);
     let _ = discover_python_tasks(dir, &mut discovered);
+    let _ = discover_taskfile_tasks(dir, &mut discovered);
     discover_shell_script_tasks(dir, &mut discovered);
 
     discovered
@@ -40,6 +41,7 @@ fn set_definition(discovered: &mut DiscoveredTasks, definition: TaskDefinitionFi
         TaskDefinitionType::PyprojectToml => {
             discovered.definitions.pyproject_toml = Some(definition)
         }
+        TaskDefinitionType::Taskfile => discovered.definitions.taskfile = Some(definition),
         _ => {}
     }
 }
@@ -173,6 +175,33 @@ fn discover_python_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result
         }
     }
 
+    Ok(())
+}
+
+fn discover_taskfile_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<(), String> {
+    let taskfile_path = dir.join("Taskfile.yml");
+    if taskfile_path.exists() {
+        let mut definition = TaskDefinitionFile {
+            path: taskfile_path.clone(),
+            definition_type: TaskDefinitionType::Taskfile,
+            status: TaskFileStatus::NotImplemented,
+        };
+
+        match parse_taskfile::parse(&taskfile_path) {
+            Ok(tasks) => {
+                definition.status = TaskFileStatus::Parsed;
+                discovered.tasks.extend(tasks);
+            }
+            Err(e) => {
+                definition.status = TaskFileStatus::ParseError(e.clone());
+                discovered
+                    .errors
+                    .push(format!("Error parsing Taskfile.yml: {}", e));
+            }
+        }
+
+        set_definition(discovered, definition);
+    }
     Ok(())
 }
 
@@ -714,5 +743,64 @@ cd:
             TaskRunner::NodeNpm | TaskRunner::NodeYarn | TaskRunner::NodePnpm | TaskRunner::NodeBun
         ));
         assert_eq!(build_task.description, Some("tsc".to_string()));
+    }
+
+    #[test]
+    fn test_discover_taskfile_tasks() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Mock task being installed
+        reset_mock();
+        enable_mock();
+        mock_executable("task");
+
+        // Create Taskfile.yml with tasks
+        let content = r#"version: '3'
+
+tasks:
+  test:
+    desc: Test task
+    cmds:
+      - echo "Running tests"
+  build:
+    desc: Build task
+    cmds:
+      - echo "Building project"
+  deps:
+    desc: Task with dependencies
+    deps:
+      - test
+    cmds:
+      - echo "Running dependent task""#;
+
+        let taskfile_path = temp_dir.path().join("Taskfile.yml");
+        let mut file = File::create(&taskfile_path).unwrap();
+        write!(file, "{}", content).unwrap();
+
+        let discovered = discover_tasks(temp_dir.path());
+
+        // Check Taskfile.yml status
+        let taskfile_def = discovered.definitions.taskfile.unwrap();
+        assert_eq!(taskfile_def.status, TaskFileStatus::Parsed);
+
+        // Verify tasks were discovered
+        assert_eq!(discovered.tasks.len(), 3);
+
+        let test_task = discovered.tasks.iter().find(|t| t.name == "test").unwrap();
+        assert_eq!(test_task.runner, TaskRunner::Task);
+        assert_eq!(test_task.description, Some("Test task".to_string()));
+
+        let build_task = discovered.tasks.iter().find(|t| t.name == "build").unwrap();
+        assert_eq!(build_task.runner, TaskRunner::Task);
+        assert_eq!(build_task.description, Some("Build task".to_string()));
+
+        let deps_task = discovered.tasks.iter().find(|t| t.name == "deps").unwrap();
+        assert_eq!(deps_task.runner, TaskRunner::Task);
+        assert_eq!(
+            deps_task.description,
+            Some("Task with dependencies".to_string())
+        );
+
+        reset_mock();
     }
 }
