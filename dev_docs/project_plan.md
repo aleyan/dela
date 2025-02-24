@@ -16,7 +16,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
     - [x] [DTKT-59] Implement `get_command` command structure and help text
     - [ ] [DTKT-60] Add command-line options for verbosity and debug output
     - [x] [DTKT-61] Add `--help` text for each subcommand
-    - [ ] [DTKT-62] Add `--version` flag to show version information
+    - [x] [DTKT-62] Add `--version` flag to show version information
 
 - [ ] **Task Definition Parsers**
   - [x] [DTKT-3] Create `task_discovery.rs`.
@@ -24,7 +24,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [x] [DTKT-5] Implement parser for `package.json` scripts (`package-json` or `package_json_schema`).
   - [x] [DTKT-6] Implement parser for `pyproject.toml` scripts (`pyproject-toml`).
   - [x] [DTKT-106] For `package.json`, detect if there is a lock file `pnpm` or  `npm` or `yarn` or `bun` use that to run tasks.
-  - [ ] [DTKT-104] Update makefile-lossless to new version supporting trailing text.
+  - [x] [DTKT-104] Update makefile-lossless to new version supporting trailing text.
 
 - [ ] **Structs and Runners**
   - [x] [DTKT-7] Define `Task` and `TaskRunner` enums in `types.rs`.
@@ -93,7 +93,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [x] [DTKT-23] Complete `dela run <task>` for direct execution.
   - [x] [DTKT-24] Ensure bare commands invoke `dela` through the fallback.
   - [ ] [DTKT-25] Prompt user if multiple matching tasks exist.
-  - [ ] [DTKT-95] Provide `dr` shell function to run dela tasks with --allow flag.
+  - [x] [DTKT-95] Provide `dr` shell function to run dela tasks with --allow flag.
   - [x] [DTKT-112] Remove `dela run` in favor of `dr` shell function.
 
 - [ ] **Disambiguation**
