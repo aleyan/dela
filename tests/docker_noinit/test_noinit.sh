@@ -28,23 +28,31 @@ else
     exit 1
 fi
 
-# Test 3: Test allow-command functionality
-echo "\nTest 3: Testing allow-command"
+# Test 3: Test allow-command interactive functionality
+echo "\nTest 3: Testing allow-command interactive functionality"
 echo "Initial allowlist contents:"
 cat /home/testuser/.dela/allowlist.toml
 
-# Allow npm-build task (option 2: Allow this task)
-echo "\nRunning allow-command:"
+# Test interactive allow-command with option 2 (Allow this task)
+echo "\nTesting interactive allow-command with 'Allow this task' option:"
 echo "2" | dela allow-command npm-build
 
 echo "\nAllowlist contents after allow-command:"
 cat /home/testuser/.dela/allowlist.toml
 
-# Verify the allowlist was updated
+# Verify the allowlist was updated with the specific task
 if grep -q "npm-build" /home/testuser/.dela/allowlist.toml; then
-    echo "${GREEN}✓ npm-build task was added to allowlist${NC}"
+    echo "${GREEN}✓ npm-build task was added to allowlist via interactive mode${NC}"
 else
-    echo "${RED}✗ npm-build task was not added to allowlist${NC}"
+    echo "${RED}✗ npm-build task was not added to allowlist via interactive mode${NC}"
+    exit 1
+fi
+
+# Verify the task was added with Task scope (not File or Directory)
+if grep -q "scope = \"Task\"" /home/testuser/.dela/allowlist.toml; then
+    echo "${GREEN}✓ Task scope was correctly set via interactive mode${NC}"
+else
+    echo "${RED}✗ Task scope was not correctly set via interactive mode${NC}"
     exit 1
 fi
 

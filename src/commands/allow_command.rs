@@ -1,8 +1,9 @@
 use crate::allowlist;
 use crate::task_discovery;
+use crate::types::AllowScope;
 use std::env;
 
-pub fn execute(task_with_args: &str) -> Result<(), String> {
+pub fn execute(task_with_args: &str, allow: Option<u8>) -> Result<(), String> {
     let task_name = task_with_args
         .split_whitespace()
         .next()
@@ -30,14 +31,45 @@ pub fn execute(task_with_args: &str) -> Result<(), String> {
         1 => {
             // Single task found, check allowlist
             let task = matching_tasks[0];
-            if !allowlist::check_task_allowed(task)? {
-                eprintln!("Task '{}' was denied by the allowlist.", task.name);
-                return Err(format!(
-                    "Dela task '{}' was denied by the ~/.dela/allowlist.toml",
-                    task.name
-                ));
+
+            // If allow option is provided, use it directly
+            if let Some(choice) = allow {
+                match choice {
+                    2 => {
+                        allowlist::check_task_allowed_with_scope(task, AllowScope::Task)?;
+                        Ok(())
+                    }
+                    3 => {
+                        allowlist::check_task_allowed_with_scope(task, AllowScope::File)?;
+                        Ok(())
+                    }
+                    4 => {
+                        allowlist::check_task_allowed_with_scope(task, AllowScope::Directory)?;
+                        Ok(())
+                    }
+                    5 => {
+                        eprintln!("Task '{}' was denied by the allowlist.", task.name);
+                        Err(format!(
+                            "Dela task '{}' was denied by the ~/.dela/allowlist.toml",
+                            task.name
+                        ))
+                    }
+                    _ => Err(format!(
+                        "Invalid allow choice {}. Please use a number between 2 and 5.",
+                        choice
+                    )),
+                }
+            } else {
+                // Otherwise, use the interactive prompt
+                if !allowlist::check_task_allowed(task)? {
+                    eprintln!("Task '{}' was denied by the allowlist.", task.name);
+                    return Err(format!(
+                        "Dela task '{}' was denied by the ~/.dela/allowlist.toml",
+                        task.name
+                    ));
+                }
+                Ok(())
             }
-            Ok(())
         }
         _ => {
             eprintln!("Multiple tasks named '{}' found:", task_name);
@@ -125,67 +157,100 @@ test: ## Running tests
     #[test]
     #[serial]
     fn test_allow_command_single_task() {
-        let (project_dir, home_dir) = setup_test_env();
+        let (project_dir, _home_dir) = setup_test_env();
         env::set_current_dir(&project_dir).expect("Failed to change directory");
 
         // Simulate user allowing the task
         with_stdin("1\n", || {
-            let result = execute("test");
+            let result = execute("test", None);
             assert!(result.is_ok(), "Should succeed for a single task");
         });
-
-        drop(project_dir);
-        drop(home_dir);
     }
 
     #[test]
     #[serial]
     fn test_allow_command_with_args() {
-        let (project_dir, home_dir) = setup_test_env();
+        let (project_dir, _home_dir) = setup_test_env();
         env::set_current_dir(&project_dir).expect("Failed to change directory");
 
         // Simulate user allowing the task
         with_stdin("1\n", || {
-            let result = execute("test --verbose --coverage");
+            let result = execute("test --verbose --coverage", None);
             assert!(result.is_ok(), "Should succeed for task with arguments");
         });
-
-        drop(project_dir);
-        drop(home_dir);
     }
 
     #[test]
     #[serial]
     fn test_allow_command_denied_task() {
-        let (project_dir, home_dir) = setup_test_env();
+        let (project_dir, _home_dir) = setup_test_env();
         env::set_current_dir(&project_dir).expect("Failed to change directory");
 
         // Simulate user denying the task
         with_stdin("5\n", || {
-            let result = execute("test");
+            let result = execute("test", None);
             assert!(result.is_err(), "Should fail when task is denied");
             assert_eq!(
                 result.unwrap_err(),
                 "Dela task 'test' was denied by the ~/.dela/allowlist.toml"
             );
         });
-
-        drop(project_dir);
-        drop(home_dir);
     }
 
     #[test]
     #[serial]
     fn test_allow_command_no_task() {
-        let (project_dir, home_dir) = setup_test_env();
+        let (project_dir, _home_dir) = setup_test_env();
         env::set_current_dir(&project_dir).expect("Failed to change directory");
 
-        let result = execute("nonexistent");
+        let result = execute("nonexistent", None);
         assert!(result.is_err(), "Should fail when no task found");
         assert_eq!(result.unwrap_err(), "No task named 'nonexistent' found");
+    }
 
-        drop(project_dir);
-        drop(home_dir);
+    #[test]
+    #[serial]
+    fn test_allow_command_with_allow_option() {
+        let (project_dir, _home_dir) = setup_test_env();
+        env::set_current_dir(&project_dir).expect("Failed to change directory");
+
+        // Test with valid allow options
+        assert!(
+            execute("test", Some(2)).is_ok(),
+            "Should succeed with allow=2"
+        );
+        assert!(
+            execute("test", Some(3)).is_ok(),
+            "Should succeed with allow=3"
+        );
+        assert!(
+            execute("test", Some(4)).is_ok(),
+            "Should succeed with allow=4"
+        );
+
+        // Test with deny option
+        let result = execute("test", Some(5));
+        assert!(result.is_err(), "Should fail with allow=5");
+        assert_eq!(
+            result.unwrap_err(),
+            "Dela task 'test' was denied by the ~/.dela/allowlist.toml"
+        );
+
+        // Test with invalid allow option
+        let result = execute("test", Some(1));
+        assert!(result.is_err(), "Should fail with allow=1");
+        assert_eq!(
+            result.unwrap_err(),
+            "Invalid allow choice 1. Please use a number between 2 and 5."
+        );
+
+        // Test with out of range allow option
+        let result = execute("test", Some(6));
+        assert!(result.is_err(), "Should fail with allow=6");
+        assert_eq!(
+            result.unwrap_err(),
+            "Invalid allow choice 6. Please use a number between 2 and 5."
+        );
     }
 
     #[test]
@@ -211,7 +276,7 @@ test: ## Running tests
             .expect("Failed to write Makefile");
 
         // Try to allow a task without .dela directory
-        let result = execute("test");
+        let result = execute("test", None);
         assert!(
             result.is_err(),
             "Should fail when .dela directory doesn't exist"
@@ -226,8 +291,26 @@ test: ## Running tests
             !home_dir.path().join(".dela").exists(),
             ".dela directory should not be created"
         );
+    }
 
-        drop(project_dir);
-        drop(home_dir);
+    #[test]
+    #[serial]
+    fn test_allow_command_with_allow_option_and_args() {
+        let (project_dir, _home_dir) = setup_test_env();
+        env::set_current_dir(&project_dir).expect("Failed to change directory");
+
+        // Test with valid allow option and task arguments
+        assert!(
+            execute("test --verbose --coverage", Some(2)).is_ok(),
+            "Should succeed with allow=2 and arguments"
+        );
+
+        // Test with deny option and task arguments
+        let result = execute("test --verbose --coverage", Some(5));
+        assert!(result.is_err(), "Should fail with allow=5 and arguments");
+        assert_eq!(
+            result.unwrap_err(),
+            "Dela task 'test' was denied by the ~/.dela/allowlist.toml"
+        );
     }
 }

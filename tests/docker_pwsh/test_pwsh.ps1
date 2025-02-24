@@ -181,14 +181,18 @@ Write-Log "4. Testing allowlist functionality..."
 
 Write-Log "4. Testing task execution..."
 
-# Test UV tasks
-Write-Log "Testing UV tasks..."
-$env:DELA_NON_INTERACTIVE = 1
+# Test interactive allow-command functionality
+Write-Log "Testing interactive allow-command functionality..."
+$env:DELA_NON_INTERACTIVE = 0
 "2" | dela allow-command uv-test
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Failed to allow uv-test"
 }
-"2" | dela allow-command uv-build
+
+# Test non-interactive allow-command
+Write-Log "Testing non-interactive allow-command..."
+$env:DELA_NON_INTERACTIVE = 1
+dela allow-command uv-build --allow 2
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Failed to allow uv-build"
 }
@@ -203,13 +207,13 @@ if (-not ($output -match "Build task executed successfully")) {
     Write-Error "dr uv-build failed. Got: $output"
 }
 
-# Test Poetry tasks
-Write-Log "Testing Poetry tasks..."
-"2" | dela allow-command poetry-test
+# Test Poetry tasks with non-interactive mode
+Write-Log "Testing Poetry tasks with non-interactive mode..."
+dela allow-command poetry-test --allow 2
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Failed to allow poetry-test"
 }
-"2" | dela allow-command poetry-build
+dela allow-command poetry-build --allow 2
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Failed to allow poetry-build"
 }
@@ -223,7 +227,6 @@ $output = dr poetry-build
 if (-not ($output -match "Build task executed successfully")) {
     Write-Error "dr poetry-build failed. Got: $output"
 }
-$env:DELA_NON_INTERACTIVE = 0
 
 # Verify command not found handler was properly replaced
 Write-Log "Testing final command_not_found_handler..."

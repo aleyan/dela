@@ -94,10 +94,14 @@ enum Commands {
     /// This is used internally by shell integration and shouldn't be called directly.
     ///
     /// Example: dela allow-command build
+    /// Example: dela allow-command build --allow 2
     #[command(name = "allow-command")]
     AllowCommand {
         /// Name of the task to check
         task: String,
+        /// Automatically allow with a specific choice (2-5)
+        #[arg(long)]
+        allow: Option<u8>,
     },
 }
 
@@ -110,7 +114,7 @@ fn main() {
         Commands::List { verbose } => commands::list::execute(verbose),
         Commands::Run { task } => commands::run::execute(&task),
         Commands::GetCommand { task } => commands::get_command::execute(&task),
-        Commands::AllowCommand { task } => commands::allow_command::execute(&task),
+        Commands::AllowCommand { task, allow } => commands::allow_command::execute(&task, allow),
     };
 
     if let Err(err) = result {
