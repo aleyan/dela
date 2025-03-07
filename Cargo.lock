@@ -124,7 +124,7 @@ checksum = "7704b5fdd17b18ae31c4c1da5a2e0305a2bf17b5249300a9ee9ed7b72114c636"
 
 [[package]]
 name = "dela"
-version = "0.0.3"
+version = "0.0.2"
 dependencies = [
  "clap",
  "libc",
@@ -320,7 +320,8 @@ checksum = "30bde2b3dc3671ae49d8e2e9f044c7c005836e7a023ee57cffa25ab82764bb9e"
 [[package]]
 name = "makefile-lossless"
 version = "0.1.7"
-source = "git+https://github.com/jelmer/makefile-lossless?rev=16e8c2d30b4f9d12bd5d688b4b2363191ab864ec#16e8c2d30b4f9d12bd5d688b4b2363191ab864ec"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "85fd6456fd1895499a2cd26302eff80855631c6c7f6a3af2a29d71eb45c3098e"
 dependencies = [
  "log",
  "rowan",

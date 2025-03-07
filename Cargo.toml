@@ -1,6 +1,6 @@
 [package]
 name = "dela"
-version = "0.0.3"
+version = "0.0.2"
 edition = "2021"
 license = "MIT"
 authors = ["Alexander Yankov"]
@@ -13,7 +13,7 @@ categories = ["command-line-utilities", "development-tools", "development-tools:
 
 [dependencies]
 clap = { version = "4.5.24", features = ["derive"] }
-makefile-lossless = { git = "https://github.com/jelmer/makefile-lossless", rev = "16e8c2d30b4f9d12bd5d688b4b2363191ab864ec" }
+makefile-lossless = "0.1.7"
 serde = { version = "1.0.217", features = ["derive"] }
 serde_json = "1.0.135"
 serde_yaml = "0.9.32"
