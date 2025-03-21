@@ -97,21 +97,21 @@ mod tests {
     fn test_maven_runner() {
         reset_mock();
         enable_mock();
-        
+
         // Set up test environment without Maven
         let env = TestEnvironment::new();
         set_test_environment(env);
-        
+
         // Maven should not be available yet
         assert!(!is_runner_available(&TaskRunner::Maven));
-        
+
         // Now set up environment with Maven
         let env_with_maven = TestEnvironment::new().with_executable("mvn");
         set_test_environment(env_with_maven);
-        
+
         // Maven should now be available
         assert!(is_runner_available(&TaskRunner::Maven));
-        
+
         // Clean up
         reset_mock();
         reset_to_real_environment();

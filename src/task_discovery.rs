@@ -1,4 +1,6 @@
-use crate::parsers::{parse_makefile, parse_package_json, parse_pom_xml, parse_pyproject_toml, parse_taskfile};
+use crate::parsers::{
+    parse_makefile, parse_package_json, parse_pom_xml, parse_pyproject_toml, parse_taskfile,
+};
 use crate::task_shadowing::check_shadowing;
 use crate::types::{
     DiscoveredTaskDefinitions, Task, TaskDefinitionFile, TaskDefinitionType, TaskFileStatus,
@@ -824,7 +826,7 @@ tasks:
     fn test_discover_maven_tasks() {
         let temp_dir = tempfile::tempdir().unwrap();
         let dir_path = temp_dir.path();
-        
+
         // Create a sample pom.xml
         let pom_xml_content = r#"<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
@@ -887,33 +889,39 @@ tasks:
         </profile>
     </profiles>
 </project>"#;
-        
+
         std::fs::write(dir_path.join("pom.xml"), pom_xml_content).unwrap();
-        
+
         let discovered = discover_tasks(dir_path);
-        
+
         // Check that the definition was found
         assert!(discovered.definitions.maven_pom.is_some());
         assert_eq!(
             discovered.definitions.maven_pom.unwrap().status,
             TaskFileStatus::Parsed
         );
-        
+
         // Check that default Maven lifecycle tasks are discovered
         assert!(discovered.tasks.iter().any(|t| t.name == "clean"));
         assert!(discovered.tasks.iter().any(|t| t.name == "compile"));
         assert!(discovered.tasks.iter().any(|t| t.name == "test"));
         assert!(discovered.tasks.iter().any(|t| t.name == "package"));
         assert!(discovered.tasks.iter().any(|t| t.name == "install"));
-        
+
         // Check that profile tasks are discovered
         assert!(discovered.tasks.iter().any(|t| t.name == "profile:dev"));
         assert!(discovered.tasks.iter().any(|t| t.name == "profile:prod"));
-        
+
         // Check that plugin goals are discovered
-        assert!(discovered.tasks.iter().any(|t| t.name == "maven-compiler-plugin:compile"));
-        assert!(discovered.tasks.iter().any(|t| t.name == "spring-boot-maven-plugin:build-info"));
-        
+        assert!(discovered
+            .tasks
+            .iter()
+            .any(|t| t.name == "maven-compiler-plugin:compile"));
+        assert!(discovered
+            .tasks
+            .iter()
+            .any(|t| t.name == "spring-boot-maven-plugin:build-info"));
+
         // Verify task runners
         for task in discovered.tasks {
             if task.definition_type == TaskDefinitionType::MavenPom {
