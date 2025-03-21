@@ -331,16 +331,12 @@ test:
             "Expected no tasks, found: {:?}",
             discovered.tasks
         );
-        assert!(
-            discovered.errors.is_empty(),
-            "Expected no errors, found some"
-        );
 
-        // The status is considered Parsed (no recognized tasks, but no parse error):
-        match &discovered.definitions.makefile.unwrap().status {
-            TaskFileStatus::Parsed => (),
-            status => panic!("Expected Parsed, got {:?}", status),
-        }
+        // The status should be ParseError, as the makefile contains invalid content:
+        assert!(matches!(
+            discovered.definitions.makefile.unwrap().status,
+            TaskFileStatus::ParseError(_)
+        ));
     }
 
     #[test]
@@ -680,12 +676,7 @@ test:
         let env = TestEnvironment::new().with_shell("/bin/zsh");
         set_test_environment(env);
 
-        let content = r#"
-test:
-    @echo "Running tests"
-cd:
-    @echo "Change directory"
-"#;
+        let content = ".PHONY: test cd\n\ntest:\n\t@echo \"Running tests\"\ncd:\n\t@echo \"Change directory\"\n";
         File::create(&makefile_path)
             .unwrap()
             .write_all(content.as_bytes())
