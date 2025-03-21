@@ -14,7 +14,8 @@ RUN apk add --no-cache \
     nodejs \
     npm \
     task \
-    maven
+    maven \
+    gradle
 
 # Create test user
 RUN adduser -D -s /bin/zsh testuser
@@ -44,6 +45,8 @@ COPY tests/task_definitions/pyproject.toml /home/testuser/test_project/
 COPY tests/task_definitions/uv.lock /home/testuser/test_project/
 COPY tests/task_definitions/Taskfile.yml /home/testuser/test_project/
 COPY tests/task_definitions/pom.xml /home/testuser/test_project/
+COPY tests/task_definitions/build.gradle /home/testuser/test_project/
+COPY tests/task_definitions/build.gradle.kts /home/testuser/test_project/
 RUN chown -R testuser:testuser /home/testuser/test_project
 
 # Copy the compiled binary from the builder stage

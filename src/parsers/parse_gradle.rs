@@ -60,7 +60,7 @@ fn add_common_tasks(tasks: &mut Vec<Task>, file_path: &Path) {
 /// Extract custom task definitions from Gradle build file content
 fn extract_custom_tasks(content: &str, tasks: &mut Vec<Task>, file_path: &Path) -> Result<(), String> {
     // Look for task definitions in Groovy DSL (build.gradle)
-    let groovy_task_regex = Regex::new(r"task\s+(\w+)(?:\s*\{|\s*\()")
+    let groovy_task_regex = Regex::new(r"task\s+(\w+)(?:\s*\{|\s*\(|\s+.*?\{)")
         .map_err(|e| format!("Failed to compile regex: {}", e))?;
 
     // Regular expressions for finding tasks in Gradle Kotlin DSL files
@@ -80,7 +80,7 @@ fn extract_custom_tasks(content: &str, tasks: &mut Vec<Task>, file_path: &Path) 
                 definition_type: TaskDefinitionType::Gradle,
                 runner: TaskRunner::Gradle,
                 source_name: task_name.as_str().to_string(),
-                description: Some("Custom Gradle task".to_string()),
+                description: extract_task_description(content, task_name.as_str()),
                 shadowed_by: None,
             });
         }
@@ -95,7 +95,7 @@ fn extract_custom_tasks(content: &str, tasks: &mut Vec<Task>, file_path: &Path) 
                 definition_type: TaskDefinitionType::Gradle,
                 runner: TaskRunner::Gradle,
                 source_name: task_name.as_str().to_string(),
-                description: Some("Custom Gradle task (Kotlin DSL)".to_string()),
+                description: extract_task_description(content, task_name.as_str()),
                 shadowed_by: None,
             });
         }
@@ -110,13 +110,51 @@ fn extract_custom_tasks(content: &str, tasks: &mut Vec<Task>, file_path: &Path) 
                 definition_type: TaskDefinitionType::Gradle,
                 runner: TaskRunner::Gradle,
                 source_name: task_name.as_str().to_string(),
-                description: Some("Custom Gradle task (Kotlin DSL)".to_string()),
+                description: extract_task_description(content, task_name.as_str()),
                 shadowed_by: None,
             });
         }
     }
 
     Ok(())
+}
+
+/// Extract task description from content if available
+fn extract_task_description(content: &str, task_name: &str) -> Option<String> {
+    // This is a simplified approach with basic regex
+    let task_pattern = format!(r"task\s+{}", regex::escape(task_name));
+    let description_single_quote_pattern = format!(r"description\s+'([^']*)'");
+    let description_double_quote_pattern = format!(r#"description\s+"([^"]*)""#);
+    
+    // Look for task with description using single quotes
+    if let Ok(regex) = Regex::new(&format!("{}.+?{}", task_pattern, description_single_quote_pattern)) {
+        if let Some(caps) = regex.captures(content) {
+            if let Some(desc) = caps.get(1) {
+                return Some(desc.as_str().to_string());
+            }
+        }
+    }
+    
+    // Look for task with description using double quotes
+    if let Ok(regex) = Regex::new(&format!("{}.+?{}", task_pattern, description_double_quote_pattern)) {
+        if let Some(caps) = regex.captures(content) {
+            if let Some(desc) = caps.get(1) {
+                return Some(desc.as_str().to_string());
+            }
+        }
+    }
+    
+    // For Kotlin DSL, look for description with equals
+    let kotlin_pattern = format!(r#"tasks.*?"{}".+?description\s*=\s*"([^"]*)""#, regex::escape(task_name));
+    if let Ok(regex) = Regex::new(&kotlin_pattern) {
+        if let Some(caps) = regex.captures(content) {
+            if let Some(desc) = caps.get(1) {
+                return Some(desc.as_str().to_string());
+            }
+        }
+    }
+    
+    Some("Custom Gradle task".to_string())
 }
 
 /// Extract plugin-provided tasks from Gradle build file content

@@ -138,8 +138,81 @@ cat /home/testuser/.dela/allowlist.toml
 
 # Test interactive allow-command with option 2 (Allow this task)
 echo "\nTesting interactive allow-command with 'Allow this task' option:"
-echo "2" | dela allow-command clean >/dev/null 2>&1 || {
-    echo "${RED}✗ allow-command failed for Maven task${NC}"
+echo "Running: dela allow-command profile:dev"
+echo "2" | dela allow-command profile:dev
+RESULT=$?
+if [ $RESULT -ne 0 ]; then
+    echo "${RED}✗ allow-command failed for Maven task with exit code: $RESULT${NC}"
+    echo "Available tasks:"
+    dela list | grep -i profile || true
+    exit 1
+fi
+
+echo "\nAllowlist contents after allow-command:"
+cat /home/testuser/.dela/allowlist.toml
+
+# Verify the allowlist was updated with the specific task
+if grep -q "profile:dev" /home/testuser/.dela/allowlist.toml; then
+    echo "${GREEN}✓ Maven profile:dev task was added to allowlist via interactive mode${NC}"
+else
+    echo "${RED}✗ Maven profile:dev task was not added to allowlist via interactive mode${NC}"
+    exit 1
+fi
+
+# Test 11: Basic dela list for Gradle tasks (Groovy DSL)
+echo "\nTest 11: Testing dela list for Gradle tasks (Groovy DSL)"
+if dela list | grep -q "gradleTest" && dela list | grep -q "gradleBuild" && dela list | grep -q "build"; then
+    echo "${GREEN}✓ dela list shows Gradle tasks from build.gradle${NC}"
+else
+    echo "${RED}✗ dela list failed to show Gradle tasks from build.gradle${NC}"
+    exit 1
+fi
+
+# Test 12: Test get-command functionality for Gradle (Groovy DSL)
+echo "\nTest 12: Testing get-command for Gradle (Groovy DSL)"
+output=$(dela get-command gradleTest 2>&1)
+if echo "$output" | grep -q "gradle gradleTest"; then
+    echo "${GREEN}✓ get-command returns correct Gradle command${NC}"
+else
+    echo "${RED}✗ get-command failed for Gradle task${NC}"
+    echo "Full output: $output"
+    exit 1
+fi
+
+# Test 13: Basic dela list for Gradle tasks (Kotlin DSL)
+echo "\nTest 13: Testing dela list for Gradle tasks (Kotlin DSL)"
+echo "Checking available tasks from build.gradle.kts:"
+dela list
+
+if dela list | grep -q "compileKotlin"; then
+    echo "${GREEN}✓ dela list shows Gradle tasks from Kotlin sources${NC}"
+else
+    echo "${RED}✗ dela list failed to show Gradle tasks from Kotlin sources${NC}"
+    echo "Looking for any Kotlin tasks:"
+    dela list | grep -i kotlin || true
+    exit 1
+fi
+
+# Test 14: Test get-command functionality for Gradle (Kotlin DSL)
+echo "\nTest 14: Testing get-command for Gradle (Kotlin DSL)"
+output=$(dela get-command compileKotlin 2>&1)
+if echo "$output" | grep -q "gradle compileKotlin"; then
+    echo "${GREEN}✓ get-command returns correct Gradle command for Kotlin DSL task${NC}"
+else
+    echo "${RED}✗ get-command failed for Gradle Kotlin DSL task${NC}"
+    echo "Full output: $output"
+    exit 1
+fi
+
+# Test 15: Test allow-command interactive functionality for Gradle
+echo "\nTest 15: Testing allow-command interactive functionality for Gradle"
+echo "Initial allowlist contents:"
+cat /home/testuser/.dela/allowlist.toml
+
+# Test interactive allow-command with option 2 (Allow this task)
+echo "\nTesting interactive allow-command with 'Allow this task' option:"
+echo "2" | dela allow-command gradleBuild >/dev/null 2>&1 || {
+    echo "${RED}✗ allow-command failed for Gradle task${NC}"
     exit 1
 }
 
@@ -147,10 +220,10 @@ echo "\nAllowlist contents after allow-command:"
 cat /home/testuser/.dela/allowlist.toml
 
 # Verify the allowlist was updated with the specific task
-if grep -q "clean" /home/testuser/.dela/allowlist.toml; then
-    echo "${GREEN}✓ Maven clean task was added to allowlist via interactive mode${NC}"
+if grep -q "gradleBuild" /home/testuser/.dela/allowlist.toml; then
+    echo "${GREEN}✓ Gradle build task was added to allowlist via interactive mode${NC}"
 else
-    echo "${RED}✗ Maven clean task was not added to allowlist via interactive mode${NC}"
+    echo "${RED}✗ Gradle build task was not added to allowlist via interactive mode${NC}"
     exit 1
 fi
 
