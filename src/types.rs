@@ -25,6 +25,8 @@ pub enum TaskDefinitionType {
     Taskfile,
     /// Maven pom.xml
     MavenPom,
+    /// Gradle build files (build.gradle, build.gradle.kts)
+    Gradle,
 }
 
 /// Different types of task runners supported by dela.
@@ -65,6 +67,9 @@ pub enum TaskRunner {
     /// Maven tasks runner
     /// Used when pom.xml is present
     Maven,
+    /// Gradle tasks runner
+    /// Used when build.gradle or build.gradle.kts is present
+    Gradle,
 }
 
 /// Status of a task definition file
@@ -107,6 +112,8 @@ pub struct DiscoveredTaskDefinitions {
     pub taskfile: Option<TaskDefinitionFile>,
     /// Maven pom.xml if found
     pub maven_pom: Option<TaskDefinitionFile>,
+    /// Gradle build files (build.gradle, build.gradle.kts) if found
+    pub gradle: Option<TaskDefinitionFile>,
 }
 
 /// Represents a discovered task that can be executed
@@ -143,6 +150,7 @@ impl TaskRunner {
             TaskRunner::ShellScript => format!("./{}", task.source_name),
             TaskRunner::Task => format!("task {}", task.source_name),
             TaskRunner::Maven => format!("mvn {}", task.source_name),
+            TaskRunner::Gradle => format!("gradle {}", task.source_name),
         }
     }
 
@@ -160,6 +168,7 @@ impl TaskRunner {
             TaskRunner::ShellScript => "Shell Script",
             TaskRunner::Task => "Taskfile",
             TaskRunner::Maven => "Maven",
+            TaskRunner::Gradle => "Gradle",
         }
     }
 
@@ -176,6 +185,7 @@ impl TaskRunner {
             TaskRunner::ShellScript => "sh",
             TaskRunner::Task => "task",
             TaskRunner::Maven => "mvn",
+            TaskRunner::Gradle => "gradle",
         }
     }
 }

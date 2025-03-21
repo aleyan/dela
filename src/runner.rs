@@ -18,6 +18,7 @@ pub fn is_runner_available(runner: &TaskRunner) -> bool {
         TaskRunner::ShellScript => true, // Shell scripts don't need a runner
         TaskRunner::Task => check_path_executable("task").is_some(),
         TaskRunner::Maven => check_path_executable("mvn").is_some(),
+        TaskRunner::Gradle => check_path_executable("gradle").is_some() || check_path_executable("./gradlew").is_some(),
     }
 }
 
@@ -112,6 +113,38 @@ mod tests {
         // Maven should now be available
         assert!(is_runner_available(&TaskRunner::Maven));
 
+        // Clean up
+        reset_mock();
+        reset_to_real_environment();
+    }
+
+    #[test]
+    #[serial]
+    fn test_gradle_runner() {
+        reset_mock();
+        enable_mock();
+        
+        // Set up test environment without Gradle
+        let env = TestEnvironment::new();
+        set_test_environment(env);
+        
+        // Gradle should not be available yet
+        assert!(!is_runner_available(&TaskRunner::Gradle));
+        
+        // Now set up environment with Gradle
+        let env_with_gradle = TestEnvironment::new().with_executable("gradle");
+        set_test_environment(env_with_gradle);
+        
+        // Gradle should now be available
+        assert!(is_runner_available(&TaskRunner::Gradle));
+        
+        // Test with Gradle wrapper
+        let env_with_wrapper = TestEnvironment::new().with_executable("./gradlew");
+        set_test_environment(env_with_wrapper);
+        
+        // Gradle wrapper should also work
+        assert!(is_runner_available(&TaskRunner::Gradle));
+        
         // Clean up
         reset_mock();
         reset_to_real_environment();
