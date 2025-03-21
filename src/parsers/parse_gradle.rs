@@ -12,7 +12,7 @@ pub fn parse(file_path: &Path) -> Result<Vec<Task>, String> {
 
     // Parse tasks using regex patterns for both Groovy and Kotlin DSL
     let mut tasks = Vec::new();
-    
+
     // Add common Gradle tasks
     add_common_tasks(&mut tasks, file_path);
 
@@ -58,7 +58,11 @@ fn add_common_tasks(tasks: &mut Vec<Task>, file_path: &Path) {
 }
 
 /// Extract custom task definitions from Gradle build file content
-fn extract_custom_tasks(content: &str, tasks: &mut Vec<Task>, file_path: &Path) -> Result<(), String> {
+fn extract_custom_tasks(
+    content: &str,
+    tasks: &mut Vec<Task>,
+    file_path: &Path,
+) -> Result<(), String> {
     // Look for task definitions in Groovy DSL (build.gradle)
     let groovy_task_regex = Regex::new(r"task\s+(\w+)(?:\s*\{|\s*\(|\s+.*?\{)")
         .map_err(|e| format!("Failed to compile regex: {}", e))?;
@@ -125,27 +129,36 @@ fn extract_task_description(content: &str, task_name: &str) -> Option<String> {
     let task_pattern = format!(r"task\s+{}", regex::escape(task_name));
     let description_single_quote_pattern = format!(r"description\s+'([^']*)'");
     let description_double_quote_pattern = format!(r#"description\s+"([^"]*)""#);
-    
+
     // Look for task with description using single quotes
-    if let Ok(regex) = Regex::new(&format!("{}.+?{}", task_pattern, description_single_quote_pattern)) {
+    if let Ok(regex) = Regex::new(&format!(
+        "{}.+?{}",
+        task_pattern, description_single_quote_pattern
+    )) {
         if let Some(caps) = regex.captures(content) {
             if let Some(desc) = caps.get(1) {
                 return Some(desc.as_str().to_string());
             }
         }
     }
-    
+
     // Look for task with description using double quotes
-    if let Ok(regex) = Regex::new(&format!("{}.+?{}", task_pattern, description_double_quote_pattern)) {
+    if let Ok(regex) = Regex::new(&format!(
+        "{}.+?{}",
+        task_pattern, description_double_quote_pattern
+    )) {
         if let Some(caps) = regex.captures(content) {
             if let Some(desc) = caps.get(1) {
                 return Some(desc.as_str().to_string());
             }
         }
     }
-    
+
     // For Kotlin DSL, look for description with equals
-    let kotlin_pattern = format!(r#"tasks.*?"{}".+?description\s*=\s*"([^"]*)""#, regex::escape(task_name));
+    let kotlin_pattern = format!(
+        r#"tasks.*?"{}".+?description\s*=\s*"([^"]*)""#,
+        regex::escape(task_name)
+    );
     if let Ok(regex) = Regex::new(&kotlin_pattern) {
         if let Some(caps) = regex.captures(content) {
             if let Some(desc) = caps.get(1) {
@@ -153,43 +166,48 @@ fn extract_task_description(content: &str, task_name: &str) -> Option<String> {
             }
         }
     }
-    
+
     Some("Custom Gradle task".to_string())
 }
 
 /// Extract plugin-provided tasks from Gradle build file content
-fn extract_plugin_tasks(content: &str, tasks: &mut Vec<Task>, file_path: &Path) -> Result<(), String> {
+fn extract_plugin_tasks(
+    content: &str,
+    tasks: &mut Vec<Task>,
+    file_path: &Path,
+) -> Result<(), String> {
     // Common plugins and their tasks
     let plugins = [
-        ("java", vec![
-            "classes", "testClasses", "javadoc", "jar", "test", "check"
-        ]),
-        ("application", vec![
-            "run", "startScripts", "distTar", "distZip", "installDist"
-        ]),
-        ("kotlin", vec![
-            "compileKotlin", "compileTestKotlin"
-        ]),
-        ("spring-boot", vec![
-            "bootRun", "bootJar", "bootWar"
-        ]),
-        ("android", vec![
-            "assembleDebug", "assembleRelease", "installDebug", "installRelease"
-        ]),
+        (
+            "java",
+            vec!["classes", "testClasses", "javadoc", "jar", "test", "check"],
+        ),
+        (
+            "application",
+            vec!["run", "startScripts", "distTar", "distZip", "installDist"],
+        ),
+        ("kotlin", vec!["compileKotlin", "compileTestKotlin"]),
+        ("spring-boot", vec!["bootRun", "bootJar", "bootWar"]),
+        (
+            "android",
+            vec![
+                "assembleDebug",
+                "assembleRelease",
+                "installDebug",
+                "installRelease",
+            ],
+        ),
     ];
 
     // Regular expressions to extract plugin information
-    let apply_plugin_regex = 
-        Regex::new(r#"apply\s+plugin\s*:\s*['"]([^'"]+)['"]"#)
-            .map_err(|e| format!("Failed to compile apply plugin regex: {}", e))?;
+    let apply_plugin_regex = Regex::new(r#"apply\s+plugin\s*:\s*['"]([^'"]+)['"]"#)
+        .map_err(|e| format!("Failed to compile apply plugin regex: {}", e))?;
 
-    let plugins_id_regex = 
-        Regex::new(r#"plugins\s*\{\s*.*?id\s*\(\s*["']([^"']+)["']\s*\)"#)
-            .map_err(|e| format!("Failed to compile plugins id regex: {}", e))?;
+    let plugins_id_regex = Regex::new(r#"plugins\s*\{\s*.*?id\s*\(\s*["']([^"']+)["']\s*\)"#)
+        .map_err(|e| format!("Failed to compile plugins id regex: {}", e))?;
 
-    let plugins_id_alt_regex = 
-        Regex::new(r#"plugins\s*\{\s*.*?id\s*["']([^"']+)["']"#)
-            .map_err(|e| format!("Failed to compile alternative plugins id regex: {}", e))?;
+    let plugins_id_alt_regex = Regex::new(r#"plugins\s*\{\s*.*?id\s*["']([^"']+)["']"#)
+        .map_err(|e| format!("Failed to compile alternative plugins id regex: {}", e))?;
 
     // Identify plugins used in the build file
     let mut identified_plugins = Vec::new();
@@ -271,20 +289,20 @@ application {
         file.write_all(content.as_bytes()).unwrap();
 
         let tasks = parse(&file_path).unwrap();
-        
+
         // Check if common tasks are present
         assert!(tasks.iter().any(|t| t.name == "build"));
         assert!(tasks.iter().any(|t| t.name == "clean"));
         assert!(tasks.iter().any(|t| t.name == "test"));
-        
+
         // Check for plugin tasks
         assert!(tasks.iter().any(|t| t.name == "jar"));
         assert!(tasks.iter().any(|t| t.name == "run"));
-        
+
         // Check for custom tasks
         assert!(tasks.iter().any(|t| t.name == "customTask"));
         assert!(tasks.iter().any(|t| t.name == "anotherTask"));
-        
+
         // Verify at least one custom task
         let custom_task = tasks.iter().find(|t| t.name == "customTask").unwrap();
         assert_eq!(custom_task.definition_type, TaskDefinitionType::Gradle);
@@ -336,22 +354,22 @@ application {
         file.write_all(content.as_bytes()).unwrap();
 
         let tasks = parse(&file_path).unwrap();
-        
+
         // Check if common tasks are present
         assert!(tasks.iter().any(|t| t.name == "build"));
         assert!(tasks.iter().any(|t| t.name == "clean"));
         assert!(tasks.iter().any(|t| t.name == "test"));
-        
+
         // Check for plugin tasks
         // No longer checking for Spring Boot plugin tasks that may not be present
         // assert!(tasks.iter().any(|t| t.name == "bootRun"));
         // assert!(tasks.iter().any(|t| t.name == "bootJar"));
         assert!(tasks.iter().any(|t| t.name == "compileKotlin"));
-        
+
         // Check for custom tasks
         assert!(tasks.iter().any(|t| t.name == "copyDocs"));
         assert!(tasks.iter().any(|t| t.name == "customKotlinTask"));
-        
+
         // Verify at least one custom task
         let custom_task = tasks.iter().find(|t| t.name == "copyDocs").unwrap();
         assert_eq!(custom_task.definition_type, TaskDefinitionType::Gradle);

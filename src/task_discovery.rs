@@ -1,5 +1,6 @@
 use crate::parsers::{
-    parse_gradle, parse_makefile, parse_package_json, parse_pom_xml, parse_pyproject_toml, parse_taskfile,
+    parse_gradle, parse_makefile, parse_package_json, parse_pom_xml, parse_pyproject_toml,
+    parse_taskfile,
 };
 use crate::task_shadowing::check_shadowing;
 use crate::types::{
@@ -250,7 +251,12 @@ fn discover_gradle_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result
                 return Ok(());
             }
             Err(e) => {
-                handle_discovery_error(e, build_gradle_path, TaskDefinitionType::Gradle, discovered);
+                handle_discovery_error(
+                    e,
+                    build_gradle_path,
+                    TaskDefinitionType::Gradle,
+                    discovered,
+                );
                 return Err("Error parsing build.gradle".to_string());
             }
         }
@@ -737,7 +743,7 @@ cd:
             .iter()
             .find(|t| matches!(t.runner, TaskRunner::Make) && t.name == "test")
             .unwrap();
-        
+
         // Check description contains "Running" but don't depend on exact text
         assert!(make_test.description.as_ref().unwrap().contains("Running"));
 

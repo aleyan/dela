@@ -102,19 +102,35 @@ pub fn execute(verbose: bool) -> Result<(), String> {
         if let Some(gradle) = &discovered.definitions.gradle {
             match &gradle.status {
                 TaskFileStatus::Parsed => {
-                    let _file_name = gradle.path.file_name().unwrap_or_default().to_string_lossy();
+                    let _file_name = gradle
+                        .path
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy();
                     test_println!("  ✓ {}: Found and parsed", _file_name);
                 }
                 TaskFileStatus::NotImplemented => {
-                    let _file_name = gradle.path.file_name().unwrap_or_default().to_string_lossy();
+                    let _file_name = gradle
+                        .path
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy();
                     test_println!("  ! {}: Found but parsing not yet implemented", _file_name);
                 }
                 TaskFileStatus::ParseError(_e) => {
-                    let _file_name = gradle.path.file_name().unwrap_or_default().to_string_lossy();
+                    let _file_name = gradle
+                        .path
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy();
                     test_println!("  ✗ {}: Error parsing: {}", _file_name, _e);
                 }
                 TaskFileStatus::NotReadable(_e) => {
-                    let _file_name = gradle.path.file_name().unwrap_or_default().to_string_lossy();
+                    let _file_name = gradle
+                        .path
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy();
                     test_println!("  ✗ {}: Not readable: {}", _file_name, _e);
                 }
                 TaskFileStatus::NotFound => {
