@@ -1006,10 +1006,10 @@ tasks:
         // Setup
         reset_mock();
         enable_mock();
-        
+
         // Create a temporary directory
         let temp_dir = TempDir::new().unwrap();
-        
+
         // Create a pom.xml file but don't mock the mvn executable
         let pom_content = r#"<project xmlns="http://maven.apache.org/POM/4.0.0">
             <modelVersion>4.0.0</modelVersion>
@@ -1020,34 +1020,47 @@ tasks:
         let pom_path = temp_dir.path().join("pom.xml");
         let mut pom_file = File::create(&pom_path).unwrap();
         pom_file.write_all(pom_content.as_bytes()).unwrap();
-        
+
         // Create a build.gradle file but don't mock the gradle executable
         let gradle_content = "task gradleTest { description 'Test task' }";
         let gradle_path = temp_dir.path().join("build.gradle");
         let mut gradle_file = File::create(&gradle_path).unwrap();
         gradle_file.write_all(gradle_content.as_bytes()).unwrap();
-        
+
         // Set up empty test environment (no executables available)
         let env = TestEnvironment::new();
         set_test_environment(env);
-        
+
         // Discover tasks
         let discovered = discover_tasks(temp_dir.path());
-        
+
         // Even though runners are unavailable, tasks should still be discovered
-        assert!(discovered.tasks.iter().any(|t| t.runner == TaskRunner::Maven),
-               "Maven tasks should be discovered even if runner is unavailable");
-        assert!(discovered.tasks.iter().any(|t| t.runner == TaskRunner::Gradle),
-               "Gradle tasks should be discovered even if runner is unavailable");
-        
+        assert!(
+            discovered
+                .tasks
+                .iter()
+                .any(|t| t.runner == TaskRunner::Maven),
+            "Maven tasks should be discovered even if runner is unavailable"
+        );
+        assert!(
+            discovered
+                .tasks
+                .iter()
+                .any(|t| t.runner == TaskRunner::Gradle),
+            "Gradle tasks should be discovered even if runner is unavailable"
+        );
+
         // Verify that the tasks are marked as having unavailable runners
         for task in &discovered.tasks {
             if task.runner == TaskRunner::Maven || task.runner == TaskRunner::Gradle {
-                assert!(!crate::runner::is_runner_available(&task.runner),
-                       "Runner for {} should be marked as unavailable", task.name);
+                assert!(
+                    !crate::runner::is_runner_available(&task.runner),
+                    "Runner for {} should be marked as unavailable",
+                    task.name
+                );
             }
         }
-        
+
         // Cleanup
         reset_mock();
         reset_to_real_environment();
