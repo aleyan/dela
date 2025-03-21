@@ -1,4 +1,4 @@
-use crate::parsers::{parse_makefile, parse_package_json, parse_pyproject_toml, parse_taskfile};
+use crate::parsers::{parse_makefile, parse_package_json, parse_pom_xml, parse_pyproject_toml, parse_taskfile};
 use crate::task_shadowing::check_shadowing;
 use crate::types::{
     DiscoveredTaskDefinitions, Task, TaskDefinitionFile, TaskDefinitionType, TaskFileStatus,
@@ -28,6 +28,7 @@ pub fn discover_tasks(dir: &Path) -> DiscoveredTasks {
     let _ = discover_npm_tasks(dir, &mut discovered);
     let _ = discover_python_tasks(dir, &mut discovered);
     let _ = discover_taskfile_tasks(dir, &mut discovered);
+    let _ = discover_maven_tasks(dir, &mut discovered);
     discover_shell_script_tasks(dir, &mut discovered);
 
     discovered
@@ -42,6 +43,7 @@ fn set_definition(discovered: &mut DiscoveredTasks, definition: TaskDefinitionFi
             discovered.definitions.pyproject_toml = Some(definition)
         }
         TaskDefinitionType::Taskfile => discovered.definitions.taskfile = Some(definition),
+        TaskDefinitionType::MavenPom => discovered.definitions.maven_pom = Some(definition),
         _ => {}
     }
 }
@@ -203,6 +205,29 @@ fn discover_taskfile_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Resu
         set_definition(discovered, definition);
     }
     Ok(())
+}
+
+fn discover_maven_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<(), String> {
+    let pom_path = dir.join("pom.xml");
+    if !pom_path.exists() {
+        return Ok(());
+    }
+
+    match parse_pom_xml(&pom_path) {
+        Ok(tasks) => {
+            handle_discovery_success(
+                tasks,
+                pom_path.clone(),
+                TaskDefinitionType::MavenPom,
+                discovered,
+            );
+            Ok(())
+        }
+        Err(e) => {
+            handle_discovery_error(e, pom_path, TaskDefinitionType::MavenPom, discovered);
+            Err("Error parsing pom.xml".to_string())
+        }
+    }
 }
 
 fn discover_shell_script_tasks(dir: &Path, discovered: &mut DiscoveredTasks) {
@@ -793,5 +818,107 @@ tasks:
         );
 
         reset_mock();
+    }
+
+    #[test]
+    fn test_discover_maven_tasks() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let dir_path = temp_dir.path();
+        
+        // Create a sample pom.xml
+        let pom_xml_content = r#"<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    
+    <groupId>com.example</groupId>
+    <artifactId>sample-project</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    
+    <properties>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+    </properties>
+    
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.10.1</version>
+                <executions>
+                    <execution>
+                        <id>compile-java</id>
+                        <goals>
+                            <goal>compile</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <version>2.7.0</version>
+                <executions>
+                    <execution>
+                        <id>build-info</id>
+                        <goals>
+                            <goal>build-info</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+    
+    <profiles>
+        <profile>
+            <id>dev</id>
+            <properties>
+                <spring.profiles.active>dev</spring.profiles.active>
+            </properties>
+        </profile>
+        <profile>
+            <id>prod</id>
+            <properties>
+                <spring.profiles.active>prod</spring.profiles.active>
+            </properties>
+        </profile>
+    </profiles>
+</project>"#;
+        
+        std::fs::write(dir_path.join("pom.xml"), pom_xml_content).unwrap();
+        
+        let discovered = discover_tasks(dir_path);
+        
+        // Check that the definition was found
+        assert!(discovered.definitions.maven_pom.is_some());
+        assert_eq!(
+            discovered.definitions.maven_pom.unwrap().status,
+            TaskFileStatus::Parsed
+        );
+        
+        // Check that default Maven lifecycle tasks are discovered
+        assert!(discovered.tasks.iter().any(|t| t.name == "clean"));
+        assert!(discovered.tasks.iter().any(|t| t.name == "compile"));
+        assert!(discovered.tasks.iter().any(|t| t.name == "test"));
+        assert!(discovered.tasks.iter().any(|t| t.name == "package"));
+        assert!(discovered.tasks.iter().any(|t| t.name == "install"));
+        
+        // Check that profile tasks are discovered
+        assert!(discovered.tasks.iter().any(|t| t.name == "profile:dev"));
+        assert!(discovered.tasks.iter().any(|t| t.name == "profile:prod"));
+        
+        // Check that plugin goals are discovered
+        assert!(discovered.tasks.iter().any(|t| t.name == "maven-compiler-plugin:compile"));
+        assert!(discovered.tasks.iter().any(|t| t.name == "spring-boot-maven-plugin:build-info"));
+        
+        // Verify task runners
+        for task in discovered.tasks {
+            if task.definition_type == TaskDefinitionType::MavenPom {
+                assert_eq!(task.runner, TaskRunner::Maven);
+            }
+        }
     }
 }

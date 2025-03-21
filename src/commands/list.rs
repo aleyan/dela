@@ -80,6 +80,25 @@ pub fn execute(verbose: bool) -> Result<(), String> {
                 }
             }
         }
+        if let Some(maven_pom) = &discovered.definitions.maven_pom {
+            match &maven_pom.status {
+                TaskFileStatus::Parsed => {
+                    test_println!("  ✓ pom.xml: Found and parsed");
+                }
+                TaskFileStatus::NotImplemented => {
+                    test_println!("  ! pom.xml: Found but parsing not yet implemented");
+                }
+                TaskFileStatus::ParseError(_e) => {
+                    test_println!("  ✗ pom.xml: Error parsing: {}", _e);
+                }
+                TaskFileStatus::NotReadable(_e) => {
+                    test_println!("  ✗ pom.xml: Not readable: {}", _e);
+                }
+                TaskFileStatus::NotFound => {
+                    test_println!("  - pom.xml: Not found");
+                }
+            }
+        }
         test_println!("");
     }
 
@@ -261,6 +280,7 @@ mod tests {
                 }
                 TaskRunner::ShellScript => TaskDefinitionType::ShellScript,
                 TaskRunner::Task => TaskDefinitionType::Taskfile,
+                TaskRunner::Maven => TaskDefinitionType::MavenPom,
             },
             runner,
             source_name: name.to_string(),
