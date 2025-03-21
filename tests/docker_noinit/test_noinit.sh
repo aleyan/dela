@@ -102,4 +102,56 @@ else
     exit 1
 fi
 
+# Test 7: Basic dela list for Maven tasks
+echo "\nTest 7: Testing dela list for Maven tasks"
+if dela list | grep -q "clean" && dela list | grep -q "compile" && dela list | grep -q "profile:dev"; then
+    echo "${GREEN}✓ dela list shows Maven tasks${NC}"
+else
+    echo "${RED}✗ dela list failed to show Maven tasks${NC}"
+    exit 1
+fi
+
+# Test 8: Test get-command functionality for Maven
+echo "\nTest 8: Testing get-command for Maven"
+output=$(dela get-command compile 2>&1)
+if echo "$output" | grep -q "mvn compile"; then
+    echo "${GREEN}✓ get-command returns correct Maven command${NC}"
+else
+    echo "${RED}✗ get-command failed for Maven task${NC}"
+    echo "Full output: $output"
+    exit 1
+fi
+
+# Test 9: Test Maven plugin goal
+echo "\nTest 9: Testing Maven plugin goal"
+if dela list | grep -q "maven-compiler-plugin:compile"; then
+    echo "${GREEN}✓ dela list shows Maven plugin goals${NC}"
+else
+    echo "${RED}✗ dela list failed to show Maven plugin goals${NC}"
+    exit 1
+fi
+
+# Test 10: Test allow-command interactive functionality for Maven
+echo "\nTest 10: Testing allow-command interactive functionality for Maven"
+echo "Initial allowlist contents:"
+cat /home/testuser/.dela/allowlist.toml
+
+# Test interactive allow-command with option 2 (Allow this task)
+echo "\nTesting interactive allow-command with 'Allow this task' option:"
+echo "2" | dela allow-command clean >/dev/null 2>&1 || {
+    echo "${RED}✗ allow-command failed for Maven task${NC}"
+    exit 1
+}
+
+echo "\nAllowlist contents after allow-command:"
+cat /home/testuser/.dela/allowlist.toml
+
+# Verify the allowlist was updated with the specific task
+if grep -q "clean" /home/testuser/.dela/allowlist.toml; then
+    echo "${GREEN}✓ Maven clean task was added to allowlist via interactive mode${NC}"
+else
+    echo "${RED}✗ Maven clean task was not added to allowlist via interactive mode${NC}"
+    exit 1
+fi
+
 echo "\n${GREEN}All non-init tests completed successfully!${NC}"
