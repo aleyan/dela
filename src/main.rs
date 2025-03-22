@@ -136,7 +136,7 @@ mod tests {
     fn test_command_not_found_error() {
         // Create a temporary file to capture stderr
         let mut stderr_file = NamedTempFile::new().unwrap();
-        
+
         // Function to test error handling
         let mut handle_error = |err: &str| {
             if err.starts_with("dela: command or task not found") {
@@ -145,32 +145,30 @@ mod tests {
                 writeln!(stderr_file, "Error: {}", err).unwrap();
             }
         };
-        
+
         // Test command not found error
         handle_error("dela: command or task not found: missing_command");
-        
+
         // Test regular error
         handle_error("Failed to execute task");
-        
+
         // Reset file position to beginning for reading
         stderr_file.as_file_mut().flush().unwrap();
         let content = std::fs::read_to_string(stderr_file.path()).unwrap();
-        
+
         // Check output content
         let lines: Vec<&str> = content.lines().collect();
         assert_eq!(lines.len(), 2, "Expected exactly two error lines");
-        
+
         // First line should NOT have "Error:" prefix
         assert_eq!(
-            lines[0], 
-            "dela: command or task not found: missing_command",
+            lines[0], "dela: command or task not found: missing_command",
             "Command not found error should not have 'Error:' prefix"
         );
-        
+
         // Second line should have "Error:" prefix
         assert_eq!(
-            lines[1], 
-            "Error: Failed to execute task",
+            lines[1], "Error: Failed to execute task",
             "Regular error should have 'Error:' prefix"
         );
     }

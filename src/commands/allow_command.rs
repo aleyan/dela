@@ -21,9 +21,7 @@ pub fn execute(task_with_args: &str, allow: Option<u8>) -> Result<(), String> {
         .collect();
 
     match matching_tasks.len() {
-        0 => {
-            Err(format!("dela: command or task not found: {}", task_name))
-        }
+        0 => Err(format!("dela: command or task not found: {}", task_name)),
         1 => {
             // Single task found, check allowlist
             let task = matching_tasks[0];
@@ -201,7 +199,10 @@ test: ## Running tests
 
         let result = execute("nonexistent", None);
         assert!(result.is_err(), "Should fail when no task found");
-        assert_eq!(result.unwrap_err(), "dela: command or task not found: nonexistent");
+        assert_eq!(
+            result.unwrap_err(),
+            "dela: command or task not found: nonexistent"
+        );
 
         drop(project_dir);
         drop(home_dir);
