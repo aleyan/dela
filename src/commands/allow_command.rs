@@ -22,11 +22,7 @@ pub fn execute(task_with_args: &str, allow: Option<u8>) -> Result<(), String> {
 
     match matching_tasks.len() {
         0 => {
-            eprintln!(
-                "No task named '{}' found in the current directory.",
-                task_name
-            );
-            Err(format!("No task named '{}' found", task_name))
+            Err(format!("dela: command or task not found: {}", task_name))
         }
         1 => {
             // Single task found, check allowlist
@@ -200,12 +196,15 @@ test: ## Running tests
     #[test]
     #[serial]
     fn test_allow_command_no_task() {
-        let (project_dir, _home_dir) = setup_test_env();
+        let (project_dir, home_dir) = setup_test_env();
         env::set_current_dir(&project_dir).expect("Failed to change directory");
 
         let result = execute("nonexistent", None);
         assert!(result.is_err(), "Should fail when no task found");
-        assert_eq!(result.unwrap_err(), "No task named 'nonexistent' found");
+        assert_eq!(result.unwrap_err(), "dela: command or task not found: nonexistent");
+
+        drop(project_dir);
+        drop(home_dir);
     }
 
     #[test]

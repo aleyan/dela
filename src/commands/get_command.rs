@@ -22,11 +22,7 @@ pub fn execute(task_with_args: &str) -> Result<(), String> {
 
     match matching_tasks.len() {
         0 => {
-            println!(
-                "No task named '{}' found in the current directory.",
-                task_name
-            );
-            Err(format!("No task named '{}' found", task_name))
+            Err(format!("dela: command or task not found: {}", task_name))
         }
         1 => {
             // Single task found, check if runner is available
@@ -146,7 +142,7 @@ test: ## Running tests
 
         let result = execute("nonexistent");
         assert!(result.is_err(), "Should fail when no task found");
-        assert_eq!(result.unwrap_err(), "No task named 'nonexistent' found");
+        assert_eq!(result.unwrap_err(), "dela: command or task not found: nonexistent");
 
         drop(project_dir);
         drop(home_dir);
