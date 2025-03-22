@@ -80,6 +80,64 @@ pub fn execute(verbose: bool) -> Result<(), String> {
                 }
             }
         }
+        if let Some(maven_pom) = &discovered.definitions.maven_pom {
+            match &maven_pom.status {
+                TaskFileStatus::Parsed => {
+                    test_println!("  ✓ pom.xml: Found and parsed");
+                }
+                TaskFileStatus::NotImplemented => {
+                    test_println!("  ! pom.xml: Found but parsing not yet implemented");
+                }
+                TaskFileStatus::ParseError(_e) => {
+                    test_println!("  ✗ pom.xml: Error parsing: {}", _e);
+                }
+                TaskFileStatus::NotReadable(_e) => {
+                    test_println!("  ✗ pom.xml: Not readable: {}", _e);
+                }
+                TaskFileStatus::NotFound => {
+                    test_println!("  - pom.xml: Not found");
+                }
+            }
+        }
+        if let Some(gradle) = &discovered.definitions.gradle {
+            match &gradle.status {
+                TaskFileStatus::Parsed => {
+                    let _file_name = gradle
+                        .path
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy();
+                    test_println!("  ✓ {}: Found and parsed", _file_name);
+                }
+                TaskFileStatus::NotImplemented => {
+                    let _file_name = gradle
+                        .path
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy();
+                    test_println!("  ! {}: Found but parsing not yet implemented", _file_name);
+                }
+                TaskFileStatus::ParseError(_e) => {
+                    let _file_name = gradle
+                        .path
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy();
+                    test_println!("  ✗ {}: Error parsing: {}", _file_name, _e);
+                }
+                TaskFileStatus::NotReadable(_e) => {
+                    let _file_name = gradle
+                        .path
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy();
+                    test_println!("  ✗ {}: Not readable: {}", _file_name, _e);
+                }
+                TaskFileStatus::NotFound => {
+                    test_println!("  - Gradle build file: Not found");
+                }
+            }
+        }
         test_println!("");
     }
 
@@ -261,6 +319,8 @@ mod tests {
                 }
                 TaskRunner::ShellScript => TaskDefinitionType::ShellScript,
                 TaskRunner::Task => TaskDefinitionType::Taskfile,
+                TaskRunner::Maven => TaskDefinitionType::MavenPom,
+                TaskRunner::Gradle => TaskDefinitionType::Gradle,
             },
             runner,
             source_name: name.to_string(),

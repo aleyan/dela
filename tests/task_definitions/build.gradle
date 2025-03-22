@@ -1,0 +1,29 @@
+apply plugin: 'java'
+apply plugin: 'application'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.slf4j:slf4j-api:1.7.30'
+    testImplementation 'junit:junit:4.13.2'
+}
+
+task gradleTest {
+    description 'A test task for Gradle'
+    doLast {
+        println 'Running Gradle test task'
+    }
+}
+
+task gradleBuild {
+    description 'A build task for Gradle'
+    doLast {
+        println 'Building with Gradle'
+    }
+}
+
+application {
+    mainClass = 'com.example.Main'
+} 

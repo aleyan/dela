@@ -23,6 +23,10 @@ pub enum TaskDefinitionType {
     ShellScript,
     /// Taskfile.yml
     Taskfile,
+    /// Maven pom.xml
+    MavenPom,
+    /// Gradle build files (build.gradle, build.gradle.kts)
+    Gradle,
 }
 
 /// Different types of task runners supported by dela.
@@ -60,6 +64,12 @@ pub enum TaskRunner {
     /// Task runner for Taskfile.yml
     /// Used when Taskfile.yml is present
     Task,
+    /// Maven tasks runner
+    /// Used when pom.xml is present
+    Maven,
+    /// Gradle tasks runner
+    /// Used when build.gradle or build.gradle.kts is present
+    Gradle,
 }
 
 /// Status of a task definition file
@@ -100,6 +110,10 @@ pub struct DiscoveredTaskDefinitions {
     pub pyproject_toml: Option<TaskDefinitionFile>,
     /// Taskfile.yml if found
     pub taskfile: Option<TaskDefinitionFile>,
+    /// Maven pom.xml if found
+    pub maven_pom: Option<TaskDefinitionFile>,
+    /// Gradle build files (build.gradle, build.gradle.kts) if found
+    pub gradle: Option<TaskDefinitionFile>,
 }
 
 /// Represents a discovered task that can be executed
@@ -135,6 +149,8 @@ impl TaskRunner {
             TaskRunner::PythonPoe => format!("poe {}", task.source_name),
             TaskRunner::ShellScript => format!("./{}", task.source_name),
             TaskRunner::Task => format!("task {}", task.source_name),
+            TaskRunner::Maven => format!("mvn {}", task.source_name),
+            TaskRunner::Gradle => format!("gradle {}", task.source_name),
         }
     }
 
@@ -151,6 +167,8 @@ impl TaskRunner {
             TaskRunner::PythonPoe => "Poe",
             TaskRunner::ShellScript => "Shell Script",
             TaskRunner::Task => "Taskfile",
+            TaskRunner::Maven => "Maven",
+            TaskRunner::Gradle => "Gradle",
         }
     }
 
@@ -166,6 +184,8 @@ impl TaskRunner {
             TaskRunner::PythonPoe => "poe",
             TaskRunner::ShellScript => "sh",
             TaskRunner::Task => "task",
+            TaskRunner::Maven => "mvn",
+            TaskRunner::Gradle => "gradle",
         }
     }
 }

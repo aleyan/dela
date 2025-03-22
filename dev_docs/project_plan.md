@@ -259,3 +259,12 @@ Mark these items `[x]` when completed to track progress. This checklist format f
 - [ ] Task search and filtering capabilities
 - [ ] Enhanced task execution control
 - [ ] Shell completion support
+
+## Phase 9: Increase Task Runner Coverage
+
+- [ ] **Maven & Gradle Support**
+  - [x] [DTKT-119] Implement Maven `pom.xml` parser and task discovery
+  - [x] [DTKT-120] Implement Gradle `build.gradle`/`build.gradle.kts` parser
+  - [ ] [DTKT-121] Parse GitHub Actions workflow files to expose jobs as tasks for `act`.
+  - [ ] [DTKT-122] Add Starlark parsing for Bazel
+  - [ ] [DTKT-123] Implement Bazel task running.
