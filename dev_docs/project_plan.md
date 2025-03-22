@@ -156,6 +156,8 @@ This plan outlines the major development phases and tasks for building `dela`, a
 - [ ] **Unit Tests**
   - [x] [DTKT-107] Run unit tests in CI
   - [x] [DTKT-39] Cover each module: `shell_integration`, `task_discovery`, `allowlist`, `task_execution`.
+  - [ ] [DTKT-124] When running attempting to run a bare task that doesn't exist. Don't print anything.
+  - [ ] [DTKT-125] When running a task via `dr`, do not attempt to execute errors.
 
 ### Dockerized Cross-Shell Testing
 - [x] [DTKT-82] Build Docker images that contain multiple shells (zsh, bash, fish, PowerShell).
@@ -207,17 +209,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
 
 ---
 
-## Future Enhancements (Post-Launch)
 
-- [ ] **Plugin Architecture**
-  - [ ] [DTKT-52] Provide a standardized interface for community-built task parsers.
-
-- [ ] **Remote Execution**
-  - [ ] [DTKT-53] Support containers or remote servers for distributed workloads.
-
-- [ ] **Advanced Configuration**
-  - [ ] [DTKT-54] Introduce optional `~/.dela/config.toml` for global settings.
-  - [ ] [DTKT-55] Add more flexible user preferences.
 
 ---
 
@@ -268,3 +260,15 @@ Mark these items `[x]` when completed to track progress. This checklist format f
   - [ ] [DTKT-121] Parse GitHub Actions workflow files to expose jobs as tasks for `act`.
   - [ ] [DTKT-122] Add Starlark parsing for Bazel
   - [ ] [DTKT-123] Implement Bazel task running.
+
+## Icebox and Future Enhancements (Post-Launch) - may never happen
+
+- [ ] **Plugin Architecture**
+  - [ ] [DTKT-52] Provide a standardized interface for community-built task parsers.
+
+- [ ] **Remote Execution**
+  - [ ] [DTKT-53] Support containers or remote servers for distributed workloads.
+
+- [ ] **Advanced Configuration**
+  - [ ] [DTKT-54] Introduce optional `~/.dela/config.toml` for global settings.
+  - [ ] [DTKT-55] Add more flexible user preferences.
