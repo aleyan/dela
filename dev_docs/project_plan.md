@@ -156,6 +156,8 @@ This plan outlines the major development phases and tasks for building `dela`, a
 - [ ] **Unit Tests**
   - [x] [DTKT-107] Run unit tests in CI
   - [x] [DTKT-39] Cover each module: `shell_integration`, `task_discovery`, `allowlist`, `task_execution`.
+  - [ ] [DTKT-124] When running attempting to run a bare task that doesn't exist. Don't print anything.
+  - [ ] [DTKT-125] When running a task via `dr`, do not attempt to execute errors.
 
 ### Dockerized Cross-Shell Testing
 - [x] [DTKT-82] Build Docker images that contain multiple shells (zsh, bash, fish, PowerShell).
