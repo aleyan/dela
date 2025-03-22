@@ -207,17 +207,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
 
 ---
 
-## Future Enhancements (Post-Launch)
 
-- [ ] **Plugin Architecture**
-  - [ ] [DTKT-52] Provide a standardized interface for community-built task parsers.
-
-- [ ] **Remote Execution**
-  - [ ] [DTKT-53] Support containers or remote servers for distributed workloads.
-
-- [ ] **Advanced Configuration**
-  - [ ] [DTKT-54] Introduce optional `~/.dela/config.toml` for global settings.
-  - [ ] [DTKT-55] Add more flexible user preferences.
 
 ---
 
@@ -268,3 +258,15 @@ Mark these items `[x]` when completed to track progress. This checklist format f
   - [ ] [DTKT-121] Parse GitHub Actions workflow files to expose jobs as tasks for `act`.
   - [ ] [DTKT-122] Add Starlark parsing for Bazel
   - [ ] [DTKT-123] Implement Bazel task running.
+
+## Icebox and Future Enhancements (Post-Launch) - may never happen
+
+- [ ] **Plugin Architecture**
+  - [ ] [DTKT-52] Provide a standardized interface for community-built task parsers.
+
+- [ ] **Remote Execution**
+  - [ ] [DTKT-53] Support containers or remote servers for distributed workloads.
+
+- [ ] **Advanced Configuration**
+  - [ ] [DTKT-54] Introduce optional `~/.dela/config.toml` for global settings.
+  - [ ] [DTKT-55] Add more flexible user preferences.
