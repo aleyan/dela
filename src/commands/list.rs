@@ -321,6 +321,7 @@ mod tests {
                 TaskRunner::Task => TaskDefinitionType::Taskfile,
                 TaskRunner::Maven => TaskDefinitionType::MavenPom,
                 TaskRunner::Gradle => TaskDefinitionType::Gradle,
+                TaskRunner::Act => TaskDefinitionType::GitHubActions,
             },
             runner,
             source_name: name.to_string(),

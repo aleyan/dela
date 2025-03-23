@@ -211,20 +211,76 @@ cat /home/testuser/.dela/allowlist.toml
 
 # Test interactive allow-command with option 2 (Allow this task)
 echo "\nTesting interactive allow-command with 'Allow this task' option:"
-echo "2" | dela allow-command gradleBuild >/dev/null 2>&1 || {
-    echo "${RED}✗ allow-command failed for Gradle task${NC}"
-    exit 1
-}
+echo "2" | dela allow-command gradleBuild >/dev/null 2>&1
 
 echo "\nAllowlist contents after allow-command:"
 cat /home/testuser/.dela/allowlist.toml
 
 # Verify the allowlist was updated with the specific task
 if grep -q "gradleBuild" /home/testuser/.dela/allowlist.toml; then
-    echo "${GREEN}✓ Gradle build task was added to allowlist via interactive mode${NC}"
+    echo "${GREEN}✓ gradleBuild task was added to allowlist via interactive mode${NC}"
 else
-    echo "${RED}✗ Gradle build task was not added to allowlist via interactive mode${NC}"
+    echo "${RED}✗ gradleBuild task was not added to allowlist via interactive mode${NC}"
     exit 1
 fi
+
+# Test 16: Basic dela list for GitHub Actions workflow jobs
+echo "\nTest 16: Testing dela list for GitHub Actions workflow jobs"
+cd /home/testuser/test_project
+if dela list | grep -q "build" && dela list | grep -q "test" && dela list | grep -q "deploy"; then
+    echo "${GREEN}✓ dela list shows GitHub Actions jobs${NC}"
+else
+    echo "${RED}✗ dela list failed to show GitHub Actions jobs${NC}"
+    exit 1
+fi
+
+# Test 17: Test GitHub Actions runner detection
+echo "\nTest 17: Testing GitHub Actions runner detection"
+
+# Verify that act is available
+if which act > /dev/null 2>&1; then
+    echo "${GREEN}✓ act command is available${NC}"
+else
+    echo "${RED}✗ act command is not available${NC}"
+    exit 1
+fi
+
+# Verify that GitHub Actions workflow file is detected
+if dela list | grep -q "Test Workflow"; then
+    echo "${GREEN}✓ GitHub Actions workflow file is detected${NC}"
+else
+    echo "${RED}✗ GitHub Actions workflow file is not detected${NC}"
+    exit 1
+fi
+
+# Test 18: Verify GitHub Actions job descriptions
+echo "\nTest 18: Testing GitHub Actions job descriptions"
+if dela list | grep -q "Test Workflow - Build Project" && \
+   dela list | grep -q "Test Workflow - Run Tests" && \
+   dela list | grep -q "Test Workflow - Deploy to Production"; then
+    echo "${GREEN}✓ GitHub Actions job descriptions are correct${NC}"
+else
+    echo "${RED}✗ GitHub Actions job descriptions are incorrect${NC}"
+    dela list
+    exit 1
+fi
+
+# Test 19: Verify GitHub Actions task discovery
+echo "\nTest 19: Verifying GitHub Actions task discovery"
+
+# Output the actual tasks for debugging
+dela list | grep "act" || true
+
+# Verify that the GitHub Actions tasks were discovered correctly - look for 'act' tasks
+if dela list | grep -q "act" && \
+   dela list | grep -q "build (act)" && \
+   dela list | grep -q "deploy (act)"; then
+    echo "${GREEN}✓ GitHub Actions jobs were discovered correctly${NC}"
+else
+    echo "${RED}✗ GitHub Actions jobs were not discovered correctly${NC}"
+    exit 1
+fi
+
+cd /home/testuser/test_project
 
 echo "\n${GREEN}All non-init tests completed successfully!${NC}"

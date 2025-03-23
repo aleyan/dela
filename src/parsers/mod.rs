@@ -1,3 +1,4 @@
+pub mod parse_github_actions;
 pub mod parse_gradle;
 pub mod parse_makefile;
 pub mod parse_package_json;
@@ -5,6 +6,7 @@ pub mod parse_pom_xml;
 pub mod parse_pyproject_toml;
 pub mod parse_taskfile;
 
+pub use parse_github_actions::parse as parse_github_actions;
 pub use parse_gradle::parse as parse_gradle;
 pub use parse_makefile::parse as parse_makefile;
 pub use parse_package_json::parse as parse_package_json;

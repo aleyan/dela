@@ -22,6 +22,7 @@ pub fn is_runner_available(runner: &TaskRunner) -> bool {
             check_path_executable("gradle").is_some()
                 || check_path_executable("./gradlew").is_some()
         }
+        TaskRunner::Act => check_path_executable("act").is_some(),
     }
 }
 
@@ -149,6 +150,29 @@ mod tests {
         assert!(is_runner_available(&TaskRunner::Gradle));
 
         // Clean up
+        reset_mock();
+        reset_to_real_environment();
+    }
+
+    #[test]
+    #[serial]
+    fn test_act_runner() {
+        // Set up test environment with act
+        reset_mock();
+        enable_mock();
+        let env = TestEnvironment::new().with_executable("act");
+        set_test_environment(env);
+
+        // Act should be available
+        assert!(is_runner_available(&TaskRunner::Act));
+
+        // Set up test environment without act
+        let env = TestEnvironment::new();
+        set_test_environment(env);
+
+        // Act should not be available
+        assert!(!is_runner_available(&TaskRunner::Act));
+
         reset_mock();
         reset_to_real_environment();
     }

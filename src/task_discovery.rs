@@ -1,6 +1,6 @@
 use crate::parsers::{
-    parse_gradle, parse_makefile, parse_package_json, parse_pom_xml, parse_pyproject_toml,
-    parse_taskfile,
+    parse_github_actions, parse_gradle, parse_makefile, parse_package_json, parse_pom_xml,
+    parse_pyproject_toml, parse_taskfile,
 };
 use crate::task_shadowing::check_shadowing;
 use crate::types::{
@@ -33,6 +33,7 @@ pub fn discover_tasks(dir: &Path) -> DiscoveredTasks {
     let _ = discover_taskfile_tasks(dir, &mut discovered);
     let _ = discover_maven_tasks(dir, &mut discovered);
     let _ = discover_gradle_tasks(dir, &mut discovered);
+    let _ = discover_github_actions_tasks(dir, &mut discovered);
     discover_shell_script_tasks(dir, &mut discovered);
 
     discovered
@@ -49,6 +50,7 @@ fn set_definition(discovered: &mut DiscoveredTasks, definition: TaskDefinitionFi
         TaskDefinitionType::Taskfile => discovered.definitions.taskfile = Some(definition),
         TaskDefinitionType::MavenPom => discovered.definitions.maven_pom = Some(definition),
         TaskDefinitionType::Gradle => discovered.definitions.gradle = Some(definition),
+        TaskDefinitionType::GitHubActions => discovered.definitions.github_actions = Some(definition),
         _ => {}
     }
 }
@@ -294,6 +296,97 @@ fn discover_gradle_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result
         });
         Ok(())
     }
+}
+
+fn discover_github_actions_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<(), String> {
+    let mut workflow_files = Vec::new();
+    
+    // 1. Check .github/workflows/ (standard location)
+    let workflows_dir = dir.join(".github").join("workflows");
+    if workflows_dir.exists() && workflows_dir.is_dir() {
+        match fs::read_dir(&workflows_dir) {
+            Ok(entries) => {
+                // Find all workflow files (*.yml, *.yaml) in the standard directory
+                let files: Vec<PathBuf> = entries
+                    .filter_map(Result::ok)
+                    .map(|entry| entry.path())
+                    .filter(|path| {
+                        if let Some(ext) = path.extension() {
+                            ext == "yml" || ext == "yaml"
+                        } else {
+                            false
+                        }
+                    })
+                    .collect();
+                workflow_files.extend(files);
+            }
+            Err(e) => {
+                discovered.errors.push(format!(
+                    "Failed to read .github/workflows directory: {}",
+                    e
+                ));
+            }
+        }
+    }
+    
+    // 2. Check root directory for workflow.yml or .github/workflow.yml
+    for filename in &["workflow.yml", "workflow.yaml", ".github/workflow.yml", ".github/workflow.yaml"] {
+        let file_path = dir.join(filename);
+        if file_path.exists() && file_path.is_file() {
+            workflow_files.push(file_path);
+        }
+    }
+    
+    // 3. Check custom directories that might contain workflows
+    for custom_dir in &["workflows", "custom/workflows", ".gitlab/workflows"] {
+        let custom_path = dir.join(custom_dir);
+        if custom_path.exists() && custom_path.is_dir() {
+            if let Ok(entries) = fs::read_dir(&custom_path) {
+                let files: Vec<PathBuf> = entries
+                    .filter_map(Result::ok)
+                    .map(|entry| entry.path())
+                    .filter(|path| {
+                        if let Some(ext) = path.extension() {
+                            ext == "yml" || ext == "yaml"
+                        } else {
+                            false
+                        }
+                    })
+                    .collect();
+                workflow_files.extend(files);
+            }
+        }
+    }
+    
+    if workflow_files.is_empty() {
+        return Ok(());
+    }
+    
+    // Parse all the found workflow files
+    let mut all_tasks = Vec::new();
+    let mut errors = Vec::new();
+    
+    for file_path in workflow_files {
+        match parse_github_actions(&file_path) {
+            Ok(tasks) => all_tasks.extend(tasks),
+            Err(e) => errors.push(format!("Failed to parse workflow file {:?}: {}", file_path, e)),
+        }
+    }
+    
+    if !errors.is_empty() {
+        discovered.errors.extend(errors);
+    }
+    
+    if !all_tasks.is_empty() {
+        discovered.definitions.github_actions = Some(TaskDefinitionFile {
+            path: PathBuf::from("<multiple-github-actions-files>"),
+            definition_type: TaskDefinitionType::GitHubActions,
+            status: TaskFileStatus::Parsed,
+        });
+        discovered.tasks.extend(all_tasks);
+    }
+    
+    Ok(())
 }
 
 fn discover_shell_script_tasks(dir: &Path, discovered: &mut DiscoveredTasks) {
@@ -1064,5 +1157,120 @@ tasks:
         // Cleanup
         reset_mock();
         reset_to_real_environment();
+    }
+
+    #[test]
+    fn test_discover_github_actions_tasks_in_different_locations() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create .github/workflows directory
+        let github_workflows_dir = temp_dir.path().join(".github").join("workflows");
+        std::fs::create_dir_all(&github_workflows_dir).unwrap();
+
+        // Create a GitHub Actions workflow file in the standard location
+        let github_workflow_content = r#"
+name: CI
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build
+        run: echo "Building..."
+  
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Test
+        run: echo "Testing..."
+"#;
+        std::fs::write(github_workflows_dir.join("ci.yml"), github_workflow_content).unwrap();
+
+        // Create a workflow file in the project root (should still be discovered)
+        let root_workflow_content = r#"
+name: Root Workflow
+on: [push]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Deploy
+        run: echo "Deploying..."
+"#;
+        std::fs::write(temp_dir.path().join("workflow.yml"), root_workflow_content).unwrap();
+
+        // Create a workflow file in a custom directory
+        let custom_dir = temp_dir.path().join("custom").join("workflows");
+        std::fs::create_dir_all(&custom_dir).unwrap();
+        let custom_workflow_content = r#"
+name: Custom Workflow
+on: [workflow_dispatch]
+
+jobs:
+  custom:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Custom Action
+        run: echo "Custom action..."
+"#;
+        std::fs::write(custom_dir.join("custom.yml"), custom_workflow_content).unwrap();
+
+        // Run task discovery
+        let discovered = discover_tasks(temp_dir.path());
+
+        // Check GitHub Actions status
+        assert!(matches!(
+            discovered.definitions.github_actions.unwrap().status,
+            TaskFileStatus::Parsed
+        ));
+
+        // Check if all jobs are discovered
+        let act_tasks: Vec<&Task> = discovered
+            .tasks
+            .iter()
+            .filter(|t| t.runner == TaskRunner::Act)
+            .collect();
+
+        // Should find 4 tasks: build and test from .github/workflows/ci.yml,
+        // deploy from workflow.yml, and custom from custom/workflows/custom.yml
+        assert_eq!(act_tasks.len(), 4, "Should discover 4 GitHub Actions tasks");
+
+        // Check for specific job names
+        let job_names: Vec<&str> = act_tasks.iter().map(|t| t.name.as_str()).collect();
+        assert!(job_names.contains(&"build"));
+        assert!(job_names.contains(&"test"));
+        assert!(job_names.contains(&"deploy"));
+        assert!(job_names.contains(&"custom"));
+
+        // Check workflow names in descriptions
+        let ci_tasks: Vec<&Task> = act_tasks
+            .iter()
+            .filter(|t| t.description.as_ref().map_or(false, |d| d == "CI"))
+            .cloned()
+            .collect();
+        assert_eq!(ci_tasks.len(), 2, "Should have 2 tasks from CI workflow");
+
+        let root_tasks: Vec<&Task> = act_tasks
+            .iter()
+            .filter(|t| t.description.as_ref().map_or(false, |d| d == "Root Workflow"))
+            .cloned()
+            .collect();
+        assert_eq!(root_tasks.len(), 1, "Should have 1 task from Root workflow");
+
+        let custom_tasks: Vec<&Task> = act_tasks
+            .iter()
+            .filter(|t| t.description.as_ref().map_or(false, |d| d == "Custom Workflow"))
+            .cloned()
+            .collect();
+        assert_eq!(custom_tasks.len(), 1, "Should have 1 task from Custom workflow");
     }
 }
