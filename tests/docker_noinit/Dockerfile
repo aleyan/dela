@@ -18,6 +18,7 @@ RUN apk add --no-cache \
     gradle
 
 # Install act (GitHub Actions runner)
+# TODO: Get act from the package manager, once it is in a non-edge alpine release.
 RUN apk add --no-cache curl git bash && \
     mkdir -p /tmp/act-installation && \
     cd /tmp/act-installation && \
