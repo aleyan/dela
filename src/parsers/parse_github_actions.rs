@@ -2,7 +2,7 @@ use crate::types::{Task, TaskDefinitionType, TaskRunner};
 use serde_yaml::Value;
 use std::fs::File;
 use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 /// Parse GitHub Actions workflow file and extract jobs as tasks
 ///
@@ -89,6 +89,7 @@ fn parse_workflow_string(content: &str, file_path: &Path) -> Result<Vec<Task>, S
 mod tests {
     use super::*;
     use std::fs;
+    use std::path::PathBuf;
     use tempfile::TempDir;
 
     fn create_test_workflow(dir: &Path, filename: &str, content: &str) -> PathBuf {
