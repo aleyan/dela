@@ -162,26 +162,7 @@ impl TaskRunner {
         }
     }
 
-    /// Returns the name of the runner
-    pub fn name(&self) -> &'static str {
-        match self {
-            TaskRunner::Make => "Make",
-            TaskRunner::NodeNpm => "NPM",
-            TaskRunner::NodeYarn => "Yarn",
-            TaskRunner::NodePnpm => "PNPM",
-            TaskRunner::NodeBun => "Bun",
-            TaskRunner::PythonUv => "UV",
-            TaskRunner::PythonPoetry => "Poetry",
-            TaskRunner::PythonPoe => "Poe",
-            TaskRunner::ShellScript => "Shell Script",
-            TaskRunner::Task => "Taskfile",
-            TaskRunner::Maven => "Maven",
-            TaskRunner::Gradle => "Gradle",
-            TaskRunner::Act => "Act (GitHub Actions)",
-        }
-    }
-
-    /// Returns a short name for the runner
+    /// Returns a short name for the runner used in the list format
     pub fn short_name(&self) -> &'static str {
         match self {
             TaskRunner::Make => "make",
