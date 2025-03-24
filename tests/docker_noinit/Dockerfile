@@ -17,6 +17,17 @@ RUN apk add --no-cache \
     maven \
     gradle
 
+# Install act (GitHub Actions runner)
+# TODO: Get act from the package manager, once it is in a non-edge alpine release.
+RUN apk add --no-cache curl git bash && \
+    mkdir -p /tmp/act-installation && \
+    cd /tmp/act-installation && \
+    curl -s https://raw.githubusercontent.com/nektos/act/master/install.sh | bash && \
+    mv ./bin/act /usr/local/bin/ && \
+    chmod +x /usr/local/bin/act && \
+    cd / && \
+    rm -rf /tmp/act-installation
+
 # Create test user
 RUN adduser -D -s /bin/zsh testuser
 
@@ -47,6 +58,8 @@ COPY tests/task_definitions/Taskfile.yml /home/testuser/test_project/
 COPY tests/task_definitions/pom.xml /home/testuser/test_project/
 COPY tests/task_definitions/build.gradle /home/testuser/test_project/
 COPY tests/task_definitions/build.gradle.kts /home/testuser/test_project/
+# Copy GitHub Actions workflow files
+COPY tests/task_definitions/github_actions/.github /home/testuser/test_project/.github
 RUN chown -R testuser:testuser /home/testuser/test_project
 
 # Copy the compiled binary from the builder stage

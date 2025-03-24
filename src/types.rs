@@ -27,6 +27,8 @@ pub enum TaskDefinitionType {
     MavenPom,
     /// Gradle build files (build.gradle, build.gradle.kts)
     Gradle,
+    /// GitHub Actions workflow files
+    GitHubActions,
 }
 
 /// Different types of task runners supported by dela.
@@ -70,6 +72,9 @@ pub enum TaskRunner {
     /// Gradle tasks runner
     /// Used when build.gradle or build.gradle.kts is present
     Gradle,
+    /// Act task runner for GitHub Actions
+    /// Used for running GitHub Actions workflows locally
+    Act,
 }
 
 /// Status of a task definition file
@@ -114,6 +119,8 @@ pub struct DiscoveredTaskDefinitions {
     pub maven_pom: Option<TaskDefinitionFile>,
     /// Gradle build files (build.gradle, build.gradle.kts) if found
     pub gradle: Option<TaskDefinitionFile>,
+    /// GitHub Actions workflow files if found
+    pub github_actions: Option<TaskDefinitionFile>,
 }
 
 /// Represents a discovered task that can be executed
@@ -151,27 +158,11 @@ impl TaskRunner {
             TaskRunner::Task => format!("task {}", task.source_name),
             TaskRunner::Maven => format!("mvn {}", task.source_name),
             TaskRunner::Gradle => format!("gradle {}", task.source_name),
+            TaskRunner::Act => format!("act -j {}", task.source_name),
         }
     }
 
-    #[allow(dead_code)]
-    pub fn name(&self) -> &'static str {
-        match self {
-            TaskRunner::Make => "Make",
-            TaskRunner::NodeNpm => "NPM",
-            TaskRunner::NodeYarn => "Yarn",
-            TaskRunner::NodePnpm => "PNPM",
-            TaskRunner::NodeBun => "Bun",
-            TaskRunner::PythonUv => "UV",
-            TaskRunner::PythonPoetry => "Poetry",
-            TaskRunner::PythonPoe => "Poe",
-            TaskRunner::ShellScript => "Shell Script",
-            TaskRunner::Task => "Taskfile",
-            TaskRunner::Maven => "Maven",
-            TaskRunner::Gradle => "Gradle",
-        }
-    }
-
+    /// Returns a short name for the runner used in the list format
     pub fn short_name(&self) -> &'static str {
         match self {
             TaskRunner::Make => "make",
@@ -186,6 +177,7 @@ impl TaskRunner {
             TaskRunner::Task => "task",
             TaskRunner::Maven => "mvn",
             TaskRunner::Gradle => "gradle",
+            TaskRunner::Act => "act",
         }
     }
 }
