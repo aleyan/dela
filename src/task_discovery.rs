@@ -429,8 +429,6 @@ fn discover_shell_script_tasks(dir: &Path, discovered: &mut DiscoveredTasks) {
     }
 }
 
-// TODO(DTKT-52): Add trait for plugin-based task discovery
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -902,6 +900,7 @@ cd:
     }
 
     #[test]
+    #[serial]
     fn test_parse_package_json() {
         let temp_dir = TempDir::new().unwrap();
         let package_json_path = temp_dir.path().join("package.json");
