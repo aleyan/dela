@@ -86,8 +86,8 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [ ] [DTKT-22] Ensure environment variables and working directory are properly propagated.
   - [ ] [DTKT-85] Design task name collision resolution strategy
   - [ ] [DTKT-86] Implement task name collision resolution
-  - [ ] [DTKT-87] Implement task runner installation detection
-  - [ ] [DTKT-88] Implement task runner disambiguation eg(npm vs yarn vs bun)
+  - [x] [DTKT-87] Implement task runner installation detection
+  - [x] [DTKT-88] Implement task runner disambiguation eg(npm vs yarn vs bun)
 
 - [ ] **`run` Command and Bare-Command Invocation**
   - [x] [DTKT-23] Complete `dela run <task>` for direct execution.
@@ -257,9 +257,11 @@ Mark these items `[x]` when completed to track progress. This checklist format f
 - [ ] **Maven & Gradle Support**
   - [x] [DTKT-119] Implement Maven `pom.xml` parser and task discovery
   - [x] [DTKT-120] Implement Gradle `build.gradle`/`build.gradle.kts` parser
-  - [ ] [DTKT-121] Parse GitHub Actions workflow files to expose jobs as tasks for `act`.
+  - [x] [DTKT-121] Parse GitHub Actions workflow files to expose jobs as tasks for `act`.
   - [ ] [DTKT-122] Add Starlark parsing for Bazel
   - [ ] [DTKT-123] Implement Bazel task running.
+  - [ ] [DTKT-126] Implement docker compose
+  - [ ] [DTKT-127] Implement cargo build
 
 ## Icebox and Future Enhancements (Post-Launch) - may never happen
 
