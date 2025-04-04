@@ -159,6 +159,13 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [x] [DTKT-124] When running attempting to run a bare task that doesn't exist. Don't print anything.
   - [x] [DTKT-125] When running a task via `dr`, do not attempt to execute errors.
 
+- [ ] **Bug & Fixes**
+  - [ ] [DTKT-128] Don't list the same make task twice
+  - [ ] [DTKT-129] Make makefile-lossless work with ifneq endif and update it
+  - [ ] [DTKT-130] Github pages should list out sub tasks.
+  - [ ] [DTKT-131] Command line arguments should be passed to tasks when passed 'bare'
+  - [ ] [DTKT-132] Command line arguments should be passed to tasks when passing via dr
+
 ### Dockerized Cross-Shell Testing
 - [x] [DTKT-82] Build Docker images that contain multiple shells (zsh, bash, fish, PowerShell).
 - [x] [DTKT-83] Automate a test workflow where each container:
@@ -209,22 +216,6 @@ This plan outlines the major development phases and tasks for building `dela`, a
 
 ---
 
-
-
----
-
-## Timeline & Dependencies
-
-- **Phase 1** (Task Discovery & Parsing & CLI) is foundational and should be completed first.
-- **Phase 2** (Shell Integration and Basic CLI) can proceed in parallel with Phase 1.
-- **Phase 3** (Task Execution & Workflow) depends on both Phase 1 and 2 being completed.
-- **Phase 4** (Security & Allowlist Management) requires Phase 3's task execution to be functional.
-- **Phase 5** (Expand shell capabilities) builds upon Phase 2's shell integration work.
-- **Phase 6** (Testing & Quality Assurance) can begin after Phase 4, running in parallel with Phase 5.
-- **Phase 7** (Documentation & Release) should commence after all other phases are substantially complete.
-
-Mark these items `[x]` when completed to track progress. This checklist format facilitates easy status updates for individuals and teams working on different tasks.
-
 ## Phase 8: Command-Line Experience
 
 - [ ] **Command Output Formatting**
@@ -258,19 +249,34 @@ Mark these items `[x]` when completed to track progress. This checklist format f
   - [x] [DTKT-119] Implement Maven `pom.xml` parser and task discovery
   - [x] [DTKT-120] Implement Gradle `build.gradle`/`build.gradle.kts` parser
   - [x] [DTKT-121] Parse GitHub Actions workflow files to expose jobs as tasks for `act`.
-  - [ ] [DTKT-122] Add Starlark parsing for Bazel
-  - [ ] [DTKT-123] Implement Bazel task running.
   - [ ] [DTKT-126] Implement docker compose
   - [ ] [DTKT-127] Implement cargo build
 
-## Icebox and Future Enhancements (Post-Launch) - may never happen
+## Icebox and Future Enhancements (Post-Launch)
 
-- [ ] **Plugin Architecture**
+- [ ] **Desirable**
+  - [ ] [DTKT-131] Become an MCP server for the tasks
+  - [ ] [DTKT-132] Shell completions
+
+- [ ] **Task Runner Expansions**
+  - [ ] [DTKT-122] Add Starlark parsing for Bazel
+  - [ ] [DTKT-123] Implement Bazel task running.
+
+- [ ] **Unlikely to Happen, deprioretized**
   - [ ] [DTKT-52] Provide a standardized interface for community-built task parsers.
-
-- [ ] **Remote Execution**
   - [ ] [DTKT-53] Support containers or remote servers for distributed workloads.
-
-- [ ] **Advanced Configuration**
   - [ ] [DTKT-54] Introduce optional `~/.dela/config.toml` for global settings.
   - [ ] [DTKT-55] Add more flexible user preferences.
+
+
+## Timeline & Dependencies
+
+- **Phase 1** (Task Discovery & Parsing & CLI) is foundational and should be completed first.
+- **Phase 2** (Shell Integration and Basic CLI) can proceed in parallel with Phase 1.
+- **Phase 3** (Task Execution & Workflow) depends on both Phase 1 and 2 being completed.
+- **Phase 4** (Security & Allowlist Management) requires Phase 3's task execution to be functional.
+- **Phase 5** (Expand shell capabilities) builds upon Phase 2's shell integration work.
+- **Phase 6** (Testing & Quality Assurance) can begin after Phase 4, running in parallel with Phase 5.
+- **Phase 7** (Documentation & Release) should commence after all other phases are substantially complete.
+
+Mark these items `[x]` when completed to track progress. This checklist format facilitates easy status updates for individuals and teams working on different tasks.
