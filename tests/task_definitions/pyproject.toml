@@ -8,6 +8,7 @@ dependencies = []
 [project.scripts]
 uv-build = "assets_py.main:main_build"
 uv-test = "assets_py.main:main_test"
+uv-run-arg = "assets_py.main:run_arg_test"
 
 [tool.poetry]
 name = "assets_py"
