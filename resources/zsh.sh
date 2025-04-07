@@ -12,7 +12,7 @@ command_not_found_handler() {
     fi
     
     # If allowed, get and execute the command
-    if cmd=$(dela get-command "$1"); then
+    if cmd=$(dela get-command "$@"); then
         eval "$cmd"
         return $?
     fi
