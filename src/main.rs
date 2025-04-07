@@ -119,7 +119,7 @@ fn main() {
             } else {
                 commands::get_command::execute(&args.join(" "))
             }
-        },
+        }
         Commands::AllowCommand { task, allow } => commands::allow_command::execute(&task, allow),
     };
 
