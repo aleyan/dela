@@ -205,4 +205,25 @@ if ! echo "$output" | grep -q "bash: command not found: nonexistent_command"; th
     exit 1
 fi
 
+# Create a test task that echoes its arguments
+log "Creating test task with arguments..."
+cat >> ~/Makefile << 'EOF'
+
+print-args:
+	@echo "Arguments: $$*"
+EOF
+
+# Test arguments are passed to tasks
+log "Testing argument passing to tasks..."
+dela allow-command print-args --allow 2 || (error "Failed to allow print-args" && exit 1)
+
+# Test using dr command with arguments
+output=$(dr print-args --arg1 --arg2 value)
+if ! echo "$output" | grep -q "Arguments: --arg1 --arg2 value"; then
+    error "Arguments not passed correctly through dr command"
+    error "Expected: Arguments: --arg1 --arg2 value"
+    error "Got: $output"
+    exit 1
+fi
+
 log "=== All tests passed successfully! ===" 

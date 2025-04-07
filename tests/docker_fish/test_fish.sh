@@ -236,5 +236,29 @@ if not string match -q "*fish: Unknown command: nonexistent_command*" -- "$outpu
     exit 1
 end
 
+# Create a test task that echoes its arguments
+log "Creating test task with arguments..."
+echo '' >> ~/Makefile
+echo 'print-args:' >> ~/Makefile
+echo '	@echo "Arguments: $$*"' >> ~/Makefile
+
+# Test arguments are passed to tasks
+log "Testing argument passing to tasks..."
+dela allow-command print-args --allow 2 >/dev/null 2>&1; or error "Failed to allow print-args"
+
+# Create a temporary script for testing arguments
+echo '#!/usr/bin/fish
+dr print-args --arg1 --arg2 value' > ~/run_args_test.fish
+chmod +x ~/run_args_test.fish
+set output (~/run_args_test.fish 2>&1)
+rm ~/run_args_test.fish
+
+if not string match -q "*Arguments: --arg1 --arg2 value*" -- "$output"
+    error "Arguments not passed correctly through dr command"
+    error "Expected: Arguments: --arg1 --arg2 value"
+    error "Got: $output"
+    exit 1
+end
+
 log "=== All tests passed successfully! ==="
 exit 0 
