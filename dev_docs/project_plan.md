@@ -163,8 +163,8 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [ ] [DTKT-128] Don't list the same make task twice
   - [ ] [DTKT-129] Make makefile-lossless work with ifneq endif and update it
   - [ ] [DTKT-130] Github pages should list out sub tasks.
-  - [ ] [DTKT-131] Command line arguments should be passed to tasks when passed 'bare'
-  - [ ] [DTKT-132] Command line arguments should be passed to tasks when passing via dr
+  - [x] [DTKT-131] Command line arguments should be passed to tasks when passed 'bare'
+  - [x] [DTKT-132] Command line arguments should be passed to tasks when passing via dr
 
 ### Dockerized Cross-Shell Testing
 - [x] [DTKT-82] Build Docker images that contain multiple shells (zsh, bash, fish, PowerShell).
