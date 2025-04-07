@@ -250,6 +250,22 @@ if (-not ($output -match "npm run npm-test --verbose --no-color")) {
     Write-Error "Arguments are not passed through get-command.`nExpected: npm run npm-test --verbose --no-color`nGot: $output"
 }
 
+# Test bare task execution with arguments
+Write-Log "Testing bare task execution with arguments..."
+dela allow-command print-args --allow 4
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Failed to allow print-args"
+}
+
+# The dr function will execute the command with proper environment variables
+$env:ARGS = "arg1 arg2 arg with spaces"
+$output = dr print-args 
+if (-not ($output -match "Arguments passed to print-args: arg1 arg2 arg with spaces")) {
+    Write-Error "Arguments are not passed through bare task execution.`nExpected output to contain: Arguments passed to print-args: arg1 arg2 arg with spaces`nGot: $output"
+}
+# Clean up environment variable
+Remove-Item Env:\ARGS -ErrorAction SilentlyContinue
+
 # Test uv-run-arg task that accepts arguments
 Write-Log "Testing arg passing with a python task..."
 dela allow-command uv-run-arg --allow 2
