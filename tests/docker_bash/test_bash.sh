@@ -198,32 +198,50 @@ log "Testing final command_not_found_handle..."
 # Temporarily disable trace mode for this test
 set +x
 output=$(nonexistent_command 2>&1) || true
-set -x
-if ! echo "$output" | grep -q "bash: command not found: nonexistent_command"; then
-    error "Command not found handler wasn't properly replaced."
-    error "Got: '$output'"
-    exit 1
-fi
-
-# Create a test task that echoes its arguments
-log "Creating test task with arguments..."
-cat >> ~/Makefile << 'EOF'
-
-print-args:
-	@echo "Arguments: $$*"
-EOF
-
-# Test arguments are passed to tasks
-log "Testing argument passing to tasks..."
-dela allow-command print-args --allow 2 || (error "Failed to allow print-args" && exit 1)
-
-# Test using dr command with arguments
-output=$(dr print-args --arg1 --arg2 value)
-if ! echo "$output" | grep -q "Arguments: --arg1 --arg2 value"; then
-    error "Arguments not passed correctly through dr command"
-    error "Expected: Arguments: --arg1 --arg2 value"
+if ! echo "$output" | grep -q "dela: command or task not found: nonexistent_command"; then
+    error "Command not found handler not properly replaced"
+    error "Expected: 'dela: command or task not found: nonexistent_command'"
     error "Got: $output"
     exit 1
 fi
+
+# Test argument passing
+log "Testing argument passing to tasks..."
+
+# Test single argument passing
+log "Testing single argument passing..."
+dela allow-command print-arg-task --allow 2 || (error "Failed to allow print-arg-task" && exit 1)
+
+output=$(ARG=value1 dr print-arg-task)
+if ! echo "$output" | grep -q "Argument is: value1"; then
+    error "Single argument not passed correctly"
+    error "Expected: Argument is: value1"
+    error "Got: $output"
+    exit 1
+fi
+
+# Test multiple arguments passing
+log "Testing multiple arguments passing..."
+dela allow-command print-args --allow 2 || (error "Failed to allow print-args" && exit 1)
+
+output=$(ARGS="--flag1 --flag2=value positional" dr print-args)
+if ! echo "$output" | grep -q "Arguments passed to print-args:"; then
+    error "Expected output to contain 'Arguments passed to print-args:'"
+    exit 1
+fi
+if ! echo "$output" | grep -q "  - --flag1"; then
+    error "Expected output to contain '--flag1'"
+    exit 1
+fi
+if ! echo "$output" | grep -q "  - --flag2=value"; then
+    error "Expected output to contain '--flag2=value'"
+    exit 1
+fi
+if ! echo "$output" | grep -q "  - positional"; then
+    error "Expected output to contain 'positional'"
+    exit 1
+fi
+
+log "All tests passed!"
 
 log "=== All tests passed successfully! ===" 

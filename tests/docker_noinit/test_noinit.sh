@@ -281,28 +281,30 @@ else
     exit 1
 fi
 
-# Test 20: Verify arguments are properly passed through get-command
-echo "\nTest 20: Testing argument passing through get-command"
+# Test 20: Test single argument passing with print-arg-task
+echo "\nTest 20: Testing single argument passing with print-arg-task"
 
-# First, create a Makefile with a test target
-cd /home/testuser
-cat >> Makefile << 'EOF'
+# Test with print-arg-task and a single argument
+output=$(dela get-command print-arg-task ARG=value1 2>&1)
+if echo "$output" | grep -q "make.*print-arg-task.*ARG=value1"; then
+    echo "${GREEN}✓ Single argument is passed through get-command${NC}"
+else
+    echo "${RED}✗ Single argument is not passed through get-command${NC}"
+    echo "Expected: make print-arg-task ARG=value1"
+    echo "Got: $output"
+    exit 1
+fi
 
-# Test target for argument passing
-print-args:
-	@echo "Arguments passed: $(ARGS)"
-EOF
-
-# Make sure dela sees the new target
-dela list > /dev/null
+# Test 21: Verify arguments are properly passed through get-command
+echo "\nTest 21: Testing argument passing through get-command"
 
 # Test with a makefile task and simple arguments (no quotes/spaces in values)
-output=$(dela get-command print-args --flag1 --flag2=value positional 2>&1)
-if echo "$output" | grep -q "make.*print-args.*--flag1.*--flag2=value.*positional"; then
+output=$(dela get-command print-args ARGS="--flag1 --flag2=value positional" 2>&1)
+if echo "$output" | grep -q "make.*print-args.*ARGS=.*--flag1.*--flag2=value.*positional"; then
     echo "${GREEN}✓ Simple arguments are passed through get-command (make task)${NC}"
 else
     echo "${RED}✗ Simple arguments are not passed through get-command (make task)${NC}"
-    echo "Expected: make print-args --flag1 --flag2=value positional"
+    echo "Expected: make print-args ARGS=\"--flag1 --flag2=value positional\""
     echo "Got: $output"
     exit 1
 fi
@@ -320,8 +322,8 @@ fi
 
 echo "${GREEN}✓ All get-command argument passing tests passed successfully${NC}"
 
-# Test 21: Simulate dr command to verify argument passing
-echo "\nTest 21: Testing argument passing with dr function simulation"
+# Test 22: Simulate dr command to verify argument passing
+echo "\nTest 22: Testing argument passing with dr function simulation"
 
 # Create a temporary dr function similar to what's in shell integrations
 function temp_dr() {

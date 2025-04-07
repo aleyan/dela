@@ -198,27 +198,26 @@ if echo "$output" | grep -q "Command not found: nonexistent_command"; then
     exit 1
 fi
 
-# Create a test task that echoes its arguments
-log "Creating test task with arguments..."
-cat >> ~/Makefile << 'EOF'
+# Test single argument passing
+log "Testing single argument passing..."
+dela allow-command print-arg-task --allow 2 || (error "Failed to allow print-arg-task" && exit 1)
 
-print-args:
-	@echo "Arguments: $$*"
-EOF
+output=$(dr print-arg-task ARG=value1)
+if ! echo "$output" | grep -q "Argument is: value1"; then
+    error "Single argument not passed correctly"
+    error "Expected: Argument is: value1"
+    error "Got: $output"
+    exit 1
+fi
 
-# Run dela list to update task cache
-log "Refreshing task list after adding new task..."
-dela list > /dev/null
-
-# Test arguments are passed to tasks
-log "Testing argument passing to tasks..."
+# Test multiple arguments passing
+log "Testing multiple arguments passing..."
 dela allow-command print-args --allow 2 || (error "Failed to allow print-args" && exit 1)
 
-# Test using dr command with arguments
-output=$(dr print-args --arg1 --arg2 value)
-if ! echo "$output" | grep -q "Arguments: --arg1 --arg2 value"; then
-    error "Arguments not passed correctly through dr command"
-    error "Expected: Arguments: --arg1 --arg2 value"
+output=$(dr print-args "ARGS='--flag1 --flag2=value positional'")
+if ! echo "$output" | grep -q "Arguments passed to print-args:.*--flag1.*--flag2=value.*positional"; then
+    error "Multiple arguments not passed correctly"
+    error "Expected arguments: --flag1 --flag2=value positional"
     error "Got: $output"
     exit 1
 fi

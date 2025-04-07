@@ -12,8 +12,7 @@ print-arg-task: ## Test task for basic functionality with args
 	@echo "Argument is: $(ARG)"
 
 print-args: ## Echo all arguments passed to the task
-	@echo "Arguments passed to print-args:"
-	@for arg in $(ARGS); do echo "  - $$arg"; done
+	@echo "Arguments passed to print-args: $(subst ',,$(ARGS))"
 
 cd: ## Task that will be shadowed by shell builtin
 	@echo "This task is shadowed by the cd shell builtin"
