@@ -20,7 +20,7 @@ function fish_command_not_found
     # Check if this is a dela task
     set -l cmd (dela get-command -- $argv 2>/dev/null)
     if test $status -eq 0
-        # Check if task is allowed
+        # Check if task is allowed - only passing the task name, not the arguments
         if not dela allow-command $argv[1]
             return 127
         end

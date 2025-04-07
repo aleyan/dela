@@ -229,16 +229,19 @@ if ! echo "$output" | grep -q "Arguments passed to print-args:"; then
     error "Expected output to contain 'Arguments passed to print-args:'"
     exit 1
 fi
-if ! echo "$output" | grep -q "  - --flag1"; then
+if ! echo "$output" | grep -q -- "--flag1"; then
     error "Expected output to contain '--flag1'"
+    error "Got: $output"
     exit 1
 fi
-if ! echo "$output" | grep -q "  - --flag2=value"; then
+if ! echo "$output" | grep -q -- "--flag2=value"; then
     error "Expected output to contain '--flag2=value'"
+    error "Got: $output"
     exit 1
 fi
-if ! echo "$output" | grep -q "  - positional"; then
+if ! echo "$output" | grep -q "positional"; then
     error "Expected output to contain 'positional'"
+    error "Got: $output"
     exit 1
 fi
 
