@@ -160,7 +160,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [x] [DTKT-125] When running a task via `dr`, do not attempt to execute errors.
 
 - [ ] **Bug & Fixes**
-  - [ ] [DTKT-128] Don't list the same make task twice
+  - [x] [DTKT-128] Don't list the same make task twice
   - [x] [DTKT-129] Make makefile-lossless work with ifneq endif and update it
   - [ ] [DTKT-130] Github pages should not list out sub tasks.
   - [x] [DTKT-131] Command line arguments should be passed to tasks when passed 'bare'
