@@ -198,4 +198,40 @@ if echo "$output" | grep -q "Command not found: nonexistent_command"; then
     exit 1
 fi
 
+# Test single argument passing
+log "Testing single argument passing..."
+dela allow-command print-arg-task --allow 2 || (error "Failed to allow print-arg-task" && exit 1)
+
+output=$(dr print-arg-task ARG=value1)
+if ! echo "$output" | grep -q "Argument is: value1"; then
+    error "Single argument not passed correctly"
+    error "Expected: Argument is: value1"
+    error "Got: $output"
+    exit 1
+fi
+
+# Test multiple arguments passing
+log "Testing multiple arguments passing..."
+dela allow-command print-args --allow 2 || (error "Failed to allow print-args" && exit 1)
+
+output=$(dr print-args "ARGS='--flag1 --flag2=value positional'")
+if ! echo "$output" | grep -q "Arguments passed to print-args:.*--flag1.*--flag2=value.*positional"; then
+    error "Multiple arguments not passed correctly"
+    error "Expected arguments: --flag1 --flag2=value positional"
+    error "Got: $output"
+    exit 1
+fi
+
+# Test passing arguments to a uv command
+log "Testing argument passing to uv command..."
+dela allow-command uv-run-arg --allow 2 || (error "Failed to allow uv-run-arg" && exit 1)
+
+output=$(dr uv-run-arg --flag1 --flag2=value)
+if ! echo "$output" | grep -q "Arguments:.*--flag1.*--flag2=value"; then
+    error "Arguments not passed correctly to uv command"
+    error "Expected to see arguments --flag1 --flag2=value in the output"
+    error "Got: $output"
+    exit 1
+fi
+
 log "=== All tests passed successfully! ===" 

@@ -240,4 +240,42 @@ try {
     }
 }
 
+# Test argument passing
+Write-Log "Testing argument passing..."
+
+# Test argument passing with dela get-command
+Write-Log "Testing dela get-command argument passing..."
+$output = dela get-command -- npm-test --verbose --no-color
+if (-not ($output -match "npm run npm-test --verbose --no-color")) {
+    Write-Error "Arguments are not passed through get-command.`nExpected: npm run npm-test --verbose --no-color`nGot: $output"
+}
+
+# Test bare task execution with arguments
+Write-Log "Testing bare task execution with arguments..."
+dela allow-command print-args --allow 4
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Failed to allow print-args"
+}
+
+# The dr function will execute the command with proper environment variables
+$env:ARGS = "arg1 arg2 arg with spaces"
+$output = dr print-args 
+if (-not ($output -match "Arguments passed to print-args: arg1 arg2 arg with spaces")) {
+    Write-Error "Arguments are not passed through bare task execution.`nExpected output to contain: Arguments passed to print-args: arg1 arg2 arg with spaces`nGot: $output"
+}
+# Clean up environment variable
+Remove-Item Env:\ARGS -ErrorAction SilentlyContinue
+
+# Test uv-run-arg task that accepts arguments
+Write-Log "Testing arg passing with a python task..."
+dela allow-command uv-run-arg --allow 2
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Failed to allow uv-run-arg"
+}
+
+$output = dr uv-run-arg --arg1 value1 --arg2=value2
+if (-not ($output -match "Arguments:.*--arg1.*value1.*--arg2=value2")) {
+    Write-Error "Arguments are not passed through dr function for python task.`nExpected output to contain arguments: --arg1 value1 --arg2=value2`nGot: $output"
+}
+
 Write-Log "=== All tests passed successfully! ===" 

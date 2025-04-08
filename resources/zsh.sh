@@ -1,6 +1,6 @@
 # dr function to handle task execution
 dr() {
-    cmd=$(command dela get-command "$@")
+    cmd=$(command dela get-command -- "$@")
     eval "$cmd"
 }
 
@@ -12,7 +12,7 @@ command_not_found_handler() {
     fi
     
     # If allowed, get and execute the command
-    if cmd=$(dela get-command "$1"); then
+    if cmd=$(dela get-command -- "$@"); then
         eval "$cmd"
         return $?
     fi

@@ -281,6 +281,70 @@ else
     exit 1
 fi
 
+# Test 20: Test single argument passing with print-arg-task
+echo "\nTest 20: Testing single argument passing with print-arg-task"
+
+# Test with print-arg-task and a single argument
+output=$(dela get-command print-arg-task ARG=value1 2>&1)
+if echo "$output" | grep -q "make.*print-arg-task.*ARG=value1"; then
+    echo "${GREEN}✓ Single argument is passed through get-command${NC}"
+else
+    echo "${RED}✗ Single argument is not passed through get-command${NC}"
+    echo "Expected: make print-arg-task ARG=value1"
+    echo "Got: $output"
+    exit 1
+fi
+
+# Test 21: Verify arguments are properly passed through get-command
+echo "\nTest 21: Testing argument passing through get-command"
+
+# Test with a makefile task and simple arguments (no quotes/spaces in values)
+output=$(dela get-command print-args ARGS="--flag1 --flag2=value positional" 2>&1)
+if echo "$output" | grep -q "make.*print-args.*ARGS=.*--flag1.*--flag2=value.*positional"; then
+    echo "${GREEN}✓ Simple arguments are passed through get-command (make task)${NC}"
+else
+    echo "${RED}✗ Simple arguments are not passed through get-command (make task)${NC}"
+    echo "Expected: make print-args ARGS=\"--flag1 --flag2=value positional\""
+    echo "Got: $output"
+    exit 1
+fi
+
+# Test with npm task (simple arguments only)
+output=$(dela get-command npm-test --verbose --no-color 2>&1)
+if echo "$output" | grep -q "npm run npm-test.*--verbose.*--no-color"; then
+    echo "${GREEN}✓ Arguments are passed through get-command for npm task${NC}"
+else
+    echo "${RED}✗ Arguments are not passed through get-command for npm task${NC}"
+    echo "Expected: npm run npm-test --verbose --no-color"
+    echo "Got: $output"
+    exit 1
+fi
+
+echo "${GREEN}✓ All get-command argument passing tests passed successfully${NC}"
+
+# Test 22: Simulate dr command to verify argument passing
+echo "\nTest 22: Testing argument passing with dr function simulation"
+
+# Create a temporary dr function similar to what's in shell integrations
+function temp_dr() {
+    local cmd=$(dela get-command "$@")
+    echo "COMMAND WOULD EXECUTE: $cmd"
+}
+
+# Test with simple arguments (avoid quotes/spaces in arguments until fixed in Docker)
+result=$(temp_dr print-args --arg1 --arg2=value positional)
+if echo "$result" | grep -q "print-args.*--arg1.*--arg2=value.*positional"; then
+    echo "${GREEN}✓ Arguments are passed through dr function${NC}"
+else
+    echo "${RED}✗ Arguments are not passed through dr function${NC}"
+    echo "Expected: COMMAND WOULD EXECUTE: make print-args --arg1 --arg2=value positional"
+    echo "Got: $result"
+    exit 1
+fi
+
+# Clean up
+unset -f temp_dr
+
 cd /home/testuser/test_project
 
 echo "\n${GREEN}All non-init tests completed successfully!${NC}"

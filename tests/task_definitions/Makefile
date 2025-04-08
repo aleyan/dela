@@ -1,6 +1,6 @@
 # Test Makefile for dela Docker tests
 
-.PHONY: test-task another-task help cd custom-exe
+.PHONY: test-task another-task help cd custom-exe print-args
 
 test-task: ## Test task for basic functionality
 	@echo "Test task executed successfully"
@@ -10,6 +10,9 @@ another-task: ## Another test task
 
 print-arg-task: ## Test task for basic functionality with args
 	@echo "Argument is: $(ARG)"
+
+print-args: ## Echo all arguments passed to the task
+	@echo "Arguments passed to print-args: $(subst ',,$(ARGS))"
 
 cd: ## Task that will be shadowed by shell builtin
 	@echo "This task is shadowed by the cd shell builtin"

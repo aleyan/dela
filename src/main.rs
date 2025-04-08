@@ -81,10 +81,10 @@ enum Commands {
     /// This is used internally by shell integration and shouldn't be called directly.
     ///
     /// Example: dela get-command build
-    #[command(name = "get-command")]
+    #[command(name = "get-command", trailing_var_arg = true)]
     GetCommand {
-        /// Name of the task to get the command for
-        task: String,
+        /// Name of the task followed by any arguments to pass to it
+        args: Vec<String>,
     },
 
     /// Check if a task is allowed to run (used internally by shell functions)
@@ -113,7 +113,13 @@ fn main() {
         Commands::ConfigureShell => commands::configure_shell::execute(),
         Commands::List { verbose } => commands::list::execute(verbose),
         Commands::Run { task } => commands::run::execute(&task),
-        Commands::GetCommand { task } => commands::get_command::execute(&task),
+        Commands::GetCommand { args } => {
+            if args.is_empty() {
+                Err("No task name provided".to_string())
+            } else {
+                commands::get_command::execute(&args.join(" "))
+            }
+        }
         Commands::AllowCommand { task, allow } => commands::allow_command::execute(&task, allow),
     };
 

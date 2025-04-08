@@ -236,5 +236,33 @@ if not string match -q "*fish: Unknown command: nonexistent_command*" -- "$outpu
     exit 1
 end
 
+# Test arguments are passed to tasks
+log "Testing argument passing to tasks..."
+# First allow the command - using --allow 2 to automatically approve it
+set -x DELA_NON_INTERACTIVE 1
+dela allow-command print-args --allow 2 >/dev/null 2>&1
+set -e DELA_NON_INTERACTIVE
+if test $status -ne 0
+    error "Failed to allow print-args"
+    exit 1
+end
+
+# Test argument passing via environment variable
+log "Testing argument passing via environment variable..."
+set -x ARGS "--arg1 --arg2 value"
+set -l output (dr print-args 2>&1)
+set -e ARGS
+
+# Print the output for debugging
+log "Command output: $output"
+
+if not string match -q "*Arguments passed to print-args: --arg1 --arg2 value*" -- "$output"
+    echo "Full output: $output"
+    error "Arguments not passed correctly through dr command"
+    error "Expected: Arguments passed to print-args: --arg1 --arg2 value"
+    error "Got: $output"
+    exit 1
+end
+
 log "=== All tests passed successfully! ==="
 exit 0 
