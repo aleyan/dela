@@ -158,7 +158,7 @@ impl TaskRunner {
             TaskRunner::Task => format!("task {}", task.source_name),
             TaskRunner::Maven => format!("mvn {}", task.source_name),
             TaskRunner::Gradle => format!("gradle {}", task.source_name),
-            TaskRunner::Act => format!("act -j {}", task.source_name),
+            TaskRunner::Act => format!("act -W {}", task.file_path.display()),
         }
     }
 

@@ -1244,56 +1244,31 @@ jobs:
             TaskFileStatus::Parsed
         ));
 
-        // Check if all jobs are discovered
+        // Check if all workflows are discovered
         let act_tasks: Vec<&Task> = discovered
             .tasks
             .iter()
             .filter(|t| t.runner == TaskRunner::Act)
             .collect();
 
-        // Should find 4 tasks: build and test from .github/workflows/ci.yml,
-        // deploy from workflow.yml, and custom from custom/workflows/custom.yml
-        assert_eq!(act_tasks.len(), 4, "Should discover 4 GitHub Actions tasks");
-
-        // Check for specific job names
-        let job_names: Vec<&str> = act_tasks.iter().map(|t| t.name.as_str()).collect();
-        assert!(job_names.contains(&"build"));
-        assert!(job_names.contains(&"test"));
-        assert!(job_names.contains(&"deploy"));
-        assert!(job_names.contains(&"custom"));
-
-        // Check workflow names in descriptions
-        let ci_tasks: Vec<&Task> = act_tasks
-            .iter()
-            .filter(|t| t.description.as_ref().map_or(false, |d| d == "CI"))
-            .cloned()
-            .collect();
-        assert_eq!(ci_tasks.len(), 2, "Should have 2 tasks from CI workflow");
-
-        let root_tasks: Vec<&Task> = act_tasks
-            .iter()
-            .filter(|t| {
-                t.description
-                    .as_ref()
-                    .map_or(false, |d| d == "Root Workflow")
-            })
-            .cloned()
-            .collect();
-        assert_eq!(root_tasks.len(), 1, "Should have 1 task from Root workflow");
-
-        let custom_tasks: Vec<&Task> = act_tasks
-            .iter()
-            .filter(|t| {
-                t.description
-                    .as_ref()
-                    .map_or(false, |d| d == "Custom Workflow")
-            })
-            .cloned()
-            .collect();
+        // Should find 3 tasks: CI from .github/workflows/ci.yml,
+        // Root Workflow from workflow.yml, and Custom Workflow from custom/workflows/custom.yml
         assert_eq!(
-            custom_tasks.len(),
-            1,
-            "Should have 1 task from Custom workflow"
+            act_tasks.len(),
+            3,
+            "Should discover 3 GitHub Actions workflows"
         );
+
+        // Check for specific workflow names - now based on filenames
+        let workflow_names: Vec<&str> = act_tasks.iter().map(|t| t.name.as_str()).collect();
+        assert!(workflow_names.contains(&"ci"));
+        assert!(workflow_names.contains(&"workflow"));
+        assert!(workflow_names.contains(&"custom"));
+
+        // Check workflow file paths
+        let workflow_files: Vec<&Path> = act_tasks.iter().map(|t| t.file_path.as_path()).collect();
+        assert!(workflow_files.iter().any(|p| p.ends_with("ci.yml")));
+        assert!(workflow_files.iter().any(|p| p.ends_with("workflow.yml")));
+        assert!(workflow_files.iter().any(|p| p.ends_with("custom.yml")));
     }
 }

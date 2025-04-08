@@ -186,15 +186,21 @@ clean:
         let makefile_path = create_test_makefile(temp_dir.path(), content);
 
         let tasks = parse(&makefile_path).unwrap();
-        
+
         // Despite 'build' appearing twice in the Makefile, we should only have two total tasks
         assert_eq!(tasks.len(), 2, "Expected 2 tasks, got: {}", tasks.len());
-        
+
         // Verify the tasks by name
         let task_names: Vec<String> = tasks.iter().map(|t| t.name.clone()).collect();
-        assert!(task_names.contains(&"build".to_string()), "Missing 'build' task");
-        assert!(task_names.contains(&"clean".to_string()), "Missing 'clean' task");
-        
+        assert!(
+            task_names.contains(&"build".to_string()),
+            "Missing 'build' task"
+        );
+        assert!(
+            task_names.contains(&"clean".to_string()),
+            "Missing 'clean' task"
+        );
+
         // Verify there's only one 'build' task
         let build_tasks: Vec<_> = tasks.iter().filter(|t| t.name == "build").collect();
         assert_eq!(build_tasks.len(), 1, "Found duplicate 'build' tasks");
