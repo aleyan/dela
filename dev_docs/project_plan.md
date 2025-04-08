@@ -161,8 +161,8 @@ This plan outlines the major development phases and tasks for building `dela`, a
 
 - [ ] **Bug & Fixes**
   - [ ] [DTKT-128] Don't list the same make task twice
-  - [ ] [DTKT-129] Make makefile-lossless work with ifneq endif and update it
-  - [ ] [DTKT-130] Github pages should list out sub tasks.
+  - [x] [DTKT-129] Make makefile-lossless work with ifneq endif and update it
+  - [ ] [DTKT-130] Github pages should not list out sub tasks.
   - [x] [DTKT-131] Command line arguments should be passed to tasks when passed 'bare'
   - [x] [DTKT-132] Command line arguments should be passed to tasks when passing via dr
 
