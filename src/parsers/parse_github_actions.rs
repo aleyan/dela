@@ -4,9 +4,9 @@ use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 
-/// Parse GitHub Actions workflow file and extract jobs as tasks
+/// Parse GitHub Actions workflow file and extract workflows as tasks
 ///
-/// This function parses a GitHub Actions workflow file and extracts each job as a task.
+/// This function parses a GitHub Actions workflow file and extracts the entire workflow as a single task.
 /// The tasks can be executed using the `act` command-line tool.
 pub fn parse(file_path: &Path) -> Result<Vec<Task>, String> {
     let mut file = File::open(file_path).map_err(|e| format!("Failed to open file: {}", e))?;
@@ -27,7 +27,7 @@ fn parse_workflow_string(content: &str, file_path: &Path) -> Result<Vec<Task>, S
         _ => return Err("Workflow YAML is not a mapping".to_string()),
     };
 
-    // Try to get workflow name for descriptions
+    // Try to get workflow name for description
     let workflow_name = workflow_map
         .get(&Value::String("name".to_string()))
         .and_then(|v| match v {
@@ -35,54 +35,44 @@ fn parse_workflow_string(content: &str, file_path: &Path) -> Result<Vec<Task>, S
             _ => None,
         });
 
-    // Extract jobs
+    // Extract jobs to confirm the workflow is valid
     let jobs = match workflow_map.get(&Value::String("jobs".to_string())) {
         Some(Value::Mapping(jobs_map)) => jobs_map,
         _ => return Err("No jobs found in workflow file".to_string()),
     };
 
-    let mut tasks = Vec::new();
-
-    // Create a task for each job
-    for (job_name, job_details) in jobs {
-        let job_id = match job_name {
-            Value::String(name) => name.clone(),
-            _ => continue, // Skip if job name is not a string
-        };
-
-        // Get job description if available
-        let job_description =
-            match job_details {
-                Value::Mapping(details) => details
-                    .get(&Value::String("name".to_string()))
-                    .and_then(|v| match v {
-                        Value::String(s) => Some(s.clone()),
-                        _ => None,
-                    }),
-                _ => None,
-            };
-
-        // Create description from workflow name + job name/description
-        let description = match (&workflow_name, &job_description) {
-            (Some(wf_name), Some(job_desc)) => Some(format!("{} - {}", wf_name, job_desc)),
-            (Some(wf_name), None) => Some(wf_name.clone()),
-            (None, Some(job_desc)) => Some(job_desc.clone()),
-            (None, None) => None,
-        };
-
-        // Create a task for this job
-        tasks.push(Task {
-            name: job_id.clone(),
-            file_path: file_path.to_path_buf(),
-            definition_type: TaskDefinitionType::GitHubActions,
-            runner: TaskRunner::Act,
-            source_name: job_id,
-            description,
-            shadowed_by: None,
-        });
+    if jobs.is_empty() {
+        return Err("Workflow contains no jobs".to_string());
     }
 
-    Ok(tasks)
+    // Extract filename without path for task name
+    let file_name = file_path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .map(|n| {
+            if n.ends_with(".yml") || n.ends_with(".yaml") {
+                &n[0..n.rfind('.').unwrap_or(n.len())]
+            } else {
+                n
+            }
+        })
+        .unwrap_or("workflow");
+
+    // Create a single task for the entire workflow
+    // Always use file name as the task name
+    let task_name = file_name.to_string();
+
+    let task = Task {
+        name: task_name.clone(),
+        file_path: file_path.to_path_buf(),
+        definition_type: TaskDefinitionType::GitHubActions,
+        runner: TaskRunner::Act,
+        source_name: task_name, // Source name is the same as the task name (entire workflow)
+        description: workflow_name,
+        shadowed_by: None,
+    };
+
+    Ok(vec![task])
 }
 
 #[cfg(test)]
@@ -131,24 +121,14 @@ jobs:
 
         let tasks = parse(&file_path).expect("Failed to parse workflow");
 
-        assert_eq!(tasks.len(), 2, "Should have two tasks");
+        assert_eq!(tasks.len(), 1, "Should have one task");
 
-        let build_task = &tasks[0];
-        assert_eq!(build_task.name, "build");
-        assert_eq!(
-            build_task.definition_type,
-            TaskDefinitionType::GitHubActions
-        );
-        assert_eq!(build_task.runner, TaskRunner::Act);
-        assert_eq!(build_task.source_name, "build");
-        assert_eq!(build_task.description, Some("CI".to_string()));
-
-        let test_task = &tasks[1];
-        assert_eq!(test_task.name, "test");
-        assert_eq!(test_task.definition_type, TaskDefinitionType::GitHubActions);
-        assert_eq!(test_task.runner, TaskRunner::Act);
-        assert_eq!(test_task.source_name, "test");
-        assert_eq!(test_task.description, Some("CI".to_string()));
+        let task = &tasks[0];
+        assert_eq!(task.name, "workflow");
+        assert_eq!(task.definition_type, TaskDefinitionType::GitHubActions);
+        assert_eq!(task.runner, TaskRunner::Act);
+        assert_eq!(task.source_name, "workflow");
+        assert_eq!(task.description, Some("CI".to_string()));
     }
 
     #[test]
@@ -219,21 +199,14 @@ jobs:
 
         let tasks = parse(&file_path).expect("Failed to parse complex workflow");
 
-        assert_eq!(tasks.len(), 4, "Should have four tasks");
+        assert_eq!(tasks.len(), 1, "Should have one task");
 
-        // Check if all job names are present
-        let job_names: Vec<String> = tasks.iter().map(|t| t.name.clone()).collect();
-        assert!(job_names.contains(&"lint".to_string()));
-        assert!(job_names.contains(&"build".to_string()));
-        assert!(job_names.contains(&"test".to_string()));
-        assert!(job_names.contains(&"deploy".to_string()));
-
-        // Check workflow name as description
-        for task in &tasks {
-            assert_eq!(task.description, Some("Complex Workflow".to_string()));
-            assert_eq!(task.definition_type, TaskDefinitionType::GitHubActions);
-            assert_eq!(task.runner, TaskRunner::Act);
-        }
+        let task = &tasks[0];
+        assert_eq!(task.name, "complex-workflow");
+        assert_eq!(task.definition_type, TaskDefinitionType::GitHubActions);
+        assert_eq!(task.runner, TaskRunner::Act);
+        assert_eq!(task.source_name, "complex-workflow");
+        assert_eq!(task.description, Some("Complex Workflow".to_string()));
     }
 
     #[test]
@@ -282,7 +255,7 @@ jobs:
 
         // Verify CI workflow tasks
         assert_eq!(ci_tasks.len(), 1);
-        assert_eq!(ci_tasks[0].name, "build");
+        assert_eq!(ci_tasks[0].name, "ci");
         assert_eq!(ci_tasks[0].description, Some("CI".to_string()));
 
         // Verify Deploy workflow tasks
@@ -315,7 +288,7 @@ jobs:
         let tasks = parse(&file_path).expect("Failed to parse workflow without name");
 
         assert_eq!(tasks.len(), 1);
-        assert_eq!(tasks[0].name, "build");
+        assert_eq!(tasks[0].name, "unnamed-workflow");
         assert_eq!(tasks[0].definition_type, TaskDefinitionType::GitHubActions);
         assert_eq!(tasks[0].runner, TaskRunner::Act);
         assert_eq!(

@@ -1,5 +1,6 @@
 use crate::types::{Task, TaskDefinitionType, TaskRunner};
 use makefile_lossless::Makefile;
+use std::collections::HashMap;
 use std::path::Path;
 
 /// Parse a Makefile at the given path and extract tasks
@@ -10,7 +11,8 @@ pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
     let makefile = Makefile::read(std::io::Cursor::new(content))
         .map_err(|e| format!("Failed to parse Makefile: {}", e))?;
 
-    let mut tasks = Vec::new();
+    // Use a HashMap to track tasks by name to avoid duplicates
+    let mut tasks_map: HashMap<String, Task> = HashMap::new();
 
     for rule in makefile.rules() {
         // Skip pattern rules and those starting with '.'
@@ -35,18 +37,25 @@ pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
             }
         });
 
-        tasks.push(Task {
-            name: name.clone(),
-            file_path: path.to_path_buf(),
-            definition_type: TaskDefinitionType::Makefile,
-            runner: TaskRunner::Make,
-            source_name: name,
-            description,
-            shadowed_by: None,
-        });
+        // Only add the task if it hasn't been seen before
+        if !tasks_map.contains_key(&name) {
+            tasks_map.insert(
+                name.clone(),
+                Task {
+                    name: name.clone(),
+                    file_path: path.to_path_buf(),
+                    definition_type: TaskDefinitionType::Makefile,
+                    runner: TaskRunner::Make,
+                    source_name: name,
+                    description,
+                    shadowed_by: None,
+                },
+            );
+        }
     }
 
-    Ok(tasks)
+    // Convert HashMap values to a Vec
+    Ok(tasks_map.into_values().collect())
 }
 
 #[cfg(test)]
@@ -153,5 +162,47 @@ all:
         let tasks = parse(&makefile_path).unwrap();
         assert_eq!(tasks.len(), 1);
         assert_eq!(tasks[0].name, "all");
+    }
+
+    #[test]
+    fn test_parse_duplicate_rules() {
+        let temp_dir = TempDir::new().unwrap();
+        let content = r#".PHONY: build clean
+
+# First definition of build
+build:
+	@echo "First part of build"
+	step1.sh
+
+# Second definition of build (should be merged)
+build:
+	@echo "Second part of build"
+	step2.sh
+
+# Only defined once
+clean:
+	@echo "Cleaning"
+	rm -rf *.o"#;
+        let makefile_path = create_test_makefile(temp_dir.path(), content);
+
+        let tasks = parse(&makefile_path).unwrap();
+
+        // Despite 'build' appearing twice in the Makefile, we should only have two total tasks
+        assert_eq!(tasks.len(), 2, "Expected 2 tasks, got: {}", tasks.len());
+
+        // Verify the tasks by name
+        let task_names: Vec<String> = tasks.iter().map(|t| t.name.clone()).collect();
+        assert!(
+            task_names.contains(&"build".to_string()),
+            "Missing 'build' task"
+        );
+        assert!(
+            task_names.contains(&"clean".to_string()),
+            "Missing 'clean' task"
+        );
+
+        // Verify there's only one 'build' task
+        let build_tasks: Vec<_> = tasks.iter().filter(|t| t.name == "build").collect();
+        assert_eq!(build_tasks.len(), 1, "Found duplicate 'build' tasks");
     }
 }

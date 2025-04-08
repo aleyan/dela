@@ -227,10 +227,10 @@ fi
 # Test 16: Basic dela list for GitHub Actions workflow jobs
 echo "\nTest 16: Testing dela list for GitHub Actions workflow jobs"
 cd /home/testuser/test_project
-if dela list | grep -q "build" && dela list | grep -q "test" && dela list | grep -q "deploy"; then
-    echo "${GREEN}✓ dela list shows GitHub Actions jobs${NC}"
+if dela list | grep -q "test"; then
+    echo "${GREEN}✓ dela list shows GitHub Actions workflows${NC}"
 else
-    echo "${RED}✗ dela list failed to show GitHub Actions jobs${NC}"
+    echo "${RED}✗ dela list failed to show GitHub Actions workflows${NC}"
     exit 1
 fi
 
@@ -246,21 +246,19 @@ else
 fi
 
 # Verify that GitHub Actions workflow file is detected
-if dela list | grep -q "Test Workflow"; then
+if dela list | grep -q "test (act)"; then
     echo "${GREEN}✓ GitHub Actions workflow file is detected${NC}"
 else
     echo "${RED}✗ GitHub Actions workflow file is not detected${NC}"
     exit 1
 fi
 
-# Test 18: Verify GitHub Actions job descriptions
-echo "\nTest 18: Testing GitHub Actions job descriptions"
-if dela list | grep -q "Test Workflow - Build Project" && \
-   dela list | grep -q "Test Workflow - Run Tests" && \
-   dela list | grep -q "Test Workflow - Deploy to Production"; then
-    echo "${GREEN}✓ GitHub Actions job descriptions are correct${NC}"
+# Test 18: Verify GitHub Actions workflow descriptions
+echo "\nTest 18: Testing GitHub Actions workflow descriptions"
+if dela list | grep -q "test (act) - Test Workflow"; then
+    echo "${GREEN}✓ GitHub Actions workflow descriptions are correct${NC}"
 else
-    echo "${RED}✗ GitHub Actions job descriptions are incorrect${NC}"
+    echo "${RED}✗ GitHub Actions workflow descriptions are incorrect${NC}"
     dela list
     exit 1
 fi
@@ -273,11 +271,10 @@ dela list | grep "act" || true
 
 # Verify that the GitHub Actions tasks were discovered correctly - look for 'act' tasks
 if dela list | grep -q "act" && \
-   dela list | grep -q "build (act)" && \
-   dela list | grep -q "deploy (act)"; then
-    echo "${GREEN}✓ GitHub Actions jobs were discovered correctly${NC}"
+   dela list | grep -q "test (act)"; then
+    echo "${GREEN}✓ GitHub Actions workflows were discovered correctly${NC}"
 else
-    echo "${RED}✗ GitHub Actions jobs were not discovered correctly${NC}"
+    echo "${RED}✗ GitHub Actions workflows were not discovered correctly${NC}"
     exit 1
 fi
 
