@@ -178,7 +178,7 @@ The project requires testing complex interactions between shell integration and 
    - Docker-based test environment using Debian Bookworm
    - Multi-stage builds to optimize image size
    - Shell scripts embedded in binary at compile time
-   - Makefile integration via `test_shells` target
+   - Makefile integration via `test_integration` target
 
 2. **Test Coverage**
    - Environment verification
@@ -188,8 +188,8 @@ The project requires testing complex interactions between shell integration and 
    - Direct task invocation
 
 3. **Test Execution**
-   - Quiet mode (default): `make test_shells`
-   - Verbose mode: `make test_shells VERBOSE=1`
+   - Quiet mode (default): `make test_integration`
+   - Verbose mode: `VERBOSE=1 make test_integration`
    - Proper error reporting and test progress
 
 #### Future Enhancements
