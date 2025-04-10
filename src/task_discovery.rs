@@ -377,7 +377,7 @@ fn discover_github_actions_tasks(
 
     // Create a common parent directory for all workflows
     let workflows_parent = dir.join(".github").join("workflows");
-    
+
     for file_path in workflow_files {
         match parse_github_actions(&file_path) {
             Ok(mut tasks) => {
@@ -387,7 +387,7 @@ fn discover_github_actions_tasks(
                     task.file_path = workflows_parent.clone();
                 }
                 all_tasks.extend(tasks);
-            },
+            }
             Err(e) => errors.push(format!(
                 "Failed to parse workflow file {:?}: {}",
                 file_path, e
