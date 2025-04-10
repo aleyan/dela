@@ -375,9 +375,19 @@ fn discover_github_actions_tasks(
     let mut all_tasks = Vec::new();
     let mut errors = Vec::new();
 
+    // Create a common parent directory for all workflows
+    let workflows_parent = dir.join(".github").join("workflows");
+
     for file_path in workflow_files {
         match parse_github_actions(&file_path) {
-            Ok(tasks) => all_tasks.extend(tasks),
+            Ok(mut tasks) => {
+                // Override the file path to use the common parent directory
+                // instead of individual workflow files
+                for task in &mut tasks {
+                    task.file_path = workflows_parent.clone();
+                }
+                all_tasks.extend(tasks);
+            }
             Err(e) => errors.push(format!(
                 "Failed to parse workflow file {:?}: {}",
                 file_path, e
@@ -391,7 +401,7 @@ fn discover_github_actions_tasks(
 
     if !all_tasks.is_empty() {
         discovered.definitions.github_actions = Some(TaskDefinitionFile {
-            path: PathBuf::from("<multiple-github-actions-files>"),
+            path: workflows_parent,
             definition_type: TaskDefinitionType::GitHubActions,
             status: TaskFileStatus::Parsed,
         });
@@ -1265,10 +1275,10 @@ jobs:
         assert!(workflow_names.contains(&"workflow"));
         assert!(workflow_names.contains(&"custom"));
 
-        // Check workflow file paths
-        let workflow_files: Vec<&Path> = act_tasks.iter().map(|t| t.file_path.as_path()).collect();
-        assert!(workflow_files.iter().any(|p| p.ends_with("ci.yml")));
-        assert!(workflow_files.iter().any(|p| p.ends_with("workflow.yml")));
-        assert!(workflow_files.iter().any(|p| p.ends_with("custom.yml")));
+        // With the new workflow grouping, all tasks should have the same workflow directory
+        let common_path = temp_dir.path().join(".github").join("workflows");
+        for task in act_tasks {
+            assert_eq!(task.file_path, common_path);
+        }
     }
 }
