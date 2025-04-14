@@ -40,7 +40,11 @@ fn extract_tasks(makefile: &Makefile, path: &Path) -> Result<Vec<Task>, String> 
     for rule in makefile.rules() {
         // Skip pattern rules, those starting with '.', and those starting with '_' (private tasks)
         let targets = rule.targets().collect::<Vec<_>>();
-        if targets.is_empty() || targets[0].contains('%') || targets[0].starts_with('.') || targets[0].starts_with('_') {
+        if targets.is_empty()
+            || targets[0].contains('%')
+            || targets[0].starts_with('.')
+            || targets[0].starts_with('_')
+        {
             continue;
         }
 
@@ -523,12 +527,15 @@ clean:
 
         let tasks = parse(&makefile_path).unwrap();
         assert_eq!(tasks.len(), 2, "Expected 2 tasks, got: {}", tasks.len());
-        
+
         // Verify we have 'build' and 'clean' but not '_helper'
         let task_names: Vec<String> = tasks.iter().map(|t| t.name.clone()).collect();
         assert!(task_names.contains(&"build".to_string()));
         assert!(task_names.contains(&"clean".to_string()));
-        assert!(!task_names.contains(&"_helper".to_string()), "Private task '_helper' should be filtered out");
+        assert!(
+            !task_names.contains(&"_helper".to_string()),
+            "Private task '_helper' should be filtered out"
+        );
     }
 
     #[test]
@@ -552,7 +559,7 @@ _helper:
 
         // Verify tasks were found and private task was filtered
         assert_eq!(tasks.len(), 1, "Expected 1 task, got: {}", tasks.len());
-        
+
         // Verify we have 'build' but not '_helper'
         let task = &tasks[0];
         assert_eq!(task.name, "build");
