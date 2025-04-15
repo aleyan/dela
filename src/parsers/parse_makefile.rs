@@ -38,9 +38,13 @@ fn extract_tasks(makefile: &Makefile, path: &Path) -> Result<Vec<Task>, String> 
     let mut tasks_map: HashMap<String, Task> = HashMap::new();
 
     for rule in makefile.rules() {
-        // Skip pattern rules and those starting with '.'
+        // Skip pattern rules, those starting with '.', and those starting with '_' (private tasks)
         let targets = rule.targets().collect::<Vec<_>>();
-        if targets.is_empty() || targets[0].contains('%') || targets[0].starts_with('.') {
+        if targets.is_empty()
+            || targets[0].contains('%')
+            || targets[0].starts_with('.')
+            || targets[0].starts_with('_')
+        {
             continue;
         }
 
@@ -100,10 +104,11 @@ fn extract_tasks_regex(content: &str, path: &Path) -> Result<Vec<Task>, String> 
 
         let name = cap[1].trim().to_string();
 
-        // Skip rules with multiple targets, pattern rules, and dot targets
+        // Skip rules with multiple targets, pattern rules, dot targets, and underscore-prefixed targets (private)
         if (name.contains(' ') && !name.contains("\\ "))
             || name.contains('%')
             || name.starts_with('.')
+            || name.starts_with('_')
         {
             continue;
         }
@@ -500,5 +505,63 @@ simple:
 
         // No descriptions in simplified mode
         assert_eq!(task.description, None);
+    }
+
+    #[test]
+    fn test_parse_ignores_private_tasks() {
+        let temp_dir = TempDir::new().unwrap();
+        let content = r#"build:
+	@echo "Building"
+	make all
+
+# Private task not meant to be run directly
+_helper:
+	@echo "Helper task"
+	rm -rf tmp
+
+# Another public task
+clean:
+	@echo "Cleaning"
+	rm -rf build"#;
+        let makefile_path = create_test_makefile(temp_dir.path(), content);
+
+        let tasks = parse(&makefile_path).unwrap();
+        assert_eq!(tasks.len(), 2, "Expected 2 tasks, got: {}", tasks.len());
+
+        // Verify we have 'build' and 'clean' but not '_helper'
+        let task_names: Vec<String> = tasks.iter().map(|t| t.name.clone()).collect();
+        assert!(task_names.contains(&"build".to_string()));
+        assert!(task_names.contains(&"clean".to_string()));
+        assert!(
+            !task_names.contains(&"_helper".to_string()),
+            "Private task '_helper' should be filtered out"
+        );
+    }
+
+    #[test]
+    fn test_regex_parsing_ignores_private_tasks() {
+        let temp_dir = TempDir::new().unwrap();
+        // Add a marker to force regex parsing for this test
+        let content = r#"
+# TEST_FORCE_REGEX_PARSING
+build:
+    @echo "Building the project"
+    cargo build
+
+# Private helper task
+_helper:
+    @echo "Helper task"
+    rm -rf tmp
+"#;
+        let makefile_path = create_test_makefile(temp_dir.path(), content);
+
+        let tasks = parse(&makefile_path).unwrap();
+
+        // Verify tasks were found and private task was filtered
+        assert_eq!(tasks.len(), 1, "Expected 1 task, got: {}", tasks.len());
+
+        // Verify we have 'build' but not '_helper'
+        let task = &tasks[0];
+        assert_eq!(task.name, "build");
     }
 }
