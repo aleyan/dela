@@ -31,9 +31,14 @@ RUN rm -rf src
 COPY src ./src
 COPY resources ./resources
 
-# Build the application with cached dependencies
+# Make sure all tests and features are enabled
+ENV RUSTFLAGS=""
+ENV CARGO_TARGET_DIR=/app/target
+
+# Build the application with cached dependencies and all features
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/app/target \
     cargo build --release --all-features && \
-    cp target/release/dela /app/ 
+    cp target/release/dela /app/ && \
+    strip /app/dela 
