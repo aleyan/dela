@@ -261,6 +261,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [x] [DTKT-121] Parse GitHub Actions workflow files to expose jobs as tasks for `act`.
   - [ ] [DTKT-126] Implement docker compose
   - [ ] [DTKT-127] Implement cargo build
+  - [ ] [DTKT-133] Improve Gradle task disambiguation strategy (duplicates in same file)
 
 ## Icebox and Future Enhancements (Post-Launch)
 
