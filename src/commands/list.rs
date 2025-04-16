@@ -2,7 +2,7 @@ use crate::runner::is_runner_available;
 use crate::task_discovery;
 use crate::types::ShadowType;
 use crate::types::{Task, TaskFileStatus};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::io::Write;
 
@@ -165,12 +165,22 @@ pub fn execute(verbose: bool) -> Result<(), String> {
         // Collect all shadow info and missing runner info for footer
         let mut shadow_infos = Vec::new();
         let mut missing_runner_infos = Vec::new();
+        
+        // Collect ambiguous task names for footer
+        let mut ambiguous_tasks = HashSet::new();
 
         for (_file, tasks) in tasks_by_file {
             write_line(&format!("\nTasks from {}:", _file))?;
             for task in tasks {
-                let output = format_task_string(task);
+                // Check if this task name is ambiguous
+                let is_ambiguous = task_discovery::is_task_ambiguous(&discovered, &task.name);
+                if is_ambiguous {
+                    ambiguous_tasks.insert(task.name.clone());
+                }
+                
+                let output = format_task_string(task, is_ambiguous);
                 write_line(&output)?;
+                
                 if let Some(ref _shadow_type) = task.shadowed_by {
                     if let Some(info) = format_shadow_info(task) {
                         shadow_infos.push(info);
@@ -197,6 +207,14 @@ pub fn execute(verbose: bool) -> Result<(), String> {
                 write_line(&format!("  {}", info))?;
             }
         }
+        
+        // Print ambiguous task names footer
+        if !ambiguous_tasks.is_empty() {
+            write_line("\nDuplicate task names:")?;
+            for task_name in ambiguous_tasks {
+                write_line(&format!("  ‖ task '{}'", task_name))?;
+            }
+        }
     }
 
     // Show any errors encountered during discovery
@@ -210,7 +228,7 @@ pub fn execute(verbose: bool) -> Result<(), String> {
     Ok(())
 }
 
-fn format_task_string(task: &Task) -> String {
+fn format_task_string(task: &Task, is_ambiguous: bool) -> String {
     let symbol = if task.shadowed_by.is_some() {
         match task.shadowed_by.as_ref().unwrap() {
             ShadowType::ShellBuiltin(_) => " †".to_string(),
@@ -218,11 +236,18 @@ fn format_task_string(task: &Task) -> String {
         }
     } else if !is_runner_available(&task.runner) {
         " *".to_string()
+    } else if is_ambiguous && task.disambiguated_name.is_none() {
+        // Add the ambiguous symbol to the original task (not to disambiguated versions)
+        " ‖".to_string() 
     } else {
         String::new()
     };
 
-    let mut output = format!("  • {}", task.name);
+    // Use disambiguated name if present, otherwise use original name
+    let display_name = task.disambiguated_name.as_ref().unwrap_or(&task.name);
+    
+    // Start with the task name
+    let mut output = format!("  • {}", display_name);
 
     // Add runner info with short name
     output.push_str(&format!(" ({}){}", task.runner.short_name(), symbol));
@@ -327,6 +352,7 @@ mod tests {
             source_name: name.to_string(),
             description: None,
             shadowed_by: None,
+            disambiguated_name: None,
         }
     }
 
@@ -348,7 +374,7 @@ mod tests {
 
     // Helper function to format task output
     fn format_task_output(task: &Task, writer: &mut impl io::Write) -> io::Result<()> {
-        writeln!(writer, "{}", format_task_string(task))
+        writeln!(writer, "{}", format_task_string(task, false))
     }
 
     // Helper function to format shadow info
@@ -532,6 +558,7 @@ test: ## Running tests
                 source_name: "cd".to_string(),
                 description: None,
                 shadowed_by: Some(ShadowType::ShellBuiltin("zsh".to_string())),
+                disambiguated_name: None,
             },
             Task {
                 name: "test".to_string(),
@@ -541,6 +568,7 @@ test: ## Running tests
                 source_name: "test".to_string(),
                 description: None,
                 shadowed_by: None,
+                disambiguated_name: None,
             },
         ];
 
@@ -599,6 +627,7 @@ test: ## Running tests
                 source_name: "build".to_string(),
                 description: None,
                 shadowed_by: None,
+                disambiguated_name: None,
             },
             Task {
                 name: "test".to_string(),
@@ -608,6 +637,7 @@ test: ## Running tests
                 source_name: "test".to_string(),
                 description: None,
                 shadowed_by: None,
+                disambiguated_name: None,
             },
         ];
 
@@ -671,6 +701,7 @@ test: ## Running tests
                 source_name: "test2".to_string(),
                 description: None,
                 shadowed_by: Some(ShadowType::ShellBuiltin("bash".to_string())),
+                disambiguated_name: None,
             },
             Task {
                 name: "test3".to_string(),
@@ -680,6 +711,7 @@ test: ## Running tests
                 source_name: "test3".to_string(),
                 description: None,
                 shadowed_by: Some(ShadowType::PathExecutable("/usr/bin/test3".to_string())),
+                disambiguated_name: None,
             },
         ];
 
@@ -769,6 +801,7 @@ test: ## Running tests
                 source_name: "build".to_string(),
                 description: Some("Building the project".to_string()),
                 shadowed_by: None,
+                disambiguated_name: None,
             },
             Task {
                 name: "test".to_string(),
@@ -778,6 +811,7 @@ test: ## Running tests
                 source_name: "test".to_string(),
                 description: Some("jest --coverage".to_string()),
                 shadowed_by: None,
+                disambiguated_name: None,
             },
             Task {
                 name: "serve".to_string(),
@@ -787,6 +821,7 @@ test: ## Running tests
                 source_name: "serve".to_string(),
                 description: Some("python script: server.py".to_string()),
                 shadowed_by: None,
+                disambiguated_name: None,
             },
             Task {
                 name: "clean".to_string(),
@@ -796,6 +831,7 @@ test: ## Running tests
                 source_name: "clean".to_string(),
                 description: None,
                 shadowed_by: None,
+                disambiguated_name: None,
             },
         ];
 

@@ -13,12 +13,8 @@ pub fn execute(task_with_args: &str) -> Result<(), String> {
         env::current_dir().map_err(|e| format!("Failed to get current directory: {}", e))?;
     let discovered = task_discovery::discover_tasks(&current_dir);
 
-    // Find all tasks with the given name
-    let matching_tasks: Vec<_> = discovered
-        .tasks
-        .iter()
-        .filter(|t| t.name == task_name)
-        .collect();
+    // Find all tasks with the given name (both original and disambiguated)
+    let matching_tasks = task_discovery::get_matching_tasks(&discovered, task_name);
 
     match matching_tasks.len() {
         0 => Err(format!("dela: command or task not found: {}", task_name)),
@@ -39,12 +35,14 @@ pub fn execute(task_with_args: &str) -> Result<(), String> {
         _ => {
             // Multiple tasks found, print error and list them
             println!("Multiple tasks named '{}' found:", task_name);
-            for task in matching_tasks {
-                println!("  • {} (from {})", task.name, task.file_path.display());
+            for task in &matching_tasks {
+                // Show disambiguated name if available
+                let display_name = task.disambiguated_name.as_ref().unwrap_or(&task.name);
+                println!("  • {} ({} from {})", display_name, task.runner.short_name(), task.file_path.display());
             }
             println!(
-                "Please use 'dela run {}' to choose which one to run.",
-                task_name
+                "Please use a disambiguated name (e.g., '{}-{}') to specify which one to run.",
+                task_name, matching_tasks[0].runner.short_name()[0..1].to_string()
             );
             Err(format!("Multiple tasks named '{}' found", task_name))
         }

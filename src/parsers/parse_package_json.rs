@@ -36,6 +36,7 @@ pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
                     source_name: name.clone(),
                     description: cmd.as_str().map(|s| s.to_string()),
                     shadowed_by: None,
+                    disambiguated_name: None,
                 });
             }
         }

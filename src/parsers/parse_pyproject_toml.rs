@@ -28,6 +28,7 @@ pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
                             source_name: name.clone(),
                             description,
                             shadowed_by: None,
+                            disambiguated_name: None,
                         });
                     }
                 }
@@ -65,6 +66,7 @@ pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
                             source_name: name.clone(),
                             description,
                             shadowed_by: None,
+                            disambiguated_name: None,
                         });
                     }
                 }
@@ -105,6 +107,7 @@ pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
                             source_name: name.clone(),
                             description,
                             shadowed_by: None,
+                            disambiguated_name: None,
                         });
                     }
                 }

@@ -1,5 +1,5 @@
 use crate::allowlist;
-use crate::task_discovery;
+use crate::task_discovery::{self, get_matching_tasks, is_task_ambiguous};
 use crate::types::AllowScope;
 use std::env;
 
@@ -13,12 +13,8 @@ pub fn execute(task_with_args: &str, allow: Option<u8>) -> Result<(), String> {
         env::current_dir().map_err(|e| format!("Failed to get current directory: {}", e))?;
     let discovered = task_discovery::discover_tasks(&current_dir);
 
-    // Find all tasks with the given name
-    let matching_tasks: Vec<_> = discovered
-        .tasks
-        .iter()
-        .filter(|t| t.name == task_name)
-        .collect();
+    // Find all tasks with the given name (both original and disambiguated)
+    let matching_tasks = task_discovery::get_matching_tasks(&discovered, task_name);
 
     match matching_tasks.len() {
         0 => Err(format!("dela: command or task not found: {}", task_name)),
@@ -66,17 +62,50 @@ pub fn execute(task_with_args: &str, allow: Option<u8>) -> Result<(), String> {
             }
         }
         _ => {
+            // Multiple tasks found, print error and list them
             eprintln!("Multiple tasks named '{}' found:", task_name);
-            for task in matching_tasks {
-                eprintln!("  • {} (from {})", task.name, task.file_path.display());
+            for task in &matching_tasks {
+                // Show disambiguated name if available
+                let display_name = task.disambiguated_name.as_ref().unwrap_or(&task.name);
+                eprintln!("  • {} ({} from {})", display_name, task.runner.short_name(), task.file_path.display());
             }
             eprintln!(
-                "Please use 'dela run {}' to choose which one to run.",
-                task_name
+                "Please use a disambiguated name (e.g., '{}-{}') to specify which one to run.",
+                task_name, matching_tasks[0].runner.short_name()[0..1].to_string()
             );
             Err(format!("Multiple tasks named '{}' found", task_name))
         }
     }
+}
+
+pub fn allow_task(discovered_tasks: &crate::task_discovery::DiscoveredTasks, task_name: &str) -> bool {
+    // Check if the task is ambiguous
+    if is_task_ambiguous(discovered_tasks, task_name) {
+        // Get all matching tasks
+        let matching_tasks = get_matching_tasks(discovered_tasks, task_name);
+        
+        // If there are multiple tasks, inform the user
+        println!("Multiple tasks found with name '{}'. Please use the disambiguated name:", task_name);
+        for task in &matching_tasks {
+            println!(
+                "  - {} ({})",
+                task.disambiguated_name.as_ref().unwrap_or(&task.name),
+                task.runner.short_name()
+            );
+        }
+        
+        return false;
+    }
+
+    // Check if the task exists
+    let matching_tasks = get_matching_tasks(discovered_tasks, task_name);
+    if matching_tasks.is_empty() {
+        println!("Task '{}' not found.", task_name);
+        return false;
+    }
+    
+    // Task exists and is not ambiguous
+    true
 }
 
 #[cfg(test)]

@@ -94,10 +94,10 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [x] [DTKT-112] Remove `dela run` in favor of `dr` shell function.
 
 - [ ] **Task Name Disambiguation**
-  - [ ] [DTKT-85] Design and implement disambiguation suffix generation
-    - [ ] Detect task name collisions across different runners
-    - [ ] Generate unique suffixes based on task runner initials (e.g., test-m, test-p)
-    - [ ] Handle multiple runners with same initial by adding more letters
+  - [x] [DTKT-85] Design and implement disambiguation suffix generation
+    - [x] Detect task name collisions across different runners
+    - [x] Generate unique suffixes based on task runner initials (e.g., test-m, test-p)
+    - [x] Handle multiple runners with same initial by adding more letters
   - [ ] [DTKT-86] Update list command for disambiguated task display
     - [ ] Mark ambiguous tasks with double vertical bar (‖)
     - [ ] Show both original and suffixed task names

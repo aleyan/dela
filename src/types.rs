@@ -140,6 +140,8 @@ pub struct Task {
     pub description: Option<String>,
     /// Information about what shadows this task, if anything
     pub shadowed_by: Option<ShadowType>,
+    /// Disambiguated task name if the task name is ambiguous
+    pub disambiguated_name: Option<String>,
 }
 
 impl TaskRunner {

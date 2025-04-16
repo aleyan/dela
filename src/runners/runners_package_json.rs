@@ -1,35 +1,75 @@
-use crate::task_shadowing::check_path_executable;
 use crate::types::TaskRunner;
+use crate::task_shadowing::check_path_executable;
 use std::path::Path;
 
-/// Detect which Node.js package manager to use based on lock files and available commands
+/// Detect which package manager to use for a Node.js project
 pub fn detect_package_manager(dir: &Path) -> Option<TaskRunner> {
-    let has_npm = check_path_executable("npm").is_some();
-    let has_bun = check_path_executable("bun").is_some();
-    let has_pnpm = check_path_executable("pnpm").is_some();
-    let has_yarn = check_path_executable("yarn").is_some();
-
-    if std::fs::metadata(dir.join("yarn.lock")).is_ok() {
-        return Some(TaskRunner::NodeYarn);
-    } else if std::fs::metadata(dir.join("package-lock.json")).is_ok() {
+    // Check for lock files first (highest priority)
+    
+    // Check for package-lock.json (npm)
+    if dir.join("package-lock.json").exists() {
         return Some(TaskRunner::NodeNpm);
-    } else if std::fs::metadata(dir.join("pnpm-lock.yaml")).is_ok() {
+    }
+
+    // Check for yarn.lock (yarn)
+    if dir.join("yarn.lock").exists() {
+        return Some(TaskRunner::NodeYarn);
+    }
+
+    // Check for pnpm-lock.yaml (pnpm)
+    if dir.join("pnpm-lock.yaml").exists() {
         return Some(TaskRunner::NodePnpm);
-    } else if std::fs::metadata(dir.join("bun.lockb")).is_ok() {
+    }
+
+    // Check for bun.lockb (bun)
+    if dir.join("bun.lockb").exists() {
         return Some(TaskRunner::NodeBun);
     }
 
-    if has_bun {
-        Some(TaskRunner::NodeBun)
-    } else if has_npm {
-        Some(TaskRunner::NodeNpm)
-    } else if has_pnpm {
-        Some(TaskRunner::NodePnpm)
-    } else if has_yarn {
-        Some(TaskRunner::NodeYarn)
-    } else {
-        None
+    // If no lock files, check which package managers are available
+    #[cfg(not(test))]
+    {
+        let has_bun = check_path_executable("bun").is_some();
+        let has_npm = check_path_executable("npm").is_some();
+        let has_yarn = check_path_executable("yarn").is_some();
+        let has_pnpm = check_path_executable("pnpm").is_some();
+        
+        // Prefer Bun > PNPM > Yarn > NPM
+        if has_bun {
+            return Some(TaskRunner::NodeBun);
+        } else if has_pnpm {
+            return Some(TaskRunner::NodePnpm);
+        } else if has_yarn {
+            return Some(TaskRunner::NodeYarn);
+        } else if has_npm {
+            return Some(TaskRunner::NodeNpm);
+        }
     }
+    
+    // In test mode, no need to do anything special as the test environment
+    // will handle mocking the available executables
+    
+    #[cfg(test)]
+    {
+        let has_bun = check_path_executable("bun").is_some();
+        let has_pnpm = check_path_executable("pnpm").is_some();
+        let has_yarn = check_path_executable("yarn").is_some();
+        let has_npm = check_path_executable("npm").is_some();
+        
+        // Prefer Bun > PNPM > Yarn > NPM
+        if has_bun {
+            return Some(TaskRunner::NodeBun);
+        } else if has_pnpm {
+            return Some(TaskRunner::NodePnpm);
+        } else if has_yarn {
+            return Some(TaskRunner::NodeYarn);
+        } else if has_npm {
+            return Some(TaskRunner::NodeNpm);
+        }
+    }
+    
+    // No package managers available
+    None
 }
 
 #[cfg(test)]

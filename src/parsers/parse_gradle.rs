@@ -53,6 +53,7 @@ fn add_common_tasks(tasks: &mut Vec<Task>, file_path: &Path) {
             source_name: task_name.to_string(),
             description: Some(description.to_string()),
             shadowed_by: None,
+            disambiguated_name: None,
         });
     }
 }
@@ -86,6 +87,7 @@ fn extract_custom_tasks(
                 source_name: task_name.as_str().to_string(),
                 description: extract_task_description(content, task_name.as_str()),
                 shadowed_by: None,
+                disambiguated_name: None,
             });
         }
     }
@@ -101,6 +103,7 @@ fn extract_custom_tasks(
                 source_name: task_name.as_str().to_string(),
                 description: extract_task_description(content, task_name.as_str()),
                 shadowed_by: None,
+                disambiguated_name: None,
             });
         }
     }
@@ -116,6 +119,7 @@ fn extract_custom_tasks(
                 source_name: task_name.as_str().to_string(),
                 description: extract_task_description(content, task_name.as_str()),
                 shadowed_by: None,
+                disambiguated_name: None,
             });
         }
     }
@@ -232,6 +236,7 @@ fn extract_plugin_tasks(
                         source_name: task_name.to_string(),
                         description: Some(format!("Task from {} plugin", plugin_prefix)),
                         shadowed_by: None,
+                        disambiguated_name: None,
                     });
                 }
             }

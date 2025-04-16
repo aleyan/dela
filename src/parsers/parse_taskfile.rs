@@ -45,6 +45,7 @@ pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
             source_name: name,
             description,
             shadowed_by: None,
+            disambiguated_name: None,
         });
     }
 

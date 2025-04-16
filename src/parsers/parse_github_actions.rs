@@ -70,6 +70,7 @@ fn parse_workflow_string(content: &str, file_path: &Path) -> Result<Vec<Task>, S
         source_name: task_name, // Source name is the same as the task name (entire workflow)
         description: workflow_name,
         shadowed_by: None,
+        disambiguated_name: None,
     };
 
     Ok(vec![task])
