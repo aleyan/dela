@@ -69,12 +69,8 @@ jobs:
           platforms: ${{ env.PLATFORM }}
           load: true
           tags: dela-test-unit:latest
-          cache-from: type=local,src=/tmp/.buildx-cache-unit
-          cache-to: type=local,dest=/tmp/.buildx-cache-unit-new,mode=max
-          outputs: type=docker
-          # Add some debugging output
-          provenance: false
-          push: false
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:buildcache
+          cache-to: type=inline
 
       # Run the tests with the embedded script
       - name: Run unit tests
@@ -134,13 +130,8 @@ jobs:
           platforms: ${{ env.PLATFORM }}
           tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
           push: true
-          # Enable buildkit inline cache
-          cache-from: |
-            type=local,src=/tmp/.buildx-cache
-            type=registry,ref=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:buildcache
-          cache-to: |
-            type=local,dest=/tmp/.buildx-cache-new,mode=max
-            type=registry,ref=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
 
       # Temp fix - make sure we use || true to avoid failures on cache move
       - name: Move cache
