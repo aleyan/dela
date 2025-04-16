@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.4
 FROM rust:alpine3.21
 
-# Install build dependencies
+# Install dependencies
 RUN apk add --no-cache \
     musl-dev \
     gcc \
@@ -14,21 +14,20 @@ RUN apk add --no-cache \
 RUN adduser -D testuser
 WORKDIR /home/testuser
 
+# Copy source code
+COPY Cargo.toml Cargo.lock ./
+COPY src src
+COPY resources resources
+
+# Build dependencies to cache them
+RUN cargo fetch
+
 # Set ownership
-RUN chown -R testuser:testuser .
+RUN chown -R testuser:testuser /home/testuser && \
+    chown -R testuser:testuser /usr/local/cargo
 
 # Switch to test user
 USER testuser
-
-# Copy Cargo definition files first (better Docker caching)
-COPY Cargo.toml Cargo.lock ./
-
-# Pre-fetch dependencies (creates a build cache layer)
-RUN cargo fetch || true
-
-# Now copy source code and build
-COPY src ./src
-COPY resources ./resources
 
 # Entry point script will be mounted
 CMD ["bash", "/home/testuser/test_script.sh"]

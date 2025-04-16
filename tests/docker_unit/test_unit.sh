@@ -1,5 +1,5 @@
 #!/bin/bash
 set -e
 
-# Run all tests
-cargo test --all-features --verbose 
+# Run all tests, using pre-compiled dependencies
+cargo test --all-features --verbose --no-default-features 
