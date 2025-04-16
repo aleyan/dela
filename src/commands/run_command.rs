@@ -317,18 +317,18 @@ test: ## Running tests
         let discovered = task_discovery::discover_tasks(&current_dir);
         
         // Verify that we can find the disambiguated tasks
-        let make_tasks = task_discovery::get_matching_tasks(&discovered, "test-m");
+        let make_tasks = task_discovery::get_matching_tasks(&discovered, "test-mak");
         assert_eq!(make_tasks.len(), 1, "Should find exactly one make task");
         assert_eq!(make_tasks[0].runner, TaskRunner::Make);
         
-        let npm_tasks = task_discovery::get_matching_tasks(&discovered, "test-n");
+        let npm_tasks = task_discovery::get_matching_tasks(&discovered, "test-npm");
         assert_eq!(npm_tasks.len(), 1, "Should find exactly one npm task");
         assert_eq!(npm_tasks[0].runner, TaskRunner::NodeNpm);
 
         // Test passing arguments to a disambiguated task name
         // Note: In test environment, this will fail with a command execution error
         // but we can still validate the task resolution logic works
-        let result = execute("test-m --verbose --watch");
+        let result = execute("test-mak --verbose --watch");
         // In test context, Command::new will fail, which is expected
         assert!(
             result.is_err(),

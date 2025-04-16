@@ -390,32 +390,22 @@ test: ## Running tests
             "Error should mention multiple tasks"
         );
 
-        // Determine which disambiguated name was created for the package.json task (it might be -n for npm or -b for bun)
-        let discovered = task_discovery::discover_tasks(&project_dir.path());
-        let js_task_suffix = discovered.tasks
-            .iter()
-            .find(|t| t.file_path.to_string_lossy().contains("package.json"))
-            .and_then(|t| t.disambiguated_name.as_ref())
-            .map(|name| name.chars().last().unwrap_or('n'))
-            .unwrap_or('n');
-
         // Now try with the disambiguated name for make task
-        let result = execute("test-m", Some(2)); // 2 = allow
+        let result = execute("test-mak", Some(2)); // 2 = allow
         assert!(result.is_ok(), "Should succeed with disambiguated task name");
 
-        // Also try with the disambiguated name for JS task
-        let js_task_name = format!("test-{}", js_task_suffix);
-        let result = execute(&js_task_name, Some(2)); // 2 = allow
+        // Also try with the disambiguated name for npm task
+        let result = execute("test-npm", Some(2)); // 2 = allow
         assert!(result.is_ok(), "Should succeed with disambiguated task name");
 
         // Test with disambiguated name and arguments
-        let test_with_args = format!("test-m --verbose --watch");
-        let result = execute(&test_with_args, Some(2)); // 2 = allow
+        let test_with_args = "test-mak --verbose --watch";
+        let result = execute(test_with_args, Some(2)); // 2 = allow
         assert!(result.is_ok(), "Should succeed with disambiguated task name and arguments");
         
-        // Test with JS task disambiguated name and arguments
-        let js_test_with_args = format!("{} --ci --coverage", js_task_name);
-        let result = execute(&js_test_with_args, Some(2)); // 2 = allow
-        assert!(result.is_ok(), "Should succeed with JS disambiguated task name and arguments");
+        // Test with npm task disambiguated name and arguments
+        let npm_test_with_args = "test-npm --ci --coverage";
+        let result = execute(npm_test_with_args, Some(2)); // 2 = allow
+        assert!(result.is_ok(), "Should succeed with npm disambiguated task name and arguments");
     }
 }

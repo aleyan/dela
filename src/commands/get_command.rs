@@ -204,15 +204,15 @@ test: ## Running tests
         );
 
         // Verify task lookup for make variant works
-        let result = execute("test-m");
+        let result = execute("test-mak");
         assert!(result.is_ok(), "Should succeed with disambiguated task name (make)");
         
         // Verify task lookup for npm variant works
-        let result = execute("test-n");
+        let result = execute("test-npm");
         assert!(result.is_ok(), "Should succeed with disambiguated task name (npm)");
         
         // Verify arguments are correctly passed with disambiguated names
-        let result = execute("test-m --verbose");
+        let result = execute("test-mak --verbose");
         assert!(result.is_ok(), "Should succeed with disambiguated task name and args");
 
         reset_mock();
