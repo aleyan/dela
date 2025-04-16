@@ -348,4 +348,127 @@ unset -f temp_dr
 
 cd /home/testuser/test_project
 
+# Test 23: Verify ambiguous task detection in dela list
+echo "\nTest 23: Testing ambiguous task detection and disambiguation in dela list"
+
+# Create a package.json with a 'test' task to conflict with GitHub Actions
+cat > duplicate_test.json << EOF
+{
+  "name": "duplicate-test",
+  "version": "1.0.0",
+  "scripts": {
+    "test": "echo \"Duplicate test task\""
+  }
+}
+EOF
+
+# Create a small Makefile with the 'test' task as well
+cat > duplicate_test.mk << EOF
+test: ## Test task in Makefile
+	echo "Another test implementation"
+EOF
+
+# First, verify that 'dela list' shows the disambiguation info
+if dela list | grep -q "Duplicate task names (‖)" && dela list | grep -q "has multiple implementations"; then
+    echo "${GREEN}✓ dela list shows the disambiguation information for conflicting tasks${NC}"
+else
+    echo "${RED}✗ dela list failed to show disambiguation information${NC}"
+    echo "List output:"
+    dela list
+    exit 1
+fi
+
+# Verify that 'test' appears as ambiguous
+if dela list | grep -q "test.*‖"; then
+    echo "${GREEN}✓ Ambiguous 'test' task is marked with ‖ symbol${NC}"
+else
+    echo "${RED}✗ Ambiguous 'test' task is not marked correctly${NC}"
+    echo "List output for 'test':"
+    dela list | grep "test" || true
+    exit 1
+fi
+
+# Verify disambiguated names are displayed
+if dela list | grep -q "Use 'test-a' for act version" || dela list | grep -q "Use 'test-n' for npm version" || dela list | grep -q "Use 'test-m' for make version"; then
+    echo "${GREEN}✓ Disambiguated task names are displayed correctly${NC}"
+else
+    echo "${RED}✗ Disambiguated task names are not displayed correctly${NC}"
+    echo "Disambiguation section:"
+    dela list | grep -A 10 "Duplicate task names" || true
+    exit 1
+fi
+
+# Test 24: Verify get-command with disambiguated task names
+echo "\nTest 24: Testing get-command with disambiguated task names"
+
+# Test with make variant of 'test'
+output=$(dela get-command test-m --verbose 2>&1)
+if echo "$output" | grep -q "make.*test.*--verbose"; then
+    echo "${GREEN}✓ get-command works with disambiguated task name 'test-m'${NC}"
+else
+    echo "${RED}✗ get-command failed with disambiguated task name 'test-m'${NC}"
+    echo "Expected: make test --verbose"
+    echo "Got: $output"
+    exit 1
+fi
+
+# Test with npm variant of 'test' (if available)
+# Check if npm variant exists first
+if dela list | grep -q "test-n"; then
+    output=$(dela get-command test-n --ci --watch 2>&1)
+    if echo "$output" | grep -q "npm run test.*--ci.*--watch"; then
+        echo "${GREEN}✓ get-command works with disambiguated task name 'test-n'${NC}"
+    else
+        echo "${RED}✗ get-command failed with disambiguated task name 'test-n'${NC}"
+        echo "Expected: npm run test --ci --watch"
+        echo "Got: $output"
+        exit 1
+    fi
+fi
+
+# Test with act variant of 'test'
+if dela list | grep -q "test-a"; then
+    output=$(dela get-command test-a --job=build 2>&1)
+    if echo "$output" | grep -q "act.*test.*--job=build"; then
+        echo "${GREEN}✓ get-command works with disambiguated task name 'test-a'${NC}"
+    else
+        echo "${RED}✗ get-command failed with disambiguated task name 'test-a'${NC}"
+        echo "Expected: act -j test --job=build"
+        echo "Got: $output"
+        exit 1
+    fi
+fi
+
+# Test 25: Test allow-command with disambiguated task names
+echo "\nTest 25: Testing allow-command with disambiguated task names"
+
+# Test allowing the make variant with arguments
+echo "2" | dela allow-command test-m --verbose
+
+# Verify the allowlist was updated for the make variant of test
+if grep -q "test.*make" /home/testuser/.dela/allowlist.toml || grep -q "test-m" /home/testuser/.dela/allowlist.toml; then
+    echo "${GREEN}✓ Disambiguated Make test task was added to allowlist${NC}"
+else
+    echo "${RED}✗ Disambiguated Make test task was not added to allowlist${NC}"
+    echo "Allowlist contents:"
+    cat /home/testuser/.dela/allowlist.toml
+    exit 1
+fi
+
+# Test allowing npm variant
+if dela list | grep -q "test-n"; then
+    echo "2" | dela allow-command test-n --ci
+    if grep -q "test.*npm" /home/testuser/.dela/allowlist.toml || grep -q "test-n" /home/testuser/.dela/allowlist.toml; then
+        echo "${GREEN}✓ Disambiguated npm test task was added to allowlist${NC}"
+    else
+        echo "${RED}✗ Disambiguated npm test task was not added to allowlist${NC}"
+        echo "Allowlist contents:"
+        cat /home/testuser/.dela/allowlist.toml
+        exit 1
+    fi
+fi
+
+# Now clean up our test files
+rm duplicate_test.json duplicate_test.mk
+
 echo "\n${GREEN}All non-init tests completed successfully!${NC}"
