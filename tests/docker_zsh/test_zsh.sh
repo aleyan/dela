@@ -129,16 +129,16 @@ log "4. Testing task disambiguation..."
 # Get output from dela list
 output=$(dela list)
 
-# Check if the ambiguous task marker is present
-if ! echo "$output" | grep -q "test.*‖"; then
-    error "Ambiguous task marker (‖) not found for 'test' task"
+# Check if the duplicate task names section exists
+if ! echo "$output" | grep -q "Duplicate task names (‖)"; then
+    error "Disambiguation section not found in dela list output"
     error "Got output: $output"
     exit 1
 fi
 
-# Check if the disambiguation section exists
-if ! echo "$output" | grep -q "Duplicate task names (‖)"; then
-    error "Disambiguation section not found in dela list output"
+# Check if there's a test entry in the duplicate tasks section
+if ! echo "$output" | grep -q "test.*has multiple implementations"; then
+    error "Test task not found in duplicate task names section"
     error "Got output: $output"
     exit 1
 fi

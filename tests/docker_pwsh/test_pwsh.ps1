@@ -182,16 +182,16 @@ Write-Log "4. Testing task disambiguation..."
 # Get output from dela list
 $output = dela list | Out-String
 
-# Check if the ambiguous task marker is present
-if (-not ($output -match "test.*‖")) {
-    Write-Error "Ambiguous task marker (‖) not found for 'test' task"
+# Check if the duplicate task names section exists
+if (-not ($output -match "Duplicate task names \(‖\)")) {
+    Write-Error "Disambiguation section not found in dela list output"
     Write-Error "Got output: $output"
     exit 1
 }
 
-# Check if the disambiguation section exists
-if (-not ($output -match "Duplicate task names \(‖\)")) {
-    Write-Error "Disambiguation section not found in dela list output"
+# Check if there's a test entry in the duplicate tasks section
+if (-not ($output -match "test.*has multiple implementations")) {
+    Write-Error "Test task not found in duplicate task names section"
     Write-Error "Got output: $output"
     exit 1
 }
