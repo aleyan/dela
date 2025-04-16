@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.4
 # Build stage using common builder
 FROM dela-builder AS builder
 
@@ -63,7 +64,7 @@ COPY tests/task_definitions/github_actions/.github /home/testuser/test_project/.
 RUN chown -R testuser:testuser /home/testuser/test_project
 
 # Copy the compiled binary from the builder stage
-COPY --from=builder /app/target/release/dela /usr/local/bin/dela
+COPY --from=builder /app/dela /usr/local/bin/dela
 
 USER testuser
 WORKDIR /home/testuser/test_project

@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.4
 # --- Stage 1: Builder ---
 FROM rust:alpine3.21 AS builder
 
@@ -15,10 +16,24 @@ WORKDIR /app
 # Copy Cargo definition files first (better Docker caching)
 COPY Cargo.toml Cargo.lock ./
 
-# Pre-fetch dependencies (creates a build cache layer)
-RUN cargo fetch || true
+# Create a dummy main file to pre-build dependencies
+RUN mkdir -p src && \
+    echo 'fn main() { println!("Dummy!"); }' > src/main.rs
 
-# Now copy source code and build
+# Use buildx cache for dependencies
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,target=/app/target \
+    cargo fetch
+
+# Copy actual source code
+RUN rm -rf src
 COPY src ./src
 COPY resources ./resources
-RUN cargo build --release --all-features 
+
+# Build the application with cached dependencies
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,target=/app/target \
+    cargo build --release --all-features && \
+    cp target/release/dela /app/ 

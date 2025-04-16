@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.4
 FROM rust:alpine3.21
 
 # Install build dependencies
