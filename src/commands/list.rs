@@ -1056,17 +1056,14 @@ check = { script = "check.py" }
 
         let output = writer.get_output();
         
-        // Debug print the output
-        eprintln!("DEBUG OUTPUT:\n{}", output);
-
         // Check for the double vertical bar on ambiguous tasks
         assert!(
-            output.contains("test (test-n) (npm)"),
-            "Ambiguous task should show both the original and disambiguated names"
+            output.contains("test (test-n) (npm) ‖"),
+            "Ambiguous task should show both the original and disambiguated names with ambiguous symbol"
         );
         assert!(
-            output.contains("test (test-m) (make)"),
-            "Ambiguous task should show both the original and disambiguated names"
+            output.contains("test (test-m) (make) ‖"),
+            "Ambiguous task should show both the original and disambiguated names with ambiguous symbol"
         );
 
         // Check for the footer with disambiguation info
