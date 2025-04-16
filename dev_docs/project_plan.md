@@ -106,9 +106,9 @@ This plan outlines the major development phases and tasks for building `dela`, a
     - [ ] Create interactive menu when ambiguous task is executed without suffix
     - [ ] Allow selection between all matching tasks
   - [ ] [DTKT-26] Support disambiguation in execution paths
-    - [ ] Handle suffixed tasks in bare execution mode
-    - [ ] Handle suffixed tasks in `dr` execution mode
-    - [ ] Pass arguments correctly to disambiguated tasks
+    - [x] Handle suffixed tasks in bare execution mode
+    - [x] Handle suffixed tasks in `dr` execution mode
+    - [x] Pass arguments correctly to disambiguated tasks
 
 **Deliverables**
 - [ ] Fully functional `dela run <task>`.

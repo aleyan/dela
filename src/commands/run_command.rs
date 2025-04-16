@@ -1,5 +1,5 @@
 use crate::runner::is_runner_available;
-use crate::task_discovery::{self, is_task_ambiguous};
+use crate::task_discovery;
 use std::env;
 use std::process::{Command, Stdio};
 
@@ -14,7 +14,7 @@ pub fn execute(task_with_args: &str) -> Result<(), String> {
         env::current_dir().map_err(|e| format!("Failed to get current directory: {}", e))?;
     let discovered = task_discovery::discover_tasks(&current_dir);
 
-    // Find all tasks with the given name
+    // Find all tasks with the given name (both original and disambiguated)
     let matching_tasks = task_discovery::get_matching_tasks(&discovered, task_name);
 
     // Check if there are no matching tasks
@@ -23,7 +23,7 @@ pub fn execute(task_with_args: &str) -> Result<(), String> {
     }
 
     // Check if there are multiple matching tasks
-    if is_task_ambiguous(&discovered, task_name) {
+    if matching_tasks.len() > 1 {
         println!(
             "Multiple tasks found with name '{}'. Please use one of the following:",
             task_name
@@ -75,6 +75,7 @@ mod tests {
     use super::*;
     use crate::environment::{reset_to_real_environment, set_test_environment, TestEnvironment};
     use crate::task_shadowing::{enable_mock, reset_mock};
+    use crate::types::TaskRunner;
     use serial_test::serial;
     use std::fs::{self, File};
     use std::io::Write;
@@ -239,6 +240,107 @@ test: ## Running tests
         assert!(
             result.is_err(),
             "Command execution should fail in test environment"
+        );
+
+        reset_mock();
+        reset_to_real_environment();
+        drop(project_dir);
+        drop(home_dir);
+    }
+
+    #[test]
+    #[serial]
+    fn test_run_command_disambiguated_tasks() {
+        let (project_dir, home_dir) = setup_test_env();
+        env::set_current_dir(&project_dir).expect("Failed to change directory");
+
+        // Create a package.json with the same task name
+        let package_json_content = r#"{
+            "name": "test-package",
+            "scripts": {
+                "test": "jest"
+            }
+        }"#;
+
+        File::create(project_dir.path().join("package.json"))
+            .unwrap()
+            .write_all(package_json_content.as_bytes())
+            .unwrap();
+
+        // Create package-lock.json to ensure npm is detected
+        File::create(project_dir.path().join("package-lock.json"))
+            .unwrap()
+            .write_all(b"{}")
+            .unwrap();
+
+        // Create an exit_with_success.sh script that will be used by our mocked command
+        let script_content = "#!/bin/sh\necho \"Args: $@\"\nexit 0\n";
+        let script_path = home_dir.path().join("exit_with_success.sh");
+        let mut script_file = File::create(&script_path).unwrap();
+        script_file.write_all(script_content.as_bytes()).unwrap();
+
+        // Make it executable
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = fs::metadata(&script_path).unwrap().permissions();
+            perms.set_mode(0o755);
+            fs::set_permissions(&script_path, perms).unwrap();
+        }
+
+        // In real execution context, we need to patch the Command execution
+        // But for testing purposes, we're just testing if the task disambiguation works
+        // not the actual command execution
+
+        // Mock both make and npm being available
+        reset_mock();
+        enable_mock();
+        let env = TestEnvironment::new()
+            .with_executable("make")
+            .with_executable("npm");
+        set_test_environment(env);
+
+        // First verify that ambiguous task gives error
+        let result = execute("test");
+        assert!(result.is_err(), "Should fail with ambiguous task name");
+        assert!(
+            result.unwrap_err().contains("Ambiguous task name: 'test'"),
+            "Error should mention ambiguous task name"
+        );
+
+        // Since we can't easily test actual command execution in unit tests,
+        // we'll just verify that the task lookup mechanism works correctly.
+        // The actual execution would happen in integration tests.
+
+        // Verify task lookup for make variant
+        let current_dir = env::current_dir().unwrap();
+        let discovered = task_discovery::discover_tasks(&current_dir);
+        
+        // Verify that we can find the disambiguated tasks
+        let make_tasks = task_discovery::get_matching_tasks(&discovered, "test-m");
+        assert_eq!(make_tasks.len(), 1, "Should find exactly one make task");
+        assert_eq!(make_tasks[0].runner, TaskRunner::Make);
+        
+        let npm_tasks = task_discovery::get_matching_tasks(&discovered, "test-n");
+        assert_eq!(npm_tasks.len(), 1, "Should find exactly one npm task");
+        assert_eq!(npm_tasks[0].runner, TaskRunner::NodeNpm);
+
+        // Test passing arguments to a disambiguated task name
+        // Note: In test environment, this will fail with a command execution error
+        // but we can still validate the task resolution logic works
+        let result = execute("test-m --verbose --watch");
+        // In test context, Command::new will fail, which is expected
+        assert!(
+            result.is_err(),
+            "Command execution should fail in test environment"
+        );
+        // But we can verify from the error message that it's a command execution error
+        // and not a task resolution error
+        let error = result.unwrap_err();
+        assert!(
+            !error.contains("dela: command or task not found") && 
+            !error.contains("Multiple tasks found"),
+            "The error should be about command execution, not task resolution"
         );
 
         reset_mock();

@@ -2,6 +2,8 @@ use crate::allowlist;
 use crate::task_discovery::{self, get_matching_tasks, is_task_ambiguous};
 use crate::types::AllowScope;
 use std::env;
+use std::fs::File;
+use std::io::Write;
 
 pub fn execute(task_with_args: &str, allow: Option<u8>) -> Result<(), String> {
     let task_name = task_with_args
@@ -353,5 +355,67 @@ test: ## Running tests
             result.unwrap_err(),
             "Dela task 'test' was denied by the ~/.dela/allowlist.toml"
         );
+    }
+
+    #[test]
+    #[serial]
+    fn test_allow_command_disambiguated_tasks() {
+        let (project_dir, _home_dir) = setup_test_env();
+        env::set_current_dir(&project_dir).expect("Failed to change directory");
+
+        // Create a package.json with the same task name
+        let package_json_content = r#"{
+            "name": "test-package",
+            "scripts": {
+                "test": "jest"
+            }
+        }"#;
+
+        File::create(project_dir.path().join("package.json"))
+            .unwrap()
+            .write_all(package_json_content.as_bytes())
+            .unwrap();
+            
+        // Create package-lock.json to ensure npm is detected
+        File::create(project_dir.path().join("package-lock.json"))
+            .unwrap()
+            .write_all(b"{}")
+            .unwrap();
+
+        // Check that ambiguous task 'test' is rejected
+        let result = execute("test", None);
+        assert!(result.is_err(), "Should error for ambiguous task");
+        assert!(
+            result.unwrap_err().contains("Multiple tasks named 'test' found"),
+            "Error should mention multiple tasks"
+        );
+
+        // Determine which disambiguated name was created for the package.json task (it might be -n for npm or -b for bun)
+        let discovered = task_discovery::discover_tasks(&project_dir.path());
+        let js_task_suffix = discovered.tasks
+            .iter()
+            .find(|t| t.file_path.to_string_lossy().contains("package.json"))
+            .and_then(|t| t.disambiguated_name.as_ref())
+            .map(|name| name.chars().last().unwrap_or('n'))
+            .unwrap_or('n');
+
+        // Now try with the disambiguated name for make task
+        let result = execute("test-m", Some(2)); // 2 = allow
+        assert!(result.is_ok(), "Should succeed with disambiguated task name");
+
+        // Also try with the disambiguated name for JS task
+        let js_task_name = format!("test-{}", js_task_suffix);
+        let result = execute(&js_task_name, Some(2)); // 2 = allow
+        assert!(result.is_ok(), "Should succeed with disambiguated task name");
+
+        // Test with disambiguated name and arguments
+        let test_with_args = format!("test-m --verbose --watch");
+        let result = execute(&test_with_args, Some(2)); // 2 = allow
+        assert!(result.is_ok(), "Should succeed with disambiguated task name and arguments");
+        
+        // Test with JS task disambiguated name and arguments
+        let js_test_with_args = format!("{} --ci --coverage", js_task_name);
+        let result = execute(&js_test_with_args, Some(2)); // 2 = allow
+        assert!(result.is_ok(), "Should succeed with JS disambiguated task name and arguments");
     }
 }

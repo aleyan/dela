@@ -33,24 +33,11 @@ pub fn execute(task_with_args: &str) -> Result<(), String> {
             Ok(())
         }
         _ => {
-            // Multiple tasks found, print error and list them
-            println!("Multiple tasks named '{}' found:", task_name);
-            for task in &matching_tasks {
-                // Show disambiguated name if available
-                let display_name = task.disambiguated_name.as_ref().unwrap_or(&task.name);
-                println!(
-                    "  • {} ({} from {})",
-                    display_name,
-                    task.runner.short_name(),
-                    task.file_path.display()
-                );
-            }
-            println!(
-                "Please use a disambiguated name (e.g., '{}-{}') to specify which one to run.",
-                task_name,
-                matching_tasks[0].runner.short_name()[0..1].to_string()
-            );
-            Err(format!("Multiple tasks named '{}' found", task_name))
+            // Multiple matches (should not happen with get_matching_tasks, but handle for safety)
+            return Err(format!(
+                "Multiple tasks found with name '{}'. Please use a more specific name.",
+                task_name
+            ));
         }
     }
 }
@@ -168,6 +155,65 @@ test: ## Running tests
         let result = execute("test");
         assert!(result.is_err(), "Should fail when runner is missing");
         assert_eq!(result.unwrap_err(), "Runner 'make' not found");
+
+        reset_mock();
+        reset_to_real_environment();
+        drop(project_dir);
+        drop(home_dir);
+    }
+
+    #[test]
+    #[serial]
+    fn test_get_command_disambiguated_tasks() {
+        let (project_dir, home_dir) = setup_test_env();
+        env::set_current_dir(&project_dir).expect("Failed to change directory");
+
+        // Create a package.json with the same task name
+        let package_json_content = r#"{
+            "name": "test-package",
+            "scripts": {
+                "test": "jest"
+            }
+        }"#;
+
+        File::create(project_dir.path().join("package.json"))
+            .unwrap()
+            .write_all(package_json_content.as_bytes())
+            .unwrap();
+
+        // Create package-lock.json to ensure npm is detected
+        File::create(project_dir.path().join("package-lock.json"))
+            .unwrap()
+            .write_all(b"{}")
+            .unwrap();
+
+        // Mock both make and npm being available
+        reset_mock();
+        enable_mock();
+        let env = TestEnvironment::new()
+            .with_executable("make")
+            .with_executable("npm");
+        set_test_environment(env);
+
+        // First verify that ambiguous task gives error
+        let result = execute("test");
+        assert!(result.is_err(), "Should fail with ambiguous task name");
+        assert!(
+            result.unwrap_err().contains("Multiple tasks found with name"),
+            "Error should mention multiple tasks"
+        );
+
+        // Verify task lookup for make variant works
+        let result = execute("test-m");
+        assert!(result.is_ok(), "Should succeed with disambiguated task name (make)");
+        
+        // Verify task lookup for npm variant works
+        let result = execute("test-n");
+        assert!(result.is_ok(), "Should succeed with disambiguated task name (npm)");
+        
+        // Verify arguments are correctly passed with disambiguated names
+        let result = execute("test-m --verbose");
+        assert!(result.is_ok(), "Should succeed with disambiguated task name and args");
 
         reset_mock();
         reset_to_real_environment();
