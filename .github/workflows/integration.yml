@@ -31,6 +31,49 @@ jobs:
         id: cargolock
         run: echo "hash=$(sha256sum Cargo.lock | cut -d ' ' -f 1)" >> $GITHUB_OUTPUT
 
+  unit-tests:
+    name: Run Unit Tests
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Setup Cache
+        uses: actions/cache@v3
+        with:
+          path: /tmp/.buildx-cache-unit
+          # Use the same Cargo.lock hash for unit tests
+          key: buildx-unit-${{ needs.prepare.outputs.cargolock_hash }}
+          restore-keys: |
+            buildx-unit-
+
+      # Build and run unit tests in a single step, using the embedded test script
+      - name: Build and run unit tests
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: tests/docker_unit/Dockerfile
+          platforms: ${{ env.PLATFORM }}
+          load: true
+          tags: dela-test-unit:latest
+          cache-from: type=local,src=/tmp/.buildx-cache-unit
+          cache-to: type=local,dest=/tmp/.buildx-cache-unit-new,mode=max
+          outputs: type=docker
+
+      # Run the tests with the embedded script
+      - name: Run unit tests
+        run: |
+          docker run --rm dela-test-unit:latest
+
+      # Temp fix
+      - name: Move cache
+        run: |
+          rm -rf /tmp/.buildx-cache-unit
+          mv /tmp/.buildx-cache-unit-new /tmp/.buildx-cache-unit || true
+
   build-base:
     name: Build Base Image
     needs: prepare
@@ -77,47 +120,7 @@ jobs:
       - name: Move cache
         run: |
           rm -rf /tmp/.buildx-cache
-          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
-
-  unit-tests:
-    name: Run Unit Tests
-    needs: prepare
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Setup Cache
-        uses: actions/cache@v3
-        with:
-          path: /tmp/.buildx-cache-unit
-          # Use the same Cargo.lock hash for unit tests
-          key: buildx-unit-${{ needs.prepare.outputs.cargolock_hash }}
-          restore-keys: |
-            buildx-unit-
-
-      - name: Build and run unit tests
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: tests/docker_unit/Dockerfile
-          platforms: ${{ env.PLATFORM }}
-          load: true
-          tags: dela-test-unit:latest
-          cache-from: type=local,src=/tmp/.buildx-cache-unit
-          cache-to: type=local,dest=/tmp/.buildx-cache-unit-new,mode=max
-
-      - name: Run unit tests
-        run: |
-          docker run --rm dela-test-unit:latest
-
-      # Temp fix
-      - name: Move cache
-        run: |
-          rm -rf /tmp/.buildx-cache-unit
-          mv /tmp/.buildx-cache-unit-new /tmp/.buildx-cache-unit
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache || true
 
   shell-tests:
     name: Shell Tests
