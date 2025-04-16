@@ -103,7 +103,7 @@ fn generate_runner_prefix(
     // Try to use the first three characters (or all if shorter than 3)
     let prefix_length = std::cmp::min(3, short_name.len());
     let mut prefix = short_name[0..prefix_length].to_string();
-    
+
     // If unique, return it
     if !used_prefixes.contains(&prefix) {
         return prefix;

@@ -199,21 +199,32 @@ test: ## Running tests
         let result = execute("test");
         assert!(result.is_err(), "Should fail with ambiguous task name");
         assert!(
-            result.unwrap_err().contains("Multiple tasks found with name"),
+            result
+                .unwrap_err()
+                .contains("Multiple tasks found with name"),
             "Error should mention multiple tasks"
         );
 
         // Verify task lookup for make variant works
         let result = execute("test-mak");
-        assert!(result.is_ok(), "Should succeed with disambiguated task name (make)");
-        
+        assert!(
+            result.is_ok(),
+            "Should succeed with disambiguated task name (make)"
+        );
+
         // Verify task lookup for npm variant works
         let result = execute("test-npm");
-        assert!(result.is_ok(), "Should succeed with disambiguated task name (npm)");
-        
+        assert!(
+            result.is_ok(),
+            "Should succeed with disambiguated task name (npm)"
+        );
+
         // Verify arguments are correctly passed with disambiguated names
         let result = execute("test-mak --verbose");
-        assert!(result.is_ok(), "Should succeed with disambiguated task name and args");
+        assert!(
+            result.is_ok(),
+            "Should succeed with disambiguated task name and args"
+        );
 
         reset_mock();
         reset_to_real_environment();

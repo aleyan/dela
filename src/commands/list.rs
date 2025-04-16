@@ -1050,7 +1050,7 @@ check = { script = "check.py" }
         }
 
         let output = writer.get_output();
-        
+
         // Check for the double vertical bar on ambiguous tasks with more flexible matching
         assert!(
             output.contains("test") && output.contains("test-n") && 

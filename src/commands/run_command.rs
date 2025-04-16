@@ -315,12 +315,12 @@ test: ## Running tests
         // Verify task lookup for make variant
         let current_dir = env::current_dir().unwrap();
         let discovered = task_discovery::discover_tasks(&current_dir);
-        
+
         // Verify that we can find the disambiguated tasks
         let make_tasks = task_discovery::get_matching_tasks(&discovered, "test-mak");
         assert_eq!(make_tasks.len(), 1, "Should find exactly one make task");
         assert_eq!(make_tasks[0].runner, TaskRunner::Make);
-        
+
         let npm_tasks = task_discovery::get_matching_tasks(&discovered, "test-npm");
         assert_eq!(npm_tasks.len(), 1, "Should find exactly one npm task");
         assert_eq!(npm_tasks[0].runner, TaskRunner::NodeNpm);
@@ -338,8 +338,8 @@ test: ## Running tests
         // and not a task resolution error
         let error = result.unwrap_err();
         assert!(
-            !error.contains("dela: command or task not found") && 
-            !error.contains("Multiple tasks found"),
+            !error.contains("dela: command or task not found")
+                && !error.contains("Multiple tasks found"),
             "The error should be about command execution, not task resolution"
         );
 

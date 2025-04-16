@@ -375,7 +375,7 @@ test: ## Running tests
             .unwrap()
             .write_all(package_json_content.as_bytes())
             .unwrap();
-            
+
         // Create package-lock.json to ensure npm is detected
         File::create(project_dir.path().join("package-lock.json"))
             .unwrap()
@@ -386,26 +386,40 @@ test: ## Running tests
         let result = execute("test", None);
         assert!(result.is_err(), "Should error for ambiguous task");
         assert!(
-            result.unwrap_err().contains("Multiple tasks named 'test' found"),
+            result
+                .unwrap_err()
+                .contains("Multiple tasks named 'test' found"),
             "Error should mention multiple tasks"
         );
 
         // Now try with the disambiguated name for make task
         let result = execute("test-mak", Some(2)); // 2 = allow
-        assert!(result.is_ok(), "Should succeed with disambiguated task name");
+        assert!(
+            result.is_ok(),
+            "Should succeed with disambiguated task name"
+        );
 
         // Also try with the disambiguated name for npm task
         let result = execute("test-npm", Some(2)); // 2 = allow
-        assert!(result.is_ok(), "Should succeed with disambiguated task name");
+        assert!(
+            result.is_ok(),
+            "Should succeed with disambiguated task name"
+        );
 
         // Test with disambiguated name and arguments
         let test_with_args = "test-mak --verbose --watch";
         let result = execute(test_with_args, Some(2)); // 2 = allow
-        assert!(result.is_ok(), "Should succeed with disambiguated task name and arguments");
-        
+        assert!(
+            result.is_ok(),
+            "Should succeed with disambiguated task name and arguments"
+        );
+
         // Test with npm task disambiguated name and arguments
         let npm_test_with_args = "test-npm --ci --coverage";
         let result = execute(npm_test_with_args, Some(2)); // 2 = allow
-        assert!(result.is_ok(), "Should succeed with npm disambiguated task name and arguments");
+        assert!(
+            result.is_ok(),
+            "Should succeed with npm disambiguated task name and arguments"
+        );
     }
 }
