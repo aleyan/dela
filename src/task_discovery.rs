@@ -98,16 +98,19 @@ fn generate_runner_prefix(
     runner: &TaskRunner,
     used_prefixes: &std::collections::HashSet<String>,
 ) -> String {
-    let short_name = runner.short_name();
+    let short_name = runner.short_name().to_lowercase();
 
-    // Try just the first letter first
-    let mut prefix = short_name[0..1].to_string();
+    // Try to use the first three characters (or all if shorter than 3)
+    let prefix_length = std::cmp::min(3, short_name.len());
+    let mut prefix = short_name[0..prefix_length].to_string();
+    
+    // If unique, return it
     if !used_prefixes.contains(&prefix) {
         return prefix;
     }
 
     // If that's taken, try adding more letters until we have a unique prefix
-    for i in 2..=short_name.len() {
+    for i in (prefix_length + 1)..=short_name.len() {
         prefix = short_name[0..i].to_string();
         if !used_prefixes.contains(&prefix) {
             return prefix;
