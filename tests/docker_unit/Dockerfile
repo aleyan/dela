@@ -48,12 +48,13 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry \
 
 # Now copy the real source code
 COPY Cargo.toml Cargo.lock ./
-COPY src src
-COPY resources resources
 
-# Build and prepare for tests
-# Using the same cache identifiers consistently with GitHub Actions
-RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry \
+# Build application while the _source_ is bind‑mounted (not copied), so
+# touching .rs files does NOT trash the Docker layer cache.
+#
+RUN --mount=type=bind,target=/home/testuser/src,source=./src,readonly \
+    --mount=type=bind,target=/home/testuser/resources,source=./resources,readonly \
+    --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry \
     --mount=type=cache,target=/usr/local/cargo/git,id=cargo-git \
     --mount=type=cache,target=/home/testuser/target,id=cargo-target,sharing=locked \
     cargo test --no-run --all-features

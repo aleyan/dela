@@ -45,13 +45,13 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry \
 
 # First copy just what we need for compilation (order matters for caching)
 COPY Cargo.toml Cargo.lock ./
-COPY src src
 
-# Then copy additional files needed for runtime
-COPY resources resources
-
-# Build the application with cached dependencies and all features
-RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry \
+# Build application while the _source_ is bind‑mounted (not copied), so
+# touching .rs files does NOT trash the Docker layer cache.
+#
+RUN --mount=type=bind,target=/app/src,source=./src,readonly \
+    --mount=type=bind,target=/app/resources,source=./resources,readonly \
+    --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry \
     --mount=type=cache,target=/usr/local/cargo/git,id=cargo-git \
     --mount=type=cache,target=/app/target,id=cargo-target \
     cargo build --release --all-features && \
