@@ -1,7 +1,30 @@
 # syntax=docker/dockerfile:1.4
-FROM rust:alpine3.21
+# --- Stage 1: Chef ---
+FROM rust:alpine3.21 AS chef
+# Install cargo-chef
+RUN apk add --no-cache musl-dev gcc make && \
+    cargo install cargo-chef --version 0.1.71
 
-# Install dependencies
+# Set the working directory inside the container
+WORKDIR /app
+
+# --- Stage 2: Planner ---
+FROM chef AS planner
+# Install build dependencies for the planner
+RUN apk add --no-cache \
+    openssl-dev \
+    pkgconfig \
+    bash
+
+# Only copy what cargo-chef needs
+COPY Cargo.toml Cargo.lock ./
+COPY src src
+# Create the dependency plan (only needs source code, not tests or resources)
+RUN cargo chef prepare --recipe-path recipe.json
+
+# --- Stage 3: Test Builder ---
+FROM chef AS builder
+# Install build dependencies
 RUN apk add --no-cache \
     musl-dev \
     gcc \
@@ -14,21 +37,30 @@ RUN apk add --no-cache \
 RUN adduser -D testuser
 WORKDIR /home/testuser
 
-# Copy source code
+# Copy the recipe from the planner
+COPY --from=planner /app/recipe.json recipe.json
+
+# Build dependencies using the recipe - critical step for caching
+RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry \
+    --mount=type=cache,target=/usr/local/cargo/git,id=cargo-git \
+    --mount=type=cache,target=/home/testuser/target,id=cargo-target,sharing=locked \
+    cargo chef cook --tests --recipe-path recipe.json
+
+# Now copy the real source code
 COPY Cargo.toml Cargo.lock ./
 COPY src src
 COPY resources resources
 
+# Build and prepare for tests
+# Using the same cache identifiers consistently with GitHub Actions
+RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry \
+    --mount=type=cache,target=/usr/local/cargo/git,id=cargo-git \
+    --mount=type=cache,target=/home/testuser/target,id=cargo-target,sharing=locked \
+    cargo test --no-run --all-features
+
 # Copy test script directly into the image
 COPY tests/docker_unit/test_unit.sh /home/testuser/test_script.sh
 RUN chmod +x /home/testuser/test_script.sh
-
-# Build dependencies with proper caching
-RUN --mount=type=cache,target=/usr/local/cargo/registry,id=unit-cargo-registry \
-    --mount=type=cache,target=/usr/local/cargo/git,id=unit-cargo-git \
-    --mount=type=cache,target=/home/testuser/target,id=unit-cargo-target \
-    cargo fetch && \
-    cargo test --no-run --all-features
 
 # Set ownership
 RUN chown -R testuser:testuser /home/testuser && \
