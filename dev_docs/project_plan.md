@@ -84,21 +84,31 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [ ] [DTKT-20] Implement shell environment inheritance for task execution.
   - [ ] [DTKT-21] Support both direct execution and subshell spawning based on task type.
   - [ ] [DTKT-22] Ensure environment variables and working directory are properly propagated.
-  - [ ] [DTKT-85] Design task name collision resolution strategy
-  - [ ] [DTKT-86] Implement task name collision resolution
   - [x] [DTKT-87] Implement task runner installation detection
   - [x] [DTKT-88] Implement task runner disambiguation eg(npm vs yarn vs bun)
 
 - [ ] **`run` Command and Bare-Command Invocation**
   - [x] [DTKT-23] Complete `dela run <task>` for direct execution.
   - [x] [DTKT-24] Ensure bare commands invoke `dela` through the fallback.
-  - [ ] [DTKT-25] Prompt user if multiple matching tasks exist.
   - [x] [DTKT-95] Provide `dr` shell function to run dela tasks with --allow flag.
   - [x] [DTKT-112] Remove `dela run` in favor of `dr` shell function.
 
-- [ ] **Disambiguation**
-  - [ ] [DTKT-26] Implement logic to handle multiple tasks with the same name.
-  - [ ] [DTKT-27] Store or remember user's choice, if desired.
+- [ ] **Task Name Disambiguation**
+  - [ ] [DTKT-85] Design and implement disambiguation suffix generation
+    - [ ] Detect task name collisions across different runners
+    - [ ] Generate unique suffixes based on task runner initials (e.g., test-m, test-p)
+    - [ ] Handle multiple runners with same initial by adding more letters
+  - [ ] [DTKT-86] Update list command for disambiguated task display
+    - [ ] Mark ambiguous tasks with double vertical bar (‖)
+    - [ ] Show both original and suffixed task names
+    - [ ] Add a footnote section listing all duplicate task names
+  - [ ] [DTKT-25] Implement TUI for ambiguous task selection
+    - [ ] Create interactive menu when ambiguous task is executed without suffix
+    - [ ] Allow selection between all matching tasks
+  - [ ] [DTKT-26] Support disambiguation in execution paths
+    - [ ] Handle suffixed tasks in bare execution mode
+    - [ ] Handle suffixed tasks in `dr` execution mode
+    - [ ] Pass arguments correctly to disambiguated tasks
 
 **Deliverables**
 - [ ] Fully functional `dela run <task>`.
