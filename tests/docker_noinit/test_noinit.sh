@@ -245,16 +245,18 @@ else
     exit 1
 fi
 
-# Verify that GitHub Actions workflow file is detected
+# Verify that GitHub Actions workflow file is detected - use regex to match any workflow with act runner
 if dela list | grep -q "test.*act"; then
     echo "${GREEN}✓ GitHub Actions workflow file is detected${NC}"
 else
     echo "${RED}✗ GitHub Actions workflow file is not detected${NC}"
+    dela list
     exit 1
 fi
 
 # Test 18: Verify GitHub Actions workflow descriptions
 echo "\nTest 18: Testing GitHub Actions workflow descriptions"
+# Look for test workflows with act runner and Test Workflow description
 if dela list | grep -q "test.*act.*Test Workflow"; then
     echo "${GREEN}✓ GitHub Actions workflow descriptions are correct${NC}"
 else
@@ -270,11 +272,13 @@ echo "\nTest 19: Verifying GitHub Actions task discovery"
 dela list | grep "act" || true
 
 # Verify that the GitHub Actions tasks were discovered correctly - look for 'act' tasks
+# First check for any act runners, then check for test workflow specifically
 if dela list | grep -q "act" && \
    dela list | grep -q "test.*act"; then
     echo "${GREEN}✓ GitHub Actions workflows were discovered correctly${NC}"
 else
     echo "${RED}✗ GitHub Actions workflows were not discovered correctly${NC}"
+    dela list
     exit 1
 fi
 
