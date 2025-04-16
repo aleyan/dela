@@ -14,15 +14,10 @@ tests:
 	@echo "Running tests..."
 	cargo test
 
-# Build the base builder image with buildx caching
+# Build the base builder image
 builder:
-	@echo "Building base builder image with caching..."
-	docker buildx create --use --name dela-builder-instance --driver docker-container || true
-	docker buildx build --load \
-		--cache-from=type=local,src=/tmp/dela-buildx-cache \
-		--cache-to=type=local,dest=/tmp/dela-buildx-cache \
-		-t dela-builder -f tests/Dockerfile.builder .
-	docker buildx rm dela-builder-instance || true
+	@echo "Building base builder image..."
+	docker build -t dela-builder -f tests/Dockerfile.builder .
 
 # Individual shell test targets
 test_unit: builder

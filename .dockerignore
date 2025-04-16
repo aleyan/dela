@@ -1,0 +1,17 @@
+# Exclude build artifacts
+target/
+**/*.rs.bk
+
+# Exclude version control
+.git/
+.gitignore
+
+# Exclude development files
+.vscode/
+.idea/
+.DS_Store
+
+# Exclude temporary files
+*~
+*.tmp
+*.log 
