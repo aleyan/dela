@@ -181,5 +181,7 @@ mod tests {
             lines[1], "Error: Failed to execute task",
             "Regular error should have 'Error:' prefix"
         );
+
+        assert_eq!(1,2,"Should fail")
     }
 }
