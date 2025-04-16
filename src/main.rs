@@ -22,7 +22,11 @@ mod types;
     author = "Alex Yankov",
     version,
     about = "A task runner that delegates to others",
-    long_about = "Dela scans your project directory for task definitions in various formats (Makefile, package.json, etc.) and lets you run them directly from your shell.\n\nAfter running '$ dela init', you can:\n1. Use '$ dr <task>' to execute a task directly\n2. Execute task with bare name `$ <task>` through the shell integration"
+    long_about = r#"Dela scans your project directory for task definitions in various formats (Makefile, package.json, etc.) and lets you run them directly from your shell.
+
+After running '$ dela init', you can:
+1. Execute task with bare name `$ <task>` through the shell integration
+2. Use '$ dr <task>' to execute a task explicitly"#
 )]
 struct Cli {
     #[command(subcommand)]
@@ -179,4 +183,3 @@ mod tests {
         );
     }
 }
-// cache bust
