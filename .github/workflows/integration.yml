@@ -77,13 +77,6 @@ jobs:
         run: |
           docker run --rm dela-test-unit:latest
 
-      # This ugly bit is necessary if you don't want your cache to grow forever
-      # See https://github.com/docker/build-push-action/issues/252
-      # and https://github.com/moby/buildkit/issues/1896
-      - name: Move cache
-        run: |
-          rm -rf /tmp/.buildx-cache-unit
-          mv /tmp/.buildx-cache-unit-new /tmp/.buildx-cache-unit
 
   build-base:
     name: Build Base Image
@@ -133,11 +126,6 @@ jobs:
           cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:buildcache
           cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
 
-      # Temp fix - make sure we use || true to avoid failures on cache move
-      - name: Move cache
-        run: |
-          rm -rf /tmp/.buildx-cache || true
-          mv /tmp/.buildx-cache-new /tmp/.buildx-cache || true
 
   shell-tests:
     name: Shell Tests
