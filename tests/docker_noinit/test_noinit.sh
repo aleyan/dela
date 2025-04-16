@@ -532,13 +532,15 @@ echo "\nTest 25: Testing allow-command with disambiguated task names"
 # Test allowing the make variant with arguments (if detected)
 if [ ! -z "$MAKE_SUFFIX" ]; then
     echo "Testing allow-command with make variant: $MAKE_SUFFIX"
-    echo "2" | dela allow-command "$MAKE_SUFFIX" --verbose
+    dela allow-command "$MAKE_SUFFIX" --allow 2
 
-    # Verify the allowlist was updated for the make variant of test
-    if grep -q "test.*make" /home/testuser/.dela/allowlist.toml || grep -q "$MAKE_SUFFIX" /home/testuser/.dela/allowlist.toml; then
-        echo "${GREEN}✓ Disambiguated Make test task was added to allowlist${NC}"
+    # Verify the allowlist was updated with the original task name "test"
+    # and with the Makefile path (not checking for the disambiguated name)
+    if grep -q "path.*Makefile" /home/testuser/.dela/allowlist.toml && \
+       grep -q 'tasks = \["test"\]' /home/testuser/.dela/allowlist.toml; then
+        echo "${GREEN}✓ Make test task was added to allowlist${NC}"
     else
-        echo "${RED}✗ Disambiguated Make test task was not added to allowlist${NC}"
+        echo "${RED}✗ Make test task was not added to allowlist${NC}"
         echo "Allowlist contents:"
         cat /home/testuser/.dela/allowlist.toml
         exit 1
@@ -550,11 +552,15 @@ fi
 # Test allowing npm variant (if detected)
 if [ ! -z "$NPM_SUFFIX" ]; then
     echo "Testing allow-command with npm variant: $NPM_SUFFIX"
-    echo "2" | dela allow-command "$NPM_SUFFIX" --ci
-    if grep -q "test.*npm" /home/testuser/.dela/allowlist.toml || grep -q "$NPM_SUFFIX" /home/testuser/.dela/allowlist.toml; then
-        echo "${GREEN}✓ Disambiguated npm test task was added to allowlist${NC}"
+    dela allow-command "$NPM_SUFFIX" --allow 2
+    
+    # Verify the allowlist was updated with the original task name "test"
+    # and with the package.json path
+    if grep -q "path.*package.json" /home/testuser/.dela/allowlist.toml && \
+       grep -q 'tasks = \["test"\]' /home/testuser/.dela/allowlist.toml; then
+        echo "${GREEN}✓ NPM test task was added to allowlist${NC}"
     else
-        echo "${RED}✗ Disambiguated npm test task was not added to allowlist${NC}"
+        echo "${RED}✗ NPM test task was not added to allowlist${NC}"
         echo "Allowlist contents:"
         cat /home/testuser/.dela/allowlist.toml
         exit 1
