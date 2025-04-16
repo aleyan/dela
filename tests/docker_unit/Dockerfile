@@ -19,8 +19,12 @@ COPY Cargo.toml Cargo.lock ./
 COPY src src
 COPY resources resources
 
-# Build dependencies to cache them
-RUN cargo fetch
+# Build dependencies with proper caching
+RUN --mount=type=cache,target=/usr/local/cargo/registry,id=unit-cargo-registry \
+    --mount=type=cache,target=/usr/local/cargo/git,id=unit-cargo-git \
+    --mount=type=cache,target=/home/testuser/target,id=unit-cargo-target \
+    cargo fetch && \
+    cargo test --no-run --all-features
 
 # Set ownership
 RUN chown -R testuser:testuser /home/testuser && \

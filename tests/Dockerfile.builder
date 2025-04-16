@@ -38,7 +38,10 @@ WORKDIR /app
 COPY --from=planner /app/recipe.json recipe.json
 
 # Build dependencies using the recipe - critical step for caching
-RUN cargo chef cook --release --recipe-path recipe.json
+RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry \
+    --mount=type=cache,target=/usr/local/cargo/git,id=cargo-git \
+    --mount=type=cache,target=/app/target,id=cargo-target \
+    cargo chef cook --release --recipe-path recipe.json
 
 # First copy just what we need for compilation (order matters for caching)
 COPY Cargo.toml Cargo.lock ./
@@ -48,5 +51,8 @@ COPY src src
 COPY resources resources
 
 # Build the application with cached dependencies and all features
-RUN cargo build --release --all-features && \
+RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry \
+    --mount=type=cache,target=/usr/local/cargo/git,id=cargo-git \
+    --mount=type=cache,target=/app/target,id=cargo-target \
+    cargo build --release --all-features && \
     cp target/release/dela /app/

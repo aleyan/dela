@@ -18,8 +18,22 @@ env:
   PLATFORM: linux/amd64
 
 jobs:
+  # Compute cargo lock hash as a separate job so both subsequent jobs can use it
+  prepare:
+    name: Prepare Cache Keys
+    runs-on: ubuntu-latest
+    outputs:
+      cargolock_hash: ${{ steps.cargolock.outputs.hash }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Compute Cargo lock hash
+        id: cargolock
+        run: echo "hash=$(sha256sum Cargo.lock | cut -d ' ' -f 1)" >> $GITHUB_OUTPUT
+
   build-base:
     name: Build Base Image
+    needs: prepare
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -33,15 +47,15 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-          
+
       - name: Setup Cache
         uses: actions/cache@v3
         with:
           path: /tmp/.buildx-cache
-          # Use a more precise cache key based on Cargo.lock to leverage cargo-chef
-          key: ${{ runner.os }}-buildx-${{ hashFiles('**/Cargo.lock') }}
+          # Use the computed Cargo.lock hash from the prepare job
+          key: buildx-cargo-${{ needs.prepare.outputs.cargolock_hash }}
           restore-keys: |
-            ${{ runner.os }}-buildx-
+            buildx-cargo-
 
       - name: Build and push base image
         uses: docker/build-push-action@v6
@@ -51,8 +65,13 @@ jobs:
           platforms: ${{ env.PLATFORM }}
           tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
           push: true
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
+          # Enable buildkit inline cache
+          cache-from: |
+            type=local,src=/tmp/.buildx-cache
+            type=registry,ref=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:buildcache
+          cache-to: |
+            type=local,dest=/tmp/.buildx-cache-new,mode=max
+            type=registry,ref=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
 
       # Temp fix for https://github.com/docker/build-push-action/issues/252
       - name: Move cache
@@ -60,13 +79,53 @@ jobs:
           rm -rf /tmp/.buildx-cache
           mv /tmp/.buildx-cache-new /tmp/.buildx-cache
 
+  unit-tests:
+    name: Run Unit Tests
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Setup Cache
+        uses: actions/cache@v3
+        with:
+          path: /tmp/.buildx-cache-unit
+          # Use the same Cargo.lock hash for unit tests
+          key: buildx-unit-${{ needs.prepare.outputs.cargolock_hash }}
+          restore-keys: |
+            buildx-unit-
+
+      - name: Build and run unit tests
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: tests/docker_unit/Dockerfile
+          platforms: ${{ env.PLATFORM }}
+          load: true
+          tags: dela-test-unit:latest
+          cache-from: type=local,src=/tmp/.buildx-cache-unit
+          cache-to: type=local,dest=/tmp/.buildx-cache-unit-new,mode=max
+
+      - name: Run unit tests
+        run: |
+          docker run --rm dela-test-unit:latest
+
+      # Temp fix
+      - name: Move cache
+        run: |
+          rm -rf /tmp/.buildx-cache-unit
+          mv /tmp/.buildx-cache-unit-new /tmp/.buildx-cache-unit
+
   shell-tests:
     name: Shell Tests
     needs: build-base
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        shell: [unit, noinit, zsh, bash, fish, pwsh]
+        shell: [noinit, zsh, bash, fish, pwsh]
       fail-fast: false
 
     steps:
