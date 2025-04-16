@@ -206,6 +206,30 @@ start (npm)
 - Checks: Each time a task is run, dela consults the allowlist to ensure permission.
 - Example: If the user chooses to allow a single run, the entry is ephemeral and not stored permanently. If the user chooses to "Allow any command from ~/Projects/dela/Makefile," a matching entry is created in the allowlist.
 
+### Task Disambiguation
+
+When multiple task runners define tasks with the same name, the following disambiguation strategy will be implemented:
+
+1. **Suffixed Task Names**: When tasks with identical names are discovered from different runners:
+   - Each ambiguous task will be assigned a suffix based on the task runner (e.g., `test-m` for Make, `test-p` for Poetry)
+   - If multiple runners start with the same letter, additional letters will be added until unique (e.g., `test-np` vs `test-no`)
+   - Both original and suffixed names will appear in `dela list` output
+
+2. **Display Format**: In `dela list` output, ambiguous task names will be marked with a double vertical bar (‖):
+   ```
+   build (make) - Build the project
+   test-m (make) ‖ - test the project
+   test-p (poetry) ‖ - run unit tests
+
+   Duplicate task names:
+   ‖ task 'test' 
+   ```
+
+3. **Execution Behavior**:
+   - Suffixed tasks (`test-m`) can be directly executed via both `dr` and bare execution paths
+   - When a user executes an ambiguous task without a suffix, a TUI selection prompt will appear
+   - The TUI will allow selection between all matching tasks, similar to the permission prompt interface
+
 ## Testing
 
 The project has comprehensive test coverage through unit tests and integration tests.
