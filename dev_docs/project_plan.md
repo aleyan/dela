@@ -98,10 +98,10 @@ This plan outlines the major development phases and tasks for building `dela`, a
     - [x] Detect task name collisions across different runners
     - [x] Generate unique suffixes based on task runner initials (e.g., test-m, test-p)
     - [x] Handle multiple runners with same initial by adding more letters
-  - [ ] [DTKT-86] Update list command for disambiguated task display
-    - [ ] Mark ambiguous tasks with double vertical bar (‖)
-    - [ ] Show both original and suffixed task names
-    - [ ] Add a footnote section listing all duplicate task names
+  - [x] [DTKT-86] Update list command for disambiguated task display
+    - [x] Mark ambiguous tasks with double vertical bar (‖)
+    - [x] Show both original and suffixed task names
+    - [x] Add a footnote section listing all duplicate task names
   - [ ] [DTKT-25] Implement TUI for ambiguous task selection
     - [ ] Create interactive menu when ambiguous task is executed without suffix
     - [ ] Allow selection between all matching tasks

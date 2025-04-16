@@ -67,25 +67,37 @@ pub fn execute(task_with_args: &str, allow: Option<u8>) -> Result<(), String> {
             for task in &matching_tasks {
                 // Show disambiguated name if available
                 let display_name = task.disambiguated_name.as_ref().unwrap_or(&task.name);
-                eprintln!("  • {} ({} from {})", display_name, task.runner.short_name(), task.file_path.display());
+                eprintln!(
+                    "  • {} ({} from {})",
+                    display_name,
+                    task.runner.short_name(),
+                    task.file_path.display()
+                );
             }
             eprintln!(
                 "Please use a disambiguated name (e.g., '{}-{}') to specify which one to run.",
-                task_name, matching_tasks[0].runner.short_name()[0..1].to_string()
+                task_name,
+                matching_tasks[0].runner.short_name()[0..1].to_string()
             );
             Err(format!("Multiple tasks named '{}' found", task_name))
         }
     }
 }
 
-pub fn allow_task(discovered_tasks: &crate::task_discovery::DiscoveredTasks, task_name: &str) -> bool {
+pub fn allow_task(
+    discovered_tasks: &crate::task_discovery::DiscoveredTasks,
+    task_name: &str,
+) -> bool {
     // Check if the task is ambiguous
     if is_task_ambiguous(discovered_tasks, task_name) {
         // Get all matching tasks
         let matching_tasks = get_matching_tasks(discovered_tasks, task_name);
-        
+
         // If there are multiple tasks, inform the user
-        println!("Multiple tasks found with name '{}'. Please use the disambiguated name:", task_name);
+        println!(
+            "Multiple tasks found with name '{}'. Please use the disambiguated name:",
+            task_name
+        );
         for task in &matching_tasks {
             println!(
                 "  - {} ({})",
@@ -93,7 +105,7 @@ pub fn allow_task(discovered_tasks: &crate::task_discovery::DiscoveredTasks, tas
                 task.runner.short_name()
             );
         }
-        
+
         return false;
     }
 
@@ -103,7 +115,7 @@ pub fn allow_task(discovered_tasks: &crate::task_discovery::DiscoveredTasks, tas
         println!("Task '{}' not found.", task_name);
         return false;
     }
-    
+
     // Task exists and is not ambiguous
     true
 }

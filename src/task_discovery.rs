@@ -3,10 +3,7 @@ use crate::parsers::{
     parse_pyproject_toml, parse_taskfile,
 };
 use crate::task_shadowing::check_shadowing;
-use crate::types::{
-    Task, TaskDefinitionFile, TaskDefinitionType, TaskFileStatus,
-    TaskRunner,
-};
+use crate::types::{Task, TaskDefinitionFile, TaskDefinitionType, TaskFileStatus, TaskRunner};
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
@@ -50,7 +47,7 @@ pub fn discover_tasks(dir: &Path) -> DiscoveredTasks {
     let _ = discover_gradle_tasks(dir, &mut discovered);
     let _ = discover_github_actions_tasks(dir, &mut discovered);
     discover_shell_script_tasks(dir, &mut discovered);
-    
+
     // Process tasks to identify name collisions
     process_task_disambiguation(&mut discovered);
 
@@ -62,31 +59,34 @@ pub fn process_task_disambiguation(discovered: &mut DiscoveredTasks) {
     // Step 1: Identify tasks with name collisions
     let mut task_name_counts: HashMap<String, usize> = HashMap::new();
     let mut tasks_by_name: HashMap<String, Vec<usize>> = HashMap::new();
-    
+
     // Count occurrences of each task name
     for (i, task) in discovered.tasks.iter().enumerate() {
         *task_name_counts.entry(task.name.clone()).or_insert(0) += 1;
-        tasks_by_name.entry(task.name.clone()).or_insert_with(Vec::new).push(i);
+        tasks_by_name
+            .entry(task.name.clone())
+            .or_insert_with(Vec::new)
+            .push(i);
     }
-    
+
     // Save task name counts for reference
     discovered.task_name_counts = task_name_counts.clone();
-    
+
     // Step 2: Add disambiguated names to tasks with name collisions
     for (name, count) in task_name_counts.iter() {
         if *count > 1 {
             // This task name has collisions
             let task_indices = tasks_by_name.get(name).unwrap();
-            
+
             // Track which runner prefix suffixes we've used for this task name
             let mut used_prefixes = std::collections::HashSet::new();
-            
+
             for &idx in task_indices {
                 let task = &mut discovered.tasks[idx];
                 let runner_prefix = generate_runner_prefix(&task.runner, &used_prefixes);
                 used_prefixes.insert(runner_prefix.clone());
-                
-                // Add a disambiguated name 
+
+                // Add a disambiguated name
                 task.disambiguated_name = Some(format!("{}-{}", task.name, runner_prefix));
             }
         }
@@ -94,15 +94,18 @@ pub fn process_task_disambiguation(discovered: &mut DiscoveredTasks) {
 }
 
 /// Generates a unique prefix for a task runner for disambiguation
-fn generate_runner_prefix(runner: &TaskRunner, used_prefixes: &std::collections::HashSet<String>) -> String {
+fn generate_runner_prefix(
+    runner: &TaskRunner,
+    used_prefixes: &std::collections::HashSet<String>,
+) -> String {
     let short_name = runner.short_name();
-    
+
     // Try just the first letter first
     let mut prefix = short_name[0..1].to_string();
     if !used_prefixes.contains(&prefix) {
         return prefix;
     }
-    
+
     // If that's taken, try adding more letters until we have a unique prefix
     for i in 2..=short_name.len() {
         prefix = short_name[0..i].to_string();
@@ -110,7 +113,7 @@ fn generate_runner_prefix(runner: &TaskRunner, used_prefixes: &std::collections:
             return prefix;
         }
     }
-    
+
     // If we somehow get here, we'll make it unique by adding a number
     let mut i = 1;
     loop {
@@ -124,20 +127,26 @@ fn generate_runner_prefix(runner: &TaskRunner, used_prefixes: &std::collections:
 
 /// Checks if a task name is ambiguous (has multiple implementations)
 pub fn is_task_ambiguous(discovered: &DiscoveredTasks, task_name: &str) -> bool {
-    discovered.task_name_counts.get(task_name).map_or(false, |&count| count > 1)
+    discovered
+        .task_name_counts
+        .get(task_name)
+        .map_or(false, |&count| count > 1)
 }
 
 /// Returns all tasks matching a given name (both original and disambiguated)
 pub fn get_matching_tasks<'a>(discovered: &'a DiscoveredTasks, task_name: &str) -> Vec<&'a Task> {
     let mut result = Vec::new();
-    
+
     // Check if this matches a disambiguated name
-    if let Some(task) = discovered.tasks.iter()
-        .find(|t| t.disambiguated_name.as_ref().map_or(false, |dn| dn == task_name)) {
+    if let Some(task) = discovered.tasks.iter().find(|t| {
+        t.disambiguated_name
+            .as_ref()
+            .map_or(false, |dn| dn == task_name)
+    }) {
         result.push(task);
         return result;
     }
-    
+
     // Otherwise, find all tasks with this original name
     result.extend(discovered.tasks.iter().filter(|t| t.name == task_name));
     result

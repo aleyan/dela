@@ -38,11 +38,17 @@ pub fn execute(task_with_args: &str) -> Result<(), String> {
             for task in &matching_tasks {
                 // Show disambiguated name if available
                 let display_name = task.disambiguated_name.as_ref().unwrap_or(&task.name);
-                println!("  • {} ({} from {})", display_name, task.runner.short_name(), task.file_path.display());
+                println!(
+                    "  • {} ({} from {})",
+                    display_name,
+                    task.runner.short_name(),
+                    task.file_path.display()
+                );
             }
             println!(
                 "Please use a disambiguated name (e.g., '{}-{}') to specify which one to run.",
-                task_name, matching_tasks[0].runner.short_name()[0..1].to_string()
+                task_name,
+                matching_tasks[0].runner.short_name()[0..1].to_string()
             );
             Err(format!("Multiple tasks named '{}' found", task_name))
         }

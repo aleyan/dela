@@ -1,7 +1,8 @@
 use crate::runner::is_runner_available;
 use crate::task_discovery;
+use crate::task_discovery::DiscoveredTasks;
 use crate::types::ShadowType;
-use crate::types::{Task, TaskFileStatus};
+use crate::types::{Task, TaskFileStatus, TaskRunner};
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::io::Write;
@@ -165,7 +166,7 @@ pub fn execute(verbose: bool) -> Result<(), String> {
         // Collect all shadow info and missing runner info for footer
         let mut shadow_infos = Vec::new();
         let mut missing_runner_infos = Vec::new();
-        
+
         // Collect ambiguous task names for footer
         let mut ambiguous_tasks = HashSet::new();
 
@@ -177,10 +178,10 @@ pub fn execute(verbose: bool) -> Result<(), String> {
                 if is_ambiguous {
                     ambiguous_tasks.insert(task.name.clone());
                 }
-                
+
                 let output = format_task_string(task, is_ambiguous);
                 write_line(&output)?;
-                
+
                 if let Some(ref _shadow_type) = task.shadowed_by {
                     if let Some(info) = format_shadow_info(task) {
                         shadow_infos.push(info);
@@ -207,13 +208,37 @@ pub fn execute(verbose: bool) -> Result<(), String> {
                 write_line(&format!("  {}", info))?;
             }
         }
-        
+
         // Print ambiguous task names footer
         if !ambiguous_tasks.is_empty() {
-            write_line("\nDuplicate task names:")?;
+            write_line("\nDuplicate task names (‖):")?;
             for task_name in ambiguous_tasks {
-                write_line(&format!("  ‖ task '{}'", task_name))?;
+                // Get all matching tasks for this ambiguous name
+                let matching_tasks = discovered
+                    .tasks
+                    .iter()
+                    .filter(|t| t.name == task_name)
+                    .collect::<Vec<_>>();
+
+                write_line(&format!(
+                    "  ‖ '{}' has multiple implementations:",
+                    task_name
+                ))?;
+
+                // List all disambiguated versions with their runners
+                for task in matching_tasks {
+                    if let Some(disambiguated) = &task.disambiguated_name {
+                        write_line(&format!(
+                            "     - Use '{}' for {} version",
+                            disambiguated,
+                            task.runner.short_name()
+                        ))?;
+                    }
+                }
             }
+            write_line(
+                "    (Add -<runner_initial> suffix to specify which implementation to use)",
+            )?;
         }
     }
 
@@ -236,21 +261,35 @@ fn format_task_string(task: &Task, is_ambiguous: bool) -> String {
         }
     } else if !is_runner_available(&task.runner) {
         " *".to_string()
-    } else if is_ambiguous && task.disambiguated_name.is_none() {
-        // Add the ambiguous symbol to the original task (not to disambiguated versions)
-        " ‖".to_string() 
+    } else if is_ambiguous {
+        // Always use the double vertical bar for ambiguous tasks
+        " ‖".to_string()
     } else {
         String::new()
     };
 
-    // Use disambiguated name if present, otherwise use original name
-    let display_name = task.disambiguated_name.as_ref().unwrap_or(&task.name);
-    
+    // For ambiguous tasks with a disambiguated name, show both names
+    let display_name = if is_ambiguous && task.disambiguated_name.is_some() {
+        format!(
+            "{} ({})",
+            task.name,
+            task.disambiguated_name.as_ref().unwrap()
+        )
+    } else {
+        task.disambiguated_name
+            .as_ref()
+            .unwrap_or(&task.name)
+            .clone()
+    };
+
     // Start with the task name
     let mut output = format!("  • {}", display_name);
 
     // Add runner info with short name
-    output.push_str(&format!(" ({}){}", task.runner.short_name(), symbol));
+    output.push_str(&format!(" ({})", task.runner.short_name()));
+
+    // Add the symbol at the end for compatibility with existing tests
+    output.push_str(&symbol);
 
     // Add description if present
     if let Some(desc) = &task.description {
@@ -924,5 +963,125 @@ check = { script = "check.py" }
 
         drop(project_dir);
         drop(home_dir);
+    }
+
+    #[test]
+    #[serial]
+    fn test_disambiguated_task_display() {
+        let mut writer = TestWriter::new();
+        let mut tasks = Vec::new();
+
+        // Create tasks with the same name but different runners
+        tasks.push(create_test_task(
+            "test",
+            PathBuf::from("/test/file1.js"),
+            TaskRunner::NodeNpm,
+        ));
+        tasks.push(create_test_task(
+            "test",
+            PathBuf::from("/test/Makefile"),
+            TaskRunner::Make,
+        ));
+
+        // Manually set disambiguated names (as would happen in real code)
+        tasks[0].disambiguated_name = Some("test-n".to_string());
+        tasks[1].disambiguated_name = Some("test-m".to_string());
+
+        // Mock discovered tasks with disambiguated tasks
+        let mut discovered = task_discovery::DiscoveredTasks::default();
+        discovered.tasks = tasks;
+
+        // Set task name counts to mark "test" as ambiguous
+        discovered.task_name_counts.insert("test".to_string(), 2);
+
+        // Create a tasks_by_file map
+        let mut tasks_by_file: HashMap<String, Vec<&Task>> = HashMap::new();
+        for task in &discovered.tasks {
+            let file_path = task.file_path.to_string_lossy().to_string();
+            tasks_by_file.entry(file_path).or_default().push(task);
+        }
+
+        // Print tasks to verify format
+        for (file, tasks) in &tasks_by_file {
+            writeln!(writer, "\nTasks from {}:", file).unwrap();
+            for task in tasks {
+                let is_ambiguous = discovered
+                    .task_name_counts
+                    .get(&task.name)
+                    .map_or(false, |&count| count > 1);
+                let output = format_task_string(task, is_ambiguous);
+                writeln!(writer, "{}", output).unwrap();
+            }
+        }
+
+        // Print duplicate task footer
+        let ambiguous_tasks: HashSet<String> = discovered
+            .task_name_counts
+            .iter()
+            .filter(|(_, &count)| count > 1)
+            .map(|(name, _)| name.clone())
+            .collect();
+
+        if !ambiguous_tasks.is_empty() {
+            writeln!(writer, "\nDuplicate task names (‖):").unwrap();
+            for task_name in ambiguous_tasks {
+                // Get all matching tasks for this ambiguous name
+                let matching_tasks = discovered
+                    .tasks
+                    .iter()
+                    .filter(|t| t.name == task_name)
+                    .collect::<Vec<_>>();
+
+                writeln!(writer, "  ‖ '{}' has multiple implementations:", task_name).unwrap();
+
+                // List all disambiguated versions with their runners
+                for task in matching_tasks {
+                    if let Some(disambiguated) = &task.disambiguated_name {
+                        writeln!(
+                            writer,
+                            "     - Use '{}' for {} version",
+                            disambiguated,
+                            task.runner.short_name()
+                        )
+                        .unwrap();
+                    }
+                }
+            }
+            writeln!(
+                writer,
+                "    (Add -<runner_initial> suffix to specify which implementation to use)"
+            )
+            .unwrap();
+        }
+
+        let output = writer.get_output();
+
+        // Check for the double vertical bar on ambiguous tasks
+        assert!(
+            output.contains("test (test-n) (npm) ‖"),
+            "Ambiguous task should show both names and ambiguous symbol"
+        );
+        assert!(
+            output.contains("test (test-m) (make) ‖"),
+            "Ambiguous task should show both names and ambiguous symbol"
+        );
+
+        // Check for the footer with disambiguation info
+        assert!(
+            output.contains("Duplicate task names (‖):"),
+            "Footer should show duplicate task section"
+        );
+        assert!(
+            output.contains("'test' has multiple implementations:"),
+            "Footer should list ambiguous task name"
+        );
+        assert!(
+            output.contains("- Use 'test-n' for npm version"),
+            "Footer should show npm disambiguated version"
+        );
+        assert!(
+            output.contains("- Use 'test-m' for make version"),
+            "Footer should show make disambiguated version"
+        );
     }
 }

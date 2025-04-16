@@ -1,11 +1,11 @@
-use crate::types::TaskRunner;
 use crate::task_shadowing::check_path_executable;
+use crate::types::TaskRunner;
 use std::path::Path;
 
 /// Detect which package manager to use for a Node.js project
 pub fn detect_package_manager(dir: &Path) -> Option<TaskRunner> {
     // Check for lock files first (highest priority)
-    
+
     // Check for package-lock.json (npm)
     if dir.join("package-lock.json").exists() {
         return Some(TaskRunner::NodeNpm);
@@ -33,7 +33,7 @@ pub fn detect_package_manager(dir: &Path) -> Option<TaskRunner> {
         let has_npm = check_path_executable("npm").is_some();
         let has_yarn = check_path_executable("yarn").is_some();
         let has_pnpm = check_path_executable("pnpm").is_some();
-        
+
         // Prefer Bun > PNPM > Yarn > NPM
         if has_bun {
             return Some(TaskRunner::NodeBun);
@@ -45,17 +45,17 @@ pub fn detect_package_manager(dir: &Path) -> Option<TaskRunner> {
             return Some(TaskRunner::NodeNpm);
         }
     }
-    
+
     // In test mode, no need to do anything special as the test environment
     // will handle mocking the available executables
-    
+
     #[cfg(test)]
     {
         let has_bun = check_path_executable("bun").is_some();
         let has_pnpm = check_path_executable("pnpm").is_some();
         let has_yarn = check_path_executable("yarn").is_some();
         let has_npm = check_path_executable("npm").is_some();
-        
+
         // Prefer Bun > PNPM > Yarn > NPM
         if has_bun {
             return Some(TaskRunner::NodeBun);
@@ -67,7 +67,7 @@ pub fn detect_package_manager(dir: &Path) -> Option<TaskRunner> {
             return Some(TaskRunner::NodeNpm);
         }
     }
-    
+
     // No package managers available
     None
 }
