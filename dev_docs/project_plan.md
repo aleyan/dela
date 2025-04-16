@@ -105,7 +105,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [ ] [DTKT-25] Implement TUI for ambiguous task selection
     - [ ] Create interactive menu when ambiguous task is executed without suffix
     - [ ] Allow selection between all matching tasks
-  - [ ] [DTKT-26] Support disambiguation in execution paths
+  - [x] [DTKT-26] Support disambiguation in execution paths
     - [x] Handle suffixed tasks in bare execution mode
     - [x] Handle suffixed tasks in `dr` execution mode
     - [x] Pass arguments correctly to disambiguated tasks
