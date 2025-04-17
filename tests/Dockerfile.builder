@@ -21,19 +21,15 @@ RUN mkdir -p src && \
     echo 'fn main() { println!("Dummy!"); }' > src/main.rs && \
     find . -name "*.rs" -not -path "./src/main.rs" -exec touch {} \;
 
-# Build dependencies for both release and debug modes
+# Build dependencies (debug mode only) and test binaries
 RUN cargo build --all-features && \
-    cargo build --release --all-features && \
-    cargo test --all-features --no-run && \
-    cargo test --release --all-features --no-run
+    cargo test --all-features --no-run
 
 # Now copy the real source code
 RUN rm -rf src
 COPY src ./src
 COPY resources ./resources
 
-# Build the project in both modes, including test binaries
+# Build the project (debug mode only) and test binaries
 RUN cargo build --all-features && \
-    cargo build --release --all-features && \
-    cargo test --all-features --no-run && \
-    cargo test --release --all-features --no-run 
+    cargo test --all-features --no-run 
