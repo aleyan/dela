@@ -1,8 +1,7 @@
 use crate::runner::is_runner_available;
 use crate::task_discovery;
-use crate::task_discovery::DiscoveredTasks;
 use crate::types::ShadowType;
-use crate::types::{Task, TaskFileStatus, TaskRunner};
+use crate::types::{Task, TaskFileStatus};
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::io::Write;

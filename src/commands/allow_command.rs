@@ -1,9 +1,7 @@
 use crate::allowlist;
-use crate::task_discovery::{self, get_matching_tasks, is_task_ambiguous};
+use crate::task_discovery;
 use crate::types::AllowScope;
 use std::env;
-use std::fs::File;
-use std::io::Write;
 
 pub fn execute(task_with_args: &str, allow: Option<u8>) -> Result<(), String> {
     let task_name = task_with_args
@@ -84,42 +82,6 @@ pub fn execute(task_with_args: &str, allow: Option<u8>) -> Result<(), String> {
             Err(format!("Multiple tasks named '{}' found", task_name))
         }
     }
-}
-
-pub fn allow_task(
-    discovered_tasks: &crate::task_discovery::DiscoveredTasks,
-    task_name: &str,
-) -> bool {
-    // Check if the task is ambiguous
-    if is_task_ambiguous(discovered_tasks, task_name) {
-        // Get all matching tasks
-        let matching_tasks = get_matching_tasks(discovered_tasks, task_name);
-
-        // If there are multiple tasks, inform the user
-        println!(
-            "Multiple tasks found with name '{}'. Please use the disambiguated name:",
-            task_name
-        );
-        for task in &matching_tasks {
-            println!(
-                "  - {} ({})",
-                task.disambiguated_name.as_ref().unwrap_or(&task.name),
-                task.runner.short_name()
-            );
-        }
-
-        return false;
-    }
-
-    // Check if the task exists
-    let matching_tasks = get_matching_tasks(discovered_tasks, task_name);
-    if matching_tasks.is_empty() {
-        println!("Task '{}' not found.", task_name);
-        return false;
-    }
-
-    // Task exists and is not ambiguous
-    true
 }
 
 #[cfg(test)]
