@@ -15,10 +15,19 @@ WORKDIR /app
 # Copy Cargo definition files first (better Docker caching)
 COPY Cargo.toml Cargo.lock ./
 
-# Pre-fetch dependencies (creates a build cache layer)
-RUN cargo fetch || true
+# Create dummy source files to compile dependencies
+# This builds a skeleton with empty files that will compile the dependencies
+RUN mkdir -p src && \
+    echo 'fn main() { println!("Dummy!"); }' > src/main.rs && \
+    find . -name "*.rs" -not -path "./src/main.rs" -exec touch {} \;
 
-# Now copy source code and build
+# Build dependencies only
+RUN cargo build --release --all-features
+
+# Now copy the real source code
+RUN rm -rf src
 COPY src ./src
 COPY resources ./resources
+
+# Build the project
 RUN cargo build --release --all-features 
