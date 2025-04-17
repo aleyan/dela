@@ -16,9 +16,10 @@ RUN apk add --no-cache \
 RUN adduser -D testuser
 WORKDIR /home/testuser
 
-# Copy the cargo registry from the builder and fix permissions
+# Copy the cargo registry and target directory from the builder
 COPY --from=builder /usr/local/cargo/registry /usr/local/cargo/registry
-RUN chmod -R 777 /usr/local/cargo/registry
+COPY --from=builder /app/target /home/testuser/target
+RUN chmod -R 777 /usr/local/cargo/registry /home/testuser/target
 
 # Copy project files
 COPY Cargo.toml Cargo.lock ./
