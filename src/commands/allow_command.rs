@@ -63,22 +63,8 @@ pub fn execute(task_with_args: &str, allow: Option<u8>) -> Result<(), String> {
         }
         _ => {
             // Multiple tasks found, print error and list them
-            eprintln!("Multiple tasks named '{}' found:", task_name);
-            for task in &matching_tasks {
-                // Show disambiguated name if available
-                let display_name = task.disambiguated_name.as_ref().unwrap_or(&task.name);
-                eprintln!(
-                    "  • {} ({} from {})",
-                    display_name,
-                    task.runner.short_name(),
-                    task.file_path.display()
-                );
-            }
-            eprintln!(
-                "Please use a disambiguated name (e.g., '{}-{}') to specify which one to run.",
-                task_name,
-                matching_tasks[0].runner.short_name()[0..1].to_string()
-            );
+            let error_msg = task_discovery::format_ambiguous_task_error(task_name, &matching_tasks);
+            eprintln!("{}", error_msg);
             Err(format!("Multiple tasks named '{}' found", task_name))
         }
     }
@@ -355,21 +341,21 @@ test: ## Running tests
         );
 
         // Now try with the disambiguated name for make task
-        let result = execute("test-mak", Some(2)); // 2 = allow
+        let result = execute("test-m", Some(2)); // 2 = allow
         assert!(
             result.is_ok(),
             "Should succeed with disambiguated task name"
         );
 
         // Also try with the disambiguated name for npm task
-        let result = execute("test-npm", Some(2)); // 2 = allow
+        let result = execute("test-n", Some(2)); // 2 = allow
         assert!(
             result.is_ok(),
             "Should succeed with disambiguated task name"
         );
 
         // Test with disambiguated name and arguments
-        let test_with_args = "test-mak --verbose --watch";
+        let test_with_args = "test-m --verbose --watch";
         let result = execute(test_with_args, Some(2)); // 2 = allow
         assert!(
             result.is_ok(),
@@ -377,7 +363,7 @@ test: ## Running tests
         );
 
         // Test with npm task disambiguated name and arguments
-        let npm_test_with_args = "test-npm --ci --coverage";
+        let npm_test_with_args = "test-n --ci --coverage";
         let result = execute(npm_test_with_args, Some(2)); // 2 = allow
         assert!(
             result.is_ok(),

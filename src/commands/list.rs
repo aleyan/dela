@@ -267,13 +267,10 @@ fn format_task_string(task: &Task, is_ambiguous: bool) -> String {
         String::new()
     };
 
-    // For ambiguous tasks with a disambiguated name, show both names
+    // For ambiguous tasks with a disambiguated name, show the disambiguated form more prominently
     let display_name = if is_ambiguous && task.disambiguated_name.is_some() {
-        format!(
-            "{} ({})",
-            task.name,
-            task.disambiguated_name.as_ref().unwrap()
-        )
+        let disambiguated = task.disambiguated_name.as_ref().unwrap();
+        format!("{} (from {})", disambiguated, task.name)
     } else {
         task.name.clone() // Use the original name if not ambiguous or no disambiguated name
     };

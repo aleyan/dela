@@ -100,7 +100,13 @@ fn generate_runner_prefix(
 ) -> String {
     let short_name = runner.short_name().to_lowercase();
 
-    // Try to use the first three characters (or all if shorter than 3)
+    // Try single character first for common runners
+    let single_char = short_name.chars().next().unwrap().to_string();
+    if !used_prefixes.contains(&single_char) {
+        return single_char;
+    }
+
+    // Then try to use the first three characters (or all if shorter than 3)
     let prefix_length = std::cmp::min(3, short_name.len());
     let mut prefix = short_name[0..prefix_length].to_string();
 
@@ -164,6 +170,23 @@ pub fn get_matching_tasks<'a>(discovered: &'a DiscoveredTasks, task_name: &str) 
     // Otherwise, find all tasks with this original name
     result.extend(discovered.tasks.iter().filter(|t| t.name == task_name));
     result
+}
+
+/// Returns a standardized error message for ambiguous tasks
+pub fn format_ambiguous_task_error(task_name: &str, matching_tasks: &[&Task]) -> String {
+    let mut msg = format!("Multiple tasks named '{}' found. Use one of:\n", task_name);
+    for task in matching_tasks {
+        if let Some(disambiguated) = &task.disambiguated_name {
+            msg.push_str(&format!(
+                "  • {} ({} from {})\n",
+                disambiguated,
+                task.runner.short_name(),
+                task.file_path.display()
+            ));
+        }
+    }
+    msg.push_str("Please use the specific task name with its suffix to disambiguate.");
+    msg
 }
 
 /// Helper function to set task definition based on type

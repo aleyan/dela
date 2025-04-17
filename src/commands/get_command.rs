@@ -34,10 +34,8 @@ pub fn execute(task_with_args: &str) -> Result<(), String> {
         }
         _ => {
             // Multiple matches (should not happen with get_matching_tasks, but handle for safety)
-            return Err(format!(
-                "Multiple tasks found with name '{}'. Please use a more specific name.",
-                task_name
-            ));
+            let error_msg = task_discovery::format_ambiguous_task_error(task_name, &matching_tasks);
+            Err(error_msg)
         }
     }
 }
@@ -204,26 +202,26 @@ test: ## Running tests
         assert!(
             result
                 .unwrap_err()
-                .contains("Multiple tasks found with name"),
+                .contains("Multiple tasks named 'test' found"),
             "Error should mention multiple tasks"
         );
 
         // Verify task lookup for make variant works
-        let result = execute("test-mak");
+        let result = execute("test-m");
         assert!(
             result.is_ok(),
             "Should succeed with disambiguated task name (make)"
         );
 
         // Verify task lookup for npm variant works
-        let result = execute("test-npm");
+        let result = execute("test-n");
         assert!(
             result.is_ok(),
             "Should succeed with disambiguated task name (npm)"
         );
 
         // Verify arguments are correctly passed with disambiguated names
-        let result = execute("test-mak --verbose");
+        let result = execute("test-m --verbose");
         assert!(
             result.is_ok(),
             "Should succeed with disambiguated task name and args"

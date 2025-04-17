@@ -24,17 +24,8 @@ pub fn execute(task_with_args: &str) -> Result<(), String> {
 
     // Check if there are multiple matching tasks
     if matching_tasks.len() > 1 {
-        println!(
-            "Multiple tasks found with name '{}'. Please use one of the following:",
-            task_name
-        );
-        for task in &matching_tasks {
-            println!(
-                "  - {} ({})",
-                task.disambiguated_name.as_ref().unwrap_or(&task.name),
-                task.runner.short_name()
-            );
-        }
+        let error_msg = task_discovery::format_ambiguous_task_error(task_name, &matching_tasks);
+        println!("{}", error_msg);
         return Err(format!("Ambiguous task name: '{}'", task_name));
     }
 
@@ -284,31 +275,31 @@ test: ## Running tests
         let current_dir = env::current_dir().unwrap();
         let discovered = task_discovery::discover_tasks(&current_dir);
 
-        let make_tasks = task_discovery::get_matching_tasks(&discovered, "test-mak");
+        let make_tasks = task_discovery::get_matching_tasks(&discovered, "test-m");
         assert_eq!(make_tasks.len(), 1, "Should find exactly one make task");
         assert_eq!(make_tasks[0].runner, TaskRunner::Make);
 
-        let npm_tasks = task_discovery::get_matching_tasks(&discovered, "test-npm");
+        let npm_tasks = task_discovery::get_matching_tasks(&discovered, "test-n");
         assert_eq!(npm_tasks.len(), 1, "Should find exactly one npm task");
         assert_eq!(npm_tasks[0].runner, TaskRunner::NodeNpm);
 
         // Don't actually try to execute the command since it will fail in a test environment
         // and produce unwanted output. Just verify that we can find the task.
 
-        // For the test-mak command, just verify the task is found correctly
-        let test_mak_tasks = task_discovery::get_matching_tasks(&discovered, "test-mak");
+        // For the test-m command, just verify the task is found correctly
+        let test_mak_tasks = task_discovery::get_matching_tasks(&discovered, "test-m");
         assert_eq!(
             test_mak_tasks.len(),
             1,
-            "Should find exactly one test-mak task"
+            "Should find exactly one test-m task"
         );
 
         // Now verify the npm variant
-        let test_npm_tasks = task_discovery::get_matching_tasks(&discovered, "test-npm");
+        let test_npm_tasks = task_discovery::get_matching_tasks(&discovered, "test-n");
         assert_eq!(
             test_npm_tasks.len(),
             1,
-            "Should find exactly one test-npm task"
+            "Should find exactly one test-n task"
         );
 
         reset_mock();
