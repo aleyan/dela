@@ -114,7 +114,10 @@ test: ## Running tests
         let env = TestEnvironment::new().with_executable("make");
         set_test_environment(env);
 
+        // Test with the execute function
         let result = execute("test --verbose --coverage");
+
+        // Verify the command was executed successfully
         assert!(result.is_ok(), "Should succeed for task with arguments");
 
         reset_mock();

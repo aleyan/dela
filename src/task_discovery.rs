@@ -136,6 +136,15 @@ pub fn is_task_ambiguous(discovered: &DiscoveredTasks, task_name: &str) -> bool 
         .map_or(false, |&count| count > 1)
 }
 
+/// Returns a list of disambiguated task names for tasks with the given name
+pub fn get_disambiguated_task_names(discovered: &DiscoveredTasks, task_name: &str) -> Vec<String> {
+    discovered.tasks
+        .iter()
+        .filter(|t| t.name == task_name)
+        .filter_map(|t| t.disambiguated_name.clone())
+        .collect()
+}
+
 /// Returns all tasks matching a given name (both original and disambiguated)
 pub fn get_matching_tasks<'a>(discovered: &'a DiscoveredTasks, task_name: &str) -> Vec<&'a Task> {
     let mut result = Vec::new();
