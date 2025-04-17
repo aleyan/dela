@@ -36,7 +36,7 @@ RUN chown -R testuser:testuser /home/testuser
 WORKDIR /home/testuser
 
 # Copy dela binary
-COPY --from=builder /app/target/release/dela /usr/local/bin/dela
+COPY --from=builder /app/target/debug/dela /usr/local/bin/dela
 
 # Set shell environment variable
 ENV SHELL=/bin/pwsh

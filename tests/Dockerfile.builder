@@ -21,7 +21,7 @@ RUN mkdir -p src && \
     echo 'fn main() { println!("Dummy!"); }' > src/main.rs && \
     find . -name "*.rs" -not -path "./src/main.rs" -exec touch {} \;
 
-# Build dependencies (debug mode only) and test binaries
+# Build dependencies (debug mode only)
 RUN cargo build --all-features && \
     cargo test --all-features --no-run
 
@@ -30,6 +30,6 @@ RUN rm -rf src
 COPY src ./src
 COPY resources ./resources
 
-# Build the project (debug mode only) and test binaries
+# Build the project (debug mode only)
 RUN cargo build --all-features && \
     cargo test --all-features --no-run 

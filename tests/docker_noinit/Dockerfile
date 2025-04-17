@@ -63,7 +63,7 @@ COPY tests/task_definitions/github_actions/.github /home/testuser/test_project/.
 RUN chown -R testuser:testuser /home/testuser/test_project
 
 # Copy the compiled binary from the builder stage
-COPY --from=builder /app/target/release/dela /usr/local/bin/
+COPY --from=builder /app/target/debug/dela /usr/local/bin/
 
 USER testuser
 WORKDIR /home/testuser/test_project
