@@ -183,6 +183,7 @@ mod tests {
             source_name: name.to_string(),
             description: None,
             shadowed_by: None,
+            disambiguated_name: None,
         }
     }
 

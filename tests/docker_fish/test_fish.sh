@@ -133,7 +133,112 @@ if not string match -q "*custom-exe (make) ‡*" "$output"
     exit 1
 end
 
-log "4. Testing allowlist functionality..."
+log "4. Testing task disambiguation..."
+
+# Get output from dela list
+set output (dela list)
+
+# Check if the duplicate task names section exists
+if not string match -q "*Duplicate task names (‖)*" "$output"
+    error "Disambiguation section not found in dela list output"
+    error "Got output: $output"
+    exit 1
+end
+
+# Check if there's a test entry in the duplicate tasks section
+if not string match -q "*test*has multiple implementations*" "$output"
+    error "Test task not found in duplicate task names section"
+    error "Got output: $output"
+    exit 1
+end
+
+# Extract disambiguated task names
+set make_test ""
+set npm_test ""
+set uv_test ""
+
+# Extract make variant
+if string match -q "*'test-*' for make version*" "$output"
+    set make_test (string match -r "'(test-[^']+)' for make version" "$output" | string replace -r ".*'(test-[^']+)'.*" '$1')
+end
+
+# Extract npm variant
+if string match -q "*'test-*' for npm version*" "$output"
+    set npm_test (string match -r "'(test-[^']+)' for npm version" "$output" | string replace -r ".*'(test-[^']+)'.*" '$1')
+end
+
+# Extract uv variant
+if string match -q "*'test-*' for uv version*" "$output"
+    set uv_test (string match -r "'(test-[^']+)' for uv version" "$output" | string replace -r ".*'(test-[^']+)'.*" '$1')
+end
+
+log "Detected disambiguated test tasks:"
+log "- Make: $make_test"
+log "- NPM: $npm_test"
+log "- UV: $uv_test"
+
+# Verify at least some disambiguated names were found
+if test -z "$make_test"; and test -z "$npm_test"; and test -z "$uv_test"
+    error "No disambiguated task names found in dela list output"
+    error "Got output: $output"
+    exit 1
+end
+
+# Allow disambiguated tasks
+set -x DELA_NON_INTERACTIVE 1
+
+if test -n "$make_test"
+    log "Testing Make disambiguated task ($make_test)..."
+    dela allow-command "$make_test" --allow 2 >/dev/null 2>&1; or error "Failed to allow $make_test"
+    
+    # Create a temporary script for make test
+    echo '#!/usr/bin/fish
+dr '$make_test > ~/run_make_test.fish
+    chmod +x ~/run_make_test.fish
+    set output (~/run_make_test.fish 2>&1)
+    rm ~/run_make_test.fish
+
+    if not string match -q "*Make test task executed successfully*" "$output"
+        error "Make test task failed. Got: $output"
+        exit 1
+    end
+end
+
+if test -n "$npm_test"
+    log "Testing NPM disambiguated task ($npm_test)..."
+    dela allow-command "$npm_test" --allow 2 >/dev/null 2>&1; or error "Failed to allow $npm_test"
+    
+    # Create a temporary script for npm test
+    echo '#!/usr/bin/fish
+dr '$npm_test > ~/run_npm_test.fish
+    chmod +x ~/run_npm_test.fish
+    set output (~/run_npm_test.fish 2>&1)
+    rm ~/run_npm_test.fish
+
+    if not string match -q "*NPM test task executed successfully*" "$output"
+        error "NPM test task failed. Got: $output"
+        exit 1
+    end
+end
+
+if test -n "$uv_test"
+    log "Testing UV disambiguated task ($uv_test)..."
+    dela allow-command "$uv_test" --allow 2 >/dev/null 2>&1; or error "Failed to allow $uv_test"
+    
+    # Create a temporary script for uv test
+    echo '#!/usr/bin/fish
+dr '$uv_test > ~/run_uv_test.fish
+    chmod +x ~/run_uv_test.fish
+    set output (~/run_uv_test.fish 2>&1)
+    rm ~/run_uv_test.fish
+
+    if not string match -q "*Test task executed successfully*" "$output"
+        error "UV test task failed. Got: $output"
+        exit 1
+    end
+end
+
+log "5. Testing allowlist functionality..."
 
 # Ensure we're in non-interactive mode for allowlist testing
 set -x DELA_NON_INTERACTIVE 1

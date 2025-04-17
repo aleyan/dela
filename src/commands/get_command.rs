@@ -13,12 +13,8 @@ pub fn execute(task_with_args: &str) -> Result<(), String> {
         env::current_dir().map_err(|e| format!("Failed to get current directory: {}", e))?;
     let discovered = task_discovery::discover_tasks(&current_dir);
 
-    // Find all tasks with the given name
-    let matching_tasks: Vec<_> = discovered
-        .tasks
-        .iter()
-        .filter(|t| t.name == task_name)
-        .collect();
+    // Find all tasks with the given name (both original and disambiguated)
+    let matching_tasks = task_discovery::get_matching_tasks(&discovered, task_name);
 
     match matching_tasks.len() {
         0 => Err(format!("dela: command or task not found: {}", task_name)),
@@ -37,16 +33,9 @@ pub fn execute(task_with_args: &str) -> Result<(), String> {
             Ok(())
         }
         _ => {
-            // Multiple tasks found, print error and list them
-            println!("Multiple tasks named '{}' found:", task_name);
-            for task in matching_tasks {
-                println!("  • {} (from {})", task.name, task.file_path.display());
-            }
-            println!(
-                "Please use 'dela run {}' to choose which one to run.",
-                task_name
-            );
-            Err(format!("Multiple tasks named '{}' found", task_name))
+            // Multiple matches (should not happen with get_matching_tasks, but handle for safety)
+            let error_msg = task_discovery::format_ambiguous_task_error(task_name, &matching_tasks);
+            Err(error_msg)
         }
     }
 }
@@ -123,7 +112,10 @@ test: ## Running tests
         let env = TestEnvironment::new().with_executable("make");
         set_test_environment(env);
 
+        // Test with the execute function
         let result = execute("test --verbose --coverage");
+
+        // Verify the command was executed successfully
         assert!(result.is_ok(), "Should succeed for task with arguments");
 
         reset_mock();
@@ -164,6 +156,76 @@ test: ## Running tests
         let result = execute("test");
         assert!(result.is_err(), "Should fail when runner is missing");
         assert_eq!(result.unwrap_err(), "Runner 'make' not found");
+
+        reset_mock();
+        reset_to_real_environment();
+        drop(project_dir);
+        drop(home_dir);
+    }
+
+    #[test]
+    #[serial]
+    fn test_get_command_disambiguated_tasks() {
+        let (project_dir, home_dir) = setup_test_env();
+        env::set_current_dir(&project_dir).expect("Failed to change directory");
+
+        // Create a package.json with the same task name
+        let package_json_content = r#"{
+            "name": "test-package",
+            "scripts": {
+                "test": "jest"
+            }
+        }"#;
+
+        File::create(project_dir.path().join("package.json"))
+            .unwrap()
+            .write_all(package_json_content.as_bytes())
+            .unwrap();
+
+        // Create package-lock.json to ensure npm is detected
+        File::create(project_dir.path().join("package-lock.json"))
+            .unwrap()
+            .write_all(b"{}")
+            .unwrap();
+
+        // Mock both make and npm being available
+        reset_mock();
+        enable_mock();
+        let env = TestEnvironment::new()
+            .with_executable("make")
+            .with_executable("npm");
+        set_test_environment(env);
+
+        // First verify that ambiguous task gives error
+        let result = execute("test");
+        assert!(result.is_err(), "Should fail with ambiguous task name");
+        assert!(
+            result
+                .unwrap_err()
+                .contains("Multiple tasks named 'test' found"),
+            "Error should mention multiple tasks"
+        );
+
+        // Verify task lookup for make variant works
+        let result = execute("test-m");
+        assert!(
+            result.is_ok(),
+            "Should succeed with disambiguated task name (make)"
+        );
+
+        // Verify task lookup for npm variant works
+        let result = execute("test-n");
+        assert!(
+            result.is_ok(),
+            "Should succeed with disambiguated task name (npm)"
+        );
+
+        // Verify arguments are correctly passed with disambiguated names
+        let result = execute("test-m --verbose");
+        assert!(
+            result.is_ok(),
+            "Should succeed with disambiguated task name and args"
+        );
 
         reset_mock();
         reset_to_real_environment();

@@ -13,12 +13,8 @@ pub fn execute(task_with_args: &str, allow: Option<u8>) -> Result<(), String> {
         env::current_dir().map_err(|e| format!("Failed to get current directory: {}", e))?;
     let discovered = task_discovery::discover_tasks(&current_dir);
 
-    // Find all tasks with the given name
-    let matching_tasks: Vec<_> = discovered
-        .tasks
-        .iter()
-        .filter(|t| t.name == task_name)
-        .collect();
+    // Find all tasks with the given name (both original and disambiguated)
+    let matching_tasks = task_discovery::get_matching_tasks(&discovered, task_name);
 
     match matching_tasks.len() {
         0 => Err(format!("dela: command or task not found: {}", task_name)),
@@ -66,14 +62,9 @@ pub fn execute(task_with_args: &str, allow: Option<u8>) -> Result<(), String> {
             }
         }
         _ => {
-            eprintln!("Multiple tasks named '{}' found:", task_name);
-            for task in matching_tasks {
-                eprintln!("  • {} (from {})", task.name, task.file_path.display());
-            }
-            eprintln!(
-                "Please use 'dela run {}' to choose which one to run.",
-                task_name
-            );
+            // Multiple tasks found, print error and list them
+            let error_msg = task_discovery::format_ambiguous_task_error(task_name, &matching_tasks);
+            eprintln!("{}", error_msg);
             Err(format!("Multiple tasks named '{}' found", task_name))
         }
     }
@@ -311,6 +302,72 @@ test: ## Running tests
         assert_eq!(
             result.unwrap_err(),
             "Dela task 'test' was denied by the ~/.dela/allowlist.toml"
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn test_allow_command_disambiguated_tasks() {
+        let (project_dir, _home_dir) = setup_test_env();
+        env::set_current_dir(&project_dir).expect("Failed to change directory");
+
+        // Create a package.json with the same task name
+        let package_json_content = r#"{
+            "name": "test-package",
+            "scripts": {
+                "test": "jest"
+            }
+        }"#;
+
+        File::create(project_dir.path().join("package.json"))
+            .unwrap()
+            .write_all(package_json_content.as_bytes())
+            .unwrap();
+
+        // Create package-lock.json to ensure npm is detected
+        File::create(project_dir.path().join("package-lock.json"))
+            .unwrap()
+            .write_all(b"{}")
+            .unwrap();
+
+        // Check that ambiguous task 'test' is rejected
+        let result = execute("test", None);
+        assert!(result.is_err(), "Should error for ambiguous task");
+        assert!(
+            result
+                .unwrap_err()
+                .contains("Multiple tasks named 'test' found"),
+            "Error should mention multiple tasks"
+        );
+
+        // Now try with the disambiguated name for make task
+        let result = execute("test-m", Some(2)); // 2 = allow
+        assert!(
+            result.is_ok(),
+            "Should succeed with disambiguated task name"
+        );
+
+        // Also try with the disambiguated name for npm task
+        let result = execute("test-n", Some(2)); // 2 = allow
+        assert!(
+            result.is_ok(),
+            "Should succeed with disambiguated task name"
+        );
+
+        // Test with disambiguated name and arguments
+        let test_with_args = "test-m --verbose --watch";
+        let result = execute(test_with_args, Some(2)); // 2 = allow
+        assert!(
+            result.is_ok(),
+            "Should succeed with disambiguated task name and arguments"
+        );
+
+        // Test with npm task disambiguated name and arguments
+        let npm_test_with_args = "test-n --ci --coverage";
+        let result = execute(npm_test_with_args, Some(2)); // 2 = allow
+        assert!(
+            result.is_ok(),
+            "Should succeed with npm disambiguated task name and arguments"
         );
     }
 }

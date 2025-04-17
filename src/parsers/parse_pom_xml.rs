@@ -46,6 +46,7 @@ fn add_default_maven_goals(tasks: &mut Vec<Task>, file_path: &Path) {
             source_name: goal.to_string(),
             description: Some(format!("Maven {} phase", goal)),
             shadowed_by: None,
+            disambiguated_name: None,
         });
     }
 }
@@ -71,6 +72,7 @@ fn add_profile_tasks(tasks: &mut Vec<Task>, root: Node, file_path: &Path) -> Res
                     source_name: profile_id.clone(),
                     description: Some(format!("Maven profile {}", profile_id)),
                     shadowed_by: None,
+                    disambiguated_name: None,
                 });
             }
         }
@@ -128,6 +130,7 @@ fn add_plugin_tasks(tasks: &mut Vec<Task>, root: Node, file_path: &Path) -> Resu
                                             goal_text, exec_id
                                         )),
                                         shadowed_by: None,
+                                        disambiguated_name: None,
                                     });
                                 }
                             }

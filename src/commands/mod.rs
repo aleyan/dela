@@ -4,3 +4,4 @@ pub mod get_command;
 pub mod init;
 pub mod list;
 pub mod run;
+pub mod run_command;

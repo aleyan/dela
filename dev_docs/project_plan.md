@@ -94,21 +94,21 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [x] [DTKT-112] Remove `dela run` in favor of `dr` shell function.
 
 - [ ] **Task Name Disambiguation**
-  - [ ] [DTKT-85] Design and implement disambiguation suffix generation
-    - [ ] Detect task name collisions across different runners
-    - [ ] Generate unique suffixes based on task runner initials (e.g., test-m, test-p)
-    - [ ] Handle multiple runners with same initial by adding more letters
-  - [ ] [DTKT-86] Update list command for disambiguated task display
-    - [ ] Mark ambiguous tasks with double vertical bar (‖)
-    - [ ] Show both original and suffixed task names
-    - [ ] Add a footnote section listing all duplicate task names
+  - [x] [DTKT-85] Design and implement disambiguation suffix generation
+    - [x] Detect task name collisions across different runners
+    - [x] Generate unique suffixes based on task runner initials (e.g., test-m, test-p)
+    - [x] Handle multiple runners with same initial by adding more letters
+  - [x] [DTKT-86] Update list command for disambiguated task display
+    - [x] Mark ambiguous tasks with double vertical bar (‖)
+    - [x] Show both original and suffixed task names
+    - [x] Add a footnote section listing all duplicate task names
   - [ ] [DTKT-25] Implement TUI for ambiguous task selection
     - [ ] Create interactive menu when ambiguous task is executed without suffix
     - [ ] Allow selection between all matching tasks
-  - [ ] [DTKT-26] Support disambiguation in execution paths
-    - [ ] Handle suffixed tasks in bare execution mode
-    - [ ] Handle suffixed tasks in `dr` execution mode
-    - [ ] Pass arguments correctly to disambiguated tasks
+  - [x] [DTKT-26] Support disambiguation in execution paths
+    - [x] Handle suffixed tasks in bare execution mode
+    - [x] Handle suffixed tasks in `dr` execution mode
+    - [x] Pass arguments correctly to disambiguated tasks
 
 **Deliverables**
 - [ ] Fully functional `dela run <task>`.
@@ -261,6 +261,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [x] [DTKT-121] Parse GitHub Actions workflow files to expose jobs as tasks for `act`.
   - [ ] [DTKT-126] Implement docker compose
   - [ ] [DTKT-127] Implement cargo build
+  - [ ] [DTKT-133] Improve Gradle task disambiguation strategy (duplicates in same file)
 
 ## Icebox and Future Enhancements (Post-Launch)
 

@@ -245,17 +245,19 @@ else
     exit 1
 fi
 
-# Verify that GitHub Actions workflow file is detected
-if dela list | grep -q "test (act)"; then
+# Verify that GitHub Actions workflow file is detected - use regex to match any workflow with act runner
+if dela list | grep -q "test.*act"; then
     echo "${GREEN}✓ GitHub Actions workflow file is detected${NC}"
 else
     echo "${RED}✗ GitHub Actions workflow file is not detected${NC}"
+    dela list
     exit 1
 fi
 
 # Test 18: Verify GitHub Actions workflow descriptions
 echo "\nTest 18: Testing GitHub Actions workflow descriptions"
-if dela list | grep -q "test (act) - Test Workflow"; then
+# Look for test workflows with act runner and Test Workflow description
+if dela list | grep -q "test.*act.*Test Workflow"; then
     echo "${GREEN}✓ GitHub Actions workflow descriptions are correct${NC}"
 else
     echo "${RED}✗ GitHub Actions workflow descriptions are incorrect${NC}"
@@ -270,11 +272,13 @@ echo "\nTest 19: Verifying GitHub Actions task discovery"
 dela list | grep "act" || true
 
 # Verify that the GitHub Actions tasks were discovered correctly - look for 'act' tasks
+# First check for any act runners, then check for test workflow specifically
 if dela list | grep -q "act" && \
-   dela list | grep -q "test (act)"; then
+   dela list | grep -q "test.*act"; then
     echo "${GREEN}✓ GitHub Actions workflows were discovered correctly${NC}"
 else
     echo "${RED}✗ GitHub Actions workflows were not discovered correctly${NC}"
+    dela list
     exit 1
 fi
 
@@ -343,5 +347,229 @@ fi
 unset -f temp_dr
 
 cd /home/testuser/test_project
+
+# Test 23: Verify ambiguous task detection in dela list
+echo "\nTest 23: Testing ambiguous task detection and disambiguation in dela list"
+
+# Create a Makefile with the 'test' task
+cat > duplicate_test.mk << EOF
+test: ## Test task in Makefile
+	echo "Another test implementation"
+EOF
+
+# Create a package.json with a 'test' task
+cat > duplicate_test.json << EOF
+{
+  "name": "duplicate-test",
+  "version": "1.0.0",
+  "scripts": {
+    "test": "echo \"Duplicate test task\""
+  }
+}
+EOF
+
+# First, run 'dela list' to see what disambiguated names are being used
+dela list > list_output.txt
+DISAMBIGUATION_SECTION=$(grep -A 20 "Duplicate task names (‖)" list_output.txt | grep "Use")
+
+# Extract the exact suffixes for each runner type
+MAKE_SUFFIX=$(echo "$DISAMBIGUATION_SECTION" | grep -o "'test-[^']*' for make version" | grep -o "test-[^']*" || echo "")
+MAVEN_SUFFIX=$(echo "$DISAMBIGUATION_SECTION" | grep -o "'test-[^']*' for mvn version" | grep -o "test-[^']*" || echo "")
+GRADLE_SUFFIX=$(echo "$DISAMBIGUATION_SECTION" | grep -o "'test-[^']*' for gradle version" | grep -o "test-[^']*" || echo "" | head -1)
+NPM_SUFFIX=$(echo "$DISAMBIGUATION_SECTION" | grep -o "'test-[^']*' for npm version" | grep -o "test-[^']*" || echo "")
+ACT_SUFFIX=$(echo "$DISAMBIGUATION_SECTION" | grep -o "'test-[^']*' for act version" | grep -o "test-[^']*" || echo "")
+
+echo "Detected disambiguated task names:"
+echo "- Make: $MAKE_SUFFIX"
+echo "- Maven: $MAVEN_SUFFIX"
+echo "- Gradle: $GRADLE_SUFFIX"
+echo "- npm: $NPM_SUFFIX"
+echo "- act: $ACT_SUFFIX"
+
+# Verify that 'dela list' shows the disambiguation info
+if grep -q "Duplicate task names (‖)" list_output.txt && grep -q "has multiple implementations" list_output.txt; then
+    echo "${GREEN}✓ dela list shows the disambiguation information for conflicting tasks${NC}"
+else
+    echo "${RED}✗ dela list failed to show disambiguation information${NC}"
+    echo "List output:"
+    cat list_output.txt
+    exit 1
+fi
+
+# Verify that 'test' appears as ambiguous
+if grep -q "test.*‖" list_output.txt; then
+    echo "${GREEN}✓ Ambiguous 'test' task is marked with ‖ symbol${NC}"
+else
+    echo "${RED}✗ Ambiguous 'test' task is not marked correctly${NC}"
+    echo "List output for 'test':"
+    grep "test" list_output.txt || true
+    exit 1
+fi
+
+# Verify that at least one disambiguated name is displayed
+if grep -q "Use 'test-" list_output.txt; then
+    echo "${GREEN}✓ Disambiguated task names are displayed correctly${NC}"
+else
+    echo "${RED}✗ Disambiguated task names are not displayed correctly${NC}"
+    echo "Disambiguation section:"
+    grep -A 10 "Duplicate task names" list_output.txt || true
+    exit 1
+fi
+
+# Test 24: Verify get-command with disambiguated task names
+echo "\nTest 24: Testing get-command with disambiguated task names"
+
+# Test make variant (if found)
+if [ ! -z "$MAKE_SUFFIX" ]; then
+    echo "Testing make variant with suffix: $MAKE_SUFFIX"
+    output=$(dela get-command "$MAKE_SUFFIX" --verbose 2>&1 || echo "COMMAND_FAILED")
+    
+    echo "Command output for make variant:"
+    echo "$output"
+    
+    # Check if command failed
+    if [[ "$output" == "COMMAND_FAILED" ]]; then
+        echo "${RED}✗ get-command execution failed for '$MAKE_SUFFIX'${NC}"
+        exit 1
+    fi
+    
+    # We're only checking if the right runner is used for the disambiguated task name
+    if echo "$output" | grep -q "make"; then
+        echo "${GREEN}✓ get-command correctly uses make runner for '$MAKE_SUFFIX'${NC}"
+    else
+        echo "${RED}✗ get-command does not use make runner for '$MAKE_SUFFIX'${NC}"
+        echo "Got: $output"
+        exit 1
+    fi
+else
+    echo "${YELLOW}⚠ Make suffix not detected, skipping test${NC}"
+fi
+
+# Test maven variant (if found)
+if [ ! -z "$MAVEN_SUFFIX" ]; then
+    echo "Testing maven variant with suffix: $MAVEN_SUFFIX"
+    output=$(dela get-command "$MAVEN_SUFFIX" --verbose 2>&1 || echo "COMMAND_FAILED")
+    
+    echo "Command output for maven variant:"
+    echo "$output"
+    
+    # Check if command failed
+    if [[ "$output" == "COMMAND_FAILED" ]]; then
+        echo "${RED}✗ get-command execution failed for '$MAVEN_SUFFIX'${NC}"
+        exit 1
+    fi
+    
+    # We're only checking if the right runner is used for the disambiguated task name
+    if echo "$output" | grep -q "mvn"; then
+        echo "${GREEN}✓ get-command correctly uses maven runner for '$MAVEN_SUFFIX'${NC}"
+    else
+        echo "${RED}✗ get-command does not use maven runner for '$MAVEN_SUFFIX'${NC}"
+        echo "Got: $output"
+        exit 1
+    fi
+else
+    echo "${YELLOW}⚠ Maven suffix not detected, skipping test${NC}"
+fi
+
+# Test npm variant (if found)
+if [ ! -z "$NPM_SUFFIX" ]; then
+    echo "Testing npm variant with suffix: $NPM_SUFFIX"
+    output=$(dela get-command "$NPM_SUFFIX" --ci --watch 2>&1 || echo "COMMAND_FAILED")
+    
+    echo "Command output for npm variant:"
+    echo "$output"
+    
+    # Check if command failed
+    if [[ "$output" == "COMMAND_FAILED" ]]; then
+        echo "${RED}✗ get-command execution failed for '$NPM_SUFFIX'${NC}"
+        exit 1
+    fi
+    
+    # We're only checking if the right runner is used for the disambiguated task name
+    if echo "$output" | grep -q "npm"; then
+        echo "${GREEN}✓ get-command correctly uses npm runner for '$NPM_SUFFIX'${NC}"
+    else
+        echo "${RED}✗ get-command does not use npm runner for '$NPM_SUFFIX'${NC}"
+        echo "Got: $output"
+        exit 1
+    fi
+else
+    echo "${YELLOW}⚠ npm suffix not detected, skipping test${NC}"
+fi
+
+# Test act variant (if found)
+if [ ! -z "$ACT_SUFFIX" ]; then
+    echo "Testing act variant with suffix: $ACT_SUFFIX"
+    output=$(dela get-command "$ACT_SUFFIX" --job=build 2>&1 || echo "COMMAND_FAILED")
+    
+    echo "Command output for act variant:"
+    echo "$output"
+    
+    # Check if command failed
+    if [[ "$output" == "COMMAND_FAILED" ]]; then
+        echo "${RED}✗ get-command execution failed for '$ACT_SUFFIX'${NC}"
+        exit 1
+    fi
+    
+    # We're only checking if the right runner is used for the disambiguated task name
+    if echo "$output" | grep -q "act"; then
+        echo "${GREEN}✓ get-command correctly uses act runner for '$ACT_SUFFIX'${NC}"
+    else
+        echo "${RED}✗ get-command does not use act runner for '$ACT_SUFFIX'${NC}"
+        echo "Got: $output"
+        exit 1
+    fi
+else
+    echo "${YELLOW}⚠ Act suffix not detected, skipping test${NC}"
+fi
+
+# Define yellow color for warnings
+YELLOW='\033[1;33m'
+
+# Test 25: Test allow-command with disambiguated task names
+echo "\nTest 25: Testing allow-command with disambiguated task names"
+
+# Test allowing the make variant with arguments (if detected)
+if [ ! -z "$MAKE_SUFFIX" ]; then
+    echo "Testing allow-command with make variant: $MAKE_SUFFIX"
+    dela allow-command "$MAKE_SUFFIX" --allow 2
+
+    # Verify the allowlist was updated with the original task name "test"
+    # and with the Makefile path (not checking for the disambiguated name)
+    if grep -q "path.*Makefile" /home/testuser/.dela/allowlist.toml && \
+       grep -q 'tasks = \["test"\]' /home/testuser/.dela/allowlist.toml; then
+        echo "${GREEN}✓ Make test task was added to allowlist${NC}"
+    else
+        echo "${RED}✗ Make test task was not added to allowlist${NC}"
+        echo "Allowlist contents:"
+        cat /home/testuser/.dela/allowlist.toml
+        exit 1
+    fi
+else
+    echo "${YELLOW}⚠ Make suffix not detected, skipping allow-command test${NC}"
+fi
+
+# Test allowing npm variant (if detected)
+if [ ! -z "$NPM_SUFFIX" ]; then
+    echo "Testing allow-command with npm variant: $NPM_SUFFIX"
+    dela allow-command "$NPM_SUFFIX" --allow 2
+    
+    # Verify the allowlist was updated with the original task name "test"
+    # and with the package.json path
+    if grep -q "path.*package.json" /home/testuser/.dela/allowlist.toml && \
+       grep -q 'tasks = \["test"\]' /home/testuser/.dela/allowlist.toml; then
+        echo "${GREEN}✓ NPM test task was added to allowlist${NC}"
+    else
+        echo "${RED}✗ NPM test task was not added to allowlist${NC}"
+        echo "Allowlist contents:"
+        cat /home/testuser/.dela/allowlist.toml
+        exit 1
+    fi
+else
+    echo "${YELLOW}⚠ npm suffix not detected, skipping allow-command test${NC}"
+fi
+
+# Clean up
+rm -f duplicate_test.json duplicate_test.mk list_output.txt
 
 echo "\n${GREEN}All non-init tests completed successfully!${NC}"

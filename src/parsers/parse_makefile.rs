@@ -76,6 +76,7 @@ fn extract_tasks(makefile: &Makefile, path: &Path) -> Result<Vec<Task>, String> 
                     source_name: name,
                     description,
                     shadowed_by: None,
+                    disambiguated_name: None,
                 },
             );
         }
@@ -125,6 +126,7 @@ fn extract_tasks_regex(content: &str, path: &Path) -> Result<Vec<Task>, String> 
                     source_name: name,
                     description: None, // No descriptions in fallback mode
                     shadowed_by: None,
+                    disambiguated_name: None,
                 },
             );
         }

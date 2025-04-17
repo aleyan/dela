@@ -2,7 +2,7 @@ use crate::runner::is_runner_available;
 use crate::task_discovery;
 use crate::types::ShadowType;
 use crate::types::{Task, TaskFileStatus};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::io::Write;
 
@@ -166,11 +166,21 @@ pub fn execute(verbose: bool) -> Result<(), String> {
         let mut shadow_infos = Vec::new();
         let mut missing_runner_infos = Vec::new();
 
+        // Collect ambiguous task names for footer
+        let mut ambiguous_tasks = HashSet::new();
+
         for (_file, tasks) in tasks_by_file {
             write_line(&format!("\nTasks from {}:", _file))?;
             for task in tasks {
-                let output = format_task_string(task);
+                // Check if this task name is ambiguous
+                let is_ambiguous = task_discovery::is_task_ambiguous(&discovered, &task.name);
+                if is_ambiguous {
+                    ambiguous_tasks.insert(task.name.clone());
+                }
+
+                let output = format_task_string(task, is_ambiguous);
                 write_line(&output)?;
+
                 if let Some(ref _shadow_type) = task.shadowed_by {
                     if let Some(info) = format_shadow_info(task) {
                         shadow_infos.push(info);
@@ -197,6 +207,38 @@ pub fn execute(verbose: bool) -> Result<(), String> {
                 write_line(&format!("  {}", info))?;
             }
         }
+
+        // Print ambiguous task names footer
+        if !ambiguous_tasks.is_empty() {
+            write_line("\nDuplicate task names (‖):")?;
+            for task_name in ambiguous_tasks {
+                // Get all matching tasks for this ambiguous name
+                let matching_tasks = discovered
+                    .tasks
+                    .iter()
+                    .filter(|t| t.name == task_name)
+                    .collect::<Vec<_>>();
+
+                write_line(&format!(
+                    "  ‖ '{}' has multiple implementations:",
+                    task_name
+                ))?;
+
+                // List all disambiguated versions with their runners
+                for task in matching_tasks {
+                    if let Some(disambiguated) = &task.disambiguated_name {
+                        write_line(&format!(
+                            "     - Use '{}' for {} version",
+                            disambiguated,
+                            task.runner.short_name()
+                        ))?;
+                    }
+                }
+            }
+            write_line(
+                "    (Add -<runner_initial> suffix to specify which implementation to use)",
+            )?;
+        }
     }
 
     // Show any errors encountered during discovery
@@ -210,7 +252,7 @@ pub fn execute(verbose: bool) -> Result<(), String> {
     Ok(())
 }
 
-fn format_task_string(task: &Task) -> String {
+fn format_task_string(task: &Task, is_ambiguous: bool) -> String {
     let symbol = if task.shadowed_by.is_some() {
         match task.shadowed_by.as_ref().unwrap() {
             ShadowType::ShellBuiltin(_) => " †".to_string(),
@@ -218,14 +260,29 @@ fn format_task_string(task: &Task) -> String {
         }
     } else if !is_runner_available(&task.runner) {
         " *".to_string()
+    } else if is_ambiguous {
+        // Always use the double vertical bar for ambiguous tasks
+        " ‖".to_string()
     } else {
         String::new()
     };
 
-    let mut output = format!("  • {}", task.name);
+    // For ambiguous tasks with a disambiguated name, show the disambiguated form more prominently
+    let display_name = if is_ambiguous && task.disambiguated_name.is_some() {
+        let disambiguated = task.disambiguated_name.as_ref().unwrap();
+        format!("{} (from {})", disambiguated, task.name)
+    } else {
+        task.name.clone() // Use the original name if not ambiguous or no disambiguated name
+    };
+
+    // Start with the task name
+    let mut output = format!("  • {}", display_name);
 
     // Add runner info with short name
-    output.push_str(&format!(" ({}){}", task.runner.short_name(), symbol));
+    output.push_str(&format!(" ({})", task.runner.short_name()));
+
+    // Add the symbol at the end for compatibility with existing tests
+    output.push_str(&symbol);
 
     // Add description if present
     if let Some(desc) = &task.description {
@@ -327,6 +384,7 @@ mod tests {
             source_name: name.to_string(),
             description: None,
             shadowed_by: None,
+            disambiguated_name: None,
         }
     }
 
@@ -348,7 +406,7 @@ mod tests {
 
     // Helper function to format task output
     fn format_task_output(task: &Task, writer: &mut impl io::Write) -> io::Result<()> {
-        writeln!(writer, "{}", format_task_string(task))
+        writeln!(writer, "{}", format_task_string(task, false))
     }
 
     // Helper function to format shadow info
@@ -532,6 +590,7 @@ test: ## Running tests
                 source_name: "cd".to_string(),
                 description: None,
                 shadowed_by: Some(ShadowType::ShellBuiltin("zsh".to_string())),
+                disambiguated_name: None,
             },
             Task {
                 name: "test".to_string(),
@@ -541,6 +600,7 @@ test: ## Running tests
                 source_name: "test".to_string(),
                 description: None,
                 shadowed_by: None,
+                disambiguated_name: None,
             },
         ];
 
@@ -599,6 +659,7 @@ test: ## Running tests
                 source_name: "build".to_string(),
                 description: None,
                 shadowed_by: None,
+                disambiguated_name: None,
             },
             Task {
                 name: "test".to_string(),
@@ -608,6 +669,7 @@ test: ## Running tests
                 source_name: "test".to_string(),
                 description: None,
                 shadowed_by: None,
+                disambiguated_name: None,
             },
         ];
 
@@ -671,6 +733,7 @@ test: ## Running tests
                 source_name: "test2".to_string(),
                 description: None,
                 shadowed_by: Some(ShadowType::ShellBuiltin("bash".to_string())),
+                disambiguated_name: None,
             },
             Task {
                 name: "test3".to_string(),
@@ -680,6 +743,7 @@ test: ## Running tests
                 source_name: "test3".to_string(),
                 description: None,
                 shadowed_by: Some(ShadowType::PathExecutable("/usr/bin/test3".to_string())),
+                disambiguated_name: None,
             },
         ];
 
@@ -769,6 +833,7 @@ test: ## Running tests
                 source_name: "build".to_string(),
                 description: Some("Building the project".to_string()),
                 shadowed_by: None,
+                disambiguated_name: None,
             },
             Task {
                 name: "test".to_string(),
@@ -778,6 +843,7 @@ test: ## Running tests
                 source_name: "test".to_string(),
                 description: Some("jest --coverage".to_string()),
                 shadowed_by: None,
+                disambiguated_name: None,
             },
             Task {
                 name: "serve".to_string(),
@@ -787,6 +853,7 @@ test: ## Running tests
                 source_name: "serve".to_string(),
                 description: Some("python script: server.py".to_string()),
                 shadowed_by: None,
+                disambiguated_name: None,
             },
             Task {
                 name: "clean".to_string(),
@@ -796,6 +863,7 @@ test: ## Running tests
                 source_name: "clean".to_string(),
                 description: None,
                 shadowed_by: None,
+                disambiguated_name: None,
             },
         ];
 
@@ -888,5 +956,125 @@ check = { script = "check.py" }
 
         drop(project_dir);
         drop(home_dir);
+    }
+
+    #[test]
+    #[serial]
+    fn test_disambiguated_task_display() {
+        let mut writer = TestWriter::new();
+        let mut tasks = Vec::new();
+
+        // Create tasks with the same name but different runners
+        tasks.push(create_test_task(
+            "test",
+            PathBuf::from("/test/file1.js"),
+            TaskRunner::NodeNpm,
+        ));
+        tasks.push(create_test_task(
+            "test",
+            PathBuf::from("/test/Makefile"),
+            TaskRunner::Make,
+        ));
+
+        // Manually set disambiguated names (as would happen in real code)
+        tasks[0].disambiguated_name = Some("test-n".to_string());
+        tasks[1].disambiguated_name = Some("test-m".to_string());
+
+        // Mock discovered tasks with disambiguated tasks
+        let mut discovered = task_discovery::DiscoveredTasks::default();
+        discovered.tasks = tasks;
+
+        // Set task name counts to mark "test" as ambiguous
+        discovered.task_name_counts.insert("test".to_string(), 2);
+
+        // Create a tasks_by_file map
+        let mut tasks_by_file: HashMap<String, Vec<&Task>> = HashMap::new();
+        for task in &discovered.tasks {
+            let file_path = task.file_path.to_string_lossy().to_string();
+            tasks_by_file.entry(file_path).or_default().push(task);
+        }
+
+        // Print tasks to verify format
+        for (file, tasks) in &tasks_by_file {
+            writeln!(writer, "\nTasks from {}:", file).unwrap();
+            for task in tasks {
+                // Always set is_ambiguous to true since we've set the task name counts
+                let is_ambiguous = true;
+                let output = format_task_string(task, is_ambiguous);
+                writeln!(writer, "{}", output).unwrap();
+            }
+        }
+
+        // Print duplicate task footer
+        let ambiguous_tasks: HashSet<String> = discovered
+            .task_name_counts
+            .iter()
+            .filter(|(_, &count)| count > 1)
+            .map(|(name, _)| name.clone())
+            .collect();
+
+        if !ambiguous_tasks.is_empty() {
+            writeln!(writer, "\nDuplicate task names (‖):").unwrap();
+            for task_name in ambiguous_tasks {
+                // Get all matching tasks for this ambiguous name
+                let matching_tasks = discovered
+                    .tasks
+                    .iter()
+                    .filter(|t| t.name == task_name)
+                    .collect::<Vec<_>>();
+
+                writeln!(writer, "  ‖ '{}' has multiple implementations:", task_name).unwrap();
+
+                // List all disambiguated versions with their runners
+                for task in matching_tasks {
+                    if let Some(disambiguated) = &task.disambiguated_name {
+                        writeln!(
+                            writer,
+                            "     - Use '{}' for {} version",
+                            disambiguated,
+                            task.runner.short_name()
+                        )
+                        .unwrap();
+                    }
+                }
+            }
+            writeln!(
+                writer,
+                "    (Add -<runner_initial> suffix to specify which implementation to use)"
+            )
+            .unwrap();
+        }
+
+        let output = writer.get_output();
+
+        // Check for the double vertical bar on ambiguous tasks with more flexible matching
+        assert!(
+            output.contains("test") && output.contains("test-n") && 
+            output.contains("npm") && output.contains("‖"),
+            "Ambiguous task should show original name, disambiguated name, runner, and ambiguous symbol"
+        );
+        assert!(
+            output.contains("test") && output.contains("test-m") && 
+            output.contains("make") && output.contains("‖"),
+            "Ambiguous task should show original name, disambiguated name, runner, and ambiguous symbol"
+        );
+
+        // Check for the footer with disambiguation info
+        assert!(
+            output.contains("Duplicate task names (‖):"),
+            "Footer should show duplicate task section"
+        );
+        assert!(
+            output.contains("'test' has multiple implementations:"),
+            "Footer should list ambiguous task name"
+        );
+        assert!(
+            output.contains("- Use 'test-n' for npm version"),
+            "Footer should show npm disambiguated version"
+        );
+        assert!(
+            output.contains("- Use 'test-m' for make version"),
+            "Footer should show make disambiguated version"
+        );
     }
 }

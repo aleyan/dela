@@ -128,7 +128,76 @@ if ! echo "$output" | grep -q "‡ task 'custom-exe' shadowed by executable at.*
     exit 1
 fi
 
-log "4. Testing allowlist functionality..."
+log "4. Testing task disambiguation..."
+
+# Get output from dela list
+output=$(dela list)
+
+# Check if the duplicate task names section exists
+if ! echo "$output" | grep -q "Duplicate task names (‖)"; then
+    error "Disambiguation section not found in dela list output"
+    error "Got output: $output"
+    exit 1
+fi
+
+# Check if there's a test entry in the duplicate tasks section
+if ! echo "$output" | grep -q "test.*has multiple implementations"; then
+    error "Test task not found in duplicate task names section"
+    error "Got output: $output"
+    exit 1
+fi
+
+# Extract disambiguated task names
+make_test=$(echo "$output" | grep -o "'test-[^']*' for make version" | grep -o "test-[^']*" || echo "")
+npm_test=$(echo "$output" | grep -o "'test-[^']*' for npm version" | grep -o "test-[^']*" || echo "")
+uv_test=$(echo "$output" | grep -o "'test-[^']*' for uv version" | grep -o "test-[^']*" || echo "")
+
+log "Detected disambiguated test tasks:"
+log "- Make: $make_test"
+log "- NPM: $npm_test"
+log "- UV: $uv_test"
+
+# Verify at least some disambiguated names were found
+if [ -z "$make_test" ] && [ -z "$npm_test" ] && [ -z "$uv_test" ]; then
+    error "No disambiguated task names found in dela list output"
+    error "Got output: $output"
+    exit 1
+fi
+
+# Allow disambiguated tasks
+export DELA_NON_INTERACTIVE=1
+
+if [ ! -z "$make_test" ]; then
+    log "Testing Make disambiguated task ($make_test)..."
+    dela allow-command "$make_test" --allow 2 || (error "Failed to allow $make_test" && exit 1)
+    output=$(dr "$make_test" 2>&1)
+    if ! echo "$output" | grep -q "Make test task executed successfully"; then
+        error "dr $make_test failed. Got: $output"
+        exit 1
+    fi
+fi
+
+if [ ! -z "$npm_test" ]; then
+    log "Testing NPM disambiguated task ($npm_test)..."
+    dela allow-command "$npm_test" --allow 2 || (error "Failed to allow $npm_test" && exit 1)
+    output=$(dr "$npm_test" 2>&1)
+    if ! echo "$output" | grep -q "NPM test task executed successfully"; then
+        error "dr $npm_test failed. Got: $output"
+        exit 1
+    fi
+fi
+
+if [ ! -z "$uv_test" ]; then
+    log "Testing UV disambiguated task ($uv_test)..."
+    dela allow-command "$uv_test" --allow 2 || (error "Failed to allow $uv_test" && exit 1)
+    output=$(dr "$uv_test" 2>&1)
+    if ! echo "$output" | grep -q "Test task executed successfully"; then
+        error "dr $uv_test failed. Got: $output"
+        exit 1
+    fi
+fi
+
+log "5. Testing allowlist functionality..."
 
 # Ensure we're in non-interactive mode for allowlist testing
 export DELA_NON_INTERACTIVE=1
