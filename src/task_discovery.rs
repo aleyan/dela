@@ -137,8 +137,10 @@ pub fn is_task_ambiguous(discovered: &DiscoveredTasks, task_name: &str) -> bool 
 }
 
 /// Returns a list of disambiguated task names for tasks with the given name
+#[allow(dead_code)]
 pub fn get_disambiguated_task_names(discovered: &DiscoveredTasks, task_name: &str) -> Vec<String> {
-    discovered.tasks
+    discovered
+        .tasks
         .iter()
         .filter(|t| t.name == task_name)
         .filter_map(|t| t.disambiguated_name.clone())

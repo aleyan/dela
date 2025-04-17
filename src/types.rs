@@ -106,6 +106,7 @@ pub struct TaskDefinitionFile {
 
 /// Collection of discovered task definition files
 #[derive(Debug, Default)]
+#[allow(dead_code)]
 pub struct DiscoveredTaskDefinitions {
     /// Makefile if found
     pub makefile: Option<TaskDefinitionFile>,
