@@ -21,7 +21,7 @@ mod types;
     name = "dela",
     author = "Alex Yankov",
     version,
-    about = "A task runner that delegates to others cache busting system wow si fast 2",
+    about = "A task runner that delegates to others cache busting system wow si fast 3",
     long_about = "Dela scans your project directory for task definitions in various formats (Makefile, package.json, etc.) and lets you run them directly from your shell.\n\nAfter running '$ dela init', you can:\n1. Use '$ dr <task>' to execute a task directly\n2. Execute task with bare name `$ <task>` through the shell integration"
 )]
 struct Cli {
