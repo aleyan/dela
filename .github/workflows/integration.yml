@@ -38,8 +38,7 @@ jobs:
           cache-to: type=gha,scope=dela-builder,mode=max
           # Let Buildx skip the cache export when nothing changed
           # Keep the image on the runner
-          load: false
-          outputs: type=cacheonly 
+          load: true
           push: false
           tags: dela-builder:latest
 
@@ -67,8 +66,7 @@ jobs:
           file: tests/Dockerfile.builder
           platforms: ${{ env.PLATFORM }}
           cache-from: type=gha,scope=dela-builder
-          load: false
-          outputs: type=cacheonly 
+          load: true
           tags: dela-builder:latest
 
       - name: Run ${{ matrix.shell }} tests
