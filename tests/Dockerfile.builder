@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.4
 # --- Stage 1: Builder ---
 FROM rust:alpine3.21 AS builder
 

@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.4
 FROM dela-builder AS builder
 
 # Test environment
