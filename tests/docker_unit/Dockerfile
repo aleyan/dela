@@ -1,3 +1,7 @@
+# syntax=docker/dockerfile:1.4
+FROM dela-builder AS builder
+
+# Test environment
 FROM rust:alpine3.21
 
 # Install build dependencies
@@ -13,21 +17,21 @@ RUN apk add --no-cache \
 RUN adduser -D testuser
 WORKDIR /home/testuser
 
+# Copy the cargo registry and target directory from the builder
+COPY --from=builder /usr/local/cargo/registry /usr/local/cargo/registry
+COPY --from=builder /app/target /home/testuser/target
+RUN chmod -R 777 /usr/local/cargo/registry /home/testuser/target
+
+# Copy project files
+COPY Cargo.toml Cargo.lock ./
+COPY src ./src
+COPY resources ./resources
+
 # Set ownership
 RUN chown -R testuser:testuser .
 
 # Switch to test user
 USER testuser
-
-# Copy Cargo definition files first (better Docker caching)
-COPY Cargo.toml Cargo.lock ./
-
-# Pre-fetch dependencies (creates a build cache layer)
-RUN cargo fetch || true
-
-# Now copy source code and build
-COPY src ./src
-COPY resources ./resources
 
 # Entry point script will be mounted
 CMD ["bash", "/home/testuser/test_script.sh"]
