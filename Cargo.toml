@@ -25,4 +25,4 @@ regex = "1.11.1"
 [dev-dependencies]
 tempfile = "3.19.1"
 serial_test = "3.2.0"
-libc = "0.2.171"
+libc = "0.2.172"
