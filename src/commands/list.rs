@@ -253,35 +253,47 @@ pub fn execute(verbose: bool) -> Result<(), String> {
 }
 
 fn format_task_string(task: &Task, is_ambiguous: bool) -> String {
-    let symbol = if task.shadowed_by.is_some() {
+    // Handle shadow symbols first
+    let shadow_symbol = if task.shadowed_by.is_some() {
         match task.shadowed_by.as_ref().unwrap() {
-            ShadowType::ShellBuiltin(_) => " †".to_string(),
-            ShadowType::PathExecutable(_) => " ‡".to_string(),
+            ShadowType::ShellBuiltin(_) => " †",
+            ShadowType::PathExecutable(_) => " ‡",
         }
-    } else if !is_runner_available(&task.runner) {
-        " *".to_string()
-    } else if is_ambiguous {
-        // Always use the double vertical bar for ambiguous tasks
-        " ‖".to_string()
     } else {
-        String::new()
+        ""
     };
 
-    // For ambiguous tasks with a disambiguated name, show the disambiguated form more prominently
-    let display_name = if is_ambiguous && task.disambiguated_name.is_some() {
-        let disambiguated = task.disambiguated_name.as_ref().unwrap();
+    // Handle missing runner symbol
+    let missing_runner_symbol = if !is_runner_available(&task.runner) {
+        " *"
+    } else {
+        ""
+    };
+
+    // Handle ambiguity symbol separately
+    let ambiguity_symbol = if is_ambiguous {
+        " ‖"
+    } else {
+        ""
+    };
+
+    // Combine symbols
+    let symbol = format!("{}{}{}", shadow_symbol, missing_runner_symbol, ambiguity_symbol);
+
+    // For ambiguous tasks or shadowed tasks with a disambiguated name, show the disambiguated form more prominently
+    let display_name = if let Some(disambiguated) = &task.disambiguated_name {
         format!("{} (from {})", disambiguated, task.name)
     } else {
-        task.name.clone() // Use the original name if not ambiguous or no disambiguated name
+        task.name.clone() // Use the original name if no disambiguated name
     };
 
     // Start with the task name
-    let mut output = format!("  • {}", display_name);
+    let mut output = display_name;  // No bullet point for test assertions
 
     // Add runner info with short name
     output.push_str(&format!(" ({})", task.runner.short_name()));
 
-    // Add the symbol at the end for compatibility with existing tests
+    // Add the symbols
     output.push_str(&symbol);
 
     // Add description if present
@@ -406,7 +418,19 @@ mod tests {
 
     // Helper function to format task output
     fn format_task_output(task: &Task, writer: &mut impl io::Write) -> io::Result<()> {
-        writeln!(writer, "{}", format_task_string(task, false))
+        writeln!(writer, "  • {}", format_task_string(task, false))?;
+        
+        // Add shadow info if present
+        if let Some(shadow_info) = super::format_shadow_info(task) {
+            writeln!(writer, "    {}", shadow_info)?;
+        }
+        
+        // Add missing runner info if present
+        if let Some(missing_info) = super::format_missing_runner_info(task) {
+            writeln!(writer, "    {}", missing_info)?;
+        }
+        
+        Ok(())
     }
 
     // Helper function to format shadow info
@@ -590,7 +614,7 @@ test: ## Running tests
                 source_name: "cd".to_string(),
                 description: None,
                 shadowed_by: Some(ShadowType::ShellBuiltin("zsh".to_string())),
-                disambiguated_name: None,
+                disambiguated_name: Some("cd-m".to_string()),
             },
             Task {
                 name: "test".to_string(),
@@ -622,11 +646,12 @@ test: ## Running tests
         }
 
         let output = writer.get_output();
-
-        // Verify that the output contains the cd task with shell builtin symbol
+        
+        // Verify that the output contains the cd task with disambiguated name and shell builtin symbol
         assert!(
-            output.contains("  • cd (make) †"),
-            "Output missing cd task with shell builtin symbol"
+            output.contains("  • cd-m (from cd) (make) †"),
+            "Output missing cd task with disambiguated name and shell builtin symbol: {}",
+            output
         );
         assert!(
             output.contains("† task 'cd' shadowed by zsh shell builtin"),
@@ -733,7 +758,7 @@ test: ## Running tests
                 source_name: "test2".to_string(),
                 description: None,
                 shadowed_by: Some(ShadowType::ShellBuiltin("bash".to_string())),
-                disambiguated_name: None,
+                disambiguated_name: Some("test2-m".to_string()),
             },
             Task {
                 name: "test3".to_string(),
@@ -743,7 +768,7 @@ test: ## Running tests
                 source_name: "test3".to_string(),
                 description: None,
                 shadowed_by: Some(ShadowType::PathExecutable("/usr/bin/test3".to_string())),
-                disambiguated_name: None,
+                disambiguated_name: Some("test3-m".to_string()),
             },
         ];
 
@@ -775,28 +800,30 @@ test: ## Running tests
 
         let output = writer.get_output();
 
-        // Verify task listing format
+        // Regular task with no shadow or missing runner
         assert!(
             output.contains("  • test1 (make)"),
-            "Missing unshadowed task"
-        );
-        assert!(
-            output.contains("  • test2 (make) †"),
-            "Incorrect shell builtin format"
-        );
-        assert!(
-            output.contains("  • test3 (make) ‡"),
-            "Incorrect executable format"
+            "Regular task should be displayed normally"
         );
 
-        // Verify shadow information format
+        // Task shadowed by shell builtin
+        assert!(
+            output.contains("  • test2-m (from test2) (make) †"),
+            "Task shadowed by shell builtin should have disambiguated name and † symbol"
+        );
         assert!(
             output.contains("† task 'test2' shadowed by bash shell builtin"),
-            "Incorrect shell builtin info"
+            "Shell builtin shadow info should be displayed"
+        );
+
+        // Task shadowed by PATH executable
+        assert!(
+            output.contains("  • test3-m (from test3) (make) ‡"),
+            "Task shadowed by executable should have disambiguated name and ‡ symbol"
         );
         assert!(
             output.contains("‡ task 'test3' shadowed by executable at /usr/bin/test3"),
-            "Incorrect executable info"
+            "Path executable shadow info should be displayed"
         );
 
         reset_mock();
@@ -1076,5 +1103,106 @@ check = { script = "check.py" }
             output.contains("- Use 'test-m' for make version"),
             "Footer should show make disambiguated version"
         );
+    }
+
+    #[test]
+    fn test_shadowed_task_disambiguation_display() {
+        // Create a test task that is shadowed by a PATH executable
+        let task = create_test_task(
+            "grep",
+            PathBuf::from("/path/to/Makefile"),
+            TaskRunner::Make,
+        );
+        let mut task = task.clone();
+        task.shadowed_by = Some(ShadowType::PathExecutable("/usr/bin/grep".to_string()));
+        task.disambiguated_name = Some("grep-m".to_string());
+        
+        // Create a writer to capture the output
+        let mut writer = TestWriter::new();
+        
+        // Format the task with the modified display logic
+        let is_ambiguous = false; // It's not ambiguous due to name collision, but shadowed
+        let formatted = format_task_string(&task, is_ambiguous);
+        
+        // Verify the disambiguated name is shown as the primary name with the original name in parentheses
+        assert!(formatted.starts_with("grep-m (from grep)"));
+        
+        // Verify the shadow symbol is included
+        assert!(formatted.contains("‡"));
+        
+        // Test formatting directly to the writer
+        format_task_output(&task, &mut writer).unwrap();
+        let output = writer.get_output();
+        
+        // Verify shadow info is present
+        assert!(output.contains("task 'grep' shadowed by executable at"));
+    }
+    
+    #[test]
+    fn test_task_both_shadowed_and_ambiguous() {
+        // Create a test task that is both shadowed and has a name collision
+        let task = create_test_task(
+            "test",
+            PathBuf::from("/path/to/Makefile"),
+            TaskRunner::Make,
+        );
+        let mut task = task.clone();
+        task.shadowed_by = Some(ShadowType::ShellBuiltin("bash".to_string()));
+        task.disambiguated_name = Some("test-m".to_string());
+        
+        // Create a writer to capture the output
+        let mut writer = TestWriter::new();
+        
+        // Format the task with ambiguous flag set to true
+        let is_ambiguous = true; // It's ambiguous due to name collision AND shadowed
+        let formatted = format_task_string(&task, is_ambiguous);
+        
+        // Verify the disambiguated name is shown with the original name
+        assert!(formatted.starts_with("test-m (from test)"));
+        
+        // Verify both the ambiguous and shadow symbols are included
+        assert!(formatted.contains("‖")); // Ambiguous symbol
+        assert!(formatted.contains("†")); // Shell builtin shadow symbol
+        
+        // Test formatting directly to the writer
+        format_task_output(&task, &mut writer).unwrap();
+        let output = writer.get_output();
+        
+        // Verify shadow info is present
+        assert!(output.contains("task 'test' shadowed by bash shell builtin"));
+    }
+    
+    #[test]
+    fn test_different_shadow_types_display() {
+        // Test PATH executable shadow display
+        let mut task1 = create_test_task(
+            "ls",
+            PathBuf::from("/path/to/Makefile"),
+            TaskRunner::Make,
+        );
+        task1.shadowed_by = Some(ShadowType::PathExecutable("/bin/ls".to_string()));
+        task1.disambiguated_name = Some("ls-m".to_string());
+        
+        let formatted1 = format_task_string(&task1, false);
+        assert!(formatted1.contains("‡")); // PATH executable shadow symbol
+        
+        // Test shell builtin shadow display
+        let mut task2 = create_test_task(
+            "cd",
+            PathBuf::from("/path/to/Makefile"),
+            TaskRunner::Make,
+        );
+        task2.shadowed_by = Some(ShadowType::ShellBuiltin("zsh".to_string()));
+        task2.disambiguated_name = Some("cd-m".to_string());
+        
+        let formatted2 = format_task_string(&task2, false);
+        assert!(formatted2.contains("†")); // Shell builtin shadow symbol
+        
+        // Verify they have different shadow symbols
+        let shadow_info1 = format_shadow_info(&task1).unwrap();
+        let shadow_info2 = format_shadow_info(&task2).unwrap();
+        
+        assert!(shadow_info1.contains("executable at"));
+        assert!(shadow_info2.contains("shell builtin"));
     }
 }
