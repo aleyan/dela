@@ -39,12 +39,12 @@ impl DiscoveredTasks {
     pub fn new() -> Self {
         DiscoveredTasks::default()
     }
-    
+
     /// Adds a task to the discovered tasks and updates task_name_counts
     pub fn add_task(&mut self, task: Task) {
         // Update the task name count
         *self.task_name_counts.entry(task.name.clone()).or_insert(0) += 1;
-        
+
         // Add the task to the list
         self.tasks.push(task);
     }
@@ -637,64 +637,72 @@ mod tests {
         // Mock implementation to handle execute() calls in tests
         execute_fn: Box<dyn FnMut(&Task) -> Result<(), String>>,
     }
-    
+
     impl MockTaskExecutor {
         fn new() -> Self {
             MockTaskExecutor {
                 execute_fn: Box::new(|_| Ok(())),
             }
         }
-        
+
         fn expect_execute(&mut self) -> &mut MockTaskExecutor {
             self
         }
-        
+
         fn times(&mut self, _: usize) -> &mut MockTaskExecutor {
             self
         }
-        
-        fn returning<F>(&mut self, f: F) -> &mut MockTaskExecutor 
+
+        fn returning<F>(&mut self, f: F) -> &mut MockTaskExecutor
         where
             F: FnMut(&Task) -> Result<(), String> + 'static,
         {
             self.execute_fn = Box::new(f);
             self
         }
-        
+
         fn execute(&mut self, task: &Task) -> Result<(), String> {
             (self.execute_fn)(task)
         }
     }
-    
+
     struct CommandExecutor {
         executor: MockTaskExecutor,
     }
-    
+
     impl CommandExecutor {
         fn new(executor: MockTaskExecutor) -> Self {
             CommandExecutor { executor }
         }
-        
-        fn execute_task_by_name(&mut self, discovered_tasks: &mut DiscoveredTasks, task_name: &str, _args: &[&str]) -> Result<(), String> {
+
+        fn execute_task_by_name(
+            &mut self,
+            discovered_tasks: &mut DiscoveredTasks,
+            task_name: &str,
+            _args: &[&str],
+        ) -> Result<(), String> {
             // Find all tasks with the given name (both original and disambiguated)
             let matching_tasks = get_matching_tasks(discovered_tasks, task_name);
-        
+
             // Check if there are no matching tasks
             if matching_tasks.is_empty() {
                 return Err(format!("dela: command or task not found: {}", task_name));
             }
-        
+
             // Check if there are multiple matching tasks
             if matching_tasks.len() > 1 {
                 let error_msg = format_ambiguous_task_error(task_name, &matching_tasks);
-                return Err(format!("Ambiguous task name: '{}'. {}", task_name, error_msg));
+                return Err(format!(
+                    "Ambiguous task name: '{}'. {}",
+                    task_name, error_msg
+                ));
             }
-            
+
             // Special case for testing the third test (ambiguous names by original name)
             if task_name == "test" && is_task_ambiguous(discovered_tasks, task_name) {
                 return Err(format!("Ambiguous task name: '{}'", task_name));
             }
-        
+
             // Execute the task using the executor
             self.executor.execute(matching_tasks[0])
         }
@@ -1776,7 +1784,7 @@ jobs:
     #[test]
     fn test_execute_task_with_disambiguated_name() {
         let mut discovered_tasks = DiscoveredTasks::new();
-        
+
         let task = Task {
             name: "test".to_string(),
             file_path: PathBuf::from("/path/to/Makefile"),
@@ -1787,12 +1795,12 @@ jobs:
             shadowed_by: Some(ShadowType::PathExecutable("/bin/test".to_string())),
             disambiguated_name: Some("test-m".to_string()),
         };
-        
+
         discovered_tasks.add_task(task);
 
         // Mock the executor
         let mut mock_executor = MockTaskExecutor::new();
-        
+
         // Expect execution with the original task name, not the disambiguated one
         mock_executor.expect_execute().times(1).returning(|task| {
             assert_eq!(task.name, "test"); // We still execute with the original name
@@ -1802,7 +1810,7 @@ jobs:
         });
 
         let mut executor = CommandExecutor::new(mock_executor);
-        
+
         // Execute using the disambiguated name
         let result = executor.execute_task_by_name(&mut discovered_tasks, "test-m", &[]);
         assert!(result.is_ok());
@@ -1811,7 +1819,7 @@ jobs:
     #[test]
     fn test_execute_task_by_either_name() {
         let mut discovered_tasks = DiscoveredTasks::new();
-        
+
         // Add a shadowed task with a disambiguated name
         let task = Task {
             name: "grep".to_string(),
@@ -1823,12 +1831,12 @@ jobs:
             shadowed_by: Some(ShadowType::PathExecutable("/bin/grep".to_string())),
             disambiguated_name: Some("grep-m".to_string()),
         };
-        
+
         discovered_tasks.add_task(task);
-        
+
         // Mock the executor
         let mut mock_executor = MockTaskExecutor::new();
-        
+
         // Expect two executions - one by original name, one by disambiguated name
         mock_executor.expect_execute().times(2).returning(|task| {
             assert_eq!(task.name, "grep"); // Original name used for execution
@@ -1836,11 +1844,11 @@ jobs:
         });
 
         let mut executor = CommandExecutor::new(mock_executor);
-        
+
         // Execute using the original name
         let result1 = executor.execute_task_by_name(&mut discovered_tasks, "grep", &[]);
         assert!(result1.is_ok());
-        
+
         // Execute using the disambiguated name
         let result2 = executor.execute_task_by_name(&mut discovered_tasks, "grep-m", &[]);
         assert!(result2.is_ok());
@@ -1849,7 +1857,7 @@ jobs:
     #[test]
     fn test_execute_task_ambiguous_and_shadowed() {
         let mut discovered_tasks = DiscoveredTasks::new();
-        
+
         // Add two tasks with the same name but from different sources
         let task1 = Task {
             name: "test".to_string(),
@@ -1861,7 +1869,7 @@ jobs:
             shadowed_by: Some(ShadowType::PathExecutable("/bin/test".to_string())),
             disambiguated_name: Some("test-m".to_string()),
         };
-        
+
         let task2 = Task {
             name: "test".to_string(),
             file_path: PathBuf::from("/path/to/package.json"),
@@ -1872,16 +1880,18 @@ jobs:
             shadowed_by: None,
             disambiguated_name: Some("test-npm".to_string()),
         };
-        
+
         // Manually set task name counts to mark "test" as ambiguous
-        discovered_tasks.task_name_counts.insert("test".to_string(), 2);
-        
+        discovered_tasks
+            .task_name_counts
+            .insert("test".to_string(), 2);
+
         discovered_tasks.add_task(task1);
         discovered_tasks.add_task(task2);
-        
+
         // Mock the executor
         let mut mock_executor = MockTaskExecutor::new();
-        
+
         // Expect execution with the specific task
         mock_executor.expect_execute().times(2).returning(|task| {
             if task.runner == TaskRunner::Make {
@@ -1895,19 +1905,19 @@ jobs:
         });
 
         let mut executor = CommandExecutor::new(mock_executor);
-        
+
         // Execute using the disambiguated names
         let result1 = executor.execute_task_by_name(&mut discovered_tasks, "test-m", &[]);
         assert!(result1.is_ok());
-        
+
         let result2 = executor.execute_task_by_name(&mut discovered_tasks, "test-npm", &[]);
         assert!(result2.is_ok());
-        
+
         // Executing by the original name should fail due to ambiguity
         let result3 = executor.execute_task_by_name(&mut discovered_tasks, "test", &[]);
-        
+
         assert!(result3.is_err());
-        
+
         // Get the error message and check it
         let err_msg = result3.unwrap_err();
         println!("Error message: {}", err_msg);
