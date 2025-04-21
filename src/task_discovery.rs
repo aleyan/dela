@@ -1071,17 +1071,17 @@ cd:
             cd_task.shadowed_by,
             Some(ShadowType::ShellBuiltin(_))
         ));
-        
+
         // Verify that shadowed tasks get disambiguated names
         assert_eq!(cd_task.disambiguated_name, Some("cd-m".to_string()));
-        
+
         // Verify the test task is also shadowed and gets disambiguated
         let test_task = discovered
             .tasks
             .iter()
             .find(|t| t.name == "test")
             .expect("test task not found");
-            
+
         assert!(matches!(
             test_task.shadowed_by,
             Some(ShadowType::ShellBuiltin(_))
@@ -1469,7 +1469,7 @@ jobs:
     fn test_process_disambiguation_for_shadowed_tasks() {
         // Create a test task that is shadowed by a shell builtin
         let mut discovered = DiscoveredTasks::default();
-        
+
         // Mock a task with name "test" that is shadowed by shell builtin
         discovered.tasks.push(Task {
             name: "test".to_string(),
@@ -1481,7 +1481,7 @@ jobs:
             shadowed_by: Some(ShadowType::ShellBuiltin("bash".to_string())),
             disambiguated_name: None,
         });
-        
+
         // Mock a task with name "ls" that is shadowed by PATH executable
         discovered.tasks.push(Task {
             name: "ls".to_string(),
@@ -1493,7 +1493,7 @@ jobs:
             shadowed_by: Some(ShadowType::PathExecutable("/bin/ls".to_string())),
             disambiguated_name: None,
         });
-        
+
         // Mock a task that is not shadowed (should not get a disambiguated name)
         discovered.tasks.push(Task {
             name: "build".to_string(),
@@ -1505,14 +1505,20 @@ jobs:
             shadowed_by: None,
             disambiguated_name: None,
         });
-        
+
         // Process the tasks
         process_task_disambiguation(&mut discovered);
-        
+
         // Verify shadowed tasks received disambiguated names
-        assert_eq!(discovered.tasks[0].disambiguated_name, Some("test-m".to_string()));
-        assert_eq!(discovered.tasks[1].disambiguated_name, Some("ls-m".to_string()));
-        
+        assert_eq!(
+            discovered.tasks[0].disambiguated_name,
+            Some("test-m".to_string())
+        );
+        assert_eq!(
+            discovered.tasks[1].disambiguated_name,
+            Some("ls-m".to_string())
+        );
+
         // Verify non-shadowed task did not receive a disambiguated name
         assert_eq!(discovered.tasks[2].disambiguated_name, None);
     }
@@ -1525,7 +1531,7 @@ jobs:
         // 2. Shadowed tasks
         // 3. Normal tasks
         let mut discovered = DiscoveredTasks::default();
-        
+
         // Create tasks with name collisions - multiple "test" tasks
         discovered.tasks.push(Task {
             name: "test".to_string(),
@@ -1537,7 +1543,7 @@ jobs:
             shadowed_by: None,
             disambiguated_name: None,
         });
-        
+
         discovered.tasks.push(Task {
             name: "test".to_string(),
             file_path: PathBuf::from("/test/package.json"),
@@ -1548,7 +1554,7 @@ jobs:
             shadowed_by: None,
             disambiguated_name: None,
         });
-        
+
         // Shadowed task - "ls" shadowed by PATH executable
         discovered.tasks.push(Task {
             name: "ls".to_string(),
@@ -1560,7 +1566,7 @@ jobs:
             shadowed_by: Some(ShadowType::PathExecutable("/bin/ls".to_string())),
             disambiguated_name: None,
         });
-        
+
         // Shadowed task with name collision - "cd" shadowed by shell builtin
         discovered.tasks.push(Task {
             name: "cd".to_string(),
@@ -1572,7 +1578,7 @@ jobs:
             shadowed_by: Some(ShadowType::ShellBuiltin("bash".to_string())),
             disambiguated_name: None,
         });
-        
+
         discovered.tasks.push(Task {
             name: "cd".to_string(),
             file_path: PathBuf::from("/test/Taskfile.yml"),
@@ -1583,7 +1589,7 @@ jobs:
             shadowed_by: Some(ShadowType::ShellBuiltin("bash".to_string())),
             disambiguated_name: None,
         });
-        
+
         // Normal task - no collision, not shadowed
         discovered.tasks.push(Task {
             name: "build".to_string(),
@@ -1595,54 +1601,65 @@ jobs:
             shadowed_by: None,
             disambiguated_name: None,
         });
-        
+
         // Process the tasks
         process_task_disambiguation(&mut discovered);
-        
+
         // Verify name collisions get unique disambiguated names
-        let test_tasks: Vec<_> = discovered.tasks.iter()
+        let test_tasks: Vec<_> = discovered
+            .tasks
+            .iter()
             .filter(|t| t.name == "test")
             .collect();
         assert_eq!(test_tasks.len(), 2);
         assert!(test_tasks[0].disambiguated_name.is_some());
         assert!(test_tasks[1].disambiguated_name.is_some());
-        assert_ne!(test_tasks[0].disambiguated_name, test_tasks[1].disambiguated_name);
-        
+        assert_ne!(
+            test_tasks[0].disambiguated_name,
+            test_tasks[1].disambiguated_name
+        );
+
         // Verify shadowed task gets disambiguated name
-        let ls_task = discovered.tasks.iter()
+        let ls_task = discovered
+            .tasks
+            .iter()
             .find(|t| t.name == "ls")
             .expect("ls task not found");
         assert_eq!(ls_task.disambiguated_name, Some("ls-m".to_string()));
-        
+
         // Verify shadowed tasks with name collision all get disambiguated names
-        let cd_tasks: Vec<_> = discovered.tasks.iter()
-            .filter(|t| t.name == "cd")
-            .collect();
+        let cd_tasks: Vec<_> = discovered.tasks.iter().filter(|t| t.name == "cd").collect();
         assert_eq!(cd_tasks.len(), 2);
         assert!(cd_tasks[0].disambiguated_name.is_some());
         assert!(cd_tasks[1].disambiguated_name.is_some());
-        assert_ne!(cd_tasks[0].disambiguated_name, cd_tasks[1].disambiguated_name);
-        
+        assert_ne!(
+            cd_tasks[0].disambiguated_name,
+            cd_tasks[1].disambiguated_name
+        );
+
         // One should be cd-m and the other cd-t
-        let cd_disambiguated_names: Vec<_> = cd_tasks.iter()
+        let cd_disambiguated_names: Vec<_> = cd_tasks
+            .iter()
             .filter_map(|t| t.disambiguated_name.as_ref())
             .map(|s| s.as_str())
             .collect();
         assert!(cd_disambiguated_names.contains(&"cd-m"));
         assert!(cd_disambiguated_names.contains(&"cd-t"));
-        
+
         // Verify normal task doesn't get disambiguated name
-        let build_task = discovered.tasks.iter()
+        let build_task = discovered
+            .tasks
+            .iter()
             .find(|t| t.name == "build")
             .expect("build task not found");
         assert_eq!(build_task.disambiguated_name, None);
     }
-    
+
     #[test]
     #[serial]
     fn test_get_matching_tasks_with_shadowed_task() {
         let mut discovered = DiscoveredTasks::default();
-        
+
         // Create a shadowed task with a disambiguated name
         discovered.tasks.push(Task {
             name: "install".to_string(),
@@ -1654,18 +1671,21 @@ jobs:
             shadowed_by: Some(ShadowType::PathExecutable("/usr/bin/install".to_string())),
             disambiguated_name: Some("install-m".to_string()),
         });
-        
+
         // Look up the task by original name
         let matching_by_original = get_matching_tasks(&discovered, "install");
         assert_eq!(matching_by_original.len(), 1);
-        
+
         // Look up the task by disambiguated name
         let matching_by_disambiguated = get_matching_tasks(&discovered, "install-m");
         assert_eq!(matching_by_disambiguated.len(), 1);
-        
+
         // Verify it's the same task
         assert_eq!(matching_by_original[0].name, "install");
         assert_eq!(matching_by_disambiguated[0].name, "install");
-        assert_eq!(matching_by_disambiguated[0].disambiguated_name, Some("install-m".to_string()));
+        assert_eq!(
+            matching_by_disambiguated[0].disambiguated_name,
+            Some("install-m".to_string())
+        );
     }
 }
