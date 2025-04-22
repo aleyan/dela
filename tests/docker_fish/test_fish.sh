@@ -114,7 +114,7 @@ log "Testing shadow detection in dela list..."
 set output (dela list)
 
 # Check for shell builtin shadowing (cd)
-if not string match -q "*cd (make) †*" "$output"
+if not string match -q "*cd-m (from cd) (make) †*" "$output"
     error "Shell builtin shadowing symbol not found for 'cd' task"
     error "Got output: $output"
     exit 1
@@ -127,7 +127,7 @@ if not string match -q "*† task 'cd' shadowed by fish shell builtin*" "$output
 end
 
 # Check for PATH executable shadowing (custom-exe)
-if not string match -q "*custom-exe (make) ‡*" "$output"
+if not string match -q "*custom-exe-m (from custom-exe) (make) ‡*" "$output"
     error "PATH executable shadowing symbol not found for 'custom-exe' task"
     error "Got output: $output"
     exit 1

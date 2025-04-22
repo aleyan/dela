@@ -152,7 +152,7 @@ Write-Host $output
 Write-Log "Debug - End of dela list output"
 
 # Check for shell builtin shadowing (cd)
-if (-not ($output -match "cd \(make\) †")) {
+if (-not ($output -match "cd-m \(from cd\) \(make\) †")) {
     Write-Error "Shell builtin shadowing symbol not found for 'cd' task"
     Write-Error "Got output: $output"
     exit 1
@@ -165,7 +165,7 @@ if (-not ($output -match "† task 'cd' shadowed by pwsh shell builtin")) {
 }
 
 # Check for PATH executable shadowing (custom-exe)
-if (-not ($output -match "custom-exe \(make\) ‡")) {
+if (-not ($output -match "custom-exe-m \(from custom-exe\) \(make\) ‡")) {
     Write-Error "PATH executable shadowing symbol not found for 'custom-exe' task"
     Write-Error "Got output: $output"
     exit 1
