@@ -36,11 +36,13 @@ pub struct DiscoveredTasks {
 
 impl DiscoveredTasks {
     /// Creates a new empty DiscoveredTasks
+    #[cfg(test)]
     pub fn new() -> Self {
         DiscoveredTasks::default()
     }
 
     /// Adds a task to the discovered tasks and updates task_name_counts
+    #[cfg(test)]
     pub fn add_task(&mut self, task: Task) {
         // Update the task name count
         *self.task_name_counts.entry(task.name.clone()).or_insert(0) += 1;
