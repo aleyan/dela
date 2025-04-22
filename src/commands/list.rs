@@ -177,12 +177,13 @@ pub fn execute(verbose: bool) -> Result<(), String> {
         }
 
         // Calculate max task name width across all runners
-        let max_task_name_width = discovered.tasks
+        let max_task_name_width = discovered
+            .tasks
             .iter()
             .map(|t| t.disambiguated_name.as_ref().unwrap_or(&t.name).len())
             .max()
             .unwrap_or(0)
-            .max(18);  // Minimum 18 characters
+            .max(18); // Minimum 18 characters
 
         // Get a sorted list of runners for deterministic output
         let mut runners: Vec<String> = tasks_by_runner.keys().cloned().collect();
@@ -287,15 +288,15 @@ pub fn execute(verbose: bool) -> Result<(), String> {
 fn format_task_entry(task: &Task, is_ambiguous: bool, name_width: usize) -> String {
     // Display the disambiguated name if available, otherwise use the original name
     let display_name = task.disambiguated_name.as_ref().unwrap_or(&task.name);
-    
+
     // Build footnote indicators
     let mut footnotes = String::new();
-    
+
     // Add conflict indicator if ambiguous
     if is_ambiguous {
         footnotes.push('‖');
     }
-    
+
     // Add shadow indicator if shadowed
     if let Some(shadow) = &task.shadowed_by {
         match shadow {
@@ -303,18 +304,18 @@ fn format_task_entry(task: &Task, is_ambiguous: bool, name_width: usize) -> Stri
             ShadowType::PathExecutable(_) => footnotes.push('‡'),
         }
     }
-    
+
     // Create the task description part
     let description_part = if let Some(_) = &task.disambiguated_name {
         // For disambiguated tasks, show the original name with footnotes
         let orig_with_footnotes = if !footnotes.is_empty() {
             format!("{} {}", task.name, footnotes)
-    } else {
+        } else {
             task.name.clone()
         };
-        
+
         // Add the description if available
-    if let Some(desc) = &task.description {
+        if let Some(desc) = &task.description {
             format!("{} - {}", orig_with_footnotes, desc)
         } else {
             // No description, just show the original name
@@ -329,9 +330,14 @@ fn format_task_entry(task: &Task, is_ambiguous: bool, name_width: usize) -> Stri
             String::new()
         }
     };
-    
+
     // Format with fixed-width column for the task name
-    format!("{:<width$}  {}", display_name, description_part, width = name_width)
+    format!(
+        "{:<width$}  {}",
+        display_name,
+        description_part,
+        width = name_width
+    )
 }
 
 #[cfg(test)]
@@ -426,11 +432,11 @@ mod tests {
     fn setup_test_env() -> (TempDir, TempDir) {
         let temp_dir = TempDir::new().unwrap();
         let home_dir = TempDir::new().unwrap();
-        
+
         // Create a basic test environment
         let env = TestEnvironment::new();
         set_test_environment(env);
-        
+
         (temp_dir, home_dir)
     }
 
@@ -455,16 +461,16 @@ mod tests {
 
         // Create mock tasks for testing
         let mut tasks = Vec::new();
-        
+
         // Make tasks
         let mut build_task = create_test_task("build", makefile_path.clone(), TaskRunner::Make);
         build_task.description = Some("Building dela...".to_string());
-        
+
         let mut test_task = create_test_task("test", makefile_path.clone(), TaskRunner::Make);
         test_task.description = Some("Running tests...".to_string());
         test_task.disambiguated_name = Some("test-m".to_string());
         test_task.shadowed_by = Some(ShadowType::ShellBuiltin("zsh".to_string()));
-        
+
         let mut install_task = create_test_task("install", makefile_path.clone(), TaskRunner::Make);
         install_task.description = Some("Installing dela locally...".to_string());
         install_task.disambiguated_name = Some("install-m".to_string());
@@ -473,16 +479,17 @@ mod tests {
         // Python tasks with uv
         let mut py_build = create_test_task("build", pyproject_path.clone(), TaskRunner::PythonUv);
         py_build.description = Some("python script: assets_py.main:main_build".to_string());
-        
+
         let mut py_test = create_test_task("test", pyproject_path.clone(), TaskRunner::PythonUv);
         py_test.description = Some("python script: assets_py.main:main_test".to_string());
         py_test.disambiguated_name = Some("test-u".to_string());
         py_test.shadowed_by = Some(ShadowType::ShellBuiltin("zsh".to_string()));
 
         // GitHub Actions workflows
-        let mut integration = create_test_task("integration", workflow_path.clone(), TaskRunner::Act);
+        let mut integration =
+            create_test_task("integration", workflow_path.clone(), TaskRunner::Act);
         integration.description = Some("Integration Tests".to_string());
-        
+
         let mut rust = create_test_task("rust", workflow_path.clone(), TaskRunner::Act);
         rust.description = Some("Rust CI".to_string());
 
@@ -500,8 +507,12 @@ mod tests {
 
         // Output the test lines directly to ensure they're in the output
         writeln!(writer, "  integration          Integration Tests").unwrap();
-        writeln!(writer, "  install-m            install † - Installing dela locally...").unwrap();
-        
+        writeln!(
+            writer,
+            "  install-m            install † - Installing dela locally..."
+        )
+        .unwrap();
+
         // Group tasks by runner
         let mut tasks_by_runner: HashMap<String, Vec<&Task>> = HashMap::new();
         let tasks_clone = tasks.clone(); // Clone to avoid ownership issues
@@ -522,16 +533,16 @@ mod tests {
         for runner in runners {
             let tasks = tasks_by_runner.get(&runner).unwrap();
             let task_count = tasks.len();
-            
+
             // Get file path
             let file_path = &tasks[0].file_path;
             let file_name = file_path
                 .file_name()
                 .map(|f| f.to_string_lossy().to_string())
                 .unwrap_or_else(|| file_path.to_string_lossy().to_string());
-            
+
             writeln!(writer, "\n{} ({}) — {}", runner, task_count, file_name).unwrap();
-            
+
             // Sort tasks
             let mut sorted_tasks = tasks.to_vec();
             sorted_tasks.sort_by(|a, b| {
@@ -539,26 +550,26 @@ mod tests {
                 let b_name = b.disambiguated_name.as_ref().unwrap_or(&b.name);
                 a_name.cmp(b_name)
             });
-            
+
             // Calculate name width
             let task_name_width = sorted_tasks
-            .iter()
+                .iter()
                 .map(|t| t.disambiguated_name.as_ref().unwrap_or(&t.name).len())
                 .max()
                 .unwrap_or(0)
                 .max(18);
-            
+
             // Format each task
             for task in sorted_tasks {
                 let formatted = format_task_entry(
-                    task, 
+                    task,
                     task_discovery::is_task_ambiguous(&discovered_tasks, &task.name),
-                    task_name_width
+                    task_name_width,
                 );
                 writeln!(writer, "  {}", formatted).unwrap();
             }
         }
-        
+
         // Write footnote legend
         writeln!(writer, "\nfootnotes legend:").unwrap();
         writeln!(writer, "† shadowed by a shell builtin").unwrap();
@@ -571,7 +582,7 @@ mod tests {
         assert!(output.contains("uv (2) —"));
         assert!(output.contains("integration          Integration Tests"));
         assert!(output.contains("install-m            install † - Installing dela locally..."));
-        
+
         // Reset environment
         reset_to_real_environment();
     }
@@ -580,13 +591,13 @@ mod tests {
     #[serial]
     fn test_task_entry_formatting() {
         // Test cases for different task scenarios
-        
+
         // Case 1: Simple task with description
         let mut task1 = create_test_task("build", PathBuf::from("Makefile"), TaskRunner::Make);
         task1.description = Some("Building the project".to_string());
         let formatted1 = format_task_entry(&task1, false, 18);
         assert_eq!(formatted1, "build               - Building the project");
-        
+
         // Case 2: Disambiguated task with shadow and ambiguity
         let mut task2 = create_test_task("test", PathBuf::from("Makefile"), TaskRunner::Make);
         task2.description = Some("Running tests".to_string());
@@ -594,12 +605,12 @@ mod tests {
         task2.shadowed_by = Some(ShadowType::ShellBuiltin("zsh".to_string()));
         let formatted2 = format_task_entry(&task2, true, 18);
         assert_eq!(formatted2, "test-m              test ‖† - Running tests");
-        
+
         // Case 3: Task with no description
         let task3 = create_test_task("format", PathBuf::from("Makefile"), TaskRunner::Make);
         let formatted3 = format_task_entry(&task3, false, 18);
         assert_eq!(formatted3, "format              ");
-        
+
         // Case 4: Task with path executable shadow
         let mut task4 = create_test_task("deploy", PathBuf::from("Makefile"), TaskRunner::Make);
         task4.shadowed_by = Some(ShadowType::PathExecutable("/usr/bin/deploy".to_string()));
@@ -614,16 +625,16 @@ mod tests {
         // Test for a tool that's not installed
         let (temp_dir, _home_dir) = setup_test_env();
         let temp_path = temp_dir.path();
-        
+
         let gradle_path = temp_path.join("build.gradle");
         File::create(&gradle_path).unwrap();
-        
+
         let mut task = create_test_task("build", gradle_path, TaskRunner::Gradle);
         task.description = Some("Build project".to_string());
-        
+
         // Set environment to indicate gradle is not available
         // In our test environment, no gradle will be available by default
-        
+
         let mut writer = TestWriter::new();
         writeln!(writer, "gradle* (1) — build.gradle").unwrap();
         writeln!(writer, "  build                - Build project").unwrap();
@@ -633,11 +644,11 @@ mod tests {
         let output = writer.get_output();
         assert!(output.contains("gradle* (1)"));
         assert!(output.contains("* tool not installed"));
-        
+
         reset_to_real_environment();
     }
 
     // ... existing test code ...
-    
+
     // Add remaining tests for backward compatibility
 }
