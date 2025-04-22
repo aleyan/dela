@@ -176,6 +176,14 @@ pub fn execute(verbose: bool) -> Result<(), String> {
             runner_files.insert(runner_name, task.file_path.to_string_lossy().to_string());
         }
 
+        // Calculate max task name width across all runners
+        let max_task_name_width = discovered.tasks
+            .iter()
+            .map(|t| t.disambiguated_name.as_ref().unwrap_or(&t.name).len())
+            .max()
+            .unwrap_or(0)
+            .max(18);  // Minimum 18 characters
+
         // Get a sorted list of runners for deterministic output
         let mut runners: Vec<String> = tasks_by_runner.keys().cloned().collect();
         runners.sort();
@@ -217,14 +225,6 @@ pub fn execute(verbose: bool) -> Result<(), String> {
                 file_name
             ))?;
 
-            // Format column width for task names - minimum 18 characters
-            let task_name_width = sorted_tasks
-                .iter()
-                .map(|t| t.disambiguated_name.as_ref().unwrap_or(&t.name).len())
-                .max()
-                .unwrap_or(0)
-                .max(18);
-
             // Process each task in the section
             for task in sorted_tasks {
                 // Check for conflicts and update footnotes tracker
@@ -245,7 +245,7 @@ pub fn execute(verbose: bool) -> Result<(), String> {
                 }
 
                 // Format the task entry
-                let formatted_task = format_task_entry(task, is_ambiguous, task_name_width);
+                let formatted_task = format_task_entry(task, is_ambiguous, max_task_name_width);
                 write_line(&format!("  {}", formatted_task))?;
             }
         }
