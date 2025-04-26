@@ -516,9 +516,11 @@ mod tests {
         )
         .unwrap();
 
-        // Group tasks by runner
+        // Process the task data to group by runner
         let mut tasks_by_runner: HashMap<String, Vec<&Task>> = HashMap::new();
-        let tasks_clone = tasks.clone(); // Clone to avoid ownership issues
+        let tasks_clone = tasks.clone();
+
+        // Clone to avoid ownership issues
         for task in &tasks_clone {
             let runner_name = task.runner.short_name().to_string();
             tasks_by_runner.entry(runner_name).or_default().push(task);
@@ -531,6 +533,19 @@ mod tests {
         // Mock the task discovery
         let mut discovered_tasks = task_discovery::DiscoveredTasks::default();
         discovered_tasks.tasks = tasks;
+
+        // Calculate max task name width across all runners
+        let max_task_name_width = discovered_tasks
+            .tasks
+            .iter()
+            .map(|t| t.disambiguated_name.as_ref().unwrap_or(&t.name).len())
+            .max()
+            .unwrap_or(0)
+            .max(18); // Minimum 18 characters
+
+        // Ensure all task names will be padded to this width
+        // Round up to nearest multiple of 5 for better alignment
+        let display_width = (max_task_name_width + 4) / 5 * 5;
 
         // Process each runner
         for runner in runners {
@@ -554,20 +569,12 @@ mod tests {
                 a_name.cmp(b_name)
             });
 
-            // Calculate name width
-            let task_name_width = sorted_tasks
-                .iter()
-                .map(|t| t.disambiguated_name.as_ref().unwrap_or(&t.name).len())
-                .max()
-                .unwrap_or(0)
-                .max(18);
-
-            // Format each task
+            // Format each task using the global display width
             for task in sorted_tasks {
                 let formatted = format_task_entry(
                     task,
                     task_discovery::is_task_ambiguous(&discovered_tasks, &task.name),
-                    task_name_width,
+                    display_width,
                 );
                 writeln!(writer, "  {}", formatted).unwrap();
             }
@@ -620,6 +627,32 @@ mod tests {
         task4.disambiguated_name = Some("deploy-m".to_string());
         let formatted4 = format_task_entry(&task4, false, 18);
         assert_eq!(formatted4, "deploy-m            deploy ‡");
+
+        // Case 5: Test with long name and adaptable width
+        let task5 = create_test_task(
+            "extremely-long-task-name",
+            PathBuf::from("Makefile"),
+            TaskRunner::Make,
+        );
+        let formatted5 = format_task_entry(&task5, false, 30);
+        assert_eq!(formatted5, "extremely-long-task-name        ");
+
+        // Case 6: Verify consistent width between short and long names
+        let task6a = create_test_task("short", PathBuf::from("Makefile"), TaskRunner::Make);
+        let task6b = create_test_task(
+            "much-longer-task-name",
+            PathBuf::from("Makefile"),
+            TaskRunner::Make,
+        );
+
+        // Same width should be used for both
+        let width = 25;
+        let formatted6a = format_task_entry(&task6a, false, width);
+        let formatted6b = format_task_entry(&task6b, false, width);
+
+        // Both should have same padding length
+        assert_eq!(formatted6a, "short                      ");
+        assert_eq!(formatted6b, "much-longer-task-name      ");
     }
 
     #[test]
