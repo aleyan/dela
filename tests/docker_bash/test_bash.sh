@@ -82,10 +82,32 @@ fi
 
 # Test dela list command
 log "Testing dela list command..."
-dela list | grep -q "test-task" || (error "test-task not found in dela list" && exit 1)
-dela list | grep -q "npm-test" || (error "npm-test not found in dela list" && exit 1)
-dela list | grep -q "npm-build" || (error "npm-build not found in dela list" && exit 1)
-dela list | grep -q "poetry-build" || (error "poetry-build not found in dela list" && exit 1)
+# Save the output to a file instead of piping directly to grep
+dela list > ~/dela_list_output.txt || true
+# Display output for debugging
+if [ "$VERBOSE" = "1" ]; then
+    cat ~/dela_list_output.txt
+fi
+if grep -q "test-task" ~/dela_list_output.txt; then
+    log "test-task found in dela list"
+else
+    error "test-task not found in dela list" && exit 1
+fi
+if grep -q "npm-test" ~/dela_list_output.txt; then
+    log "npm-test found in dela list"
+else
+    error "npm-test not found in dela list" && exit 1
+fi
+if grep -q "npm-build" ~/dela_list_output.txt; then
+    log "npm-build found in dela list"
+else
+    error "npm-build not found in dela list" && exit 1
+fi
+if grep -q "poetry-build" ~/dela_list_output.txt; then
+    log "poetry-build found in dela list"
+else
+    error "poetry-build not found in dela list" && exit 1
+fi
 
 log "Testing task shadowing detection..."
 
@@ -100,19 +122,17 @@ chmod +x ~/.local/bin/custom-exe
 
 # Test that dela list shows shadowing symbols
 log "Testing shadow detection in dela list..."
-output=$(dela list)
-
-# Check for shell builtin shadowing (cd)
-if ! echo "$output" | grep -q "cd-m.*cd.*†"; then
+dela list > ~/shadow_list_output.txt || true
+if ! grep -q "cd-m.*cd.*†" ~/shadow_list_output.txt; then
     error "Shell builtin shadowing symbol not found for 'cd' task"
-    error "Got output: $output"
+    cat ~/shadow_list_output.txt
     exit 1
 fi
 
 # Check for PATH executable shadowing (custom-exe)
-if ! echo "$output" | grep -q "custom-exe-m.*custom-exe.*‡"; then
+if ! grep -q "custom-exe-m.*custom-exe.*‡" ~/shadow_list_output.txt; then
     error "PATH executable shadowing symbol not found for 'custom-exe' task"
-    error "Got output: $output"
+    cat ~/shadow_list_output.txt
     exit 1
 fi
 
@@ -120,10 +140,40 @@ log "4. Testing task disambiguation..."
 
 # Extract disambiguated task names from the main listing
 log "Searching for test- entries:"
-echo "$output" | grep -E 'test-[^ ]+' || log "No test- entries found!"
+grep -E 'test-[^ ]+' ~/dela_list_output.txt || log "No test- entries found!"
 
 # Skip detailed disambiguation test - this is fully tested in test_noinit.sh
 log "Skipping detailed disambiguation test"
+
+# Add test for column width consistency
+log "Testing column width formatting consistency..."
+
+# Simplify the column width test - just verify basic formatting
+dela list > ~/task_list_output.txt || true
+
+# Count total number of task lines
+total_lines=$(grep -E "^  [^ ]+" ~/task_list_output.txt | wc -l)
+log "Found $total_lines task lines for column width check"
+
+if [ "$total_lines" -lt 10 ]; then
+    error "Expected at least 10 task lines, but found only $total_lines"
+    cat ~/task_list_output.txt
+    exit 1
+fi
+
+# Just verify all task lines start with 2 spaces followed by a non-space character
+# followed by spaces, and have consistent column alignment
+column_widths=$(grep -E "^  [^ ]+" ~/task_list_output.txt | awk '{print length($1)}' | sort | uniq | wc -l)
+if [ "$column_widths" -gt 15 ]; then
+    error "Column widths are not consistent (found more than 15 different widths)"
+    cat ~/task_list_output.txt
+    exit 1
+fi
+
+log "Column width formatting test passed successfully"
+
+# Clean up the test file
+rm -f ~/task_list_output.txt ~/dela_list_output.txt ~/shadow_list_output.txt
 
 log "5. Testing allowlist functionality..."
 

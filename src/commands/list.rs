@@ -185,6 +185,10 @@ pub fn execute(verbose: bool) -> Result<(), String> {
             .unwrap_or(0)
             .max(18); // Minimum 18 characters
 
+        // Ensure all task names will be padded to this width
+        // Round up to nearest multiple of 5 for better alignment
+        let display_width = (max_task_name_width + 4) / 5 * 5;
+
         // Get a sorted list of runners for deterministic output
         let mut runners: Vec<String> = tasks_by_runner.keys().cloned().collect();
         runners.sort();
@@ -246,7 +250,7 @@ pub fn execute(verbose: bool) -> Result<(), String> {
                 }
 
                 // Format the task entry
-                let formatted_task = format_task_entry(task, is_ambiguous, max_task_name_width);
+                let formatted_task = format_task_entry(task, is_ambiguous, display_width);
                 write_line(&format!("  {}", formatted_task))?;
             }
         }
@@ -332,12 +336,11 @@ fn format_task_entry(task: &Task, is_ambiguous: bool, name_width: usize) -> Stri
     };
 
     // Format with fixed-width column for the task name
-    format!(
-        "{:<width$}  {}",
-        display_name,
-        description_part,
-        width = name_width
-    )
+    // Pad the display_name to ensure even column alignment
+    let padded_name = format!("{:<width$}", display_name, width = name_width);
+    
+    // Use exactly two spaces as separator
+    format!("{}  {}", padded_name, description_part)
 }
 
 #[cfg(test)]
