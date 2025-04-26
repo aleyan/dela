@@ -122,10 +122,8 @@ log "4. Testing task disambiguation..."
 log "Searching for test- entries:"
 echo "$output" | grep -E 'test-[^ ]+' || log "No test- entries found!"
 
-# Skip the disambiguation test for now
-log "Skipping task disambiguation test since it's not relevant for the column width formatting task"
-# Skip adding duplicate test tasks too
-log "Skipping addition of duplicate test tasks"
+# Skip detailed disambiguation test - this is fully tested in test_noinit.sh
+log "Skipping detailed disambiguation test"
 
 log "5. Testing allowlist functionality..."
 
@@ -246,38 +244,4 @@ fi
 
 log "All tests passed!"
 
-log "=== All tests passed successfully! ==="
-
-# Make sure this test is properly isolated from the main test flow
-function run_secondary_disambiguation_test() {
-  echo -e "\nTest 23: Testing ambiguous task detection and disambiguation in dela list"
-
-  # Create a Makefile with the 'test' task
-  cat > duplicate_test.mk << EOF
-test: ## Test task in Makefile
-	echo "Another test implementation"
-EOF
-
-  # Create a package.json with a 'test' task
-  cat > duplicate_test.json << EOF
-{
-  "name": "duplicate-test",
-  "version": "1.0.0",
-  "scripts": {
-    "test": "echo \"Duplicate test task\""
-  }
-}
-EOF
-
-  # Run 'dela list' to see what disambiguated names are being used
-  dela list > list_output.txt
-
-  # Skip detailed testing, just ensure the formatting looks good
-  echo "${GREEN}✓ Checking column width formatting in task list${NC}"
-  
-  # Clean up
-  rm -f duplicate_test.json duplicate_test.mk list_output.txt
-}
-
-# Comment out this secondary test for now since we're focusing on column widths
-# run_secondary_disambiguation_test 
+log "=== All tests passed successfully! ===" 

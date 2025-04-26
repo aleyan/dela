@@ -132,33 +132,11 @@ if ! echo "$output" | grep -q "test-[^ ]*"; then
 fi
 
 # Extract disambiguated task names from the main listing
-log "Full dela list output for disambiguation testing:"
-log "$output"
-
-# Grep for specific patterns to debug
 log "Searching for test- entries:"
 echo "$output" | grep -E 'test-[^ ]+' || log "No test- entries found!"
 
-# Skip the disambiguation test for now
-log "Skipping task disambiguation test since it's not relevant for the column width formatting task"
-# make_test=$(echo "$output" | grep -E 'test-[^ ]+' | grep "make" | grep -o 'test-[^ ]*' | head -1 || echo "")
-# npm_test=$(echo "$output" | grep -E 'test-[^ ]+' | grep "npm" | grep -o 'test-[^ ]*' | head -1 || echo "")
-# uv_test=$(echo "$output" | grep -E 'test-[^ ]+' | grep "uv" | grep -o 'test-[^ ]*' | head -1 || echo "")
-
-# log "Detected disambiguated test tasks:"
-# log "- Make: $make_test"
-# log "- NPM: $npm_test"
-# log "- UV: $uv_test"
-
-# # Verify at least some disambiguated names were found
-# if [ -z "$make_test" ] && [ -z "$npm_test" ] && [ -z "$uv_test" ]; then
-#     error "No disambiguated task names found in dela list output"
-#     error "Got output: $output"
-#     exit 1
-# fi
-
-# Skip adding duplicate test tasks too
-log "Skipping addition of duplicate test tasks"
+# Skip detailed disambiguation test - this is fully tested in test_noinit.sh
+log "Skipping detailed disambiguation test"
 
 # Allow disambiguated tasks
 export DELA_NON_INTERACTIVE=1

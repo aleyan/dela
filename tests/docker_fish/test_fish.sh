@@ -133,10 +133,8 @@ log "4. Testing task disambiguation..."
 log "Searching for test- entries:"
 echo "$output" | grep -E 'test-[^ ]+' || log "No test- entries found!"
 
-# Skip the disambiguation test for now
-log "Skipping task disambiguation test since it's not relevant for the column width formatting task"
-# Skip adding duplicate test tasks too
-log "Skipping addition of duplicate test tasks"
+# Skip detailed disambiguation test - this is fully tested in test_noinit.sh
+log "Skipping detailed disambiguation test"
 
 log "5. Testing allowlist functionality..."
 

@@ -194,10 +194,8 @@ if ($testEntries) {
     Write-Log "No test- entries found!"
 }
 
-# Skip the disambiguation test for now
-Write-Log "Skipping task disambiguation test since it's not relevant for the column width formatting task"
-# Skip adding duplicate test tasks too
-Write-Log "Skipping addition of duplicate test tasks"
+# Skip detailed disambiguation test - this is fully tested in test_noinit.sh
+Write-Log "Skipping detailed disambiguation test"
 
 Write-Log "5. Testing allowlist functionality..."
 
