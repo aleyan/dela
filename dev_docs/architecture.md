@@ -106,6 +106,10 @@ The tests for `zsh`, `bash`, `fish`, and `pwsh` tests can be run via `make tests
 
 Additionally there are integration tests called `noinit` that test dela functionality that doesn't require a shell integration, but does actually read the definition files. These can exercise the `dela` commands without mocking the file system. These tests should cover the `dela list`, `dela get-command`, `della allow-list` and other commands.
 
+Further there are `unit` integartion tests which simply runs the regular rust unit tests inside of docker, which can expose some timing issues.
+
+These can be run individually via `make test_unit` and `make test_zsh` etc, as well as all together `make tests_integration`.
+
 ---
 
 ## Future Enhancements
