@@ -97,6 +97,17 @@ At a high level, `dela` operates by intercepting commands in your shell that wou
 
 ---
 
+## Integration Tests
+
+Dela closely integrates with the shell it is running in. That means that it needs to be
+tested in the context of the shell. This is done via Dockerized shell tests.
+
+The tests for `zsh`, `bash`, `fish`, and `pwsh` tests can be run via `make tests_integration`.  These tests should cover shell impacting functionality including running `dela init`, have the `/resources` sourced into the shell, bare executions, `dr` executions, and allowlists. These tests should have direct equivalents between the 4 supported shells.
+
+Additionally there are integration tests called `noinit` that test dela functionality that doesn't require a shell integration, but does actually read the definition files. These can exercise the `dela` commands without mocking the file system. These tests should cover the `dela list`, `dela get-command`, `della allow-list` and other commands.
+
+---
+
 ## Future Enhancements
 
 ## Dockerized Testing for Shell Scripts and Shell Integration
