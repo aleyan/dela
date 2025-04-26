@@ -338,7 +338,7 @@ fn format_task_entry(task: &Task, is_ambiguous: bool, name_width: usize) -> Stri
     // Format with fixed-width column for the task name
     // Pad the display_name to ensure even column alignment
     let padded_name = format!("{:<width$}", display_name, width = name_width);
-    
+
     // Use exactly two spaces as separator
     format!("{}  {}", padded_name, description_part)
 }
