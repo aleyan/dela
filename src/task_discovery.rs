@@ -397,7 +397,7 @@ fn discover_taskfile_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Resu
 
     // Use a default path for reporting if no Taskfile was found
     let default_path = dir.join("Taskfile.yml");
-    
+
     // If a Taskfile was found, parse it
     if let Some(taskfile_path) = taskfile_path {
         let mut definition = TaskDefinitionFile {
@@ -428,7 +428,7 @@ fn discover_taskfile_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Resu
             status: TaskFileStatus::NotFound,
         });
     }
-    
+
     Ok(())
 }
 
@@ -1962,7 +1962,7 @@ jobs:
     #[test]
     fn test_discover_taskfile_variants() {
         let temp_dir = TempDir::new().unwrap();
-        
+
         // Create taskfile.yaml (lower priority than Taskfile.yml)
         let taskfile_yaml_content = r#"version: '3'
 tasks:
@@ -1974,7 +1974,7 @@ tasks:
         let taskfile_yaml_path = temp_dir.path().join("taskfile.yaml");
         let mut file = File::create(&taskfile_yaml_path).unwrap();
         write!(file, "{}", taskfile_yaml_content).unwrap();
-        
+
         // Now create Taskfile.yml (higher priority, should be used)
         let taskfile_yml_content = r#"version: '3'
 tasks:
@@ -1986,34 +1986,40 @@ tasks:
         let taskfile_yml_path = temp_dir.path().join("Taskfile.yml");
         let mut file = File::create(&taskfile_yml_path).unwrap();
         write!(file, "{}", taskfile_yml_content).unwrap();
-        
+
         // Run discovery
         let discovered = discover_tasks(temp_dir.path());
-        
+
         // Check that the taskfile status is Parsed
         let taskfile_def = discovered.definitions.taskfile.unwrap();
         assert_eq!(taskfile_def.status, TaskFileStatus::Parsed);
-        
+
         // Verify the task from Taskfile.yml exists (check by content rather than filename)
         assert_eq!(discovered.tasks.len(), 1);
         let task = discovered.tasks.first().unwrap();
         assert_eq!(task.name, "from_yml");
-        assert_eq!(task.description, Some("This task is from Taskfile.yml".to_string()));
-        
+        assert_eq!(
+            task.description,
+            Some("This task is from Taskfile.yml".to_string())
+        );
+
         // Delete the higher priority Taskfile and verify the lower priority one is used
         std::fs::remove_file(taskfile_yml_path).unwrap();
-        
+
         // Run discovery again
         let discovered = discover_tasks(temp_dir.path());
-        
+
         // Check that the taskfile status is Parsed
         let taskfile_def = discovered.definitions.taskfile.unwrap();
         assert_eq!(taskfile_def.status, TaskFileStatus::Parsed);
-        
+
         // Check the task from taskfile.yaml exists (verify by content)
         assert_eq!(discovered.tasks.len(), 1);
         let task = discovered.tasks.first().unwrap();
         assert_eq!(task.name, "from_yaml");
-        assert_eq!(task.description, Some("This task is from taskfile.yaml".to_string()));
+        assert_eq!(
+            task.description,
+            Some("This task is from taskfile.yaml".to_string())
+        );
     }
 }

@@ -19,12 +19,13 @@ struct Taskfile {
 
 /// Parse a Taskfile.yml file at the given path and extract tasks
 pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
-    let file_name = path.file_name()
+    let file_name = path
+        .file_name()
         .and_then(|n| n.to_str())
         .unwrap_or("Taskfile");
 
-    let contents =
-        std::fs::read_to_string(path).map_err(|e| format!("Failed to read {}: {}", file_name, e))?;
+    let contents = std::fs::read_to_string(path)
+        .map_err(|e| format!("Failed to read {}: {}", file_name, e))?;
 
     let taskfile: Taskfile = serde_yaml::from_str(&contents)
         .map_err(|e| format!("Failed to parse {}: {}", file_name, e))?;
@@ -36,7 +37,7 @@ pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
         if task_def.internal.unwrap_or(false) {
             continue;
         }
-        
+
         let description = task_def.desc.or_else(|| {
             task_def.cmds.as_ref().map(|cmds| {
                 if cmds.len() == 1 {
@@ -158,14 +159,14 @@ tasks:
         .unwrap();
 
         let tasks = parse(&taskfile_path).unwrap();
-        
+
         // Only 3 tasks should be returned, the 2 internal tasks should be filtered out
         assert_eq!(tasks.len(), 3);
-        
+
         // Verify that the internal tasks are not included
         assert!(tasks.iter().find(|t| t.name == "internal-task").is_none());
         assert!(tasks.iter().find(|t| t.name == "helper").is_none());
-        
+
         // Verify the normal tasks are included
         assert!(tasks.iter().find(|t| t.name == "build").is_some());
         assert!(tasks.iter().find(|t| t.name == "test").is_some());
