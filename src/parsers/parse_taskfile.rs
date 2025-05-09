@@ -18,11 +18,15 @@ struct Taskfile {
 
 /// Parse a Taskfile.yml file at the given path and extract tasks
 pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
+    let file_name = path.file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("Taskfile");
+
     let contents =
-        std::fs::read_to_string(path).map_err(|e| format!("Failed to read Taskfile.yml: {}", e))?;
+        std::fs::read_to_string(path).map_err(|e| format!("Failed to read {}: {}", file_name, e))?;
 
     let taskfile: Taskfile = serde_yaml::from_str(&contents)
-        .map_err(|e| format!("Failed to parse Taskfile.yml: {}", e))?;
+        .map_err(|e| format!("Failed to parse {}: {}", file_name, e))?;
 
     let mut tasks = Vec::new();
 
