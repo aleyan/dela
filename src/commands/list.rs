@@ -309,6 +309,15 @@ fn format_task_entry(task: &Task, is_ambiguous: bool, name_width: usize) -> Stri
         }
     }
 
+    // Function to truncate description if needed
+    let truncate_desc = |desc: &str| -> String {
+        if desc.len() <= 40 {
+            desc.to_string()
+        } else {
+            format!("{}...", &desc[0..37])
+        }
+    };
+
     // Create the task description part
     let description_part = if let Some(_) = &task.disambiguated_name {
         // For disambiguated tasks, show the original name with footnotes
@@ -320,7 +329,7 @@ fn format_task_entry(task: &Task, is_ambiguous: bool, name_width: usize) -> Stri
 
         // Add the description if available
         if let Some(desc) = &task.description {
-            format!("{} - {}", orig_with_footnotes, desc)
+            format!("{} - {}", orig_with_footnotes, truncate_desc(desc))
         } else {
             // No description, just show the original name
             orig_with_footnotes
@@ -328,7 +337,7 @@ fn format_task_entry(task: &Task, is_ambiguous: bool, name_width: usize) -> Stri
     } else {
         // For non-disambiguated tasks
         if let Some(desc) = &task.description {
-            format!("- {}", desc)
+            format!("- {}", truncate_desc(desc))
         } else {
             // No description, return empty string since we already show the task name
             String::new()
@@ -687,4 +696,48 @@ mod tests {
     // ... existing test code ...
 
     // Add remaining tests for backward compatibility
+
+    #[test]
+    fn test_truncate_long_descriptions() {
+        // Test task with a short description (should not be truncated)
+        let mut task_short = create_test_task("test", PathBuf::from("Makefile"), TaskRunner::Make);
+        task_short.description = Some("A short description".to_string());
+
+        // Test task with a long description (should be truncated)
+        let mut task_long = create_test_task("build", PathBuf::from("Makefile"), TaskRunner::Make);
+        task_long.description = Some("This is a very long description that should be truncated because it's more than 40 characters".to_string());
+
+        // Test task with a description exactly 40 characters (should not be truncated)
+        let mut task_exact = create_test_task("clean", PathBuf::from("Makefile"), TaskRunner::Make);
+        // Create a string that's exactly 40 characters
+        let exactly_40_chars = "1234567890123456789012345678901234567890";
+        assert_eq!(exactly_40_chars.len(), 40);
+        task_exact.description = Some(exactly_40_chars.to_string());
+
+        // Test formatting for each task
+        let formatted_short = format_task_entry(&task_short, false, 20);
+        let formatted_long = format_task_entry(&task_long, false, 20);
+        let formatted_exact = format_task_entry(&task_exact, false, 20);
+
+        // Print debug information
+        println!("Short formatted: '{}'", formatted_short);
+        println!("Long formatted: '{}'", formatted_long);
+        println!("Exact formatted: '{}'", formatted_exact);
+        println!(
+            "Exact description length: {}",
+            task_exact.description.as_ref().unwrap().len()
+        );
+
+        // Verify short description is not truncated
+        assert!(formatted_short.contains("A short description"));
+        assert!(!formatted_short.contains("..."));
+
+        // Verify long description is truncated with ellipsis
+        assert!(formatted_long.contains("..."));
+        assert!(!formatted_long.contains("more than 40 characters"));
+
+        // Verify border case (exactly 40 chars) is not truncated
+        assert!(formatted_exact.contains(exactly_40_chars));
+        assert!(!formatted_exact.contains("..."));
+    }
 }

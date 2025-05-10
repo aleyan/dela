@@ -8,6 +8,7 @@ struct TaskfileTask {
     desc: Option<String>,
     cmds: Option<Vec<String>>,
     deps: Option<Vec<String>>,
+    internal: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -18,15 +19,25 @@ struct Taskfile {
 
 /// Parse a Taskfile.yml file at the given path and extract tasks
 pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
-    let contents =
-        std::fs::read_to_string(path).map_err(|e| format!("Failed to read Taskfile.yml: {}", e))?;
+    let file_name = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("Taskfile");
+
+    let contents = std::fs::read_to_string(path)
+        .map_err(|e| format!("Failed to read {}: {}", file_name, e))?;
 
     let taskfile: Taskfile = serde_yaml::from_str(&contents)
-        .map_err(|e| format!("Failed to parse Taskfile.yml: {}", e))?;
+        .map_err(|e| format!("Failed to parse {}: {}", file_name, e))?;
 
     let mut tasks = Vec::new();
 
     for (name, task_def) in taskfile.tasks {
+        // Skip tasks marked as internal
+        if task_def.internal.unwrap_or(false) {
+            continue;
+        }
+
         let description = task_def.desc.or_else(|| {
             task_def.cmds.as_ref().map(|cmds| {
                 if cmds.len() == 1 {
@@ -107,5 +118,58 @@ tasks:
             Some("Clean build artifacts")
         );
         assert_eq!(clean_task.runner, TaskRunner::Task);
+    }
+
+    #[test]
+    fn test_parse_taskfile_with_internal_tasks() {
+        let temp_dir = TempDir::new().unwrap();
+        let taskfile_path = temp_dir.path().join("Taskfile.yml");
+        let mut file = File::create(&taskfile_path).unwrap();
+
+        write!(
+            file,
+            r#"
+version: '3'
+tasks:
+  build:
+    desc: Build the project
+    cmds:
+      - cargo build
+  test:
+    cmds:
+      - cargo test
+  clean:
+    desc: Clean build artifacts
+    deps:
+      - test
+    cmds:
+      - cargo clean
+  internal-task:
+    desc: This task should not be exposed
+    internal: true
+    cmds:
+      - echo "This is an internal task"
+  helper:
+    desc: Another internal task
+    internal: true
+    cmds:
+      - echo "Helper task"
+"#
+        )
+        .unwrap();
+
+        let tasks = parse(&taskfile_path).unwrap();
+
+        // Only 3 tasks should be returned, the 2 internal tasks should be filtered out
+        assert_eq!(tasks.len(), 3);
+
+        // Verify that the internal tasks are not included
+        assert!(tasks.iter().find(|t| t.name == "internal-task").is_none());
+        assert!(tasks.iter().find(|t| t.name == "helper").is_none());
+
+        // Verify the normal tasks are included
+        assert!(tasks.iter().find(|t| t.name == "build").is_some());
+        assert!(tasks.iter().find(|t| t.name == "test").is_some());
+        assert!(tasks.iter().find(|t| t.name == "clean").is_some());
     }
 }
