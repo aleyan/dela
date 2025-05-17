@@ -14,7 +14,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
     - [x] [DTKT-9] Implement `list` command structure and help text
     - [x] [DTKT-58] Implement `run` command structure and help text
     - [x] [DTKT-59] Implement `get_command` command structure and help text
-    - [ ] [DTKT-60] Add command-line options for verbosity and debug output
+    - [x] [DTKT-60] Add command-line options for verbosity and debug output
     - [x] [DTKT-61] Add `--help` text for each subcommand
     - [x] [DTKT-62] Add `--version` flag to show version information
 
@@ -34,7 +34,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [x] [DTKT-9] Ensure `dela list` shows tasks from recognized files.
   - [x] [DTKT-10] Print tasks with references to the source file.
   - [x] [DTKT-92] List which task runner will be used for each task.
-  - [ ] [DTKT-113] Indicate which commands have duplicate names.
+  - [x] [DTKT-113] Indicate which commands have duplicate names.
   - [x] [DTKT-116] Indicate when a command is missing a runner.
 
 **Deliverables**
@@ -77,13 +77,13 @@ This plan outlines the major development phases and tasks for building `dela`, a
 
 ## Phase 3: Task Execution & Workflow
 
-- [ ] **Task Execution Logic**
-  - [ ] [DTKT-18] Implement `task_execution.rs` to invoke tasks (e.g., `make <target>`, `npm run <script>`).
-  - [ ] [DTKT-94] Pass arguments after the task name to the task
-  - [ ] [DTKT-19] Handle errors if required CLI tools are missing.
-  - [ ] [DTKT-20] Implement shell environment inheritance for task execution.
-  - [ ] [DTKT-21] Support both direct execution and subshell spawning based on task type.
-  - [ ] [DTKT-22] Ensure environment variables and working directory are properly propagated.
+- [x] **Task Execution Logic**
+  - [x] [DTKT-18] Implement `task_execution.rs` to invoke tasks (e.g., `make <target>`, `npm run <script>`).
+  - [x] [DTKT-94] Pass arguments after the task name to the task
+  - [x] [DTKT-19] Handle errors if required CLI tools are missing.
+  - [x] [DTKT-20] Implement shell environment inheritance for task execution.
+  - [x] [DTKT-21] Support both direct execution and subshell spawning based on task type.
+  - [x] [DTKT-22] Ensure environment variables and working directory are properly propagated.
   - [x] [DTKT-87] Implement task runner installation detection
   - [x] [DTKT-88] Implement task runner disambiguation eg(npm vs yarn vs bun)
 
@@ -111,9 +111,9 @@ This plan outlines the major development phases and tasks for building `dela`, a
     - [x] Pass arguments correctly to disambiguated tasks
 
 **Deliverables**
-- [ ] Fully functional `dela run <task>`.
-- [ ] Automatic fallback from unrecognized commands.
-- [ ] Handling of multiple tasks with the same name.
+- [x] Fully functional `dela run <task>`.
+- [x] Automatic fallback from unrecognized commands.
+- [x] Handling of multiple tasks with the same name.
 
 ---
 
@@ -135,12 +135,12 @@ This plan outlines the major development phases and tasks for building `dela`, a
 - [x] **Runtime Checks**
   - [x] [DTKT-96] Consult allowlist before executing tasks.
   - [x] [DTKT-34] If disallowed, prompt or block execution.
-  - [ ] [DTKT-97] Add native task execution when shell integration is not detected
+  - [x] [DTKT-97] Add native task execution when shell integration is not detected
 
 **Deliverables**
 - [ ] Secure allowlist solution.
-- [ ] Integrated prompting mechanism.
-- [ ] Repeated approvals handled gracefully.
+- [x] Integrated prompting mechanism.
+- [x] Repeated approvals handled gracefully.
 
 ---
 
@@ -196,8 +196,8 @@ This plan outlines the major development phases and tasks for building `dela`, a
 
 **Deliverables**
 - [ ] Comprehensive test coverage.
-- [ ] CI/CD pipeline to automate test runs.
-- [ ] Verified cross-shell compatibility.
+- [x] CI/CD pipeline to automate test runs.
+- [x] Verified cross-shell compatibility.
 
 ---
 
