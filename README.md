@@ -1,5 +1,9 @@
 # Dela!
 
+[![CI](https://github.com/alex/dela/actions/workflows/integration.yml/badge.svg)](https://github.com/alex/dela/actions/workflows/integration.yml)
+[![Crates.io](https://img.shields.io/crates/v/dela)](https://crates.io/crates/dela)
+[![Docs.rs](https://docs.rs/dela/badge.svg)](https://docs.rs/dela)
+
 Dela is a lightweight task runner that provides discovery for task definitions in various formats, and lets you execute tasks without specifying the runner while delegating their execution to your existing tools like Make, npm, uv, and others.
 
 ## Installation
