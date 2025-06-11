@@ -1,6 +1,6 @@
 # Dela!
 
-[![CI](https://github.com/alex/dela/actions/workflows/integration.yml/badge.svg)](https://github.com/alex/dela/actions/workflows/integration.yml)
+[![CI](https://github.com/aleyan/dela/actions/workflows/integration.yml/badge.svg)](https://github.com/aleyan/dela/actions/workflows/integration.yml)
 [![Crates.io](https://img.shields.io/crates/v/dela)](https://crates.io/crates/dela)
 [![Docs.rs](https://docs.rs/dela/badge.svg)](https://docs.rs/dela)
 
