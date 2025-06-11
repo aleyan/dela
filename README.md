@@ -8,17 +8,21 @@ Dela is a lightweight task runner that provides discovery for task definitions i
 
 ## Installation
 
-You can install `dela` from crates.io. The `dela init` command will add itself to your shell and create a `.dela` directory in your home directory.
+Install `dela` from crates.io and initialize it to set up shell integration:
 
 ```sh
 $ cargo install dela
 $ dela init
 ```
 
+The `dela init` command will:
+- Add shell integration to handle "command not found" events
+- Create a `~/.dela` directory for configuration
+
 ## Usage
 
 ### Discovering tasks
-The `dela list` command will list all the tasks defined.
+List all available tasks in the current directory:
 
 ```sh
 $ dela list
@@ -43,13 +47,13 @@ Running build from ~/Projects/dela/Makefile for the first time. Allow?
 4) Deny
 ```
 
-You can also call request dela explicitly with `dr <task>`.
+You can also use `dr` to explicitly invoke `dela`:
 
 ```sh
 $ dr build
 ```
 
-If you don't have dela shell integration, you can use `dela run <task>` to run a task. This will execute the task in a subshell environment.
+Or use `dela run` for subshell execution:
 
 ```sh
 $ dela run build
@@ -79,11 +83,18 @@ Currently, `dela` supports zsh, bash, fish, and PowerShell.
 
 ### Which task runners are supported?
 
-Currently, `dela` supports Make, npm, uv, poetry, Maven, Gradle, and Github Actions.
+Currently, `dela` supports make, npm, uv, poetry, Maven, Gradle, and Github Actions.
 
 ### Which platforms are supported?
 
 Currently, `dela` supports macOS and Linux.
+
+### What is the purpose of allowlists?
+
+Allowlist are a typo protection feature, and not for security. Since dela relies on
+method missing functionality in your shell, typing a previously invalid command could
+turn into executing something unintended, which is what allowlists mean to prevent.
+When you download a repo from the internet and execute a task in it you need to be cognizant of its providence, just like you would with make or npm.
 
 ### Is dela production ready?
 
@@ -91,23 +102,18 @@ Currently, `dela` supports macOS and Linux.
 
 ## Development
 
-To use a dev version of the rust binary locally, build and install it with the following command.
+For local development:
 
 ```sh
 $ cargo install --path .
-```
-
-You can also source the shell integration directly from the `resources` directory.
-
-```sh
-$ source resources/zsh.sh
+$ source resources/zsh.sh  # or equivalent for your shell
 ```
 
 ## Testing
-Run integration tests with `dr test`, it requires `Make`, `cargo`, and `dela` to be installed.
 
+Run all tests:
 ```sh
-$ tests
+$ make tests_integration
 ```
 
 Run integrations test with `test_shells`, it requires `Make`, `Docker`, and `dela` to be installed.
@@ -115,3 +121,5 @@ Run integrations test with `test_shells`, it requires `Make`, `Docker`, and `del
 ```sh
 $ tests_integration
 ```
+
+Note: `dela` is not at 0.1 yet and its CLI is subject to change.
