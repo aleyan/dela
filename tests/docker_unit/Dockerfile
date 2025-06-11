@@ -26,6 +26,7 @@ RUN chmod -R 777 /usr/local/cargo/registry /home/testuser/target
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src
 COPY resources ./resources
+COPY README.md ./
 
 # Set ownership
 RUN chown -R testuser:testuser .

@@ -29,6 +29,7 @@ RUN mkdir -p src && \
 # Now copy the real source code
 COPY src/ ./src/
 COPY resources/ ./resources/
+COPY README.md ./
 
 # Build the project (debug mode only)
 RUN cargo build --all-features && \
