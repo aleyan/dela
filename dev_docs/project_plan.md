@@ -255,13 +255,14 @@ This plan outlines the major development phases and tasks for building `dela`, a
 
 ## Phase 9: Increase Task Runner Coverage
 
-- [ ] **Maven & Gradle Support**
+- [ ] **Additional Task Runners support**
   - [x] [DTKT-119] Implement Maven `pom.xml` parser and task discovery
   - [x] [DTKT-120] Implement Gradle `build.gradle`/`build.gradle.kts` parser
   - [x] [DTKT-121] Parse GitHub Actions workflow files to expose jobs as tasks for `act`.
-  - [ ] [DTKT-126] Implement docker compose
-  - [ ] [DTKT-127] Implement cargo build
-  - [ ] [DTKT-133] Improve Gradle task disambiguation strategy (duplicates in same file)
+  - [ ] [DTKT-126] Implement docker compose support
+
+  - [ ] [DTKT-134] Implement CMake `CMakeLists.txt` parser and task discovery
+  - [ ] [DTKT-135] Implement Travis CI `.travis.yml` parser and task discovery
 
 ## Icebox and Future Enhancements (Post-Launch)
 
@@ -270,6 +271,10 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [ ] [DTKT-132] Shell completions
 
 - [ ] **Task Runner Expansions**
+  - [ ] [DTKT-127] Implement cargo build
+  - [ ] [DTKT-133] Improve Gradle task disambiguation strategy (duplicates in same file)
+  - [ ] [DTKT-136] Implement Turborepo support
+  - [ ] [DTKT-136] Implement Rake support
   - [ ] [DTKT-122] Add Starlark parsing for Bazel
   - [ ] [DTKT-123] Implement Bazel task running.
 
