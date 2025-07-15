@@ -516,6 +516,68 @@ else
     echo "${YELLOW}⚠ No task suffix found, skipping allow-command test${NC}"
 fi
 
+# Test 26: Basic dela list for Docker Compose services
+echo "\nTest 26: Testing dela list for Docker Compose services"
+if list_and_grep "web" && list_and_grep "db" && list_and_grep "app"; then
+    echo "${GREEN}✓ dela list shows Docker Compose services${NC}"
+else
+    echo "${RED}✗ dela list failed to show Docker Compose services${NC}"
+    exit 1
+fi
+
+# Test 27: Test get-command functionality for Docker Compose
+echo "\nTest 27: Testing get-command for Docker Compose"
+output=$(dela get-command web 2>&1)
+if echo "$output" | grep -q "docker-compose run web"; then
+    echo "${GREEN}✓ get-command returns correct Docker Compose command${NC}"
+else
+    echo "${RED}✗ get-command failed for Docker Compose service${NC}"
+    echo "Full output: $output"
+    exit 1
+fi
+
+# Test 28: Test Docker Compose service descriptions
+echo "\nTest 28: Testing Docker Compose service descriptions"
+if list_and_grep "nginx:alpine" && list_and_grep "postgres:13"; then
+    echo "${GREEN}✓ Docker Compose service descriptions are correct${NC}"
+else
+    echo "${RED}✗ Docker Compose service descriptions are incorrect${NC}"
+    dela list 2>/dev/null
+    exit 1
+fi
+
+# Test 29: Test allow-command interactive functionality for Docker Compose
+echo "\nTest 29: Testing allow-command interactive functionality for Docker Compose"
+echo "Initial allowlist contents:"
+cat /home/testuser/.dela/allowlist.toml
+
+# Test interactive allow-command with option 2 (Allow this task)
+echo "\nTesting interactive allow-command with 'Allow this task' option:"
+echo "2" | dela allow-command app >/dev/null 2>&1
+
+echo "\nAllowlist contents after allow-command:"
+cat /home/testuser/.dela/allowlist.toml
+
+# Verify the allowlist was updated with the specific task
+if grep -q "app" /home/testuser/.dela/allowlist.toml; then
+    echo "${GREEN}✓ app service was added to allowlist via interactive mode${NC}"
+else
+    echo "${RED}✗ app service was not added to allowlist via interactive mode${NC}"
+    exit 1
+fi
+
+# Test 30: Test Docker Compose with arguments
+echo "\nTest 30: Testing Docker Compose with arguments"
+output=$(dela get-command app --env-file .env 2>&1)
+if echo "$output" | grep -q "docker-compose run app.*--env-file .env"; then
+    echo "${GREEN}✓ Arguments are passed through get-command for Docker Compose service${NC}"
+else
+    echo "${RED}✗ Arguments are not passed through get-command for Docker Compose service${NC}"
+    echo "Expected: docker-compose run app --env-file .env"
+    echo "Got: $output"
+    exit 1
+fi
+
 # Clean up test files
 rm -f duplicate_test.json duplicate_test.mk list_output.txt list_output_long.txt
 

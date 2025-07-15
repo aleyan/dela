@@ -407,6 +407,7 @@ mod tests {
                 TaskRunner::Maven => TaskDefinitionType::MavenPom,
                 TaskRunner::Gradle => TaskDefinitionType::Gradle,
                 TaskRunner::Act => TaskDefinitionType::GitHubActions,
+                TaskRunner::DockerCompose => TaskDefinitionType::DockerCompose,
             },
             runner,
             source_name: name.to_string(),
