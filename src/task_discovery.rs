@@ -2106,10 +2106,11 @@ services:
         assert_eq!(docker_compose_def.status, TaskFileStatus::Parsed);
         assert_eq!(docker_compose_def.path, docker_compose_path);
 
-        // Check that all services are found as tasks
-        assert_eq!(discovered.tasks.len(), 3);
+        // Check that all services are found as tasks (plus the "up" task)
+        assert_eq!(discovered.tasks.len(), 4);
 
         let service_names: Vec<&str> = discovered.tasks.iter().map(|t| t.name.as_str()).collect();
+        assert!(service_names.contains(&"up"));
         assert!(service_names.contains(&"web"));
         assert!(service_names.contains(&"db"));
         assert!(service_names.contains(&"app"));
@@ -2156,8 +2157,10 @@ services: {}
         let docker_compose_def = discovered.definitions.docker_compose.unwrap();
         assert_eq!(docker_compose_def.status, TaskFileStatus::Parsed);
 
-        // Check that no tasks are found
-        assert_eq!(discovered.tasks.len(), 0);
+        // Check that only the "up" task is found
+        assert_eq!(discovered.tasks.len(), 1);
+        let task = discovered.tasks.first().unwrap();
+        assert_eq!(task.name, "up");
     }
 
     #[test]
@@ -2198,12 +2201,15 @@ services:
         assert_eq!(docker_compose_def.status, TaskFileStatus::Parsed);
         assert_eq!(docker_compose_def.path, temp_dir.path().join("compose.yml"));
 
-        // Check that the service is found
-        assert_eq!(discovered.tasks.len(), 1);
-        let task = discovered.tasks.first().unwrap();
-        assert_eq!(task.name, "api");
-        assert_eq!(task.definition_type, TaskDefinitionType::DockerCompose);
-        assert_eq!(task.runner, TaskRunner::DockerCompose);
+        // Check that the service is found (plus the "up" task)
+        assert_eq!(discovered.tasks.len(), 2);
+        let service_names: Vec<&str> = discovered.tasks.iter().map(|t| t.name.as_str()).collect();
+        assert!(service_names.contains(&"up"));
+        assert!(service_names.contains(&"api"));
+        
+        let api_task = discovered.tasks.iter().find(|t| t.name == "api").unwrap();
+        assert_eq!(api_task.definition_type, TaskDefinitionType::DockerCompose);
+        assert_eq!(api_task.runner, TaskRunner::DockerCompose);
 
         // Now create a docker-compose.yml file (higher priority)
         let docker_compose_content = r#"
@@ -2226,9 +2232,10 @@ services:
         assert_eq!(docker_compose_def.status, TaskFileStatus::Parsed);
         assert_eq!(docker_compose_def.path, temp_dir.path().join("docker-compose.yml"));
 
-        // Check that the services from the higher priority file are found
-        assert_eq!(discovered.tasks.len(), 2);
+        // Check that the services from the higher priority file are found (plus the "up" task)
+        assert_eq!(discovered.tasks.len(), 3);
         let service_names: Vec<&str> = discovered.tasks.iter().map(|t| t.name.as_str()).collect();
+        assert!(service_names.contains(&"up"));
         assert!(service_names.contains(&"web"));
         assert!(service_names.contains(&"db"));
     }

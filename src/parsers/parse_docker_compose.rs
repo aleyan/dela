@@ -45,6 +45,18 @@ pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
 
     let mut tasks = Vec::new();
 
+    // Add "up" task to bring up all services
+    tasks.push(Task {
+        name: "up".to_string(),
+        file_path: path.clone(),
+        definition_type: TaskDefinitionType::DockerCompose,
+        runner: TaskRunner::DockerCompose,
+        source_name: "up".to_string(),
+        description: Some("Bring up all Docker Compose services".to_string()),
+        shadowed_by: None,
+        disambiguated_name: None,
+    });
+
     for (service_name, service) in docker_compose.services {
         // Create a description based on the service configuration
         let description = if let Some(image) = &service.image {
@@ -142,10 +154,11 @@ services:
         assert!(result.is_ok());
 
         let tasks = result.unwrap();
-        assert_eq!(tasks.len(), 3);
+        assert_eq!(tasks.len(), 4); // 3 services + 1 "up" task
 
         // Check that all services are found
         let service_names: Vec<&str> = tasks.iter().map(|t| t.name.as_str()).collect();
+        assert!(service_names.contains(&"up"));
         assert!(service_names.contains(&"web"));
         assert!(service_names.contains(&"db"));
         assert!(service_names.contains(&"app"));
@@ -157,6 +170,10 @@ services:
             assert_eq!(task.file_path, temp_dir.path().join("docker-compose.yml"));
             assert!(task.description.is_some());
         }
+
+        // Check that "up" task has correct description
+        let up_task = tasks.iter().find(|t| t.name == "up").unwrap();
+        assert_eq!(up_task.description.as_ref().unwrap(), "Bring up all Docker Compose services");
     }
 
     #[test]
@@ -172,7 +189,11 @@ services: {}
         assert!(result.is_ok());
 
         let tasks = result.unwrap();
-        assert_eq!(tasks.len(), 0);
+        assert_eq!(tasks.len(), 1); // Only the "up" task
+
+        // Check that "up" task is present
+        let service_names: Vec<&str> = tasks.iter().map(|t| t.name.as_str()).collect();
+        assert!(service_names.contains(&"up"));
     }
 
     #[test]
@@ -235,15 +256,18 @@ services:
         assert!(result.is_ok());
 
         let tasks = result.unwrap();
-        assert_eq!(tasks.len(), 2);
+        assert_eq!(tasks.len(), 3); // 2 services + 1 "up" task
 
         let service_names: Vec<&str> = tasks.iter().map(|t| t.name.as_str()).collect();
+        assert!(service_names.contains(&"up"));
         assert!(service_names.contains(&"app"));
         assert!(service_names.contains(&"api"));
 
         // Check that build services have appropriate descriptions
         for task in &tasks {
-            assert!(task.description.as_ref().unwrap().contains("build"));
+            if task.name != "up" {
+                assert!(task.description.as_ref().unwrap().contains("build"));
+            }
         }
     }
 
