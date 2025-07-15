@@ -107,10 +107,10 @@ pub fn find_docker_compose_files(dir: &Path) -> Vec<PathBuf> {
             .map(|e| e.path())
             .filter(|p| {
                 if let Some(fname) = p.file_name().and_then(|n| n.to_str()) {
-                    (fname.starts_with("docker-compose.")
+                    fname.starts_with("docker-compose.")
                         && (fname.ends_with(".yml") || fname.ends_with(".yaml"))
                         && fname != "docker-compose.yml"
-                        && fname != "docker-compose.yaml")
+                        && fname != "docker-compose.yaml"
                 } else {
                     false
                 }
