@@ -1,6 +1,6 @@
 use crate::parsers::{
-    parse_github_actions, parse_gradle, parse_makefile, parse_package_json, parse_pom_xml,
-    parse_pyproject_toml, parse_taskfile,
+    parse_docker_compose, parse_github_actions, parse_gradle, parse_makefile, parse_package_json,
+    parse_pom_xml, parse_pyproject_toml, parse_taskfile,
 };
 use crate::task_shadowing::check_shadowing;
 use crate::types::{Task, TaskDefinitionFile, TaskDefinitionType, TaskFileStatus, TaskRunner};
@@ -19,6 +19,7 @@ pub struct DiscoveredTaskDefinitions {
     pub maven_pom: Option<TaskDefinitionFile>,
     pub gradle: Option<TaskDefinitionFile>,
     pub github_actions: Option<TaskDefinitionFile>,
+    pub docker_compose: Option<TaskDefinitionFile>,
 }
 
 /// Result of task discovery
@@ -64,6 +65,7 @@ pub fn discover_tasks(dir: &Path) -> DiscoveredTasks {
     let _ = discover_maven_tasks(dir, &mut discovered);
     let _ = discover_gradle_tasks(dir, &mut discovered);
     let _ = discover_github_actions_tasks(dir, &mut discovered);
+    let _ = discover_docker_compose_tasks(dir, &mut discovered);
     discover_shell_script_tasks(dir, &mut discovered);
 
     // Process tasks to identify name collisions
@@ -235,6 +237,9 @@ fn set_definition(discovered: &mut DiscoveredTasks, definition: TaskDefinitionFi
         TaskDefinitionType::Gradle => discovered.definitions.gradle = Some(definition),
         TaskDefinitionType::GitHubActions => {
             discovered.definitions.github_actions = Some(definition)
+        }
+        TaskDefinitionType::DockerCompose => {
+            discovered.definitions.docker_compose = Some(definition)
         }
         _ => {}
     }
@@ -622,6 +627,49 @@ fn discover_github_actions_tasks(
             status: TaskFileStatus::Parsed,
         });
         discovered.tasks.extend(all_tasks);
+    }
+
+    Ok(())
+}
+
+fn discover_docker_compose_tasks(
+    dir: &Path,
+    discovered: &mut DiscoveredTasks,
+) -> Result<(), String> {
+    // Find all possible Docker Compose files
+    let docker_compose_files = parse_docker_compose::find_docker_compose_files(dir);
+
+    if docker_compose_files.is_empty() {
+        // No Docker Compose files found, mark as not found
+        let default_path = dir.join("docker-compose.yml");
+        discovered.definitions.docker_compose = Some(TaskDefinitionFile {
+            path: default_path,
+            definition_type: TaskDefinitionType::DockerCompose,
+            status: TaskFileStatus::NotFound,
+        });
+        return Ok(());
+    }
+
+    // Use the first found file (priority order: docker-compose.yml > docker-compose.yaml > compose.yml > compose.yaml)
+    let docker_compose_path = &docker_compose_files[0];
+
+    match parse_docker_compose::parse(docker_compose_path) {
+        Ok(tasks) => {
+            handle_discovery_success(
+                tasks,
+                docker_compose_path.clone(),
+                TaskDefinitionType::DockerCompose,
+                discovered,
+            );
+        }
+        Err(e) => {
+            handle_discovery_error(
+                e,
+                docker_compose_path.clone(),
+                TaskDefinitionType::DockerCompose,
+                discovered,
+            );
+        }
     }
 
     Ok(())
@@ -2021,5 +2069,185 @@ tasks:
             task.description,
             Some("This task is from taskfile.yaml".to_string())
         );
+    }
+
+    #[test]
+    fn test_discover_docker_compose_tasks() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create a docker-compose.yml file
+        let docker_compose_content = r#"
+version: '3.8'
+services:
+  web:
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+  db:
+    image: postgres:13
+    environment:
+      POSTGRES_DB: myapp
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+  app:
+    build: .
+    depends_on:
+      - db
+"#;
+        let docker_compose_path = temp_dir.path().join("docker-compose.yml");
+        let mut file = File::create(&docker_compose_path).unwrap();
+        write!(file, "{}", docker_compose_content).unwrap();
+
+        // Run discovery
+        let discovered = discover_tasks(temp_dir.path());
+
+        // Check that the docker-compose status is Parsed
+        let docker_compose_def = discovered.definitions.docker_compose.unwrap();
+        assert_eq!(docker_compose_def.status, TaskFileStatus::Parsed);
+        assert_eq!(docker_compose_def.path, docker_compose_path);
+
+        // Check that all services are found as tasks (plus the "up" and "down" tasks)
+        assert_eq!(discovered.tasks.len(), 5);
+
+        let service_names: Vec<&str> = discovered.tasks.iter().map(|t| t.name.as_str()).collect();
+        assert!(service_names.contains(&"up"));
+        assert!(service_names.contains(&"down"));
+        assert!(service_names.contains(&"web"));
+        assert!(service_names.contains(&"db"));
+        assert!(service_names.contains(&"app"));
+
+        // Check task properties
+        for task in &discovered.tasks {
+            assert_eq!(task.definition_type, TaskDefinitionType::DockerCompose);
+            assert_eq!(task.runner, TaskRunner::DockerCompose);
+            assert_eq!(task.file_path, docker_compose_path);
+            assert!(task.description.is_some());
+            assert!(task.shadowed_by.is_none());
+            assert!(task.disambiguated_name.is_none());
+        }
+
+        // Check specific task descriptions
+        let web_task = discovered.tasks.iter().find(|t| t.name == "web").unwrap();
+        assert!(web_task
+            .description
+            .as_ref()
+            .unwrap()
+            .contains("nginx:alpine"));
+
+        let app_task = discovered.tasks.iter().find(|t| t.name == "app").unwrap();
+        assert!(app_task.description.as_ref().unwrap().contains("build"));
+    }
+
+    #[test]
+    fn test_discover_docker_compose_empty() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create an empty docker-compose.yml file
+        let docker_compose_content = r#"
+version: '3.8'
+services: {}
+"#;
+        let docker_compose_path = temp_dir.path().join("docker-compose.yml");
+        let mut file = File::create(&docker_compose_path).unwrap();
+        write!(file, "{}", docker_compose_content).unwrap();
+
+        // Run discovery
+        let discovered = discover_tasks(temp_dir.path());
+
+        // Check that the docker-compose status is Parsed
+        let docker_compose_def = discovered.definitions.docker_compose.unwrap();
+        assert_eq!(docker_compose_def.status, TaskFileStatus::Parsed);
+
+        // Check that only the "up" and "down" tasks are found
+        assert_eq!(discovered.tasks.len(), 2);
+        let service_names: Vec<&str> = discovered.tasks.iter().map(|t| t.name.as_str()).collect();
+        assert!(service_names.contains(&"up"));
+        assert!(service_names.contains(&"down"));
+    }
+
+    #[test]
+    fn test_discover_docker_compose_missing_file() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Run discovery without docker-compose.yml
+        let discovered = discover_tasks(temp_dir.path());
+
+        // Check that the docker-compose status is NotFound
+        let docker_compose_def = discovered.definitions.docker_compose.unwrap();
+        assert_eq!(docker_compose_def.status, TaskFileStatus::NotFound);
+
+        // Check that no tasks are found
+        assert_eq!(discovered.tasks.len(), 0);
+    }
+
+    #[test]
+    fn test_discover_docker_compose_multiple_formats() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create a compose.yml file (lower priority)
+        let compose_content = r#"
+version: '3.8'
+services:
+  api:
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+"#;
+        std::fs::write(temp_dir.path().join("compose.yml"), compose_content).unwrap();
+
+        // Run discovery
+        let discovered = discover_tasks(temp_dir.path());
+
+        // Check that the docker-compose status is Parsed
+        let docker_compose_def = discovered.definitions.docker_compose.unwrap();
+        assert_eq!(docker_compose_def.status, TaskFileStatus::Parsed);
+        assert_eq!(docker_compose_def.path, temp_dir.path().join("compose.yml"));
+
+        // Check that the service is found (plus the "up" and "down" tasks)
+        assert_eq!(discovered.tasks.len(), 3);
+        let service_names: Vec<&str> = discovered.tasks.iter().map(|t| t.name.as_str()).collect();
+        assert!(service_names.contains(&"up"));
+        assert!(service_names.contains(&"down"));
+        assert!(service_names.contains(&"api"));
+
+        let api_task = discovered.tasks.iter().find(|t| t.name == "api").unwrap();
+        assert_eq!(api_task.definition_type, TaskDefinitionType::DockerCompose);
+        assert_eq!(api_task.runner, TaskRunner::DockerCompose);
+
+        // Now create a docker-compose.yml file (higher priority)
+        let docker_compose_content = r#"
+version: '3.8'
+services:
+  web:
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+  db:
+    image: postgres:13
+"#;
+        std::fs::write(
+            temp_dir.path().join("docker-compose.yml"),
+            docker_compose_content,
+        )
+        .unwrap();
+
+        // Run discovery again
+        let discovered = discover_tasks(temp_dir.path());
+
+        // Check that the higher priority file is used
+        let docker_compose_def = discovered.definitions.docker_compose.unwrap();
+        assert_eq!(docker_compose_def.status, TaskFileStatus::Parsed);
+        assert_eq!(
+            docker_compose_def.path,
+            temp_dir.path().join("docker-compose.yml")
+        );
+
+        // Check that the services from the higher priority file are found (plus the "up" and "down" tasks)
+        assert_eq!(discovered.tasks.len(), 4);
+        let service_names: Vec<&str> = discovered.tasks.iter().map(|t| t.name.as_str()).collect();
+        assert!(service_names.contains(&"up"));
+        assert!(service_names.contains(&"down"));
+        assert!(service_names.contains(&"web"));
+        assert!(service_names.contains(&"db"));
     }
 }

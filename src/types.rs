@@ -29,6 +29,8 @@ pub enum TaskDefinitionType {
     Gradle,
     /// GitHub Actions workflow files
     GitHubActions,
+    /// Docker Compose files
+    DockerCompose,
 }
 
 /// Different types of task runners supported by dela.
@@ -75,6 +77,9 @@ pub enum TaskRunner {
     /// Act task runner for GitHub Actions
     /// Used for running GitHub Actions workflows locally
     Act,
+    /// Docker Compose task runner
+    /// Used when docker-compose.yml is present
+    DockerCompose,
 }
 
 /// Status of a task definition file
@@ -122,6 +127,8 @@ pub struct DiscoveredTaskDefinitions {
     pub gradle: Option<TaskDefinitionFile>,
     /// GitHub Actions workflow files if found
     pub github_actions: Option<TaskDefinitionFile>,
+    /// Docker Compose files if found
+    pub docker_compose: Option<TaskDefinitionFile>,
 }
 
 /// Represents a discovered task that can be executed
@@ -162,6 +169,15 @@ impl TaskRunner {
             TaskRunner::Maven => format!("mvn {}", task.source_name),
             TaskRunner::Gradle => format!("gradle {}", task.source_name),
             TaskRunner::Act => format!("act -W {}", task.file_path.display()),
+            TaskRunner::DockerCompose => {
+                if task.source_name == "up" {
+                    "docker compose up".to_string()
+                } else if task.source_name == "down" {
+                    "docker compose down".to_string()
+                } else {
+                    format!("docker compose run {}", task.source_name)
+                }
+            }
         }
     }
 
@@ -181,6 +197,7 @@ impl TaskRunner {
             TaskRunner::Maven => "mvn",
             TaskRunner::Gradle => "gradle",
             TaskRunner::Act => "act",
+            TaskRunner::DockerCompose => "docker compose",
         }
     }
 }

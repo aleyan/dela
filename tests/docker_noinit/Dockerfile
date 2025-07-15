@@ -16,7 +16,8 @@ RUN apk add --no-cache \
     npm \
     task \
     maven \
-    gradle
+    gradle \
+    docker-cli
 
 # Install act (GitHub Actions runner)
 # TODO: Get act from the package manager, once it is in a non-edge alpine release.
@@ -61,6 +62,9 @@ COPY tests/task_definitions/build.gradle /home/testuser/test_project/
 COPY tests/task_definitions/build.gradle.kts /home/testuser/test_project/
 # Copy GitHub Actions workflow files
 COPY tests/task_definitions/github_actions/.github /home/testuser/test_project/.github
+# Copy Docker Compose files
+COPY tests/task_definitions/docker-compose.yml /home/testuser/test_project/
+COPY tests/task_definitions/compose.yml /home/testuser/test_project/
 RUN chown -R testuser:testuser /home/testuser/test_project
 
 # Copy the compiled binary from the builder stage

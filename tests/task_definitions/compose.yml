@@ -1,0 +1,22 @@
+version: '3.8'
+services:
+  api:
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+    environment:
+      NGINX_HOST: localhost
+      NGINX_PORT: 80
+  cache:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+  worker:
+    build: ./worker
+    depends_on:
+      - cache
+    environment:
+      REDIS_URL: redis://cache:6379
+
+volumes:
+  redis_data: 

@@ -1,0 +1,40 @@
+version: '3.8'
+services:
+  web:
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+    environment:
+      NGINX_HOST: localhost
+      NGINX_PORT: 80
+  db:
+    image: postgres:13
+    environment:
+      POSTGRES_DB: testdb
+      POSTGRES_USER: testuser
+      POSTGRES_PASSWORD: testpass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgresql://testuser:testpass@db:5432/testdb
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+  worker:
+    build: ./worker
+    depends_on:
+      - db
+      - redis
+    environment:
+      DATABASE_URL: postgresql://testuser:testpass@db:5432/testdb
+      REDIS_URL: redis://redis:6379
+
+volumes:
+  postgres_data: 

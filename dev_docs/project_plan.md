@@ -259,7 +259,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [x] [DTKT-119] Implement Maven `pom.xml` parser and task discovery
   - [x] [DTKT-120] Implement Gradle `build.gradle`/`build.gradle.kts` parser
   - [x] [DTKT-121] Parse GitHub Actions workflow files to expose jobs as tasks for `act`.
-  - [ ] [DTKT-126] Implement docker compose support
+  - [x] [DTKT-126] Implement docker compose support
 
   - [ ] [DTKT-134] Implement CMake `CMakeLists.txt` parser and task discovery
   - [ ] [DTKT-135] Implement Travis CI `.travis.yml` parser and task discovery
