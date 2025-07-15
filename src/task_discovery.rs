@@ -638,7 +638,7 @@ fn discover_docker_compose_tasks(
 ) -> Result<(), String> {
     // Find all possible Docker Compose files
     let docker_compose_files = parse_docker_compose::find_docker_compose_files(dir);
-    
+
     if docker_compose_files.is_empty() {
         // No Docker Compose files found, mark as not found
         let default_path = dir.join("docker-compose.yml");
@@ -2206,7 +2206,7 @@ services:
         let service_names: Vec<&str> = discovered.tasks.iter().map(|t| t.name.as_str()).collect();
         assert!(service_names.contains(&"up"));
         assert!(service_names.contains(&"api"));
-        
+
         let api_task = discovered.tasks.iter().find(|t| t.name == "api").unwrap();
         assert_eq!(api_task.definition_type, TaskDefinitionType::DockerCompose);
         assert_eq!(api_task.runner, TaskRunner::DockerCompose);
@@ -2222,7 +2222,11 @@ services:
   db:
     image: postgres:13
 "#;
-        std::fs::write(temp_dir.path().join("docker-compose.yml"), docker_compose_content).unwrap();
+        std::fs::write(
+            temp_dir.path().join("docker-compose.yml"),
+            docker_compose_content,
+        )
+        .unwrap();
 
         // Run discovery again
         let discovered = discover_tasks(temp_dir.path());
@@ -2230,7 +2234,10 @@ services:
         // Check that the higher priority file is used
         let docker_compose_def = discovered.definitions.docker_compose.unwrap();
         assert_eq!(docker_compose_def.status, TaskFileStatus::Parsed);
-        assert_eq!(docker_compose_def.path, temp_dir.path().join("docker-compose.yml"));
+        assert_eq!(
+            docker_compose_def.path,
+            temp_dir.path().join("docker-compose.yml")
+        );
 
         // Check that the services from the higher priority file are found (plus the "up" task)
         assert_eq!(discovered.tasks.len(), 3);
