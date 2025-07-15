@@ -172,6 +172,8 @@ impl TaskRunner {
             TaskRunner::DockerCompose => {
                 if task.source_name == "up" {
                     "docker compose up".to_string()
+                } else if task.source_name == "down" {
+                    "docker compose down".to_string()
                 } else {
                     format!("docker compose run {}", task.source_name)
                 }

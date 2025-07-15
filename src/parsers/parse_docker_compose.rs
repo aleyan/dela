@@ -57,6 +57,18 @@ pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
         disambiguated_name: None,
     });
 
+    // Add "down" task to bring down all services
+    tasks.push(Task {
+        name: "down".to_string(),
+        file_path: path.clone(),
+        definition_type: TaskDefinitionType::DockerCompose,
+        runner: TaskRunner::DockerCompose,
+        source_name: "down".to_string(),
+        description: Some("Bring down all Docker Compose services".to_string()),
+        shadowed_by: None,
+        disambiguated_name: None,
+    });
+
     for (service_name, service) in docker_compose.services {
         // Create a description based on the service configuration
         let description = if let Some(image) = &service.image {
@@ -160,11 +172,12 @@ services:
         assert!(result.is_ok());
 
         let tasks = result.unwrap();
-        assert_eq!(tasks.len(), 4); // 3 services + 1 "up" task
+        assert_eq!(tasks.len(), 5); // 3 services + "up" + "down" tasks
 
         // Check that all services are found
         let service_names: Vec<&str> = tasks.iter().map(|t| t.name.as_str()).collect();
         assert!(service_names.contains(&"up"));
+        assert!(service_names.contains(&"down"));
         assert!(service_names.contains(&"web"));
         assert!(service_names.contains(&"db"));
         assert!(service_names.contains(&"app"));
@@ -183,6 +196,23 @@ services:
             up_task.description.as_ref().unwrap(),
             "Bring up all Docker Compose services"
         );
+        // Check that "down" task has correct description
+        let down_task = tasks.iter().find(|t| t.name == "down").unwrap();
+        assert_eq!(
+            down_task.description.as_ref().unwrap(),
+            "Bring down all Docker Compose services"
+        );
+
+        // Check specific task descriptions
+        let web_task = tasks.iter().find(|t| t.name == "web").unwrap();
+        assert!(web_task
+            .description
+            .as_ref()
+            .unwrap()
+            .contains("nginx:alpine"));
+
+        let app_task = tasks.iter().find(|t| t.name == "app").unwrap();
+        assert!(app_task.description.as_ref().unwrap().contains("build"));
     }
 
     #[test]
@@ -198,11 +228,12 @@ services: {}
         assert!(result.is_ok());
 
         let tasks = result.unwrap();
-        assert_eq!(tasks.len(), 1); // Only the "up" task
+        assert_eq!(tasks.len(), 2); // "up" and "down" tasks
 
-        // Check that "up" task is present
+        // Check that "up" and "down" tasks are present
         let service_names: Vec<&str> = tasks.iter().map(|t| t.name.as_str()).collect();
         assert!(service_names.contains(&"up"));
+        assert!(service_names.contains(&"down"));
     }
 
     #[test]
@@ -265,16 +296,17 @@ services:
         assert!(result.is_ok());
 
         let tasks = result.unwrap();
-        assert_eq!(tasks.len(), 3); // 2 services + 1 "up" task
+        assert_eq!(tasks.len(), 4); // 2 services + "up" + "down" tasks
 
         let service_names: Vec<&str> = tasks.iter().map(|t| t.name.as_str()).collect();
         assert!(service_names.contains(&"up"));
+        assert!(service_names.contains(&"down"));
         assert!(service_names.contains(&"app"));
         assert!(service_names.contains(&"api"));
 
         // Check that build services have appropriate descriptions
         for task in &tasks {
-            if task.name != "up" {
+            if task.name != "up" && task.name != "down" {
                 assert!(task.description.as_ref().unwrap().contains("build"));
             }
         }
