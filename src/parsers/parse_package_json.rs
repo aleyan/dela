@@ -116,6 +116,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_parse_package_json_no_scripts() {
         let temp_dir = TempDir::new().unwrap();
         let package_json_path = temp_dir.path().join("package.json");
@@ -143,6 +144,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_parse_package_json_no_package_manager() {
         env::set_var("MOCK_NO_PM", "1");
         let temp_dir = TempDir::new().unwrap();
