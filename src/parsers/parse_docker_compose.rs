@@ -1,7 +1,8 @@
 use crate::types::{Task, TaskDefinitionType, TaskRunner};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::fs;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct DockerComposeService {
@@ -67,6 +68,41 @@ pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
     }
 
     Ok(tasks)
+}
+
+/// Find Docker Compose files in the given directory, including profile files
+pub fn find_docker_compose_files(dir: &Path) -> Vec<PathBuf> {
+    let mut found_files = Vec::new();
+
+    // 1. Add base files first (highest priority)
+    let base_files = ["docker-compose.yml", "docker-compose.yaml", "compose.yml", "compose.yaml"];
+    for filename in &base_files {
+        let path = dir.join(filename);
+        if path.exists() {
+            found_files.push(path);
+        }
+    }
+
+    // 2. Add docker-compose.<profile>.yml and .yaml files (excluding the base files)
+    if let Ok(entries) = fs::read_dir(dir) {
+        let mut profile_files: Vec<PathBuf> = entries
+            .filter_map(|e| e.ok())
+            .map(|e| e.path())
+            .filter(|p| {
+                if let Some(fname) = p.file_name().and_then(|n| n.to_str()) {
+                    (fname.starts_with("docker-compose.") &&
+                        (fname.ends_with(".yml") || fname.ends_with(".yaml")) &&
+                        fname != "docker-compose.yml" && fname != "docker-compose.yaml")
+                } else {
+                    false
+                }
+            })
+            .collect();
+        profile_files.sort(); // Lexicographical order
+        found_files.extend(profile_files);
+    }
+
+    found_files
 }
 
 #[cfg(test)]
@@ -209,5 +245,76 @@ services:
         for task in &tasks {
             assert!(task.description.as_ref().unwrap().contains("build"));
         }
+    }
+
+    #[test]
+    fn test_find_docker_compose_files() {
+        let temp_dir = TempDir::new().unwrap();
+        
+        // Create multiple Docker Compose files
+        std::fs::write(temp_dir.path().join("docker-compose.yml"), "version: '3.8'\nservices: {}").unwrap();
+        std::fs::write(temp_dir.path().join("docker-compose.yaml"), "version: '3.8'\nservices: {}").unwrap();
+        std::fs::write(temp_dir.path().join("compose.yml"), "version: '3.8'\nservices: {}").unwrap();
+        std::fs::write(temp_dir.path().join("compose.yaml"), "version: '3.8'\nservices: {}").unwrap();
+
+        let found_files = find_docker_compose_files(temp_dir.path());
+        assert_eq!(found_files.len(), 4);
+
+        // Check that files are found in priority order
+        let file_names: Vec<String> = found_files.iter()
+            .map(|p| p.file_name().unwrap().to_string_lossy().to_string())
+            .collect();
+        
+        assert!(file_names.contains(&"docker-compose.yml".to_string()));
+        assert!(file_names.contains(&"docker-compose.yaml".to_string()));
+        assert!(file_names.contains(&"compose.yml".to_string()));
+        assert!(file_names.contains(&"compose.yaml".to_string()));
+    }
+
+    #[test]
+    fn test_find_docker_compose_files_empty_directory() {
+        let temp_dir = TempDir::new().unwrap();
+        
+        let found_files = find_docker_compose_files(temp_dir.path());
+        assert_eq!(found_files.len(), 0);
+    }
+
+    #[test]
+    fn test_find_docker_compose_files_priority_order() {
+        let temp_dir = TempDir::new().unwrap();
+        
+        // Create files in reverse priority order
+        std::fs::write(temp_dir.path().join("compose.yaml"), "version: '3.8'\nservices: {}").unwrap();
+        std::fs::write(temp_dir.path().join("compose.yml"), "version: '3.8'\nservices: {}").unwrap();
+        std::fs::write(temp_dir.path().join("docker-compose.yaml"), "version: '3.8'\nservices: {}").unwrap();
+        std::fs::write(temp_dir.path().join("docker-compose.yml"), "version: '3.8'\nservices: {}").unwrap();
+
+        let found_files = find_docker_compose_files(temp_dir.path());
+        assert_eq!(found_files.len(), 4);
+
+        // The first file should be docker-compose.yml (highest priority)
+        let first_file = found_files[0].file_name().unwrap().to_string_lossy();
+        assert_eq!(first_file, "docker-compose.yml");
+    }
+
+    #[test]
+    fn test_find_docker_compose_profile_files() {
+        let temp_dir = TempDir::new().unwrap();
+        // Create base and profile files
+        std::fs::write(temp_dir.path().join("docker-compose.yml"), "version: '3.8'\nservices: {}").unwrap();
+        std::fs::write(temp_dir.path().join("docker-compose.dev.yml"), "version: '3.8'\nservices: {}").unwrap();
+        std::fs::write(temp_dir.path().join("docker-compose.prod.yaml"), "version: '3.8'\nservices: {}").unwrap();
+        std::fs::write(temp_dir.path().join("docker-compose.test.yml"), "version: '3.8'\nservices: {}").unwrap();
+        std::fs::write(temp_dir.path().join("compose.yml"), "version: '3.8'\nservices: {}").unwrap();
+
+        let found_files = find_docker_compose_files(temp_dir.path());
+        let file_names: Vec<String> = found_files.iter().map(|p| p.file_name().unwrap().to_string_lossy().to_string()).collect();
+        // Base files first
+        assert_eq!(file_names[0], "docker-compose.yml");
+        assert_eq!(file_names[1], "compose.yml");
+        // Profile files in lex order
+        assert_eq!(file_names[2], "docker-compose.dev.yml");
+        assert_eq!(file_names[3], "docker-compose.prod.yaml");
+        assert_eq!(file_names[4], "docker-compose.test.yml");
     }
 }

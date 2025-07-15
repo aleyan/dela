@@ -528,7 +528,7 @@ fi
 # Test 27: Test get-command functionality for Docker Compose
 echo "\nTest 27: Testing get-command for Docker Compose"
 output=$(dela get-command web 2>&1)
-if echo "$output" | grep -q "docker-compose run web"; then
+if echo "$output" | grep -q "docker compose run web"; then
     echo "${GREEN}✓ get-command returns correct Docker Compose command${NC}"
 else
     echo "${RED}✗ get-command failed for Docker Compose service${NC}"
@@ -569,11 +569,11 @@ fi
 # Test 30: Test Docker Compose with arguments
 echo "\nTest 30: Testing Docker Compose with arguments"
 output=$(dela get-command app --env-file .env 2>&1)
-if echo "$output" | grep -q "docker-compose run app.*--env-file .env"; then
+if echo "$output" | grep -q "docker compose run app.*--env-file .env"; then
     echo "${GREEN}✓ Arguments are passed through get-command for Docker Compose service${NC}"
 else
     echo "${RED}✗ Arguments are not passed through get-command for Docker Compose service${NC}"
-    echo "Expected: docker-compose run app --env-file .env"
+    echo "Expected: docker compose run app --env-file .env"
     echo "Got: $output"
     exit 1
 fi

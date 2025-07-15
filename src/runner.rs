@@ -23,7 +23,7 @@ pub fn is_runner_available(runner: &TaskRunner) -> bool {
                 || check_path_executable("./gradlew").is_some()
         }
         TaskRunner::Act => check_path_executable("act").is_some(),
-        TaskRunner::DockerCompose => check_path_executable("docker-compose").is_some(),
+        TaskRunner::DockerCompose => check_path_executable("docker").is_some(),
     }
 }
 
@@ -184,7 +184,7 @@ mod tests {
         // Set up test environment with docker-compose
         reset_mock();
         enable_mock();
-        let env = TestEnvironment::new().with_executable("docker-compose");
+        let env = TestEnvironment::new().with_executable("docker");
         set_test_environment(env);
 
         // Docker Compose should be available

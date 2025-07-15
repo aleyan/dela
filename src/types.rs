@@ -169,7 +169,7 @@ impl TaskRunner {
             TaskRunner::Maven => format!("mvn {}", task.source_name),
             TaskRunner::Gradle => format!("gradle {}", task.source_name),
             TaskRunner::Act => format!("act -W {}", task.file_path.display()),
-            TaskRunner::DockerCompose => format!("docker-compose run {}", task.source_name),
+            TaskRunner::DockerCompose => format!("docker compose run {}", task.source_name),
         }
     }
 
@@ -189,7 +189,7 @@ impl TaskRunner {
             TaskRunner::Maven => "mvn",
             TaskRunner::Gradle => "gradle",
             TaskRunner::Act => "act",
-            TaskRunner::DockerCompose => "docker-compose",
+            TaskRunner::DockerCompose => "docker compose",
         }
     }
 }
