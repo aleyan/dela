@@ -1,6 +1,6 @@
 use crate::parsers::{
-    parse_github_actions, parse_gradle, parse_makefile, parse_package_json, parse_pom_xml,
-    parse_pyproject_toml, parse_taskfile, parse_docker_compose,
+    parse_docker_compose, parse_github_actions, parse_gradle, parse_makefile, parse_package_json,
+    parse_pom_xml, parse_pyproject_toml, parse_taskfile,
 };
 use crate::task_shadowing::check_shadowing;
 use crate::types::{Task, TaskDefinitionFile, TaskDefinitionType, TaskFileStatus, TaskRunner};
@@ -632,7 +632,10 @@ fn discover_github_actions_tasks(
     Ok(())
 }
 
-fn discover_docker_compose_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<(), String> {
+fn discover_docker_compose_tasks(
+    dir: &Path,
+    discovered: &mut DiscoveredTasks,
+) -> Result<(), String> {
     let docker_compose_path = dir.join("docker-compose.yml");
     if !docker_compose_path.exists() {
         discovered.definitions.docker_compose = Some(TaskDefinitionFile {
@@ -653,7 +656,12 @@ fn discover_docker_compose_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -
             );
         }
         Err(e) => {
-            handle_discovery_error(e, docker_compose_path, TaskDefinitionType::DockerCompose, discovered);
+            handle_discovery_error(
+                e,
+                docker_compose_path,
+                TaskDefinitionType::DockerCompose,
+                discovered,
+            );
         }
     }
 
@@ -2111,7 +2119,11 @@ services:
 
         // Check specific task descriptions
         let web_task = discovered.tasks.iter().find(|t| t.name == "web").unwrap();
-        assert!(web_task.description.as_ref().unwrap().contains("nginx:alpine"));
+        assert!(web_task
+            .description
+            .as_ref()
+            .unwrap()
+            .contains("nginx:alpine"));
 
         let app_task = discovered.tasks.iter().find(|t| t.name == "app").unwrap();
         assert!(app_task.description.as_ref().unwrap().contains("build"));

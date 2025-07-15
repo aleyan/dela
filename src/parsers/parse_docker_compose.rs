@@ -72,8 +72,8 @@ pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::TempDir;
     use std::path::Path;
+    use tempfile::TempDir;
 
     fn create_test_docker_compose(dir: &Path, content: &str) {
         std::fs::write(dir.join("docker-compose.yml"), content).unwrap();
@@ -210,4 +210,4 @@ services:
             assert!(task.description.as_ref().unwrap().contains("build"));
         }
     }
-} 
+}
