@@ -30,7 +30,10 @@ pub fn execute(verbose: bool) -> Result<(), String> {
                     test_println!("  {} Makefile: Found and parsed", "✓".green());
                 }
                 TaskFileStatus::NotImplemented => {
-                    test_println!("  {} Makefile: Found but parsing not yet implemented", "!".yellow());
+                    test_println!(
+                        "  {} Makefile: Found but parsing not yet implemented",
+                        "!".yellow()
+                    );
                 }
                 TaskFileStatus::ParseError(_e) => {
                     test_println!("  {} Makefile: Error parsing: {}", "✗".red(), _e);
@@ -49,7 +52,10 @@ pub fn execute(verbose: bool) -> Result<(), String> {
                     test_println!("  {} package.json: Found and parsed", "✓".green());
                 }
                 TaskFileStatus::NotImplemented => {
-                    test_println!("  {} package.json: Found but parsing not yet implemented", "!".yellow());
+                    test_println!(
+                        "  {} package.json: Found but parsing not yet implemented",
+                        "!".yellow()
+                    );
                 }
                 TaskFileStatus::ParseError(_e) => {
                     test_println!("  {} package.json: Error parsing: {}", "✗".red(), _e);
@@ -68,7 +74,10 @@ pub fn execute(verbose: bool) -> Result<(), String> {
                     test_println!("  {} pyproject.toml: Found and parsed", "✓".green());
                 }
                 TaskFileStatus::NotImplemented => {
-                    test_println!("  {} pyproject.toml: Found but parsing not yet implemented", "!".yellow());
+                    test_println!(
+                        "  {} pyproject.toml: Found but parsing not yet implemented",
+                        "!".yellow()
+                    );
                 }
                 TaskFileStatus::ParseError(_e) => {
                     test_println!("  {} pyproject.toml: Error parsing: {}", "✗".red(), _e);
@@ -87,7 +96,10 @@ pub fn execute(verbose: bool) -> Result<(), String> {
                     test_println!("  {} pom.xml: Found and parsed", "✓".green());
                 }
                 TaskFileStatus::NotImplemented => {
-                    test_println!("  {} pom.xml: Found but parsing not yet implemented", "!".yellow());
+                    test_println!(
+                        "  {} pom.xml: Found but parsing not yet implemented",
+                        "!".yellow()
+                    );
                 }
                 TaskFileStatus::ParseError(_e) => {
                     test_println!("  {} pom.xml: Error parsing: {}", "✗".red(), _e);
@@ -116,7 +128,11 @@ pub fn execute(verbose: bool) -> Result<(), String> {
                         .file_name()
                         .unwrap_or_default()
                         .to_string_lossy();
-                    test_println!("  {} {}: Found but parsing not yet implemented", "!".yellow(), _file_name);
+                    test_println!(
+                        "  {} {}: Found but parsing not yet implemented",
+                        "!".yellow(),
+                        _file_name
+                    );
                 }
                 TaskFileStatus::ParseError(_e) => {
                     let _file_name = gradle
@@ -168,7 +184,10 @@ pub fn execute(verbose: bool) -> Result<(), String> {
     used_footnotes.insert('‖', false); // conflicts with task from another tool
 
     if tasks_by_runner.is_empty() {
-        write_line(&format!("{}", "No tasks found in the current directory.".yellow()))?;
+        write_line(&format!(
+            "{}",
+            "No tasks found in the current directory.".yellow()
+        ))?;
     } else {
         // Collect file paths for each runner for reference
         let mut runner_files: HashMap<String, String> = HashMap::new();
@@ -208,11 +227,12 @@ pub fn execute(verbose: bool) -> Result<(), String> {
 
             // Add missing runner indicator if needed
             let tool_not_installed = !is_runner_available(&sorted_tasks[0].runner);
-            let runner_indicator = if tool_not_installed {
+            let runner_name = runner.clone();
+            let runner_footnote = if tool_not_installed {
                 used_footnotes.insert('*', true);
-                format!("{}*", runner)
+                Some("*".yellow())
             } else {
-                runner.clone()
+                None
             };
 
             // Get file path for this runner
@@ -225,15 +245,16 @@ pub fn execute(verbose: bool) -> Result<(), String> {
 
             // Write section header
             let colored_runner = if tool_not_installed {
-                runner_indicator.red()
+                runner_name.dimmed().red()
             } else {
-                runner_indicator.cyan()
+                runner_name.cyan()
             };
-            write_line(&format!(
-                "\n{} — {}",
-                colored_runner,
-                file_name.dimmed()
-            ))?;
+            let runner_header = if let Some(footnote) = runner_footnote {
+                format!("{} {}", colored_runner, footnote)
+            } else {
+                format!("{}", colored_runner)
+            };
+            write_line(&format!("\n{} — {}", runner_header, file_name.dimmed()))?;
 
             // Process each task in the section
             for task in sorted_tasks {
@@ -278,7 +299,11 @@ pub fn execute(verbose: bool) -> Result<(), String> {
         if !footnotes.is_empty() {
             write_line(&format!("\n{}", "footnotes legend:".dimmed()))?;
             for (symbol, description) in footnotes {
-                write_line(&format!("{} {}", symbol.to_string().yellow(), description.dimmed()))?;
+                write_line(&format!(
+                    "{} {}",
+                    symbol.to_string().yellow(),
+                    description.dimmed()
+                ))?;
             }
         }
     }
