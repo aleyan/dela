@@ -666,6 +666,11 @@ mod tests {
     #[serial]
     fn test_task_entry_formatting() {
         use crate::types::{Task, TaskDefinitionType, TaskRunner};
+        
+        // Force colors in test environment
+        std::env::set_var("NO_COLOR", "");
+        std::env::set_var("FORCE_COLOR", "1");
+        
         let task = Task {
             name: "build".to_string(),
             file_path: std::path::PathBuf::from("Makefile"),
@@ -677,6 +682,11 @@ mod tests {
             disambiguated_name: None,
         };
         let formatted = super::format_task_entry(&task, false, 18);
+        
+        // Debug: Print the formatted output and its bytes
+        println!("Formatted output: '{}'", formatted);
+        println!("Formatted bytes: {:?}", formatted.as_bytes());
+        
         // The output should include green for the task name and white for the description
         assert!(formatted.contains("\u{1b}[32m")); // green
         assert!(formatted.contains("\u{1b}[37m")); // white
