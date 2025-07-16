@@ -11,3 +11,4 @@ pub mod runners;
 pub mod task_discovery;
 pub mod task_shadowing;
 pub mod types;
+pub mod colors;

@@ -2,7 +2,7 @@ use crate::runner::is_runner_available;
 use crate::task_discovery;
 use crate::types::ShadowType;
 use crate::types::{Task, TaskFileStatus};
-use colored::*;
+use colored::Colorize;
 use std::collections::HashMap;
 use std::env;
 use std::io::Write;
@@ -227,12 +227,11 @@ pub fn execute(verbose: bool) -> Result<(), String> {
             let colored_runner = if tool_not_installed {
                 runner_indicator.red()
             } else {
-                runner_indicator.cyan().bold()
+                runner_indicator.cyan()
             };
             write_line(&format!(
-                "\n{} ({}) — {}",
+                "\n{} — {}",
                 colored_runner,
-                sorted_tasks.len().to_string().blue(),
                 file_name.dimmed()
             ))?;
 
@@ -279,7 +278,7 @@ pub fn execute(verbose: bool) -> Result<(), String> {
         if !footnotes.is_empty() {
             write_line(&format!("\n{}", "footnotes legend:".dimmed()))?;
             for (symbol, description) in footnotes {
-                write_line(&format!("{} {}", symbol.to_string().red().bold(), description.dimmed()))?;
+                write_line(&format!("{} {}", symbol.to_string().yellow(), description.dimmed()))?;
             }
         }
     }
@@ -328,9 +327,9 @@ fn format_task_entry(task: &Task, is_ambiguous: bool, name_width: usize) -> Stri
     let description_part = if let Some(_) = &task.disambiguated_name {
         // For disambiguated tasks, show the original name with footnotes
         let orig_with_footnotes = if !footnotes.is_empty() {
-            format!("{} {}", task.name, footnotes.red().bold())
+            format!("{} {}", task.name.dimmed().red(), footnotes.yellow())
         } else {
-            task.name.clone()
+            task.name.dimmed().red().to_string()
         };
 
         // Add the description if available
@@ -350,11 +349,14 @@ fn format_task_entry(task: &Task, is_ambiguous: bool, name_width: usize) -> Stri
         }
     };
 
-    // Color the task name
-    let colored_name = if is_ambiguous {
-        display_name.yellow().bold()
+    // Color the task name (disambiguated name is always green, original name is dimmed red)
+    let colored_name = if task.disambiguated_name.is_some() {
+        // For disambiguated tasks, the display name (disambiguated) should be green
+        display_name.green()
+    } else if is_ambiguous {
+        display_name.dimmed().red()
     } else if task.shadowed_by.is_some() {
-        display_name.red()
+        display_name.dimmed().red()
     } else {
         display_name.green()
     };
@@ -370,13 +372,6 @@ fn format_task_entry(task: &Task, is_ambiguous: bool, name_width: usize) -> Stri
         }
     } else {
         description_part.white().to_string()
-    };
-
-    // Color the footnotes
-    let colored_footnotes = if !footnotes.is_empty() {
-        footnotes.red().bold()
-    } else {
-        footnotes.to_string().into()
     };
 
     // Format with fixed-width column for the task name
