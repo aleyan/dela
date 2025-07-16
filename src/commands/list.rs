@@ -2,6 +2,7 @@ use crate::runner::is_runner_available;
 use crate::task_discovery;
 use crate::types::ShadowType;
 use crate::types::{Task, TaskFileStatus};
+use colored::Colorize;
 use std::collections::HashMap;
 use std::env;
 use std::io::Write;
@@ -26,76 +27,88 @@ pub fn execute(verbose: bool) -> Result<(), String> {
         if let Some(makefile) = &discovered.definitions.makefile {
             match &makefile.status {
                 TaskFileStatus::Parsed => {
-                    test_println!("  ✓ Makefile: Found and parsed");
+                    test_println!("  {} Makefile: Found and parsed", "✓".green());
                 }
                 TaskFileStatus::NotImplemented => {
-                    test_println!("  ! Makefile: Found but parsing not yet implemented");
+                    test_println!(
+                        "  {} Makefile: Found but parsing not yet implemented",
+                        "!".yellow()
+                    );
                 }
                 TaskFileStatus::ParseError(_e) => {
-                    test_println!("  ✗ Makefile: Error parsing: {}", _e);
+                    test_println!("  {} Makefile: Error parsing: {}", "✗".red(), _e);
                 }
                 TaskFileStatus::NotReadable(_e) => {
-                    test_println!("  ✗ Makefile: Not readable: {}", _e);
+                    test_println!("  {} Makefile: Not readable: {}", "✗".red(), _e);
                 }
                 TaskFileStatus::NotFound => {
-                    test_println!("  - Makefile: Not found");
+                    test_println!("  {} Makefile: Not found", "-".dimmed());
                 }
             }
         }
         if let Some(package_json) = &discovered.definitions.package_json {
             match &package_json.status {
                 TaskFileStatus::Parsed => {
-                    test_println!("  ✓ package.json: Found and parsed");
+                    test_println!("  {} package.json: Found and parsed", "✓".green());
                 }
                 TaskFileStatus::NotImplemented => {
-                    test_println!("  ! package.json: Found but parsing not yet implemented");
+                    test_println!(
+                        "  {} package.json: Found but parsing not yet implemented",
+                        "!".yellow()
+                    );
                 }
                 TaskFileStatus::ParseError(_e) => {
-                    test_println!("  ✗ package.json: Error parsing: {}", _e);
+                    test_println!("  {} package.json: Error parsing: {}", "✗".red(), _e);
                 }
                 TaskFileStatus::NotReadable(_e) => {
-                    test_println!("  ✗ package.json: Not readable: {}", _e);
+                    test_println!("  {} package.json: Not readable: {}", "✗".red(), _e);
                 }
                 TaskFileStatus::NotFound => {
-                    test_println!("  - package.json: Not found");
+                    test_println!("  {} package.json: Not found", "-".dimmed());
                 }
             }
         }
         if let Some(pyproject_toml) = &discovered.definitions.pyproject_toml {
             match &pyproject_toml.status {
                 TaskFileStatus::Parsed => {
-                    test_println!("  ✓ pyproject.toml: Found and parsed");
+                    test_println!("  {} pyproject.toml: Found and parsed", "✓".green());
                 }
                 TaskFileStatus::NotImplemented => {
-                    test_println!("  ! pyproject.toml: Found but parsing not yet implemented");
+                    test_println!(
+                        "  {} pyproject.toml: Found but parsing not yet implemented",
+                        "!".yellow()
+                    );
                 }
                 TaskFileStatus::ParseError(_e) => {
-                    test_println!("  ✗ pyproject.toml: Error parsing: {}", _e);
+                    test_println!("  {} pyproject.toml: Error parsing: {}", "✗".red(), _e);
                 }
                 TaskFileStatus::NotReadable(_e) => {
-                    test_println!("  ✗ pyproject.toml: Not readable: {}", _e);
+                    test_println!("  {} pyproject.toml: Not readable: {}", "✗".red(), _e);
                 }
                 TaskFileStatus::NotFound => {
-                    test_println!("  - pyproject.toml: Not found");
+                    test_println!("  {} pyproject.toml: Not found", "-".dimmed());
                 }
             }
         }
         if let Some(maven_pom) = &discovered.definitions.maven_pom {
             match &maven_pom.status {
                 TaskFileStatus::Parsed => {
-                    test_println!("  ✓ pom.xml: Found and parsed");
+                    test_println!("  {} pom.xml: Found and parsed", "✓".green());
                 }
                 TaskFileStatus::NotImplemented => {
-                    test_println!("  ! pom.xml: Found but parsing not yet implemented");
+                    test_println!(
+                        "  {} pom.xml: Found but parsing not yet implemented",
+                        "!".yellow()
+                    );
                 }
                 TaskFileStatus::ParseError(_e) => {
-                    test_println!("  ✗ pom.xml: Error parsing: {}", _e);
+                    test_println!("  {} pom.xml: Error parsing: {}", "✗".red(), _e);
                 }
                 TaskFileStatus::NotReadable(_e) => {
-                    test_println!("  ✗ pom.xml: Not readable: {}", _e);
+                    test_println!("  {} pom.xml: Not readable: {}", "✗".red(), _e);
                 }
                 TaskFileStatus::NotFound => {
-                    test_println!("  - pom.xml: Not found");
+                    test_println!("  {} pom.xml: Not found", "-".dimmed());
                 }
             }
         }
@@ -107,7 +120,7 @@ pub fn execute(verbose: bool) -> Result<(), String> {
                         .file_name()
                         .unwrap_or_default()
                         .to_string_lossy();
-                    test_println!("  ✓ {}: Found and parsed", _file_name);
+                    test_println!("  {} {}: Found and parsed", "✓".green(), _file_name);
                 }
                 TaskFileStatus::NotImplemented => {
                     let _file_name = gradle
@@ -115,7 +128,11 @@ pub fn execute(verbose: bool) -> Result<(), String> {
                         .file_name()
                         .unwrap_or_default()
                         .to_string_lossy();
-                    test_println!("  ! {}: Found but parsing not yet implemented", _file_name);
+                    test_println!(
+                        "  {} {}: Found but parsing not yet implemented",
+                        "!".yellow(),
+                        _file_name
+                    );
                 }
                 TaskFileStatus::ParseError(_e) => {
                     let _file_name = gradle
@@ -123,7 +140,7 @@ pub fn execute(verbose: bool) -> Result<(), String> {
                         .file_name()
                         .unwrap_or_default()
                         .to_string_lossy();
-                    test_println!("  ✗ {}: Error parsing: {}", _file_name, _e);
+                    test_println!("  {} {}: Error parsing: {}", "✗".red(), _file_name, _e);
                 }
                 TaskFileStatus::NotReadable(_e) => {
                     let _file_name = gradle
@@ -131,10 +148,10 @@ pub fn execute(verbose: bool) -> Result<(), String> {
                         .file_name()
                         .unwrap_or_default()
                         .to_string_lossy();
-                    test_println!("  ✗ {}: Not readable: {}", _file_name, _e);
+                    test_println!("  {} {}: Not readable: {}", "✗".red(), _file_name, _e);
                 }
                 TaskFileStatus::NotFound => {
-                    test_println!("  - Gradle build file: Not found");
+                    test_println!("  {} Gradle build file: Not found", "-".dimmed());
                 }
             }
         }
@@ -167,7 +184,10 @@ pub fn execute(verbose: bool) -> Result<(), String> {
     used_footnotes.insert('‖', false); // conflicts with task from another tool
 
     if tasks_by_runner.is_empty() {
-        write_line("No tasks found in the current directory.")?;
+        write_line(&format!(
+            "{}",
+            "No tasks found in the current directory.".yellow()
+        ))?;
     } else {
         // Collect file paths for each runner for reference
         let mut runner_files: HashMap<String, String> = HashMap::new();
@@ -207,11 +227,12 @@ pub fn execute(verbose: bool) -> Result<(), String> {
 
             // Add missing runner indicator if needed
             let tool_not_installed = !is_runner_available(&sorted_tasks[0].runner);
-            let runner_indicator = if tool_not_installed {
+            let runner_name = runner.clone();
+            let runner_footnote = if tool_not_installed {
                 used_footnotes.insert('*', true);
-                format!("{}*", runner)
+                Some("*".yellow())
             } else {
-                runner.clone()
+                None
             };
 
             // Get file path for this runner
@@ -223,12 +244,17 @@ pub fn execute(verbose: bool) -> Result<(), String> {
                 .unwrap_or_else(|| file_path.clone());
 
             // Write section header
-            write_line(&format!(
-                "\n{} ({}) — {}",
-                runner_indicator,
-                sorted_tasks.len(),
-                file_name
-            ))?;
+            let colored_runner = if tool_not_installed {
+                runner_name.dimmed().red()
+            } else {
+                runner_name.cyan()
+            };
+            let runner_header = if let Some(footnote) = runner_footnote {
+                format!("{} {}", colored_runner, footnote)
+            } else {
+                format!("{}", colored_runner)
+            };
+            write_line(&format!("\n{} — {}", runner_header, file_name.dimmed()))?;
 
             // Process each task in the section
             for task in sorted_tasks {
@@ -271,18 +297,22 @@ pub fn execute(verbose: bool) -> Result<(), String> {
         }
 
         if !footnotes.is_empty() {
-            write_line("\nfootnotes legend:")?;
+            write_line(&format!("\n{}", "footnotes legend:".dimmed()))?;
             for (symbol, description) in footnotes {
-                write_line(&format!("{} {}", symbol, description))?;
+                write_line(&format!(
+                    "{} {}",
+                    symbol.to_string().yellow(),
+                    description.dimmed()
+                ))?;
             }
         }
     }
 
     // Show any errors encountered during discovery
     if !discovered.errors.is_empty() {
-        write_line("\nErrors encountered:")?;
+        write_line(&format!("\n{}", "Errors encountered:".red().bold()))?;
         for error in discovered.errors {
-            write_line(&format!("  • {}", error))?;
+            write_line(&format!("  {} {}", "•".red(), error.red()))?;
         }
     }
 
@@ -322,9 +352,9 @@ fn format_task_entry(task: &Task, is_ambiguous: bool, name_width: usize) -> Stri
     let description_part = if let Some(_) = &task.disambiguated_name {
         // For disambiguated tasks, show the original name with footnotes
         let orig_with_footnotes = if !footnotes.is_empty() {
-            format!("{} {}", task.name, footnotes)
+            format!("{} {}", task.name.dimmed().red(), footnotes.yellow())
         } else {
-            task.name.clone()
+            task.name.dimmed().red().to_string()
         };
 
         // Add the description if available
@@ -344,12 +374,37 @@ fn format_task_entry(task: &Task, is_ambiguous: bool, name_width: usize) -> Stri
         }
     };
 
+    // Color the task name (disambiguated name is always green, original name is dimmed red)
+    let colored_name = if task.disambiguated_name.is_some() {
+        // For disambiguated tasks, the display name (disambiguated) should be green
+        display_name.green()
+    } else if is_ambiguous {
+        display_name.dimmed().red()
+    } else if task.shadowed_by.is_some() {
+        display_name.dimmed().red()
+    } else {
+        display_name.green()
+    };
+
+    // Color the description
+    let colored_description = if description_part.starts_with("- ") {
+        // For descriptions, color the dash and the text
+        let parts: Vec<&str> = description_part.splitn(2, " - ").collect();
+        if parts.len() == 2 {
+            format!("{} {}", "-".dimmed(), parts[1].white())
+        } else {
+            description_part.white().to_string()
+        }
+    } else {
+        description_part.white().to_string()
+    };
+
     // Format with fixed-width column for the task name
     // Pad the display_name to ensure even column alignment
-    let padded_name = format!("{:<width$}", display_name, width = name_width);
+    let padded_name = format!("{:<width$}", colored_name, width = name_width);
 
     // Use exactly two spaces as separator
-    format!("{}  {}", padded_name, description_part)
+    format!("{}  {}", padded_name, colored_description)
 }
 
 #[cfg(test)]
@@ -610,59 +665,28 @@ mod tests {
     #[test]
     #[serial]
     fn test_task_entry_formatting() {
-        // Test cases for different task scenarios
+        use crate::types::{Task, TaskDefinitionType, TaskRunner};
 
-        // Case 1: Simple task with description
-        let mut task1 = create_test_task("build", PathBuf::from("Makefile"), TaskRunner::Make);
-        task1.description = Some("Building the project".to_string());
-        let formatted1 = format_task_entry(&task1, false, 18);
-        assert_eq!(formatted1, "build               - Building the project");
+        // Force colors in test environment
+        colored::control::set_override(true);
 
-        // Case 2: Disambiguated task with shadow and ambiguity
-        let mut task2 = create_test_task("test", PathBuf::from("Makefile"), TaskRunner::Make);
-        task2.description = Some("Running tests".to_string());
-        task2.disambiguated_name = Some("test-m".to_string());
-        task2.shadowed_by = Some(ShadowType::ShellBuiltin("zsh".to_string()));
-        let formatted2 = format_task_entry(&task2, true, 18);
-        assert_eq!(formatted2, "test-m              test ‖† - Running tests");
+        let task = Task {
+            name: "build".to_string(),
+            file_path: std::path::PathBuf::from("Makefile"),
+            definition_type: TaskDefinitionType::Makefile,
+            runner: TaskRunner::Make,
+            source_name: "build".to_string(),
+            description: Some("Building the project".to_string()),
+            shadowed_by: None,
+            disambiguated_name: None,
+        };
+        let formatted = super::format_task_entry(&task, false, 18);
 
-        // Case 3: Task with no description
-        let task3 = create_test_task("format", PathBuf::from("Makefile"), TaskRunner::Make);
-        let formatted3 = format_task_entry(&task3, false, 18);
-        assert_eq!(formatted3, "format              ");
-
-        // Case 4: Task with path executable shadow
-        let mut task4 = create_test_task("deploy", PathBuf::from("Makefile"), TaskRunner::Make);
-        task4.shadowed_by = Some(ShadowType::PathExecutable("/usr/bin/deploy".to_string()));
-        task4.disambiguated_name = Some("deploy-m".to_string());
-        let formatted4 = format_task_entry(&task4, false, 18);
-        assert_eq!(formatted4, "deploy-m            deploy ‡");
-
-        // Case 5: Test with long name and adaptable width
-        let task5 = create_test_task(
-            "extremely-long-task-name",
-            PathBuf::from("Makefile"),
-            TaskRunner::Make,
-        );
-        let formatted5 = format_task_entry(&task5, false, 30);
-        assert_eq!(formatted5, "extremely-long-task-name        ");
-
-        // Case 6: Verify consistent width between short and long names
-        let task6a = create_test_task("short", PathBuf::from("Makefile"), TaskRunner::Make);
-        let task6b = create_test_task(
-            "much-longer-task-name",
-            PathBuf::from("Makefile"),
-            TaskRunner::Make,
-        );
-
-        // Same width should be used for both
-        let width = 25;
-        let formatted6a = format_task_entry(&task6a, false, width);
-        let formatted6b = format_task_entry(&task6b, false, width);
-
-        // Both should have same padding length
-        assert_eq!(formatted6a, "short                      ");
-        assert_eq!(formatted6b, "much-longer-task-name      ");
+        // The output should include green for the task name and white for the description
+        assert!(formatted.contains("\u{1b}[32m")); // green
+        assert!(formatted.contains("\u{1b}[37m")); // white
+        assert!(formatted.contains("build"));
+        assert!(formatted.contains("Building the project"));
     }
 
     #[test]

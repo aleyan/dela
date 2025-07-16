@@ -2,6 +2,7 @@
 
 pub mod allowlist;
 pub mod builtins;
+pub mod colors;
 pub mod commands;
 pub mod environment;
 pub mod parsers;
