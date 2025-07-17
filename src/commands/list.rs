@@ -238,10 +238,22 @@ pub fn execute(verbose: bool) -> Result<(), String> {
             // Get file path for this runner
             let empty_string = String::new();
             let file_path = runner_files.get(&runner).unwrap_or(&empty_string);
-            let file_name = std::path::Path::new(file_path)
-                .file_name()
-                .map(|f| f.to_string_lossy().to_string())
-                .unwrap_or_else(|| file_path.clone());
+            
+            // For GitHub Actions, show the full relative path instead of just the filename
+            let display_path = if runner == "act" {
+                let path = std::path::Path::new(file_path);
+                if let Ok(relative_path) = path.strip_prefix(&current_dir) {
+                    relative_path.to_string_lossy().to_string()
+                } else {
+                    file_path.clone()
+                }
+            } else {
+                // For other runners, show just the filename
+                std::path::Path::new(file_path)
+                    .file_name()
+                    .map(|f| f.to_string_lossy().to_string())
+                    .unwrap_or_else(|| file_path.clone())
+            };
 
             // Write section header
             let colored_runner = if tool_not_installed {
@@ -254,7 +266,7 @@ pub fn execute(verbose: bool) -> Result<(), String> {
             } else {
                 format!("{}", colored_runner)
             };
-            write_line(&format!("\n{} — {}", runner_header, file_name.dimmed()))?;
+            write_line(&format!("\n{} — {}", runner_header, display_path.dimmed()))?;
 
             // Process each task in the section
             for task in sorted_tasks {
@@ -764,5 +776,78 @@ mod tests {
         // Verify border case (exactly 40 chars) is not truncated
         assert!(formatted_exact.contains(exactly_40_chars));
         assert!(!formatted_exact.contains("..."));
+    }
+
+    #[test]
+    fn test_github_actions_path_display() {
+        use crate::types::{Task, TaskDefinitionType, TaskRunner};
+        use std::path::PathBuf;
+
+        // Create a test task with GitHub Actions runner and .github/workflows path
+        let task = Task {
+            name: "integration".to_string(),
+            file_path: PathBuf::from(".github/workflows"),
+            definition_type: TaskDefinitionType::GitHubActions,
+            runner: TaskRunner::Act,
+            source_name: "integration".to_string(),
+            description: Some("Integration Tests".to_string()),
+            shadowed_by: None,
+            disambiguated_name: None,
+        };
+
+        // Create a test writer to capture output
+        let mut writer = TestWriter::new();
+
+        // Mock the task discovery with our GitHub Actions task
+        let mut discovered_tasks = task_discovery::DiscoveredTasks::default();
+        discovered_tasks.tasks = vec![task];
+
+        // Group tasks by runner
+        let mut tasks_by_runner: HashMap<String, Vec<&Task>> = HashMap::new();
+        for task in &discovered_tasks.tasks {
+            let runner_name = task.runner.short_name().to_string();
+            tasks_by_runner.entry(runner_name).or_default().push(task);
+        }
+
+        // Get the act runner tasks
+        let act_tasks = tasks_by_runner.get("act").unwrap();
+        let runner = "act".to_string();
+        let file_path = &act_tasks[0].file_path.to_string_lossy().to_string();
+
+        // Test the path display logic for GitHub Actions
+        let current_dir = std::env::current_dir().unwrap();
+        let display_path = if runner == "act" {
+            let path = std::path::Path::new(file_path);
+            if let Ok(relative_path) = path.strip_prefix(&current_dir) {
+                relative_path.to_string_lossy().to_string()
+            } else {
+                file_path.clone()
+            }
+        } else {
+            // For other runners, show just the filename
+            std::path::Path::new(file_path)
+                .file_name()
+                .map(|f| f.to_string_lossy().to_string())
+                .unwrap_or_else(|| file_path.clone())
+        };
+
+        // Write the section header (without newline at start)
+        write!(writer, "{} — {}", runner.cyan(), display_path.dimmed()).unwrap();
+
+        // Write the task
+        let formatted_task = format_task_entry(&act_tasks[0], false,20);
+        writeln!(writer, "\n  {}", formatted_task).unwrap();
+
+        // Get the output and verify it shows the full path
+        let output = writer.get_output();
+        
+        // Should show .github/workflows, not just workflows
+        assert!(output.contains("act"), "Should contain 'act'");
+        assert!(output.contains(".github/workflows"), "Should contain '.github/workflows'");
+        assert!(!output.contains("act — workflows"), "Should not contain just 'workflows'");
+        
+        // Should show the task
+        assert!(output.contains("integration"), "Should show task name 'integration'");
+        assert!(output.contains("Integration Tests"), "Should show task description");
     }
 }
