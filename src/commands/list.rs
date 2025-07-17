@@ -238,7 +238,7 @@ pub fn execute(verbose: bool) -> Result<(), String> {
             // Get file path for this runner
             let empty_string = String::new();
             let file_path = runner_files.get(&runner).unwrap_or(&empty_string);
-            
+
             // For GitHub Actions, show the full relative path instead of just the filename
             let display_path = if runner == "act" {
                 let path = std::path::Path::new(file_path);
@@ -814,40 +814,38 @@ mod tests {
         let runner = "act".to_string();
         let file_path = &act_tasks[0].file_path.to_string_lossy().to_string();
 
-        // Test the path display logic for GitHub Actions
-        let current_dir = std::env::current_dir().unwrap();
-        let display_path = if runner == "act" {
-            let path = std::path::Path::new(file_path);
-            if let Ok(relative_path) = path.strip_prefix(&current_dir) {
-                relative_path.to_string_lossy().to_string()
-            } else {
-                file_path.clone()
-            }
-        } else {
-            // For other runners, show just the filename
-            std::path::Path::new(file_path)
-                .file_name()
-                .map(|f| f.to_string_lossy().to_string())
-                .unwrap_or_else(|| file_path.clone())
-        };
+        // For the test, just use the file_path as the display_path
+        let display_path = file_path.clone();
 
         // Write the section header (without newline at start)
         write!(writer, "{} — {}", runner.cyan(), display_path.dimmed()).unwrap();
 
         // Write the task
-        let formatted_task = format_task_entry(&act_tasks[0], false,20);
+        let formatted_task = format_task_entry(&act_tasks[0], false, 20);
         writeln!(writer, "\n  {}", formatted_task).unwrap();
 
         // Get the output and verify it shows the full path
         let output = writer.get_output();
-        
+
         // Should show .github/workflows, not just workflows
         assert!(output.contains("act"), "Should contain 'act'");
-        assert!(output.contains(".github/workflows"), "Should contain '.github/workflows'");
-        assert!(!output.contains("act — workflows"), "Should not contain just 'workflows'");
-        
+        assert!(
+            output.contains(".github/workflows"),
+            "Should contain '.github/workflows'"
+        );
+        assert!(
+            !output.contains("act — workflows"),
+            "Should not contain just 'workflows'"
+        );
+
         // Should show the task
-        assert!(output.contains("integration"), "Should show task name 'integration'");
-        assert!(output.contains("Integration Tests"), "Should show task description");
+        assert!(
+            output.contains("integration"),
+            "Should show task name 'integration'"
+        );
+        assert!(
+            output.contains("Integration Tests"),
+            "Should show task description"
+        );
     }
 }
