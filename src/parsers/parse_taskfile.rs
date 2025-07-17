@@ -7,7 +7,7 @@ use std::path::PathBuf;
 #[serde(untagged)]
 enum TaskCommand {
     String(String),
-    Map(HashMap<String, String>),
+    Map(HashMap<String, serde_yaml::Value>),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -50,12 +50,9 @@ pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
                 if cmds.len() == 1 {
                     match &cmds[0] {
                         TaskCommand::String(cmd) => format!("command: {}", cmd),
-                        TaskCommand::Map(map) => {
-                            if let Some(task_name) = map.get("task") {
-                                format!("task: {}", task_name)
-                            } else {
-                                format!("map command: {:?}", map)
-                            }
+                        TaskCommand::Map(_map) => {
+                            // Just indicate it's a complex command without parsing details
+                            format!("complex command")
                         }
                     }
                 } else {
@@ -224,5 +221,11 @@ tasks:
 
         let tasks = parse(&taskfile_path).unwrap();
 
+        // Should have 1 task
+        assert_eq!(tasks.len(), 1);
+
+        let build_task = tasks.iter().find(|t| t.name == "build").unwrap();
+        assert_eq!(build_task.description.as_deref(), Some("echo to the world"));
+        assert_eq!(build_task.runner, TaskRunner::Task);
     }
 }
