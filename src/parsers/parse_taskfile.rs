@@ -4,9 +4,16 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+enum TaskCommand {
+    String(String),
+    Map(HashMap<String, serde_yaml::Value>),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 struct TaskfileTask {
     desc: Option<String>,
-    cmds: Option<Vec<String>>,
+    cmds: Option<Vec<TaskCommand>>,
     deps: Option<Vec<String>>,
     internal: Option<bool>,
 }
@@ -41,7 +48,13 @@ pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
         let description = task_def.desc.or_else(|| {
             task_def.cmds.as_ref().map(|cmds| {
                 if cmds.len() == 1 {
-                    format!("command: {}", cmds[0])
+                    match &cmds[0] {
+                        TaskCommand::String(cmd) => format!("command: {}", cmd),
+                        TaskCommand::Map(_map) => {
+                            // Just indicate it's a complex command without parsing details
+                            format!("complex command")
+                        }
+                    }
                 } else {
                     format!("multiple commands: {}", cmds.len())
                 }
@@ -94,12 +107,17 @@ tasks:
       - test
     cmds:
       - cargo clean
+  format:
+    cmds:
+      - task: build
+      - two
+    deps: ['clean']
 "#
         )
         .unwrap();
 
         let tasks = parse(&taskfile_path).unwrap();
-        assert_eq!(tasks.len(), 3);
+        assert_eq!(tasks.len(), 4);
 
         let build_task = tasks.iter().find(|t| t.name == "build").unwrap();
         assert_eq!(build_task.description.as_deref(), Some("Build the project"));
@@ -118,6 +136,13 @@ tasks:
             Some("Clean build artifacts")
         );
         assert_eq!(clean_task.runner, TaskRunner::Task);
+
+        let format_task = tasks.iter().find(|t| t.name == "format").unwrap();
+        assert_eq!(
+            format_task.description.as_deref(),
+            Some("multiple commands: 2")
+        );
+        assert_eq!(format_task.runner, TaskRunner::Task);
     }
 
     #[test]
@@ -171,5 +196,36 @@ tasks:
         assert!(tasks.iter().find(|t| t.name == "build").is_some());
         assert!(tasks.iter().find(|t| t.name == "test").is_some());
         assert!(tasks.iter().find(|t| t.name == "clean").is_some());
+    }
+    #[test]
+    fn test_parse_taskfile_with_nested_commands() {
+        let temp_dir = TempDir::new().unwrap();
+        let taskfile_path = temp_dir.path().join("Taskfile.yml");
+        let mut file = File::create(&taskfile_path).unwrap();
+
+        write!(
+            file,
+            r#"
+version: '3'
+tasks:
+  build:
+    desc: echo to the world
+    cmds:
+      - cmd: |
+          echo "Hello, world!"
+          echo "Hello, world!"
+        silent: true
+"#
+        )
+        .unwrap();
+
+        let tasks = parse(&taskfile_path).unwrap();
+
+        // Should have 1 task
+        assert_eq!(tasks.len(), 1);
+
+        let build_task = tasks.iter().find(|t| t.name == "build").unwrap();
+        assert_eq!(build_task.description.as_deref(), Some("echo to the world"));
+        assert_eq!(build_task.runner, TaskRunner::Task);
     }
 }
