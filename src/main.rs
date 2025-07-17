@@ -23,6 +23,15 @@ mod types;
     version,
     about = "A task runner that delegates to other runners",
     after_help = r#"Supported Task Runners:
+• Make (Makefile)
+• Node.js: npm, yarn, pnpm, bun (package.json)
+• Python: uv, poetry, poethepoet (pyproject.toml)
+• Shell scripts (.sh files)
+• Task (Taskfile.yml)
+• Maven (pom.xml)
+• Gradle (build.gradle, build.gradle.kts)
+• GitHub Actions (act)
+• Docker Compose (docker-compose.yml, compose.yml)
 "#,
     long_about = r#"Dela integrates with you shell to let you to execute locally defined
 tasks such as in Makefile or package.json without specifying the task runner.
