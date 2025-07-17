@@ -22,7 +22,35 @@ mod types;
     author = "Alex Yankov",
     version,
     about = "A task runner that delegates to other runners",
-    long_about = "Dela scans your project directory for task definitions in various formats (Makefile, package.json, etc.) and lets you run them directly from your shell.\n\nAfter running '$ dela init', you can:\n1. Use '$ dr <task>' to execute a task directly\n2. Execute task with bare name `$ <task>` through the shell integration"
+    after_help = r#"Supported Task Runners:
+• Make (Makefile)
+• Node.js: npm, yarn, pnpm, bun (package.json)
+• Python: uv, poetry, poethepoet (pyproject.toml)
+• Task (Taskfile.yml)
+• Maven (pom.xml)
+• Gradle (build.gradle, build.gradle.kts)
+• GitHub Actions (act)
+• Docker Compose (docker-compose.yml, compose.yml)
+"#,
+    long_about = r#"Dela integrates with you shell to let you to execute locally defined
+tasks such as in Makefile or package.json without specifying the task runner.
+
+Setup:
+After installing dela, you need to add it to your shell configuration by
+running `$ dela init`. You need to do it only once.
+
+You shell can now execute tasks just by their name: `$ <TASKNAME>`
+
+Get all tasks that are available in the current directory via `$ dela list`.
+Tasks with name collisions will be suffixed and be runnable by their new names.
+"#,
+    help_template = "\
+{before-help}{about}
+
+{usage-heading}
+{usage}
+
+{all-args}{after-help}"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -40,15 +68,6 @@ enum Commands {
     ///
     /// Example: dela init
     Init,
-
-    /// Configure shell integration (used internally by init)
-    ///
-    /// Outputs shell-specific configuration code that needs to be evaluated.
-    /// This is typically called by your shell's config file, not directly.
-    ///
-    /// Example: eval "$(dela configure-shell)"
-    #[command(name = "configure-shell")]
-    ConfigureShell,
 
     /// List all available tasks in the current directory
     ///
@@ -75,27 +94,17 @@ enum Commands {
         task: String,
     },
 
-    /// Get the shell command for a task (used internally by shell functions)
-    ///
-    /// Returns the actual command that would be executed for a task.
-    /// This is used internally by shell integration and shouldn't be called directly.
-    ///
-    /// Example: dela get-command build
-    #[command(name = "get-command", trailing_var_arg = true)]
+    // Internal commands (hidden from help by default)
+    #[command(name = "configure-shell", hide = true)]
+    ConfigureShell,
+
+    #[command(name = "get-command", hide = true, trailing_var_arg = true)]
     GetCommand {
         /// Name of the task followed by any arguments to pass to it
         args: Vec<String>,
     },
 
-    /// Check if a task is allowed to run (used internally by shell functions)
-    ///
-    /// Consults the allowlist at ~/.dela/allowlist.toml to determine if a task can be executed.
-    /// If the command is not covered by the allowlist, it will prompt the user to allow or deny the command.
-    /// This is used internally by shell integration and shouldn't be called directly.
-    ///
-    /// Example: dela allow-command build
-    /// Example: dela allow-command build --allow 2
-    #[command(name = "allow-command")]
+    #[command(name = "allow-command", hide = true)]
     AllowCommand {
         /// Name of the task to check
         task: String,
