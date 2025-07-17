@@ -200,4 +200,29 @@ tasks:
         assert!(tasks.iter().find(|t| t.name == "test").is_some());
         assert!(tasks.iter().find(|t| t.name == "clean").is_some());
     }
+    #[test]
+    fn test_parse_taskfile_with_nested_commands() {
+        let temp_dir = TempDir::new().unwrap();
+        let taskfile_path = temp_dir.path().join("Taskfile.yml");
+        let mut file = File::create(&taskfile_path).unwrap();
+
+        write!(
+            file,
+            r#"
+version: '3'
+tasks:
+  build:
+    desc: echo to the world
+    cmds:
+      - cmd: |
+          echo "Hello, world!"
+          echo "Hello, world!"
+        silent: true
+"#
+        )
+        .unwrap();
+
+        let tasks = parse(&taskfile_path).unwrap();
+
+    }
 }
