@@ -26,6 +26,8 @@ mod types;
 "#,
     long_about = r#"Dela integrates with you shell to let you to execute locally defined
 tasks such as in Makefile or package.json without specifying the task runner.
+
+Setup:
 After installing dela, you need to add it to your shell configuration by
 running `$ dela init`. You need to do it only once.
 
