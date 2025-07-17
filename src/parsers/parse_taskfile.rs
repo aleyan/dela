@@ -4,9 +4,16 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+enum TaskCommand {
+    String(String),
+    Map(HashMap<String, String>),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 struct TaskfileTask {
     desc: Option<String>,
-    cmds: Option<Vec<String>>,
+    cmds: Option<Vec<TaskCommand>>,
     deps: Option<Vec<String>>,
     internal: Option<bool>,
 }
@@ -41,7 +48,16 @@ pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
         let description = task_def.desc.or_else(|| {
             task_def.cmds.as_ref().map(|cmds| {
                 if cmds.len() == 1 {
-                    format!("command: {}", cmds[0])
+                    match &cmds[0] {
+                        TaskCommand::String(cmd) => format!("command: {}", cmd),
+                        TaskCommand::Map(map) => {
+                            if let Some(task_name) = map.get("task") {
+                                format!("task: {}", task_name)
+                            } else {
+                                format!("map command: {:?}", map)
+                            }
+                        }
+                    }
                 } else {
                     format!("multiple commands: {}", cmds.len())
                 }
@@ -104,7 +120,7 @@ tasks:
         .unwrap();
 
         let tasks = parse(&taskfile_path).unwrap();
-        assert_eq!(tasks.len(), 3);
+        assert_eq!(tasks.len(), 4);
 
         let build_task = tasks.iter().find(|t| t.name == "build").unwrap();
         assert_eq!(build_task.description.as_deref(), Some("Build the project"));
@@ -123,6 +139,13 @@ tasks:
             Some("Clean build artifacts")
         );
         assert_eq!(clean_task.runner, TaskRunner::Task);
+
+        let format_task = tasks.iter().find(|t| t.name == "format").unwrap();
+        assert_eq!(
+            format_task.description.as_deref(),
+            Some("multiple commands: 2")
+        );
+        assert_eq!(format_task.runner, TaskRunner::Task);
     }
 
     #[test]
