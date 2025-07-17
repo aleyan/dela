@@ -94,6 +94,11 @@ tasks:
       - test
     cmds:
       - cargo clean
+  format:
+    cmds:
+      - task: build
+      - two
+    deps: ['clean']
 "#
         )
         .unwrap();
