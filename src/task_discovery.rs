@@ -243,9 +243,7 @@ fn set_definition(discovered: &mut DiscoveredTasks, definition: TaskDefinitionFi
         TaskDefinitionType::DockerCompose => {
             discovered.definitions.docker_compose = Some(definition)
         }
-        TaskDefinitionType::TravisCi => {
-            discovered.definitions.travis_ci = Some(definition)
-        }
+        TaskDefinitionType::TravisCi => discovered.definitions.travis_ci = Some(definition),
         _ => {}
     }
 }
@@ -2329,12 +2327,18 @@ jobs:
         let test_task = discovered.tasks.iter().find(|t| t.name == "test").unwrap();
         assert_eq!(test_task.definition_type, TaskDefinitionType::TravisCi);
         assert_eq!(test_task.runner, TaskRunner::TravisCi);
-        assert_eq!(test_task.description, Some("Travis CI job: Test".to_string()));
+        assert_eq!(
+            test_task.description,
+            Some("Travis CI job: Test".to_string())
+        );
 
         let build_task = discovered.tasks.iter().find(|t| t.name == "build").unwrap();
         assert_eq!(build_task.definition_type, TaskDefinitionType::TravisCi);
         assert_eq!(build_task.runner, TaskRunner::TravisCi);
-        assert_eq!(build_task.description, Some("Travis CI job: Build".to_string()));
+        assert_eq!(
+            build_task.description,
+            Some("Travis CI job: Build".to_string())
+        );
     }
 
     #[test]
@@ -2371,17 +2375,42 @@ matrix:
         for task in &discovered.tasks {
             assert_eq!(task.definition_type, TaskDefinitionType::TravisCi);
             assert_eq!(task.runner, TaskRunner::TravisCi);
-            assert!(task.description.as_ref().unwrap().contains("Travis CI job:"));
+            assert!(task
+                .description
+                .as_ref()
+                .unwrap()
+                .contains("Travis CI job:"));
         }
 
-        let python_38_task = discovered.tasks.iter().find(|t| t.name == "Python 3.8").unwrap();
-        assert_eq!(python_38_task.description, Some("Travis CI job: Python 3.8".to_string()));
+        let python_38_task = discovered
+            .tasks
+            .iter()
+            .find(|t| t.name == "Python 3.8")
+            .unwrap();
+        assert_eq!(
+            python_38_task.description,
+            Some("Travis CI job: Python 3.8".to_string())
+        );
 
-        let python_39_task = discovered.tasks.iter().find(|t| t.name == "Python 3.9").unwrap();
-        assert_eq!(python_39_task.description, Some("Travis CI job: Python 3.9".to_string()));
+        let python_39_task = discovered
+            .tasks
+            .iter()
+            .find(|t| t.name == "Python 3.9")
+            .unwrap();
+        assert_eq!(
+            python_39_task.description,
+            Some("Travis CI job: Python 3.9".to_string())
+        );
 
-        let python_310_task = discovered.tasks.iter().find(|t| t.name == "Python 3.10").unwrap();
-        assert_eq!(python_310_task.description, Some("Travis CI job: Python 3.10".to_string()));
+        let python_310_task = discovered
+            .tasks
+            .iter()
+            .find(|t| t.name == "Python 3.10")
+            .unwrap();
+        assert_eq!(
+            python_310_task.description,
+            Some("Travis CI job: Python 3.10".to_string())
+        );
     }
 
     #[test]
@@ -2418,7 +2447,10 @@ script:
         assert_eq!(task.name, "travis");
         assert_eq!(task.definition_type, TaskDefinitionType::TravisCi);
         assert_eq!(task.runner, TaskRunner::TravisCi);
-        assert_eq!(task.description, Some("Travis CI configuration".to_string()));
+        assert_eq!(
+            task.description,
+            Some("Travis CI configuration".to_string())
+        );
     }
 
     #[test]

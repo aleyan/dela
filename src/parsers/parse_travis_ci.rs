@@ -39,7 +39,7 @@ fn parse_travis_string(content: &str, file_path: &Path) -> Result<Vec<Task>, Str
         for (job_key, job_value) in jobs_map {
             if let Value::String(job_name) = job_key {
                 let description = extract_job_description(job_value);
-                
+
                 let task = Task {
                     name: job_name.clone(),
                     file_path: file_path.to_path_buf(),
@@ -50,20 +50,26 @@ fn parse_travis_string(content: &str, file_path: &Path) -> Result<Vec<Task>, Str
                     shadowed_by: None,
                     disambiguated_name: None,
                 };
-                
+
                 tasks.push(task);
             }
         }
     } else {
         // If no jobs section, look for matrix or other job definitions
-        if let Some(Value::Mapping(matrix_map)) = config_map.get(&Value::String("matrix".to_string())) {
+        if let Some(Value::Mapping(matrix_map)) =
+            config_map.get(&Value::String("matrix".to_string()))
+        {
             // Handle matrix configuration
-            if let Some(Value::Sequence(include_list)) = matrix_map.get(&Value::String("include".to_string())) {
+            if let Some(Value::Sequence(include_list)) =
+                matrix_map.get(&Value::String("include".to_string()))
+            {
                 for (i, include_item) in include_list.iter().enumerate() {
                     if let Value::Mapping(include_map) = include_item {
-                        if let Some(Value::String(job_name)) = include_map.get(&Value::String("name".to_string())) {
+                        if let Some(Value::String(job_name)) =
+                            include_map.get(&Value::String("name".to_string()))
+                        {
                             let description = extract_job_description(include_item);
-                            
+
                             let task = Task {
                                 name: job_name.clone(),
                                 file_path: file_path.to_path_buf(),
@@ -74,13 +80,13 @@ fn parse_travis_string(content: &str, file_path: &Path) -> Result<Vec<Task>, Str
                                 shadowed_by: None,
                                 disambiguated_name: None,
                             };
-                            
+
                             tasks.push(task);
                         } else {
                             // If no name, use index
                             let job_name = format!("matrix-job-{}", i);
                             let description = Some("Matrix job from Travis CI".to_string());
-                            
+
                             let task = Task {
                                 name: job_name.clone(),
                                 file_path: file_path.to_path_buf(),
@@ -91,14 +97,14 @@ fn parse_travis_string(content: &str, file_path: &Path) -> Result<Vec<Task>, Str
                                 shadowed_by: None,
                                 disambiguated_name: None,
                             };
-                            
+
                             tasks.push(task);
                         }
                     }
                 }
             }
         }
-        
+
         // If still no tasks found, create a default task for the entire configuration
         if tasks.is_empty() {
             let task = Task {
@@ -111,7 +117,7 @@ fn parse_travis_string(content: &str, file_path: &Path) -> Result<Vec<Task>, Str
                 shadowed_by: None,
                 disambiguated_name: None,
             };
-            
+
             tasks.push(task);
         }
     }
@@ -127,17 +133,19 @@ fn extract_job_description(job_value: &Value) -> Option<String> {
             if let Some(Value::String(name)) = job_map.get(&Value::String("name".to_string())) {
                 return Some(format!("Travis CI job: {}", name));
             }
-            
+
             // Try to get stage
             if let Some(Value::String(stage)) = job_map.get(&Value::String("stage".to_string())) {
                 return Some(format!("Travis CI job in stage: {}", stage));
             }
-            
+
             // Try to get language
-            if let Some(Value::String(language)) = job_map.get(&Value::String("language".to_string())) {
+            if let Some(Value::String(language)) =
+                job_map.get(&Value::String("language".to_string()))
+            {
                 return Some(format!("Travis CI {} job", language));
             }
-            
+
             Some("Travis CI job".to_string())
         }
         Value::String(job_name) => Some(format!("Travis CI job: {}", job_name)),
@@ -183,15 +191,27 @@ jobs:
 
         assert_eq!(tasks.len(), 2, "Should have two tasks");
 
-        let test_task = tasks.iter().find(|t| t.name == "test").expect("Should find test task");
+        let test_task = tasks
+            .iter()
+            .find(|t| t.name == "test")
+            .expect("Should find test task");
         assert_eq!(test_task.definition_type, TaskDefinitionType::TravisCi);
         assert_eq!(test_task.runner, TaskRunner::TravisCi);
-        assert_eq!(test_task.description, Some("Travis CI job: Test".to_string()));
+        assert_eq!(
+            test_task.description,
+            Some("Travis CI job: Test".to_string())
+        );
 
-        let build_task = tasks.iter().find(|t| t.name == "build").expect("Should find build task");
+        let build_task = tasks
+            .iter()
+            .find(|t| t.name == "build")
+            .expect("Should find build task");
         assert_eq!(build_task.definition_type, TaskDefinitionType::TravisCi);
         assert_eq!(build_task.runner, TaskRunner::TravisCi);
-        assert_eq!(build_task.description, Some("Travis CI job: Build".to_string()));
+        assert_eq!(
+            build_task.description,
+            Some("Travis CI job: Build".to_string())
+        );
     }
 
     #[test]
@@ -220,7 +240,11 @@ matrix:
         for task in &tasks {
             assert_eq!(task.definition_type, TaskDefinitionType::TravisCi);
             assert_eq!(task.runner, TaskRunner::TravisCi);
-            assert!(task.description.as_ref().unwrap().contains("Travis CI job:"));
+            assert!(task
+                .description
+                .as_ref()
+                .unwrap()
+                .contains("Travis CI job:"));
         }
     }
 
@@ -250,7 +274,10 @@ script:
         assert_eq!(task.name, "travis");
         assert_eq!(task.definition_type, TaskDefinitionType::TravisCi);
         assert_eq!(task.runner, TaskRunner::TravisCi);
-        assert_eq!(task.description, Some("Travis CI configuration".to_string()));
+        assert_eq!(
+            task.description,
+            Some("Travis CI configuration".to_string())
+        );
     }
 
     #[test]
@@ -287,11 +314,15 @@ jobs:
 
         let tasks = parse(&file_path).expect("Failed to parse empty Travis CI config");
 
-        assert_eq!(tasks.len(), 1, "Should have one default task for empty config");
+        assert_eq!(
+            tasks.len(),
+            1,
+            "Should have one default task for empty config"
+        );
 
         let task = &tasks[0];
         assert_eq!(task.name, "travis");
         assert_eq!(task.definition_type, TaskDefinitionType::TravisCi);
         assert_eq!(task.runner, TaskRunner::TravisCi);
     }
-} 
+}

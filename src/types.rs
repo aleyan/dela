@@ -185,7 +185,10 @@ impl TaskRunner {
             }
             TaskRunner::TravisCi => {
                 // Travis CI tasks are not executable locally
-                format!("# Travis CI task '{}' - not executable locally", task.source_name)
+                format!(
+                    "# Travis CI task '{}' - not executable locally",
+                    task.source_name
+                )
             }
         }
     }
