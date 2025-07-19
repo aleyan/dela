@@ -261,7 +261,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [x] [DTKT-121] Parse GitHub Actions workflow files to expose jobs as tasks for `act`.
   - [x] [DTKT-126] Implement docker compose support
 
-  - [ ] [DTKT-134] Implement CMake `CMakeLists.txt` parser and task discovery
+  - [x] [DTKT-134] Implement CMake `CMakeLists.txt` parser and task discovery
   - [x] [DTKT-135] Implement Travis CI `.travis.yml` parser and task discovery
 
 ## Icebox and Future Enhancements (Post-Launch)

@@ -25,6 +25,7 @@ pub fn is_runner_available(runner: &TaskRunner) -> bool {
         TaskRunner::Act => check_path_executable("act").is_some(),
         TaskRunner::DockerCompose => check_path_executable("docker").is_some(),
         TaskRunner::TravisCi => false, // Travis CI tasks are not executable locally
+        TaskRunner::CMake => check_path_executable("cmake").is_some(),
     }
 }
 

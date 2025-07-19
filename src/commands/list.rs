@@ -486,6 +486,7 @@ mod tests {
                 TaskRunner::Act => TaskDefinitionType::GitHubActions,
                 TaskRunner::DockerCompose => TaskDefinitionType::DockerCompose,
                 TaskRunner::TravisCi => TaskDefinitionType::TravisCi,
+                TaskRunner::CMake => TaskDefinitionType::CMake,
             },
             runner,
             source_name: name.to_string(),
