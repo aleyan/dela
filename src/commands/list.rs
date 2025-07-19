@@ -182,6 +182,7 @@ pub fn execute(verbose: bool) -> Result<(), String> {
     used_footnotes.insert('†', false); // shadowed by shell builtin
     used_footnotes.insert('‡', false); // shadowed by command on path
     used_footnotes.insert('‖', false); // conflicts with task from another tool
+    used_footnotes.insert('§', false); // no tool exists for ci execution
 
     if tasks_by_runner.is_empty() {
         write_line(&format!(
@@ -228,7 +229,10 @@ pub fn execute(verbose: bool) -> Result<(), String> {
             // Add missing runner indicator if needed
             let tool_not_installed = !is_runner_available(&sorted_tasks[0].runner);
             let runner_name = runner.clone();
-            let runner_footnote = if tool_not_installed {
+            let runner_footnote = if sorted_tasks[0].runner == crate::types::TaskRunner::TravisCi {
+                used_footnotes.insert('§', true);
+                Some("§".yellow())
+            } else if tool_not_installed {
                 used_footnotes.insert('*', true);
                 Some("*".yellow())
             } else {
@@ -306,6 +310,9 @@ pub fn execute(verbose: bool) -> Result<(), String> {
         }
         if *used_footnotes.get(&'‖').unwrap_or(&false) {
             footnotes.push(('‖', "conflicts with task from another tool"));
+        }
+        if *used_footnotes.get(&'§').unwrap_or(&false) {
+            footnotes.push(('§', "no tool exists for ci execution"));
         }
 
         if !footnotes.is_empty() {
@@ -475,6 +482,7 @@ mod tests {
                 TaskRunner::Gradle => TaskDefinitionType::Gradle,
                 TaskRunner::Act => TaskDefinitionType::GitHubActions,
                 TaskRunner::DockerCompose => TaskDefinitionType::DockerCompose,
+                TaskRunner::TravisCi => TaskDefinitionType::TravisCi,
             },
             runner,
             source_name: name.to_string(),

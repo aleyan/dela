@@ -1,6 +1,6 @@
 use crate::parsers::{
     parse_docker_compose, parse_github_actions, parse_gradle, parse_makefile, parse_package_json,
-    parse_pom_xml, parse_pyproject_toml, parse_taskfile,
+    parse_pom_xml, parse_pyproject_toml, parse_taskfile, parse_travis_ci,
 };
 use crate::task_shadowing::check_shadowing;
 use crate::types::{Task, TaskDefinitionFile, TaskDefinitionType, TaskFileStatus, TaskRunner};
@@ -20,6 +20,7 @@ pub struct DiscoveredTaskDefinitions {
     pub gradle: Option<TaskDefinitionFile>,
     pub github_actions: Option<TaskDefinitionFile>,
     pub docker_compose: Option<TaskDefinitionFile>,
+    pub travis_ci: Option<TaskDefinitionFile>,
 }
 
 /// Result of task discovery
@@ -66,6 +67,7 @@ pub fn discover_tasks(dir: &Path) -> DiscoveredTasks {
     let _ = discover_gradle_tasks(dir, &mut discovered);
     let _ = discover_github_actions_tasks(dir, &mut discovered);
     let _ = discover_docker_compose_tasks(dir, &mut discovered);
+    let _ = discover_travis_ci_tasks(dir, &mut discovered);
     discover_shell_script_tasks(dir, &mut discovered);
 
     // Process tasks to identify name collisions
@@ -240,6 +242,9 @@ fn set_definition(discovered: &mut DiscoveredTasks, definition: TaskDefinitionFi
         }
         TaskDefinitionType::DockerCompose => {
             discovered.definitions.docker_compose = Some(definition)
+        }
+        TaskDefinitionType::TravisCi => {
+            discovered.definitions.travis_ci = Some(definition)
         }
         _ => {}
     }
@@ -670,6 +675,42 @@ fn discover_docker_compose_tasks(
                 discovered,
             );
         }
+    }
+
+    Ok(())
+}
+
+fn discover_travis_ci_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<(), String> {
+    let travis_ci_path = dir.join(".travis.yml");
+
+    if travis_ci_path.exists() {
+        match parse_travis_ci(&travis_ci_path) {
+            Ok(tasks) => {
+                handle_discovery_success(
+                    tasks,
+                    travis_ci_path.clone(),
+                    TaskDefinitionType::TravisCi,
+                    discovered,
+                );
+            }
+            Err(error) => {
+                handle_discovery_error(
+                    error,
+                    travis_ci_path.clone(),
+                    TaskDefinitionType::TravisCi,
+                    discovered,
+                );
+            }
+        }
+    } else {
+        set_definition(
+            discovered,
+            TaskDefinitionFile {
+                path: travis_ci_path,
+                definition_type: TaskDefinitionType::TravisCi,
+                status: TaskFileStatus::NotFound,
+            },
+        );
     }
 
     Ok(())
@@ -2249,5 +2290,149 @@ services:
         assert!(service_names.contains(&"down"));
         assert!(service_names.contains(&"web"));
         assert!(service_names.contains(&"db"));
+    }
+
+    #[test]
+    fn test_discover_travis_ci_tasks() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create a .travis.yml file
+        let travis_content = r#"
+language: node_js
+node_js:
+  - "18"
+  - "20"
+
+jobs:
+  test:
+    name: "Test"
+    stage: test
+  build:
+    name: "Build"
+    stage: build
+"#;
+        let travis_path = temp_dir.path().join(".travis.yml");
+        let mut file = File::create(&travis_path).unwrap();
+        write!(file, "{}", travis_content).unwrap();
+
+        // Run discovery
+        let discovered = discover_tasks(temp_dir.path());
+
+        // Check that the travis-ci status is Parsed
+        let travis_def = discovered.definitions.travis_ci.unwrap();
+        assert_eq!(travis_def.status, TaskFileStatus::Parsed);
+        assert_eq!(travis_def.path, travis_path);
+
+        // Check that both jobs are found as tasks
+        assert_eq!(discovered.tasks.len(), 2);
+
+        let test_task = discovered.tasks.iter().find(|t| t.name == "test").unwrap();
+        assert_eq!(test_task.definition_type, TaskDefinitionType::TravisCi);
+        assert_eq!(test_task.runner, TaskRunner::TravisCi);
+        assert_eq!(test_task.description, Some("Travis CI job: Test".to_string()));
+
+        let build_task = discovered.tasks.iter().find(|t| t.name == "build").unwrap();
+        assert_eq!(build_task.definition_type, TaskDefinitionType::TravisCi);
+        assert_eq!(build_task.runner, TaskRunner::TravisCi);
+        assert_eq!(build_task.description, Some("Travis CI job: Build".to_string()));
+    }
+
+    #[test]
+    fn test_discover_travis_ci_matrix_config() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create a .travis.yml file with matrix configuration
+        let travis_content = r#"
+language: python
+
+matrix:
+  include:
+    - name: "Python 3.8"
+      python: "3.8"
+    - name: "Python 3.9"
+      python: "3.9"
+    - name: "Python 3.10"
+      python: "3.10"
+"#;
+        let travis_path = temp_dir.path().join(".travis.yml");
+        let mut file = File::create(&travis_path).unwrap();
+        write!(file, "{}", travis_content).unwrap();
+
+        // Run discovery
+        let discovered = discover_tasks(temp_dir.path());
+
+        // Check that the travis-ci status is Parsed
+        let travis_def = discovered.definitions.travis_ci.unwrap();
+        assert_eq!(travis_def.status, TaskFileStatus::Parsed);
+
+        // Check that all matrix jobs are found as tasks
+        assert_eq!(discovered.tasks.len(), 3);
+
+        for task in &discovered.tasks {
+            assert_eq!(task.definition_type, TaskDefinitionType::TravisCi);
+            assert_eq!(task.runner, TaskRunner::TravisCi);
+            assert!(task.description.as_ref().unwrap().contains("Travis CI job:"));
+        }
+
+        let python_38_task = discovered.tasks.iter().find(|t| t.name == "Python 3.8").unwrap();
+        assert_eq!(python_38_task.description, Some("Travis CI job: Python 3.8".to_string()));
+
+        let python_39_task = discovered.tasks.iter().find(|t| t.name == "Python 3.9").unwrap();
+        assert_eq!(python_39_task.description, Some("Travis CI job: Python 3.9".to_string()));
+
+        let python_310_task = discovered.tasks.iter().find(|t| t.name == "Python 3.10").unwrap();
+        assert_eq!(python_310_task.description, Some("Travis CI job: Python 3.10".to_string()));
+    }
+
+    #[test]
+    fn test_discover_travis_ci_basic_config() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create a basic .travis.yml file without jobs section
+        let travis_content = r#"
+language: ruby
+rvm:
+  - 2.7
+  - 3.0
+  - 3.1
+
+script:
+  - bundle install
+  - bundle exec rspec
+"#;
+        let travis_path = temp_dir.path().join(".travis.yml");
+        let mut file = File::create(&travis_path).unwrap();
+        write!(file, "{}", travis_content).unwrap();
+
+        // Run discovery
+        let discovered = discover_tasks(temp_dir.path());
+
+        // Check that the travis-ci status is Parsed
+        let travis_def = discovered.definitions.travis_ci.unwrap();
+        assert_eq!(travis_def.status, TaskFileStatus::Parsed);
+
+        // Check that a default task is created
+        assert_eq!(discovered.tasks.len(), 1);
+
+        let task = &discovered.tasks[0];
+        assert_eq!(task.name, "travis");
+        assert_eq!(task.definition_type, TaskDefinitionType::TravisCi);
+        assert_eq!(task.runner, TaskRunner::TravisCi);
+        assert_eq!(task.description, Some("Travis CI configuration".to_string()));
+    }
+
+    #[test]
+    fn test_discover_travis_ci_missing_file() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Run discovery without .travis.yml
+        let discovered = discover_tasks(temp_dir.path());
+
+        // Check that the travis-ci status is NotFound
+        let travis_def = discovered.definitions.travis_ci.unwrap();
+        assert_eq!(travis_def.status, TaskFileStatus::NotFound);
+
+        // Check that no tasks are found
+        assert_eq!(discovered.tasks.len(), 0);
     }
 }

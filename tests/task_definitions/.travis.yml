@@ -1,0 +1,23 @@
+language: node_js
+node_js:
+  - "18"
+  - "20"
+
+jobs:
+  test:
+    name: "Test"
+    stage: test
+    script:
+      - npm install
+      - npm test
+  build:
+    name: "Build"
+    stage: build
+    script:
+      - npm install
+      - npm run build
+  deploy:
+    name: "Deploy"
+    stage: deploy
+    script:
+      - echo "Deploying..." 
