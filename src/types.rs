@@ -33,6 +33,8 @@ pub enum TaskDefinitionType {
     DockerCompose,
     /// Travis CI configuration files
     TravisCi,
+    /// CMake CMakeLists.txt files
+    CMake,
 }
 
 /// Different types of task runners supported by dela.
@@ -85,6 +87,9 @@ pub enum TaskRunner {
     /// Travis CI task runner
     /// Used when .travis.yml is present (note: tasks are listed but not executable)
     TravisCi,
+    /// CMake task runner
+    /// Used when CMakeLists.txt is present
+    CMake,
 }
 
 /// Status of a task definition file
@@ -190,6 +195,12 @@ impl TaskRunner {
                     task.source_name
                 )
             }
+            TaskRunner::CMake => {
+                format!(
+                    "cmake -S . -B build && cmake --build build --target {}",
+                    task.source_name
+                )
+            }
         }
     }
 
@@ -211,6 +222,7 @@ impl TaskRunner {
             TaskRunner::Act => "act",
             TaskRunner::DockerCompose => "docker compose",
             TaskRunner::TravisCi => "travis",
+            TaskRunner::CMake => "cmake",
         }
     }
 }

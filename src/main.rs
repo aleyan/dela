@@ -31,6 +31,8 @@ mod types;
 • Gradle (build.gradle, build.gradle.kts)
 • GitHub Actions (act)
 • Docker Compose (docker-compose.yml, compose.yml)
+• CMake (CMakeLists.txt)
+• Travis CI (.travis.yml)
 "#,
     long_about = r#"Dela integrates with you shell to let you to execute locally defined
 tasks such as in Makefile or package.json without specifying the task runner.

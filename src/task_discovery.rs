@@ -1,6 +1,6 @@
 use crate::parsers::{
-    parse_docker_compose, parse_github_actions, parse_gradle, parse_makefile, parse_package_json,
-    parse_pom_xml, parse_pyproject_toml, parse_taskfile, parse_travis_ci,
+    parse_cmake, parse_docker_compose, parse_github_actions, parse_gradle, parse_makefile,
+    parse_package_json, parse_pom_xml, parse_pyproject_toml, parse_taskfile, parse_travis_ci,
 };
 use crate::task_shadowing::check_shadowing;
 use crate::types::{Task, TaskDefinitionFile, TaskDefinitionType, TaskFileStatus, TaskRunner};
@@ -21,6 +21,7 @@ pub struct DiscoveredTaskDefinitions {
     pub github_actions: Option<TaskDefinitionFile>,
     pub docker_compose: Option<TaskDefinitionFile>,
     pub travis_ci: Option<TaskDefinitionFile>,
+    pub cmake: Option<TaskDefinitionFile>,
 }
 
 /// Result of task discovery
@@ -68,6 +69,7 @@ pub fn discover_tasks(dir: &Path) -> DiscoveredTasks {
     let _ = discover_github_actions_tasks(dir, &mut discovered);
     let _ = discover_docker_compose_tasks(dir, &mut discovered);
     let _ = discover_travis_ci_tasks(dir, &mut discovered);
+    let _ = discover_cmake_tasks(dir, &mut discovered);
     discover_shell_script_tasks(dir, &mut discovered);
 
     // Process tasks to identify name collisions
@@ -244,6 +246,7 @@ fn set_definition(discovered: &mut DiscoveredTasks, definition: TaskDefinitionFi
             discovered.definitions.docker_compose = Some(definition)
         }
         TaskDefinitionType::TravisCi => discovered.definitions.travis_ci = Some(definition),
+        TaskDefinitionType::CMake => discovered.definitions.cmake = Some(definition),
         _ => {}
     }
 }
@@ -712,6 +715,29 @@ fn discover_travis_ci_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Res
     }
 
     Ok(())
+}
+
+fn discover_cmake_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<(), String> {
+    let cmake_path = dir.join("CMakeLists.txt");
+    if !cmake_path.exists() {
+        return Ok(());
+    }
+
+    match parse_cmake::parse(&cmake_path) {
+        Ok(tasks) => {
+            handle_discovery_success(
+                tasks,
+                cmake_path.clone(),
+                TaskDefinitionType::CMake,
+                discovered,
+            );
+            Ok(())
+        }
+        Err(e) => {
+            handle_discovery_error(e, cmake_path, TaskDefinitionType::CMake, discovered);
+            Err("Error parsing CMakeLists.txt".to_string())
+        }
+    }
 }
 
 fn discover_shell_script_tasks(dir: &Path, discovered: &mut DiscoveredTasks) {
@@ -2466,5 +2492,45 @@ script:
 
         // Check that no tasks are found
         assert_eq!(discovered.tasks.len(), 0);
+    }
+
+    #[test]
+    fn test_discover_cmake_tasks() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create a CMakeLists.txt file
+        let cmake_content = r#"
+cmake_minimum_required(VERSION 3.10)
+project(TestProject)
+
+add_custom_target(build-all COMMENT "Build all components")
+add_custom_target(test-all COMMENT "Run all tests")
+add_custom_target(clean-all COMMENT "Clean all build artifacts")
+"#;
+        let cmake_path = temp_dir.path().join("CMakeLists.txt");
+        let mut file = File::create(&cmake_path).unwrap();
+        write!(file, "{}", cmake_content).unwrap();
+
+        // Run discovery
+        let discovered = discover_tasks(temp_dir.path());
+
+        // Check that the cmake status is Parsed
+        let cmake_def = discovered.definitions.cmake.unwrap();
+        assert_eq!(cmake_def.status, TaskFileStatus::Parsed);
+        assert_eq!(cmake_def.path, cmake_path);
+
+        // Check that we found the expected tasks
+        let task_names: Vec<&str> = discovered.tasks.iter().map(|t| t.name.as_str()).collect();
+        assert!(task_names.contains(&"build-all"));
+        assert!(task_names.contains(&"test-all"));
+        assert!(task_names.contains(&"clean-all"));
+
+        // Check that the tasks have the correct runner
+        for task in &discovered.tasks {
+            if task.name == "build-all" || task.name == "test-all" || task.name == "clean-all" {
+                assert_eq!(task.runner, TaskRunner::CMake);
+                assert_eq!(task.definition_type, TaskDefinitionType::CMake);
+            }
+        }
     }
 }

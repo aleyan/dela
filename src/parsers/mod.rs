@@ -1,3 +1,4 @@
+pub mod parse_cmake;
 pub mod parse_docker_compose;
 pub mod parse_github_actions;
 pub mod parse_gradle;
@@ -8,6 +9,7 @@ pub mod parse_pyproject_toml;
 pub mod parse_taskfile;
 pub mod parse_travis_ci;
 
+pub use parse_cmake::parse as parse_cmake;
 pub use parse_docker_compose::parse as parse_docker_compose;
 pub use parse_github_actions::parse as parse_github_actions;
 pub use parse_gradle::parse as parse_gradle;
