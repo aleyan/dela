@@ -13,5 +13,5 @@ add_custom_target(
     COMMENT "Deploy the application to production"
 )
 
-add_custom_target(install COMMENT "Install dependencies")
+add_custom_target(install-deps COMMENT "Install dependencies")
 add_custom_target(docs COMMENT "Generate documentation") 

@@ -196,7 +196,7 @@ impl TaskRunner {
                 )
             }
             TaskRunner::CMake => {
-                format!("cmake -S . -B build --target {}", task.source_name)
+                format!("cmake -S . -B build && cmake --build build --target {}", task.source_name)
             }
         }
     }
