@@ -394,7 +394,10 @@ fn format_task_entry(task: &Task, is_ambiguous: bool, name_width: usize) -> Stri
     };
 
     // Color the task name (disambiguated name is always green, original name is dimmed red)
-    let colored_name = if task.disambiguated_name.is_some() {
+    let colored_name = if !is_runner_available(&task.runner) {
+        // For unavailable tasks (missing runner or no runner exists), show in red
+        display_name.red()
+    } else if task.disambiguated_name.is_some() {
         // For disambiguated tasks, the display name (disambiguated) should be green
         display_name.green()
     } else if is_ambiguous {
@@ -736,6 +739,30 @@ mod tests {
         assert!(output.contains("* tool not installed"));
 
         reset_to_real_environment();
+    }
+
+    #[test]
+    #[serial]
+    fn test_unavailable_task_coloring() {
+        // Force colors in test environment
+        colored::control::set_override(true);
+
+        // Test Travis CI task (no runner exists)
+        let travis_task =
+            create_test_task("build", PathBuf::from(".travis.yml"), TaskRunner::TravisCi);
+        let formatted_travis = format_task_entry(&travis_task, false, 18);
+
+        // Should be red (unavailable)
+        assert!(formatted_travis.contains("\u{1b}[31m")); // red
+        assert!(formatted_travis.contains("build"));
+
+        // Test Make task (runner available)
+        let make_task = create_test_task("build", PathBuf::from("Makefile"), TaskRunner::Make);
+        let formatted_make = format_task_entry(&make_task, false, 18);
+
+        // Should be green (available)
+        assert!(formatted_make.contains("\u{1b}[32m")); // green
+        assert!(formatted_make.contains("build"));
     }
 
     // ... existing test code ...
