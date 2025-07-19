@@ -31,6 +31,8 @@ pub enum TaskDefinitionType {
     GitHubActions,
     /// Docker Compose files
     DockerCompose,
+    /// Travis CI configuration files
+    TravisCi,
 }
 
 /// Different types of task runners supported by dela.
@@ -80,6 +82,9 @@ pub enum TaskRunner {
     /// Docker Compose task runner
     /// Used when docker-compose.yml is present
     DockerCompose,
+    /// Travis CI task runner
+    /// Used when .travis.yml is present (note: tasks are listed but not executable)
+    TravisCi,
 }
 
 /// Status of a task definition file
@@ -178,6 +183,13 @@ impl TaskRunner {
                     format!("docker compose run {}", task.source_name)
                 }
             }
+            TaskRunner::TravisCi => {
+                // Travis CI tasks are not executable locally
+                format!(
+                    "# Travis CI task '{}' - not executable locally",
+                    task.source_name
+                )
+            }
         }
     }
 
@@ -198,6 +210,7 @@ impl TaskRunner {
             TaskRunner::Gradle => "gradle",
             TaskRunner::Act => "act",
             TaskRunner::DockerCompose => "docker compose",
+            TaskRunner::TravisCi => "travis",
         }
     }
 }

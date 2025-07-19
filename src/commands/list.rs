@@ -182,6 +182,7 @@ pub fn execute(verbose: bool) -> Result<(), String> {
     used_footnotes.insert('†', false); // shadowed by shell builtin
     used_footnotes.insert('‡', false); // shadowed by command on path
     used_footnotes.insert('‖', false); // conflicts with task from another tool
+    used_footnotes.insert('§', false); // no tool exists for ci execution
 
     if tasks_by_runner.is_empty() {
         write_line(&format!(
@@ -228,7 +229,10 @@ pub fn execute(verbose: bool) -> Result<(), String> {
             // Add missing runner indicator if needed
             let tool_not_installed = !is_runner_available(&sorted_tasks[0].runner);
             let runner_name = runner.clone();
-            let runner_footnote = if tool_not_installed {
+            let runner_footnote = if sorted_tasks[0].runner == crate::types::TaskRunner::TravisCi {
+                used_footnotes.insert('§', true);
+                Some("§".yellow())
+            } else if tool_not_installed {
                 used_footnotes.insert('*', true);
                 Some("*".yellow())
             } else {
@@ -306,6 +310,9 @@ pub fn execute(verbose: bool) -> Result<(), String> {
         }
         if *used_footnotes.get(&'‖').unwrap_or(&false) {
             footnotes.push(('‖', "conflicts with task from another tool"));
+        }
+        if *used_footnotes.get(&'§').unwrap_or(&false) {
+            footnotes.push(('§', "no tool exists for ci execution"));
         }
 
         if !footnotes.is_empty() {
@@ -387,7 +394,10 @@ fn format_task_entry(task: &Task, is_ambiguous: bool, name_width: usize) -> Stri
     };
 
     // Color the task name (disambiguated name is always green, original name is dimmed red)
-    let colored_name = if task.disambiguated_name.is_some() {
+    let colored_name = if !is_runner_available(&task.runner) {
+        // For unavailable tasks (missing runner or no runner exists), show in red
+        display_name.red()
+    } else if task.disambiguated_name.is_some() {
         // For disambiguated tasks, the display name (disambiguated) should be green
         display_name.green()
     } else if is_ambiguous {
@@ -475,6 +485,7 @@ mod tests {
                 TaskRunner::Gradle => TaskDefinitionType::Gradle,
                 TaskRunner::Act => TaskDefinitionType::GitHubActions,
                 TaskRunner::DockerCompose => TaskDefinitionType::DockerCompose,
+                TaskRunner::TravisCi => TaskDefinitionType::TravisCi,
             },
             runner,
             source_name: name.to_string(),
@@ -728,6 +739,30 @@ mod tests {
         assert!(output.contains("* tool not installed"));
 
         reset_to_real_environment();
+    }
+
+    #[test]
+    #[serial]
+    fn test_unavailable_task_coloring() {
+        // Force colors in test environment
+        colored::control::set_override(true);
+
+        // Test Travis CI task (no runner exists)
+        let travis_task =
+            create_test_task("build", PathBuf::from(".travis.yml"), TaskRunner::TravisCi);
+        let formatted_travis = format_task_entry(&travis_task, false, 18);
+
+        // Should be red (unavailable)
+        assert!(formatted_travis.contains("\u{1b}[31m")); // red
+        assert!(formatted_travis.contains("build"));
+
+        // Test Make task (runner available)
+        let make_task = create_test_task("build", PathBuf::from("Makefile"), TaskRunner::Make);
+        let formatted_make = format_task_entry(&make_task, false, 18);
+
+        // Should be green (available)
+        assert!(formatted_make.contains("\u{1b}[32m")); // green
+        assert!(formatted_make.contains("build"));
     }
 
     // ... existing test code ...

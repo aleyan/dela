@@ -22,6 +22,9 @@ pub fn execute(task_with_args: &str) -> Result<(), String> {
             // Single task found, check if runner is available
             let task = matching_tasks[0];
             if !is_runner_available(&task.runner) {
+                if task.runner == crate::types::TaskRunner::TravisCi {
+                    return Err("Travis CI tasks cannot be executed locally - they are only available for discovery".to_string());
+                }
                 return Err(format!("Runner '{}' not found", task.runner.short_name()));
             }
             let mut command = task.runner.get_command(task);
