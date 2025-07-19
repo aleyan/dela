@@ -50,11 +50,11 @@ fn parse_cmake_string(content: &str, file_path: &Path) -> Result<Vec<Task>, Stri
         let target_block = &normalized_content[target_start..target_end];
 
         let mut description = format!("CMake custom target: {}", target_name);
-        
+
         // Look for COMMENT in this specific target block
         let comment_pattern = Regex::new(r#"COMMENT\s+"([^"]*)"#)
             .map_err(|e| format!("Failed to compile comment regex: {}", e))?;
-        
+
         if let Some(comment_captures) = comment_pattern.captures(target_block) {
             if let Some(comment) = comment_captures.get(1) {
                 description = comment.as_str().to_string();
@@ -83,23 +83,23 @@ fn find_closing_paren(content: &str) -> usize {
     let mut paren_count = 0;
     let mut in_string = false;
     let mut escape_next = false;
-    
+
     for (i, ch) in content.chars().enumerate() {
         if escape_next {
             escape_next = false;
             continue;
         }
-        
+
         if ch == '\\' {
             escape_next = true;
             continue;
         }
-        
+
         if ch == '"' && !escape_next {
             in_string = !in_string;
             continue;
         }
-        
+
         if !in_string {
             if ch == '(' {
                 paren_count += 1;
@@ -111,7 +111,7 @@ fn find_closing_paren(content: &str) -> usize {
             }
         }
     }
-    
+
     content.len() - 1 // Fallback
 }
 
@@ -163,7 +163,10 @@ add_custom_target(clean-all)
         assert_eq!(test_task.description.as_ref().unwrap(), "Run all tests");
 
         let build_task = tasks.iter().find(|t| t.name == "build-all").unwrap();
-        assert_eq!(build_task.description.as_ref().unwrap(), "CMake custom target: build-all");
+        assert_eq!(
+            build_task.description.as_ref().unwrap(),
+            "CMake custom target: build-all"
+        );
     }
 
     #[test]
@@ -197,10 +200,16 @@ add_custom_target(build COMMENT "Build the project")
 
         // Check descriptions
         let deploy_task = tasks.iter().find(|t| t.name == "deploy").unwrap();
-        assert_eq!(deploy_task.description.as_ref().unwrap(), "Deploy the application");
+        assert_eq!(
+            deploy_task.description.as_ref().unwrap(),
+            "Deploy the application"
+        );
 
         let install_task = tasks.iter().find(|t| t.name == "install").unwrap();
-        assert_eq!(install_task.description.as_ref().unwrap(), "Install dependencies");
+        assert_eq!(
+            install_task.description.as_ref().unwrap(),
+            "Install dependencies"
+        );
     }
 
     #[test]
@@ -234,7 +243,10 @@ add_custom_target(clean)
         // Check that tasks without comments get default descriptions
         for task in tasks {
             assert!(task.description.is_some());
-            assert!(task.description.unwrap().starts_with("CMake custom target:"));
+            assert!(task
+                .description
+                .unwrap()
+                .starts_with("CMake custom target:"));
         }
     }
-} 
+}

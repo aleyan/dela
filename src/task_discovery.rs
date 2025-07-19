@@ -1,6 +1,6 @@
 use crate::parsers::{
-    parse_cmake, parse_docker_compose, parse_github_actions, parse_gradle, parse_makefile, parse_package_json,
-    parse_pom_xml, parse_pyproject_toml, parse_taskfile, parse_travis_ci,
+    parse_cmake, parse_docker_compose, parse_github_actions, parse_gradle, parse_makefile,
+    parse_package_json, parse_pom_xml, parse_pyproject_toml, parse_taskfile, parse_travis_ci,
 };
 use crate::task_shadowing::check_shadowing;
 use crate::types::{Task, TaskDefinitionFile, TaskDefinitionType, TaskFileStatus, TaskRunner};
@@ -245,12 +245,8 @@ fn set_definition(discovered: &mut DiscoveredTasks, definition: TaskDefinitionFi
         TaskDefinitionType::DockerCompose => {
             discovered.definitions.docker_compose = Some(definition)
         }
-        TaskDefinitionType::TravisCi => {
-            discovered.definitions.travis_ci = Some(definition)
-        }
-        TaskDefinitionType::CMake => {
-            discovered.definitions.cmake = Some(definition)
-        }
+        TaskDefinitionType::TravisCi => discovered.definitions.travis_ci = Some(definition),
+        TaskDefinitionType::CMake => discovered.definitions.cmake = Some(definition),
         _ => {}
     }
 }
