@@ -1,5 +1,9 @@
 use crate::types::{AllowScope, Task};
-use std::io::{self, Write};
+use crossterm::{
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
+    execute,
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+};
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
@@ -8,12 +12,8 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem, Paragraph},
     Frame, Terminal,
 };
-use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-};
 use std::io::Stdout;
+use std::io::{self, Write};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum AllowDecision {
@@ -24,10 +24,9 @@ pub enum AllowDecision {
 /// Prompt the user for a decision about a task using a TUI interface
 pub fn prompt_for_task(task: &Task) -> Result<AllowDecision, String> {
     // Check if we're in a test environment or non-interactive terminal
-    let is_test = std::env::var("RUST_TEST_THREADS").is_ok() 
-        || std::env::var("CARGO_TEST").is_ok();
+    let is_test = std::env::var("RUST_TEST_THREADS").is_ok() || std::env::var("CARGO_TEST").is_ok();
     let is_interactive = atty::is(atty::Stream::Stdout) && atty::is(atty::Stream::Stdin);
-    
+
     // Force fallback in test environment or when stdin/stdout are redirected
     if is_test || !is_interactive {
         return prompt_for_task_fallback(task);
@@ -43,7 +42,7 @@ pub fn prompt_for_task(task: &Task) -> Result<AllowDecision, String> {
                     match Terminal::new(backend) {
                         Ok(mut terminal) => {
                             let result = run_tui(&mut terminal, task);
-                            
+
                             // Restore terminal
                             let _ = disable_raw_mode();
                             let _ = execute!(
@@ -52,7 +51,7 @@ pub fn prompt_for_task(task: &Task) -> Result<AllowDecision, String> {
                                 DisableMouseCapture
                             );
                             let _ = terminal.show_cursor();
-                            
+
                             result
                         }
                         Err(_) => prompt_for_task_fallback(task),
@@ -102,12 +101,27 @@ fn prompt_for_task_fallback(task: &Task) -> Result<AllowDecision, String> {
     }
 }
 
-fn run_tui(terminal: &mut Terminal<CrosstermBackend<Stdout>>, task: &Task) -> Result<AllowDecision, String> {
+fn run_tui(
+    terminal: &mut Terminal<CrosstermBackend<Stdout>>,
+    task: &Task,
+) -> Result<AllowDecision, String> {
     let options = vec![
-        ("Allow once (this time only)", AllowDecision::Allow(AllowScope::Once)),
-        ("Allow this task (remember for this task)", AllowDecision::Allow(AllowScope::Task)),
-        ("Allow file (remember for all tasks in this file)", AllowDecision::Allow(AllowScope::File)),
-        ("Allow directory (remember for all tasks in this directory)", AllowDecision::Allow(AllowScope::Directory)),
+        (
+            "Allow once (this time only)",
+            AllowDecision::Allow(AllowScope::Once),
+        ),
+        (
+            "Allow this task (remember for this task)",
+            AllowDecision::Allow(AllowScope::Task),
+        ),
+        (
+            "Allow file (remember for all tasks in this file)",
+            AllowDecision::Allow(AllowScope::File),
+        ),
+        (
+            "Allow directory (remember for all tasks in this directory)",
+            AllowDecision::Allow(AllowScope::Directory),
+        ),
         ("Deny (don't run this task)", AllowDecision::Deny),
     ];
 
@@ -118,7 +132,9 @@ fn run_tui(terminal: &mut Terminal<CrosstermBackend<Stdout>>, task: &Task) -> Re
             .draw(|f| ui(f, task, &options, selected))
             .map_err(|e| format!("Failed to draw UI: {}", e))?;
 
-        if let Event::Key(key) = event::read().map_err(|e| format!("Failed to read event: {}", e))? {
+        if let Event::Key(key) =
+            event::read().map_err(|e| format!("Failed to read event: {}", e))?
+        {
             match key.code {
                 KeyCode::Char('q') | KeyCode::Esc => {
                     return Err("User cancelled".to_string());
@@ -148,12 +164,7 @@ fn run_tui(terminal: &mut Terminal<CrosstermBackend<Stdout>>, task: &Task) -> Re
     }
 }
 
-fn ui(
-    f: &mut Frame,
-    task: &Task,
-    options: &[(&str, AllowDecision)],
-    selected: usize,
-) {
+fn ui(f: &mut Frame, task: &Task, options: &[(&str, AllowDecision)], selected: usize) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(2)
@@ -171,24 +182,26 @@ fn ui(
 
     // Header
     let header_text = vec![
-        Line::from(vec![
-            Span::styled(
-                format!("Task '{}' requires approval from:", task.name),
-                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled(
-                format!("  {}", task.file_path.display()),
-                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
-            ),
-        ]),
+        Line::from(vec![Span::styled(
+            format!("Task '{}' requires approval from:", task.name),
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )]),
+        Line::from(vec![Span::styled(
+            format!("  {}", task.file_path.display()),
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )]),
     ];
 
-
-
     let header = Paragraph::new(header_text)
-        .block(Block::default().borders(Borders::ALL).title("Task Approval"))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("Task Approval"),
+        )
         .wrap(ratatui::widgets::Wrap { trim: true });
     f.render_widget(header, chunks[0]);
 
@@ -215,18 +228,16 @@ fn ui(
     f.render_widget(list, chunks[2]);
 
     // Instructions
-    let instructions = Paragraph::new(vec![
-        Line::from(vec![
-            Span::styled("↑/↓ or j/k", Style::default().fg(Color::Yellow)),
-            Span::styled(" to navigate, ", Style::default().fg(Color::White)),
-            Span::styled("g/G", Style::default().fg(Color::Yellow)),
-            Span::styled(" for first/last, ", Style::default().fg(Color::White)),
-            Span::styled("Enter", Style::default().fg(Color::Yellow)),
-            Span::styled(" to select, ", Style::default().fg(Color::White)),
-            Span::styled("q/Esc", Style::default().fg(Color::Yellow)),
-            Span::styled(" to cancel", Style::default().fg(Color::White)),
-        ]),
-    ])
+    let instructions = Paragraph::new(vec![Line::from(vec![
+        Span::styled("↑/↓ or j/k", Style::default().fg(Color::Yellow)),
+        Span::styled(" to navigate, ", Style::default().fg(Color::White)),
+        Span::styled("g/G", Style::default().fg(Color::Yellow)),
+        Span::styled(" for first/last, ", Style::default().fg(Color::White)),
+        Span::styled("Enter", Style::default().fg(Color::Yellow)),
+        Span::styled(" to select, ", Style::default().fg(Color::White)),
+        Span::styled("q/Esc", Style::default().fg(Color::Yellow)),
+        Span::styled(" to cancel", Style::default().fg(Color::White)),
+    ])])
     .block(Block::default().borders(Borders::ALL).title("Controls"));
     f.render_widget(instructions, chunks[4]);
 }
@@ -235,16 +246,25 @@ fn ui(
 mod tests {
     use super::*;
 
-
-
-
     // Test helper function that simulates the TUI logic
     fn test_tui_logic(selected_index: usize) -> Result<AllowDecision, String> {
         let options = vec![
-            ("Allow once (this time only)", AllowDecision::Allow(AllowScope::Once)),
-            ("Allow this task (remember for this task)", AllowDecision::Allow(AllowScope::Task)),
-            ("Allow file (remember for all tasks in this file)", AllowDecision::Allow(AllowScope::File)),
-            ("Allow directory (remember for all tasks in this directory)", AllowDecision::Allow(AllowScope::Directory)),
+            (
+                "Allow once (this time only)",
+                AllowDecision::Allow(AllowScope::Once),
+            ),
+            (
+                "Allow this task (remember for this task)",
+                AllowDecision::Allow(AllowScope::Task),
+            ),
+            (
+                "Allow file (remember for all tasks in this file)",
+                AllowDecision::Allow(AllowScope::File),
+            ),
+            (
+                "Allow directory (remember for all tasks in this directory)",
+                AllowDecision::Allow(AllowScope::Directory),
+            ),
             ("Deny (don't run this task)", AllowDecision::Deny),
         ];
 
