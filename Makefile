@@ -58,9 +58,5 @@ publish: tests tests_integration
 	fi
 	@cargo publish
 
-# Print git diff without pager
-pdiff:
-	@git --no-pager diff
-
 format:
 	cargo fmt --all
