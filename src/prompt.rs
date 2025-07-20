@@ -123,15 +123,21 @@ fn run_tui(terminal: &mut Terminal<CrosstermBackend<Stdout>>, task: &Task) -> Re
                 KeyCode::Char('q') | KeyCode::Esc => {
                     return Err("User cancelled".to_string());
                 }
-                KeyCode::Up => {
+                KeyCode::Up | KeyCode::Char('k') => {
                     selected = if selected == 0 {
                         options.len() - 1
                     } else {
                         selected - 1
                     };
                 }
-                KeyCode::Down => {
+                KeyCode::Down | KeyCode::Char('j') => {
                     selected = (selected + 1) % options.len();
+                }
+                KeyCode::Home | KeyCode::Char('g') => {
+                    selected = 0;
+                }
+                KeyCode::End | KeyCode::Char('G') => {
+                    selected = options.len() - 1;
                 }
                 KeyCode::Enter => {
                     return Ok(options[selected].1.clone());
@@ -153,9 +159,9 @@ fn ui(
         .margin(2)
         .constraints(
             [
-                Constraint::Length(3), // Header
+                Constraint::Min(3),    // Header (allow for wrapping)
                 Constraint::Length(1), // Spacer
-                Constraint::Min(0),    // Options list
+                Constraint::Length(7), // Options list (exactly 5 lines)
                 Constraint::Length(1), // Spacer
                 Constraint::Length(3), // Instructions
             ]
@@ -164,26 +170,26 @@ fn ui(
         .split(f.size());
 
     // Header
-    let mut header_text = vec![
+    let header_text = vec![
         Line::from(vec![
             Span::styled(
-                format!("Task '{}' from '{}' requires approval", task.name, task.file_path.display()),
+                format!("Task '{}' requires approval from:", task.name),
+                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled(
+                format!("  {}", task.file_path.display()),
                 Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
             ),
         ]),
     ];
 
-    if let Some(desc) = &task.description {
-        header_text.push(Line::from(vec![
-            Span::styled(
-                format!("Description: {}", desc),
-                Style::default().fg(Color::Cyan),
-            ),
-        ]));
-    }
+
 
     let header = Paragraph::new(header_text)
-        .block(Block::default().borders(Borders::ALL).title("Task Approval"));
+        .block(Block::default().borders(Borders::ALL).title("Task Approval"))
+        .wrap(ratatui::widgets::Wrap { trim: true });
     f.render_widget(header, chunks[0]);
 
     // Options list
@@ -211,8 +217,10 @@ fn ui(
     // Instructions
     let instructions = Paragraph::new(vec![
         Line::from(vec![
-            Span::styled("↑/↓", Style::default().fg(Color::Yellow)),
+            Span::styled("↑/↓ or j/k", Style::default().fg(Color::Yellow)),
             Span::styled(" to navigate, ", Style::default().fg(Color::White)),
+            Span::styled("g/G", Style::default().fg(Color::Yellow)),
+            Span::styled(" for first/last, ", Style::default().fg(Color::White)),
             Span::styled("Enter", Style::default().fg(Color::Yellow)),
             Span::styled(" to select, ", Style::default().fg(Color::White)),
             Span::styled("q/Esc", Style::default().fg(Color::Yellow)),
