@@ -4,7 +4,7 @@
 [![Crates.io](https://img.shields.io/crates/v/dela)](https://crates.io/crates/dela)
 [![Docs.rs](https://docs.rs/dela/badge.svg)](https://docs.rs/dela)
 
-Dela is a lightweight task runner that provides discovery for task definitions in various formats, and lets you execute tasks without specifying the runner while delegating their execution to your existing tools like Make, npm, uv, and others.
+Dela is a task runner that provides discovery for task definitions in various formats, and lets you execute tasks without specifying the runner while delegating their execution to your existing tools like Make, npm, uv, and others.
 
 ## Installation
 
@@ -99,6 +99,10 @@ When you download a repo from the internet and execute a task in it you need to 
 ### Is dela production ready?
 
 `dela` is not at 0.1 yet and its cli is subject to change.
+
+### What are the alternatives to dela?
+
+Other task runners that handle multiple runners are [task-keeper](https://github.com/linux-china/task-keeper) and [ds](https://github.com/metaist/ds).
 
 ## Development
 
