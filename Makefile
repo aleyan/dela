@@ -11,43 +11,44 @@ build:
 	cargo build
 
 tests:
-	@echo "Running tests..."
+	@echo "Running unit tests."
 	cargo test
 
 # Build the base builder image
-builder:
+_builder:
 	@echo "Building base builder image..."
 	docker build -t dela-builder -f tests/Dockerfile.builder .
 
 # Individual shell test targets
-test_unit: builder
+test_unit: _builder
 	VERBOSE=$(VERBOSE) ./tests/run_tests.sh unit;
 
-test_noinit: builder
+test_noinit: _builder
 	VERBOSE=$(VERBOSE) ./tests/run_tests.sh noinit;
 
-test_zsh: builder
+test_zsh: _builder
 	VERBOSE=$(VERBOSE) ./tests/run_tests.sh zsh;
 
-test_bash: builder
+test_bash: _builder
 	VERBOSE=$(VERBOSE) ./tests/run_tests.sh bash;
 
-test_fish: builder
+test_fish: _builder
 	VERBOSE=$(VERBOSE) ./tests/run_tests.sh fish;
 
-test_pwsh: builder
+test_pwsh: _builder
 	VERBOSE=$(VERBOSE) ./tests/run_tests.sh pwsh;
 
 # Run all shell tests
-tests_integration: builder test_unit test_noinit test_zsh test_bash test_fish test_pwsh
+tests_integration: _builder test_unit test_noinit test_zsh test_bash test_fish test_pwsh
 
 install:
 	@echo "Installing dela locally..."
 	cargo install --path .
 
+# Run dela with arguments: make run ARGS="list" or make run ARGS="help"
 run:
-	@echo "Running dela..."
-	cargo run
+	@echo "Build and run dela binary with args"
+	cargo run $(ARGS)
 
 # Publish to crates.io
 publish: tests tests_integration
