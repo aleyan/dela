@@ -3,6 +3,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.6.0] - 2025-07-22
+
+### Added
+
+- Added support for travis ci.
+- Added support for docker-compose.
+- Added support for cmake.
+- Added color to the `dela list` output.
+
+### Changed
+
+- Allow dialog is now a tui with 5 selectable options.
+- Update the `dela --help` command to filter out internal commands.
+
 ## [0.5.0] - 2025-05-17
 
 ### Added
