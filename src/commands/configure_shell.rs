@@ -67,8 +67,10 @@ mod tests {
     use serial_test::serial;
 
     fn setup_test_env(shell: &str) {
-        env::remove_var("SHELL");
-        env::set_var("SHELL", shell);
+        unsafe {
+            env::remove_var("SHELL");
+            env::set_var("SHELL", shell);
+        }
     }
 
     #[test]
@@ -124,7 +126,9 @@ mod tests {
     #[test]
     #[serial]
     fn test_missing_shell_env() {
-        env::remove_var("SHELL");
+        unsafe {
+            env::remove_var("SHELL");
+        }
         let result = execute();
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "SHELL environment variable not set");

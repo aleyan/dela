@@ -189,7 +189,9 @@ mod tests {
 
     fn setup_test_env() -> (TempDir, Task) {
         let temp_dir = TempDir::new().unwrap();
-        env::set_var("HOME", temp_dir.path());
+        unsafe {
+            env::set_var("HOME", temp_dir.path());
+        }
 
         // Create ~/.dela directory
         fs::create_dir_all(temp_dir.path().join(".dela"))

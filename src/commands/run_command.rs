@@ -99,7 +99,9 @@ test: ## Running tests
 
         // Create a temp dir for HOME and set it up
         let home_dir = TempDir::new().expect("Failed to create temp HOME directory");
-        env::set_var("HOME", home_dir.path());
+        unsafe {
+            env::set_var("HOME", home_dir.path());
+        }
 
         // Create ~/.dela directory
         fs::create_dir_all(home_dir.path().join(".dela"))

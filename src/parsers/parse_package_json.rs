@@ -146,7 +146,9 @@ mod tests {
     #[test]
     #[serial]
     fn test_parse_package_json_no_package_manager() {
-        env::set_var("MOCK_NO_PM", "1");
+        unsafe {
+            env::set_var("MOCK_NO_PM", "1");
+        }
         let temp_dir = TempDir::new().unwrap();
         let package_json_path = temp_dir.path().join("package.json");
 
@@ -173,7 +175,9 @@ mod tests {
         let tasks = parse(&package_json_path).unwrap();
         assert!(tasks.is_empty());
 
-        env::remove_var("MOCK_NO_PM");
+        unsafe {
+            env::remove_var("MOCK_NO_PM");
+        }
         reset_mock();
     }
 }

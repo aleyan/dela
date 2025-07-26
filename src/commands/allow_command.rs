@@ -130,7 +130,9 @@ test: ## Running tests
 
         // Create a temp dir for HOME and set it up
         let home_dir = TempDir::new().expect("Failed to create temp HOME directory");
-        env::set_var("HOME", home_dir.path());
+        unsafe {
+            env::set_var("HOME", home_dir.path());
+        }
 
         // Create ~/.dela directory
         fs::create_dir_all(home_dir.path().join(".dela"))
@@ -249,7 +251,9 @@ test: ## Running tests
     fn test_allow_command_uninitialized() {
         // Create a temp dir for HOME but don't create .dela directory
         let home_dir = TempDir::new().expect("Failed to create temp HOME directory");
-        env::set_var("HOME", home_dir.path());
+        unsafe {
+            env::set_var("HOME", home_dir.path());
+        }
 
         // Create a temp dir for the project
         let project_dir = TempDir::new().expect("Failed to create temp directory");
