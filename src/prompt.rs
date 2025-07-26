@@ -13,7 +13,7 @@ use ratatui::{
     Frame, Terminal,
 };
 use std::io::Stdout;
-use std::io::{self, Write};
+use std::io::{self, IsTerminal, Write};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum AllowDecision {
@@ -25,7 +25,7 @@ pub enum AllowDecision {
 pub fn prompt_for_task(task: &Task) -> Result<AllowDecision, String> {
     // Check if we're in a test environment or non-interactive terminal
     let is_test = std::env::var("RUST_TEST_THREADS").is_ok() || std::env::var("CARGO_TEST").is_ok();
-    let is_interactive = atty::is(atty::Stream::Stdout) && atty::is(atty::Stream::Stdin);
+    let is_interactive = io::stdout().is_terminal() && io::stdin().is_terminal();
 
     // Force fallback in test environment or when stdin/stdout are redirected
     if is_test || !is_interactive {
