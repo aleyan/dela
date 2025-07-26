@@ -240,11 +240,12 @@ matrix:
         for task in &tasks {
             assert_eq!(task.definition_type, TaskDefinitionType::TravisCi);
             assert_eq!(task.runner, TaskRunner::TravisCi);
-            assert!(task
-                .description
-                .as_ref()
-                .unwrap()
-                .contains("Travis CI job:"));
+            assert!(
+                task.description
+                    .as_ref()
+                    .unwrap()
+                    .contains("Travis CI job:")
+            );
         }
     }
 

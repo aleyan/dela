@@ -76,7 +76,7 @@ pub fn detect_package_manager(dir: &Path) -> Option<TaskRunner> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::environment::{reset_to_real_environment, set_test_environment, TestEnvironment};
+    use crate::environment::{TestEnvironment, reset_to_real_environment, set_test_environment};
     use crate::types::ShadowType;
     use std::fs::File;
     use tempfile::TempDir;

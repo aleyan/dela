@@ -75,7 +75,7 @@ pub fn detect_package_manager(dir: &Path) -> Option<TaskRunner> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::environment::{reset_to_real_environment, set_test_environment, TestEnvironment};
+    use crate::environment::{TestEnvironment, reset_to_real_environment, set_test_environment};
     use crate::task_shadowing::{enable_mock, mock_executable, reset_mock};
     use serial_test::serial;
     use std::fs::File;

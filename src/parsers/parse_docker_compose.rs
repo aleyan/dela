@@ -205,11 +205,13 @@ services:
 
         // Check specific task descriptions
         let web_task = tasks.iter().find(|t| t.name == "web").unwrap();
-        assert!(web_task
-            .description
-            .as_ref()
-            .unwrap()
-            .contains("nginx:alpine"));
+        assert!(
+            web_task
+                .description
+                .as_ref()
+                .unwrap()
+                .contains("nginx:alpine")
+        );
 
         let app_task = tasks.iter().find(|t| t.name == "app").unwrap();
         assert!(app_task.description.as_ref().unwrap().contains("build"));

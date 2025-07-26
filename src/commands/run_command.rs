@@ -64,7 +64,7 @@ pub fn execute(task_with_args: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::environment::{reset_to_real_environment, set_test_environment, TestEnvironment};
+    use crate::environment::{TestEnvironment, reset_to_real_environment, set_test_environment};
     #[cfg(test)]
     use crate::task_shadowing::{enable_mock, reset_mock};
     #[cfg(test)]

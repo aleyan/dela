@@ -772,7 +772,7 @@ fn discover_shell_script_tasks(dir: &Path, discovered: &mut DiscoveredTasks) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::environment::{reset_to_real_environment, set_test_environment, TestEnvironment};
+    use crate::environment::{TestEnvironment, reset_to_real_environment, set_test_environment};
     use crate::task_shadowing::{enable_mock, mock_executable, reset_mock};
     use crate::types::ShadowType;
     use serial_test::serial;
@@ -1519,14 +1519,18 @@ tasks:
         assert!(discovered.tasks.iter().any(|t| t.name == "profile:prod"));
 
         // Check that plugin goals are discovered
-        assert!(discovered
-            .tasks
-            .iter()
-            .any(|t| t.name == "maven-compiler-plugin:compile"));
-        assert!(discovered
-            .tasks
-            .iter()
-            .any(|t| t.name == "spring-boot-maven-plugin:build-info"));
+        assert!(
+            discovered
+                .tasks
+                .iter()
+                .any(|t| t.name == "maven-compiler-plugin:compile")
+        );
+        assert!(
+            discovered
+                .tasks
+                .iter()
+                .any(|t| t.name == "spring-boot-maven-plugin:build-info")
+        );
 
         // Verify task runners
         for task in discovered.tasks {
@@ -2193,11 +2197,13 @@ services:
 
         // Check specific task descriptions
         let web_task = discovered.tasks.iter().find(|t| t.name == "web").unwrap();
-        assert!(web_task
-            .description
-            .as_ref()
-            .unwrap()
-            .contains("nginx:alpine"));
+        assert!(
+            web_task
+                .description
+                .as_ref()
+                .unwrap()
+                .contains("nginx:alpine")
+        );
 
         let app_task = discovered.tasks.iter().find(|t| t.name == "app").unwrap();
         assert!(app_task.description.as_ref().unwrap().contains("build"));
@@ -2401,11 +2407,12 @@ matrix:
         for task in &discovered.tasks {
             assert_eq!(task.definition_type, TaskDefinitionType::TravisCi);
             assert_eq!(task.runner, TaskRunner::TravisCi);
-            assert!(task
-                .description
-                .as_ref()
-                .unwrap()
-                .contains("Travis CI job:"));
+            assert!(
+                task.description
+                    .as_ref()
+                    .unwrap()
+                    .contains("Travis CI job:")
+            );
         }
 
         let python_38_task = discovered

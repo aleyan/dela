@@ -253,7 +253,7 @@ fn check_pwsh_builtin(name: &str) -> Option<ShadowType> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::environment::{reset_to_real_environment, set_test_environment, TestEnvironment};
+    use crate::environment::{TestEnvironment, reset_to_real_environment, set_test_environment};
     use serial_test::serial;
 
     #[test]

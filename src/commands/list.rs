@@ -432,7 +432,7 @@ fn format_task_entry(task: &Task, is_ambiguous: bool, name_width: usize) -> Stri
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::environment::{reset_to_real_environment, set_test_environment, TestEnvironment};
+    use crate::environment::{TestEnvironment, reset_to_real_environment, set_test_environment};
     use crate::types::{Task, TaskDefinitionType, TaskRunner};
     use serial_test::serial;
     use std::fs::{self, File};

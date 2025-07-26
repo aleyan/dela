@@ -1,5 +1,5 @@
 #[cfg(test)]
-use crate::environment::{reset_to_real_environment, set_test_environment, TestEnvironment};
+use crate::environment::{TestEnvironment, reset_to_real_environment, set_test_environment};
 use crate::task_shadowing::check_path_executable;
 use crate::types::TaskRunner;
 #[cfg(test)]

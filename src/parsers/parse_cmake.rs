@@ -243,10 +243,11 @@ add_custom_target(clean)
         // Check that tasks without comments get default descriptions
         for task in tasks {
             assert!(task.description.is_some());
-            assert!(task
-                .description
-                .unwrap()
-                .starts_with("CMake custom target:"));
+            assert!(
+                task.description
+                    .unwrap()
+                    .starts_with("CMake custom target:")
+            );
         }
     }
 }
