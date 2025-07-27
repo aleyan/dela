@@ -64,7 +64,7 @@ pub fn execute(task_with_args: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::environment::{reset_to_real_environment, set_test_environment, TestEnvironment};
+    use crate::environment::{TestEnvironment, reset_to_real_environment, set_test_environment};
     #[cfg(test)]
     use crate::task_shadowing::{enable_mock, reset_mock};
     #[cfg(test)]
@@ -99,7 +99,9 @@ test: ## Running tests
 
         // Create a temp dir for HOME and set it up
         let home_dir = TempDir::new().expect("Failed to create temp HOME directory");
-        env::set_var("HOME", home_dir.path());
+        unsafe {
+            env::set_var("HOME", home_dir.path());
+        }
 
         // Create ~/.dela directory
         fs::create_dir_all(home_dir.path().join(".dela"))

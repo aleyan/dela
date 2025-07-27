@@ -152,8 +152,10 @@ mod tests {
     use tempfile::TempDir;
 
     fn setup_test_env(shell: &str, home: &PathBuf) -> Result<(), std::io::Error> {
-        env::set_var("SHELL", shell);
-        env::set_var("HOME", home.to_str().unwrap());
+        unsafe {
+            env::set_var("SHELL", shell);
+            env::set_var("HOME", home.to_str().unwrap());
+        }
         Ok(())
     }
 

@@ -1,7 +1,7 @@
 [package]
 name = "dela"
 version = "0.0.6"
-edition = "2021"
+edition = "2024"
 license = "MIT"
 authors = ["Alexander Yankov"]
 description = "A task runner that delegates the work to other tools"
