@@ -1,5 +1,5 @@
-use crate::types::Allowlist;
 use crate::environment::{get_current_home, get_current_shell as env_get_current_shell};
+use crate::types::Allowlist;
 use std::env;
 use std::fs;
 use std::io::Write;
@@ -16,8 +16,7 @@ fn get_current_shell() -> Result<String, String> {
     }
 
     // Fallback to $SHELL if version variables aren't set
-    let shell = env_get_current_shell()
-        .ok_or("SHELL environment variable not set".to_string())?;
+    let shell = env_get_current_shell().ok_or("SHELL environment variable not set".to_string())?;
 
     let shell_path = std::path::PathBuf::from(&shell);
     shell_path
@@ -30,8 +29,7 @@ fn get_current_shell() -> Result<String, String> {
 /// Get the appropriate shell config path based on current shell
 fn get_shell_config_path() -> Result<PathBuf, String> {
     let shell_name = get_current_shell()?;
-    let home = get_current_home()
-        .ok_or("HOME environment variable not set".to_string())?;
+    let home = get_current_home().ok_or("HOME environment variable not set".to_string())?;
     let home_path = PathBuf::from(&home);
 
     match shell_name.as_str() {
@@ -109,8 +107,7 @@ pub fn execute() -> Result<(), String> {
     );
 
     // Create ~/.dela directory if it doesn't exist
-    let home = get_current_home()
-        .ok_or("HOME environment variable not set".to_string())?;
+    let home = get_current_home().ok_or("HOME environment variable not set".to_string())?;
     let dela_dir = PathBuf::from(&home).join(".dela");
 
     if !dela_dir.exists() {
@@ -152,7 +149,7 @@ pub fn execute() -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::environment::{TestEnvironment, set_test_environment, reset_to_real_environment};
+    use crate::environment::{TestEnvironment, reset_to_real_environment, set_test_environment};
     use serial_test::serial;
     use tempfile::TempDir;
 
@@ -181,7 +178,7 @@ mod tests {
         // Verify the content
         let content = fs::read_to_string(&zshrc).unwrap();
         assert!(content.contains("eval \"$(dela configure-shell)\""));
-        
+
         reset_to_real_environment();
     }
 
@@ -209,7 +206,7 @@ mod tests {
             content.matches("eval \"$(dela configure-shell)\"").count(),
             1
         );
-        
+
         reset_to_real_environment();
     }
 
@@ -231,7 +228,7 @@ mod tests {
         let dela_dir = home.join(".dela");
         assert!(dela_dir.exists());
         assert!(dela_dir.is_dir());
-        
+
         reset_to_real_environment();
     }
 
@@ -245,7 +242,7 @@ mod tests {
         let result = execute();
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "Unsupported shell: unsupported");
-        
+
         reset_to_real_environment();
     }
 
@@ -268,7 +265,7 @@ mod tests {
         // Verify the content has the fish-specific integration pattern
         let content = fs::read_to_string(&config_fish).unwrap();
         assert!(content.contains("eval (dela configure-shell | string collect)"));
-        
+
         reset_to_real_environment();
     }
 
@@ -291,7 +288,7 @@ mod tests {
         // Verify the content has the PowerShell-specific integration pattern
         let content = fs::read_to_string(&config_pwsh).unwrap();
         assert!(content.contains("Invoke-Expression (dela configure-shell | Out-String)"));
-        
+
         reset_to_real_environment();
     }
 
@@ -318,7 +315,7 @@ mod tests {
         let content = fs::read_to_string(&allowlist_path).unwrap();
         let allowlist: Allowlist = toml::from_str(&content).unwrap();
         assert!(allowlist.entries.is_empty());
-        
+
         reset_to_real_environment();
     }
 }

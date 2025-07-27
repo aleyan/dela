@@ -74,10 +74,9 @@ test: ## Running tests
 
         // Create a temp dir for HOME and set it up
         let home_dir = TempDir::new().expect("Failed to create temp HOME directory");
-        
+
         // Set up test environment with the temp directory as HOME
-        let test_env = TestEnvironment::new()
-            .with_home(home_dir.path().to_string_lossy());
+        let test_env = TestEnvironment::new().with_home(home_dir.path().to_string_lossy());
         set_test_environment(test_env);
 
         // Create ~/.dela directory

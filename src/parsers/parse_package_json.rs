@@ -148,12 +148,12 @@ mod tests {
         // Set up test environment with MOCK_NO_PM flag
         let test_env = TestEnvironment::new();
         set_test_environment(test_env);
-        
+
         // Set the MOCK_NO_PM environment variable
         unsafe {
             std::env::set_var("MOCK_NO_PM", "1");
         }
-        
+
         let temp_dir = TempDir::new().unwrap();
         let package_json_path = temp_dir.path().join("package.json");
 

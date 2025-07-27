@@ -34,8 +34,7 @@ impl Shell {
 
 pub fn execute() -> Result<(), String> {
     // Get the current shell from environment
-    let shell = get_current_shell()
-        .ok_or("SHELL environment variable not set".to_string())?;
+    let shell = get_current_shell().ok_or("SHELL environment variable not set".to_string())?;
 
     // Parse the shell type
     let shell_type = Shell::from_path(&shell)?;
@@ -65,12 +64,11 @@ pub fn execute() -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::environment::{TestEnvironment, set_test_environment, reset_to_real_environment};
+    use crate::environment::{TestEnvironment, reset_to_real_environment, set_test_environment};
     use serial_test::serial;
 
     fn setup_test_env(shell: &str) {
-        let test_env = TestEnvironment::new()
-            .with_shell(shell);
+        let test_env = TestEnvironment::new().with_shell(shell);
         set_test_environment(test_env);
     }
 
@@ -135,7 +133,7 @@ mod tests {
         // Don't set any shell in test environment
         let test_env = TestEnvironment::new();
         set_test_environment(test_env);
-        
+
         let result = execute();
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "SHELL environment variable not set");
