@@ -13,13 +13,8 @@ pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
     let runner = match crate::runners::runners_package_json::detect_package_manager(parent) {
         Some(runner) => runner,
         None => {
-            #[cfg(test)]
-            {
-                if std::env::var("MOCK_NO_PM").is_ok() {
-                    return Ok(vec![]);
-                }
-            }
-            TaskRunner::NodeNpm
+            // No package managers available, return empty list
+            return Ok(vec![]);
         }
     };
 
@@ -39,13 +34,6 @@ pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
                     disambiguated_name: None,
                 });
             }
-        }
-    }
-
-    #[cfg(test)]
-    {
-        if std::env::var("MOCK_NO_PM").is_ok() {
-            return Ok(vec![]);
         }
     }
 
@@ -125,7 +113,6 @@ mod tests {
         enable_mock();
 
         // Create package-lock.json to ensure npm is selected
-        File::create(temp_dir.path().join("package-lock.json")).unwrap();
 
         let content = r#"{
             "name": "test-package"
@@ -145,14 +132,9 @@ mod tests {
     #[test]
     #[serial]
     fn test_parse_package_json_no_package_manager() {
-        // Set up test environment with MOCK_NO_PM flag
+        // Set up test environment with no package managers
         let test_env = TestEnvironment::new();
         set_test_environment(test_env);
-
-        // Set the MOCK_NO_PM environment variable
-        unsafe {
-            std::env::set_var("MOCK_NO_PM", "1");
-        }
 
         let temp_dir = TempDir::new().unwrap();
         let package_json_path = temp_dir.path().join("package.json");
@@ -161,8 +143,6 @@ mod tests {
         reset_mock();
         enable_mock();
 
-        // Create package-lock.json to simulate a package manager lock file
-        File::create(temp_dir.path().join("package-lock.json")).unwrap();
 
         let content = r#"{
             "name": "test-package",
@@ -180,10 +160,6 @@ mod tests {
         let tasks = parse(&package_json_path).unwrap();
         assert!(tasks.is_empty());
 
-        // Clean up
-        unsafe {
-            std::env::remove_var("MOCK_NO_PM");
-        }
         reset_mock();
         reset_to_real_environment();
     }
