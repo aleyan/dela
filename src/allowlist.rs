@@ -1,3 +1,4 @@
+use crate::environment::get_current_home;
 use crate::prompt::{self, AllowDecision};
 use crate::types::{AllowScope, Allowlist, AllowlistEntry, Task};
 use std::fs;
@@ -5,8 +6,7 @@ use std::path::{Path, PathBuf};
 
 /// Returns the path to ~/.dela/allowlist.toml
 fn allowlist_path() -> Result<PathBuf, String> {
-    let home =
-        std::env::var("HOME").map_err(|_| "HOME environment variable not set".to_string())?;
+    let home = get_current_home().ok_or("HOME environment variable not set".to_string())?;
     Ok(PathBuf::from(home).join(".dela").join("allowlist.toml"))
 }
 
@@ -168,9 +168,9 @@ pub fn check_task_allowed_with_scope(task: &Task, scope: AllowScope) -> Result<b
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::environment::{TestEnvironment, reset_to_real_environment, set_test_environment};
     use crate::types::{Task, TaskDefinitionType, TaskRunner};
     use serial_test::serial;
-    use std::env;
     use std::fs;
     use tempfile::TempDir;
 
@@ -189,9 +189,10 @@ mod tests {
 
     fn setup_test_env() -> (TempDir, Task) {
         let temp_dir = TempDir::new().unwrap();
-        unsafe {
-            env::set_var("HOME", temp_dir.path());
-        }
+
+        // Set up test environment with the temp directory as HOME
+        let test_env = TestEnvironment::new().with_home(temp_dir.path().to_string_lossy());
+        set_test_environment(test_env);
 
         // Create ~/.dela directory
         fs::create_dir_all(temp_dir.path().join(".dela"))
@@ -208,6 +209,7 @@ mod tests {
         let (_temp_dir, _task) = setup_test_env();
         let allowlist = load_allowlist().unwrap();
         assert!(allowlist.entries.is_empty());
+        reset_to_real_environment();
     }
 
     #[test]
@@ -243,6 +245,7 @@ mod tests {
 
         // Keep temp_dir around until the end of the test
         drop(temp_dir);
+        reset_to_real_environment();
     }
 
     #[test]

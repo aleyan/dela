@@ -1,4 +1,4 @@
-use crate::types::{Task, TaskDefinitionType, TaskRunner};
+use crate::types::{Task, TaskDefinitionType};
 use std::path::PathBuf;
 
 /// Parse a package.json file at the given path and extract tasks
@@ -13,13 +13,8 @@ pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
     let runner = match crate::runners::runners_package_json::detect_package_manager(parent) {
         Some(runner) => runner,
         None => {
-            #[cfg(test)]
-            {
-                if std::env::var("MOCK_NO_PM").is_ok() {
-                    return Ok(vec![]);
-                }
-            }
-            TaskRunner::NodeNpm
+            // No package managers available, return empty list
+            return Ok(vec![]);
         }
     };
 
@@ -42,13 +37,6 @@ pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
         }
     }
 
-    #[cfg(test)]
-    {
-        if std::env::var("MOCK_NO_PM").is_ok() {
-            return Ok(vec![]);
-        }
-    }
-
     Ok(tasks)
 }
 
@@ -57,8 +45,8 @@ mod tests {
     use super::*;
     use crate::environment::{TestEnvironment, reset_to_real_environment, set_test_environment};
     use crate::task_shadowing::{enable_mock, reset_mock};
+    use crate::types::TaskRunner;
     use serial_test::serial;
-    use std::env;
     use std::fs::File;
     use std::io::Write;
     use tempfile::TempDir;
@@ -126,7 +114,6 @@ mod tests {
         enable_mock();
 
         // Create package-lock.json to ensure npm is selected
-        File::create(temp_dir.path().join("package-lock.json")).unwrap();
 
         let content = r#"{
             "name": "test-package"
@@ -146,18 +133,16 @@ mod tests {
     #[test]
     #[serial]
     fn test_parse_package_json_no_package_manager() {
-        unsafe {
-            env::set_var("MOCK_NO_PM", "1");
-        }
+        // Set up test environment with no package managers
+        let test_env = TestEnvironment::new();
+        set_test_environment(test_env);
+
         let temp_dir = TempDir::new().unwrap();
         let package_json_path = temp_dir.path().join("package.json");
 
         // Enable mocking and do not mock any package manager
         reset_mock();
         enable_mock();
-
-        // Create package-lock.json to simulate a package manager lock file
-        File::create(temp_dir.path().join("package-lock.json")).unwrap();
 
         let content = r#"{
             "name": "test-package",
@@ -175,9 +160,7 @@ mod tests {
         let tasks = parse(&package_json_path).unwrap();
         assert!(tasks.is_empty());
 
-        unsafe {
-            env::remove_var("MOCK_NO_PM");
-        }
         reset_mock();
+        reset_to_real_environment();
     }
 }

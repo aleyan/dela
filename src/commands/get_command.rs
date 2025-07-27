@@ -49,6 +49,7 @@ mod tests {
     use crate::environment::{TestEnvironment, reset_to_real_environment, set_test_environment};
     use crate::task_shadowing::{enable_mock, reset_mock};
     use serial_test::serial;
+    use std::env;
     use std::fs::{self, File};
     use std::io::Write;
     use tempfile::TempDir;
@@ -73,9 +74,10 @@ test: ## Running tests
 
         // Create a temp dir for HOME and set it up
         let home_dir = TempDir::new().expect("Failed to create temp HOME directory");
-        unsafe {
-            env::set_var("HOME", home_dir.path());
-        }
+
+        // Set up test environment with the temp directory as HOME
+        let test_env = TestEnvironment::new().with_home(home_dir.path().to_string_lossy());
+        set_test_environment(test_env);
 
         // Create ~/.dela directory
         fs::create_dir_all(home_dir.path().join(".dela"))

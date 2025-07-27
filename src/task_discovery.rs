@@ -950,6 +950,7 @@ test:
     }
 
     #[test]
+    #[serial]
     fn test_discover_tasks_with_unimplemented_parsers() {
         let temp_dir = TempDir::new().unwrap();
 
@@ -967,8 +968,18 @@ test:
     }
 
     #[test]
+    #[serial]
     fn test_discover_npm_tasks() {
         let temp_dir = TempDir::new().unwrap();
+
+        // Mock npm being installed
+        reset_mock();
+        enable_mock();
+        mock_executable("npm");
+
+        // Set up test environment
+        let env = TestEnvironment::new().with_executable("npm");
+        set_test_environment(env);
 
         // Create package.json with scripts
         let content = r#"{
@@ -1004,9 +1015,13 @@ test:
             TaskRunner::NodeNpm | TaskRunner::NodeYarn | TaskRunner::NodePnpm | TaskRunner::NodeBun
         ));
         assert_eq!(build_task.description, Some("tsc".to_string()));
+
+        reset_mock();
+        reset_to_real_environment();
     }
 
     #[test]
+    #[serial]
     fn test_discover_npm_tasks_invalid_json() {
         let temp_dir = TempDir::new().unwrap();
 
@@ -1029,6 +1044,7 @@ test:
     }
 
     #[test]
+    #[serial]
     fn test_discover_python_tasks() {
         let temp_dir = TempDir::new().unwrap();
 
@@ -1070,6 +1086,7 @@ serve = "uvicorn main:app --reload"
     }
 
     #[test]
+    #[serial]
     fn test_discover_python_poetry_tasks() {
         let temp_dir = TempDir::new().unwrap();
 
@@ -1133,6 +1150,7 @@ lint = "flake8"
     }
 
     #[test]
+    #[serial]
     fn test_discover_tasks_multiple_files() {
         let temp_dir = TempDir::new().unwrap();
 
@@ -1141,6 +1159,12 @@ lint = "flake8"
         enable_mock();
         mock_executable("npm");
         mock_executable("poetry");
+
+        // Set up test environment
+        let env = TestEnvironment::new()
+            .with_executable("npm")
+            .with_executable("poetry");
+        set_test_environment(env);
 
         // Create Makefile
         let makefile_content = r#".PHONY: build test
@@ -1171,6 +1195,9 @@ serve = "python -m http.server"
 "#;
         let mut pyproject = File::create(temp_dir.path().join("pyproject.toml")).unwrap();
         write!(pyproject, "{}", pyproject_content).unwrap();
+
+        // Create poetry.lock to ensure Poetry is selected
+        File::create(temp_dir.path().join("poetry.lock")).unwrap();
 
         let discovered = discover_tasks(temp_dir.path());
 
@@ -1222,11 +1249,22 @@ serve = "python -m http.server"
         assert_eq!(python_tasks.len(), 1);
 
         reset_mock();
+        reset_to_real_environment();
     }
 
     #[test]
+    #[serial]
     fn test_discover_tasks_with_name_collision() {
         let temp_dir = TempDir::new().unwrap();
+
+        // Mock package managers
+        reset_mock();
+        enable_mock();
+        mock_executable("npm");
+
+        // Set up test environment
+        let env = TestEnvironment::new().with_executable("npm");
+        set_test_environment(env);
 
         // Create Makefile with 'test' task
         let makefile_content = r#".PHONY: test cd
@@ -1280,6 +1318,9 @@ cd:
             })
             .unwrap();
         assert_eq!(node_test.description, Some("jest".to_string()));
+
+        reset_mock();
+        reset_to_real_environment();
     }
 
     #[test]
@@ -1337,6 +1378,15 @@ cd:
         let temp_dir = TempDir::new().unwrap();
         let package_json_path = temp_dir.path().join("package.json");
 
+        // Mock npm being installed
+        reset_mock();
+        enable_mock();
+        mock_executable("npm");
+
+        // Set up test environment
+        let env = TestEnvironment::new().with_executable("npm");
+        set_test_environment(env);
+
         let content = r#"{
             "name": "test-package",
             "scripts": {
@@ -1367,6 +1417,9 @@ cd:
             TaskRunner::NodeNpm | TaskRunner::NodeYarn | TaskRunner::NodePnpm | TaskRunner::NodeBun
         ));
         assert_eq!(build_task.description, Some("tsc".to_string()));
+
+        reset_mock();
+        reset_to_real_environment();
     }
 
     #[test]

@@ -7,6 +7,7 @@ use std::sync::Mutex;
 pub trait Environment: Send + Sync {
     fn get_shell(&self) -> Option<String>;
     fn check_executable(&self, name: &str) -> Option<String>;
+    fn get_home(&self) -> Option<String>;
 }
 
 /// Production environment implementation
@@ -26,6 +27,10 @@ impl Environment for RealEnvironment {
             None
         }
     }
+
+    fn get_home(&self) -> Option<String> {
+        std::env::var("HOME").ok()
+    }
 }
 
 /// Test environment implementation
@@ -33,6 +38,7 @@ impl Environment for RealEnvironment {
 pub struct TestEnvironment {
     shell: Option<String>,
     executables: HashSet<String>,
+    home: Option<String>,
 }
 
 #[cfg(test)]
@@ -50,6 +56,11 @@ impl TestEnvironment {
         self.executables.insert(name.into());
         self
     }
+
+    pub fn with_home(mut self, home: impl Into<String>) -> Self {
+        self.home = Some(home.into());
+        self
+    }
 }
 
 impl Environment for TestEnvironment {
@@ -63,6 +74,10 @@ impl Environment for TestEnvironment {
         } else {
             None
         }
+    }
+
+    fn get_home(&self) -> Option<String> {
+        self.home.clone()
     }
 }
 
@@ -80,4 +95,14 @@ pub fn set_test_environment(env: TestEnvironment) {
 #[cfg(test)]
 pub fn reset_to_real_environment() {
     *ENVIRONMENT.lock().unwrap() = Arc::new(RealEnvironment);
+}
+
+/// Helper to get the current environment's HOME value
+pub fn get_current_home() -> Option<String> {
+    ENVIRONMENT.lock().unwrap().get_home()
+}
+
+/// Helper to get the current environment's SHELL value
+pub fn get_current_shell() -> Option<String> {
+    ENVIRONMENT.lock().unwrap().get_shell()
 }
