@@ -265,37 +265,45 @@ mod tests {
     #[serial]
     fn test_check_task_allowed_with_scope_edge_cases() {
         let (_temp_dir, task) = setup_test_env();
-        
+
         // Test with Once scope
         let result = check_task_allowed_with_scope(&task, AllowScope::Once);
         assert!(result.is_ok());
         assert!(result.unwrap());
-        
+
         // Test with Task scope
         let result = check_task_allowed_with_scope(&task, AllowScope::Task);
         assert!(result.is_ok());
         assert!(result.unwrap());
-        
+
         // Test with File scope
         let result = check_task_allowed_with_scope(&task, AllowScope::File);
         assert!(result.is_ok());
         assert!(result.unwrap());
-        
+
         // Test with Directory scope
         let result = check_task_allowed_with_scope(&task, AllowScope::Directory);
         assert!(result.is_ok());
         assert!(result.unwrap());
-        
+
         // Verify that the allowlist was updated
         let allowlist = load_allowlist().unwrap();
         assert_eq!(allowlist.entries.len(), 4);
-        
+
         // Check that Task scope has the specific task name
-        let task_entry = allowlist.entries.iter().find(|e| e.scope == AllowScope::Task).unwrap();
+        let task_entry = allowlist
+            .entries
+            .iter()
+            .find(|e| e.scope == AllowScope::Task)
+            .unwrap();
         assert_eq!(task_entry.tasks, Some(vec!["test-task".to_string()]));
-        
+
         // Check that other scopes don't have specific tasks
-        let file_entry = allowlist.entries.iter().find(|e| e.scope == AllowScope::File).unwrap();
+        let file_entry = allowlist
+            .entries
+            .iter()
+            .find(|e| e.scope == AllowScope::File)
+            .unwrap();
         assert_eq!(file_entry.tasks, None);
     }
 
@@ -303,25 +311,25 @@ mod tests {
     #[serial]
     fn test_check_task_allowed_edge_cases() {
         let (_temp_dir, task) = setup_test_env();
-        
+
         // Test with no allowlist entries - this would normally prompt, so we test the logic differently
         // First, verify that the allowlist is empty
         let allowlist = load_allowlist().unwrap();
         assert_eq!(allowlist.entries.len(), 0);
-        
+
         // Test the path matching logic directly instead of calling check_task_allowed
         let task_path = &task.file_path;
         let allowlist_path = &task.file_path;
         assert!(path_matches(task_path, allowlist_path, false));
-        
+
         // Add an entry and test again
         let result = check_task_allowed_with_scope(&task, AllowScope::Task);
         assert!(result.is_ok());
-        
+
         // Now verify the allowlist was updated
         let allowlist = load_allowlist().unwrap();
         assert_eq!(allowlist.entries.len(), 1);
-        
+
         // Test that the entry has the correct structure
         let entry = &allowlist.entries[0];
         assert_eq!(entry.scope, AllowScope::Task);
@@ -332,23 +340,23 @@ mod tests {
     #[serial]
     fn test_path_matches_edge_cases() {
         let task_path = PathBuf::from("/project/Makefile");
-        
+
         // Test exact match
         let allowlist_path = PathBuf::from("/project/Makefile");
         assert!(path_matches(&task_path, &allowlist_path, false));
-        
+
         // Test with subdirs allowed
         let allowlist_path = PathBuf::from("/project");
         assert!(path_matches(&task_path, &allowlist_path, true));
-        
+
         // Test with subdirs not allowed
         assert!(!path_matches(&task_path, &allowlist_path, false));
-        
+
         // Test different paths
         let allowlist_path = PathBuf::from("/different/Makefile");
         assert!(!path_matches(&task_path, &allowlist_path, false));
         assert!(!path_matches(&task_path, &allowlist_path, true));
-        
+
         // Test relative paths
         let task_path = PathBuf::from("Makefile");
         let allowlist_path = PathBuf::from("Makefile");
@@ -359,24 +367,24 @@ mod tests {
     #[serial]
     fn test_allowlist_scope_comparison() {
         let (_temp_dir, task) = setup_test_env();
-        
+
         // Test scope equality
         assert_eq!(AllowScope::Once, AllowScope::Once);
         assert_eq!(AllowScope::Task, AllowScope::Task);
         assert_eq!(AllowScope::File, AllowScope::File);
         assert_eq!(AllowScope::Directory, AllowScope::Directory);
-        
+
         // Test scope inequality
         assert_ne!(AllowScope::Once, AllowScope::Task);
         assert_ne!(AllowScope::File, AllowScope::Directory);
-        
+
         // Test scope in allowlist entries
         let entry = AllowlistEntry {
             path: task.file_path.clone(),
             scope: AllowScope::Task,
             tasks: Some(vec!["test-task".to_string()]),
         };
-        
+
         assert_eq!(entry.scope, AllowScope::Task);
         assert_eq!(entry.tasks, Some(vec!["test-task".to_string()]));
     }
@@ -386,17 +394,17 @@ mod tests {
     fn test_allowlist_error_handling() {
         // Test that load_allowlist handles errors gracefully
         // This test verifies that the function doesn't panic on errors
-        
+
         // Test with a non-existent allowlist file (normal case)
         let result = load_allowlist();
         // Should either succeed (if .dela exists) or fail gracefully
         assert!(result.is_ok() || result.is_err());
-        
+
         // Test that save_allowlist works
         let allowlist = Allowlist::default();
         let result = save_allowlist(&allowlist);
         assert!(result.is_ok());
-        
+
         // Test that we can load after saving
         let result = load_allowlist();
         assert!(result.is_ok());
@@ -406,25 +414,25 @@ mod tests {
     #[serial]
     fn test_allowlist_entry_validation() {
         let (_temp_dir, task) = setup_test_env();
-        
+
         // Test valid entry
         let entry = AllowlistEntry {
             path: task.file_path.clone(),
             scope: AllowScope::Task,
             tasks: Some(vec!["test-task".to_string()]),
         };
-        
+
         assert_eq!(entry.path, task.file_path);
         assert_eq!(entry.scope, AllowScope::Task);
         assert_eq!(entry.tasks, Some(vec!["test-task".to_string()]));
-        
+
         // Test entry without specific tasks
         let entry = AllowlistEntry {
             path: task.file_path.clone(),
             scope: AllowScope::File,
             tasks: None,
         };
-        
+
         assert_eq!(entry.scope, AllowScope::File);
         assert_eq!(entry.tasks, None);
     }
@@ -433,26 +441,38 @@ mod tests {
     #[serial]
     fn test_allowlist_multiple_entries() {
         let (_temp_dir, task) = setup_test_env();
-        
+
         // Add multiple entries for the same task
         let result1 = check_task_allowed_with_scope(&task, AllowScope::Once);
         assert!(result1.is_ok());
-        
+
         let result2 = check_task_allowed_with_scope(&task, AllowScope::Task);
         assert!(result2.is_ok());
-        
+
         let result3 = check_task_allowed_with_scope(&task, AllowScope::File);
         assert!(result3.is_ok());
-        
+
         // Check that all entries were added
         let allowlist = load_allowlist().unwrap();
         assert_eq!(allowlist.entries.len(), 3);
-        
+
         // Verify the entries have the correct structure
-        let once_entry = allowlist.entries.iter().find(|e| e.scope == AllowScope::Once).unwrap();
-        let task_entry = allowlist.entries.iter().find(|e| e.scope == AllowScope::Task).unwrap();
-        let file_entry = allowlist.entries.iter().find(|e| e.scope == AllowScope::File).unwrap();
-        
+        let once_entry = allowlist
+            .entries
+            .iter()
+            .find(|e| e.scope == AllowScope::Once)
+            .unwrap();
+        let task_entry = allowlist
+            .entries
+            .iter()
+            .find(|e| e.scope == AllowScope::Task)
+            .unwrap();
+        let file_entry = allowlist
+            .entries
+            .iter()
+            .find(|e| e.scope == AllowScope::File)
+            .unwrap();
+
         assert_eq!(once_entry.scope, AllowScope::Once);
         assert_eq!(task_entry.scope, AllowScope::Task);
         assert_eq!(task_entry.tasks, Some(vec![task.name.clone()]));

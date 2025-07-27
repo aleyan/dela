@@ -2544,10 +2544,10 @@ add_custom_target(clean-all COMMENT "Clean all build artifacts")
     #[test]
     fn test_set_definition_all_types() {
         let mut discovered = DiscoveredTasks::new();
-        
+
         // Test all task definition types to ensure they're handled
         let test_path = PathBuf::from("test");
-        
+
         // Test Makefile
         let makefile_def = TaskDefinitionFile {
             path: test_path.clone(),
@@ -2556,7 +2556,7 @@ add_custom_target(clean-all COMMENT "Clean all build artifacts")
         };
         set_definition(&mut discovered, makefile_def);
         assert!(discovered.definitions.makefile.is_some());
-        
+
         // Test PackageJson
         let package_json_def = TaskDefinitionFile {
             path: test_path.clone(),
@@ -2565,7 +2565,7 @@ add_custom_target(clean-all COMMENT "Clean all build artifacts")
         };
         set_definition(&mut discovered, package_json_def);
         assert!(discovered.definitions.package_json.is_some());
-        
+
         // Test PyProjectToml
         let pyproject_def = TaskDefinitionFile {
             path: test_path.clone(),
@@ -2574,7 +2574,7 @@ add_custom_target(clean-all COMMENT "Clean all build artifacts")
         };
         set_definition(&mut discovered, pyproject_def);
         assert!(discovered.definitions.pyproject_toml.is_some());
-        
+
         // Test Taskfile
         let taskfile_def = TaskDefinitionFile {
             path: test_path.clone(),
@@ -2583,7 +2583,7 @@ add_custom_target(clean-all COMMENT "Clean all build artifacts")
         };
         set_definition(&mut discovered, taskfile_def);
         assert!(discovered.definitions.taskfile.is_some());
-        
+
         // Test MavenPom
         let maven_def = TaskDefinitionFile {
             path: test_path.clone(),
@@ -2592,7 +2592,7 @@ add_custom_target(clean-all COMMENT "Clean all build artifacts")
         };
         set_definition(&mut discovered, maven_def);
         assert!(discovered.definitions.maven_pom.is_some());
-        
+
         // Test Gradle
         let gradle_def = TaskDefinitionFile {
             path: test_path.clone(),
@@ -2601,7 +2601,7 @@ add_custom_target(clean-all COMMENT "Clean all build artifacts")
         };
         set_definition(&mut discovered, gradle_def);
         assert!(discovered.definitions.gradle.is_some());
-        
+
         // Test GitHubActions
         let github_def = TaskDefinitionFile {
             path: test_path.clone(),
@@ -2610,7 +2610,7 @@ add_custom_target(clean-all COMMENT "Clean all build artifacts")
         };
         set_definition(&mut discovered, github_def);
         assert!(discovered.definitions.github_actions.is_some());
-        
+
         // Test DockerCompose
         let docker_def = TaskDefinitionFile {
             path: test_path.clone(),
@@ -2619,7 +2619,7 @@ add_custom_target(clean-all COMMENT "Clean all build artifacts")
         };
         set_definition(&mut discovered, docker_def);
         assert!(discovered.definitions.docker_compose.is_some());
-        
+
         // Test TravisCi
         let travis_def = TaskDefinitionFile {
             path: test_path.clone(),
@@ -2628,7 +2628,7 @@ add_custom_target(clean-all COMMENT "Clean all build artifacts")
         };
         set_definition(&mut discovered, travis_def);
         assert!(discovered.definitions.travis_ci.is_some());
-        
+
         // Test CMake
         let cmake_def = TaskDefinitionFile {
             path: test_path,
@@ -2642,30 +2642,30 @@ add_custom_target(clean-all COMMENT "Clean all build artifacts")
     #[test]
     fn test_generate_runner_prefix_edge_cases() {
         let mut used_prefixes = std::collections::HashSet::new();
-        
+
         // Test with empty used prefixes - should return single character first
         let prefix1 = generate_runner_prefix(&TaskRunner::Make, &used_prefixes);
         assert_eq!(prefix1, "m");
-        
+
         // Test with existing single character prefix
         used_prefixes.insert("m".to_string());
         let prefix2 = generate_runner_prefix(&TaskRunner::Make, &used_prefixes);
         assert_eq!(prefix2, "mak");
-        
+
         // Test with existing 3-character prefix
         used_prefixes.insert("mak".to_string());
         let prefix3 = generate_runner_prefix(&TaskRunner::Make, &used_prefixes);
         assert_eq!(prefix3, "make");
-        
+
         // Test with existing full name
         used_prefixes.insert("make".to_string());
         let prefix4 = generate_runner_prefix(&TaskRunner::Make, &used_prefixes);
         assert_eq!(prefix4, "make1");
-        
+
         // Test different runners
         let npm_prefix = generate_runner_prefix(&TaskRunner::NodeNpm, &used_prefixes);
         assert_eq!(npm_prefix, "n");
-        
+
         let python_prefix = generate_runner_prefix(&TaskRunner::PythonUv, &used_prefixes);
         assert_eq!(python_prefix, "u");
     }
@@ -2673,10 +2673,10 @@ add_custom_target(clean-all COMMENT "Clean all build artifacts")
     #[test]
     fn test_is_task_ambiguous_edge_cases() {
         let mut discovered = DiscoveredTasks::new();
-        
+
         // Test with no tasks
         assert!(!is_task_ambiguous(&discovered, "test"));
-        
+
         // Test with single task
         let task = Task {
             name: "test".to_string(),
@@ -2690,7 +2690,7 @@ add_custom_target(clean-all COMMENT "Clean all build artifacts")
         };
         discovered.add_task(task);
         assert!(!is_task_ambiguous(&discovered, "test"));
-        
+
         // Test with multiple tasks with same name
         let task2 = Task {
             name: "test".to_string(),
@@ -2704,7 +2704,7 @@ add_custom_target(clean-all COMMENT "Clean all build artifacts")
         };
         discovered.add_task(task2);
         assert!(is_task_ambiguous(&discovered, "test"));
-        
+
         // Test with disambiguated names
         let mut discovered2 = DiscoveredTasks::new();
         let task3 = Task {
@@ -2724,11 +2724,11 @@ add_custom_target(clean-all COMMENT "Clean all build artifacts")
     #[test]
     fn test_get_disambiguated_task_names_edge_cases() {
         let mut discovered = DiscoveredTasks::new();
-        
+
         // Test with no matching tasks
         let names = get_disambiguated_task_names(&discovered, "nonexistent");
         assert!(names.is_empty());
-        
+
         // Test with single matching task
         let task = Task {
             name: "test".to_string(),
@@ -2744,7 +2744,7 @@ add_custom_target(clean-all COMMENT "Clean all build artifacts")
         let names = get_disambiguated_task_names(&discovered, "test");
         assert_eq!(names.len(), 1);
         assert_eq!(names[0], "make-test");
-        
+
         // Test with multiple matching tasks
         let task2 = Task {
             name: "test".to_string(),
@@ -2766,11 +2766,11 @@ add_custom_target(clean-all COMMENT "Clean all build artifacts")
     #[test]
     fn test_get_matching_tasks_edge_cases() {
         let mut discovered = DiscoveredTasks::new();
-        
+
         // Test with no tasks
         let matching = get_matching_tasks(&discovered, "test");
         assert!(matching.is_empty());
-        
+
         // Test with single matching task
         let task = Task {
             name: "test".to_string(),
@@ -2786,7 +2786,7 @@ add_custom_target(clean-all COMMENT "Clean all build artifacts")
         let matching = get_matching_tasks(&discovered, "test");
         assert_eq!(matching.len(), 1);
         assert_eq!(matching[0].name, "test");
-        
+
         // Test with multiple matching tasks
         let task2 = Task {
             name: "test".to_string(),
@@ -2801,7 +2801,7 @@ add_custom_target(clean-all COMMENT "Clean all build artifacts")
         discovered.add_task(task2);
         let matching = get_matching_tasks(&discovered, "test");
         assert_eq!(matching.len(), 2);
-        
+
         // Test with no matching tasks
         let matching = get_matching_tasks(&discovered, "nonexistent");
         assert!(matching.is_empty());
@@ -2819,7 +2819,7 @@ add_custom_target(clean-all COMMENT "Clean all build artifacts")
             shadowed_by: None,
             disambiguated_name: Some("make-test".to_string()),
         };
-        
+
         let task2 = Task {
             name: "test".to_string(),
             file_path: PathBuf::from("package.json"),
@@ -2830,10 +2830,10 @@ add_custom_target(clean-all COMMENT "Clean all build artifacts")
             shadowed_by: None,
             disambiguated_name: Some("npm-test".to_string()),
         };
-        
+
         let matching_tasks = vec![&task1, &task2];
         let error_msg = format_ambiguous_task_error("test", &matching_tasks);
-        
+
         assert!(error_msg.contains("test"));
         assert!(error_msg.contains("make-test"));
         assert!(error_msg.contains("npm-test"));
@@ -2842,14 +2842,14 @@ add_custom_target(clean-all COMMENT "Clean all build artifacts")
     #[test]
     fn test_discover_shell_script_tasks() {
         let temp_dir = TempDir::new().unwrap();
-        
+
         // Create a shell script
         let script_path = temp_dir.path().join("test.sh");
         let script_content = r#"#!/bin/bash
 echo "Test script"
 "#;
         std::fs::write(&script_path, script_content).unwrap();
-        
+
         // Make it executable
         #[cfg(unix)]
         {
@@ -2858,13 +2858,13 @@ echo "Test script"
             perms.set_mode(0o755);
             std::fs::set_permissions(&script_path, perms).unwrap();
         }
-        
+
         let mut discovered = DiscoveredTasks::new();
         discover_shell_script_tasks(temp_dir.path(), &mut discovered);
-        
+
         // Shell script discovery should add tasks for .sh files
         assert_eq!(discovered.tasks.len(), 1);
-        
+
         let task = &discovered.tasks[0];
         assert_eq!(task.name, "test");
         assert_eq!(task.definition_type, TaskDefinitionType::ShellScript);

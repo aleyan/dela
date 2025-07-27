@@ -98,11 +98,11 @@ mod tests {
         // Test normal task name color
         let normal = task_name_normal();
         assert!(!normal.to_string().is_empty());
-        
+
         // Test ambiguous task name color
         let ambiguous = task_name_ambiguous();
         assert!(!ambiguous.to_string().is_empty());
-        
+
         // Test shadowed task name color
         let shadowed = task_name_shadowed();
         assert!(!shadowed.to_string().is_empty());
@@ -113,7 +113,7 @@ mod tests {
         // Test footnote symbol color
         let symbol = footnote_symbol();
         assert!(!symbol.to_string().is_empty());
-        
+
         // Test footnote description color
         let description = footnote_description();
         assert!(!description.to_string().is_empty());
@@ -124,7 +124,7 @@ mod tests {
         // Test available runner color
         let available = task_runner_available();
         assert!(!available.to_string().is_empty());
-        
+
         // Test unavailable runner color
         let unavailable = task_runner_unavailable();
         assert!(!unavailable.to_string().is_empty());
@@ -149,7 +149,7 @@ mod tests {
         // Test task description color
         let description = task_description();
         assert!(!description.to_string().is_empty());
-        
+
         // Test task description dash color
         let dash = task_description_dash();
         assert!(!dash.to_string().is_empty());
@@ -162,17 +162,17 @@ mod tests {
         let success = status_success();
         assert!(!success.to_string().is_empty());
         assert!(success.to_string().contains("✓"));
-        
+
         // Test warning status color
         let warning = status_warning();
         assert!(!warning.to_string().is_empty());
         assert!(warning.to_string().contains("!"));
-        
+
         // Test error status color
         let error = status_error();
         assert!(!error.to_string().is_empty());
         assert!(error.to_string().contains("✗"));
-        
+
         // Test not found status color
         let not_found = status_not_found();
         assert!(!not_found.to_string().is_empty());
@@ -184,12 +184,12 @@ mod tests {
         // Test error header color
         let header = error_header();
         assert!(!header.to_string().is_empty());
-        
+
         // Test error bullet color
         let bullet = error_bullet();
         assert!(!bullet.to_string().is_empty());
         assert!(bullet.to_string().contains("•"));
-        
+
         // Test error message color
         let message = error_message();
         assert!(!message.to_string().is_empty());
@@ -200,7 +200,7 @@ mod tests {
         // Test info message color
         let message = info_message();
         assert!(!message.to_string().is_empty());
-        
+
         // Test info header color
         let header = info_header();
         assert!(!header.to_string().is_empty());
@@ -212,7 +212,7 @@ mod tests {
         let normal1 = task_name_normal();
         let normal2 = task_name_normal();
         assert_eq!(normal1.to_string(), normal2.to_string());
-        
+
         let error1 = status_error();
         let error2 = status_error();
         assert_eq!(error1.to_string(), error2.to_string());
@@ -226,7 +226,7 @@ mod tests {
         // Note: These might be the same in some environments, so we just check they're not empty
         assert!(!normal.to_string().is_empty());
         assert!(!ambiguous.to_string().is_empty());
-        
+
         let success = status_success();
         let error = status_error();
         // These should be different because they have different symbols
@@ -258,7 +258,7 @@ mod tests {
             info_message(),
             info_header(),
         ];
-        
+
         // All colors should be non-empty strings
         for color in colors {
             assert!(!color.to_string().is_empty());

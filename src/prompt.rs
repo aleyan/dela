@@ -14,8 +14,6 @@ use ratatui::{
 };
 use std::io::Stdout;
 use std::io::{self, IsTerminal, Write};
-use std::path::PathBuf;
-use crate::types::{TaskDefinitionType, TaskRunner};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum AllowDecision {
@@ -247,6 +245,8 @@ fn ui(f: &mut Frame, task: &Task, options: &[(&str, AllowDecision)], selected: u
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::{Task, TaskDefinitionType, TaskRunner};
+    use std::path::PathBuf;
 
     // Test helper function that simulates the TUI logic
     fn test_tui_logic(selected_index: usize) -> Result<AllowDecision, String> {
@@ -332,21 +332,36 @@ mod tests {
             shadowed_by: None,
             disambiguated_name: None,
         };
-        
+
         let options = vec![
             ("Allow once", AllowDecision::Allow(AllowScope::Once)),
             ("Allow task", AllowDecision::Allow(AllowScope::Task)),
             ("Allow file", AllowDecision::Allow(AllowScope::File)),
-            ("Allow directory", AllowDecision::Allow(AllowScope::Directory)),
+            (
+                "Allow directory",
+                AllowDecision::Allow(AllowScope::Directory),
+            ),
             ("Deny", AllowDecision::Deny),
         ];
-        
+
         // Test that options are properly formatted
         assert_eq!(options.len(), 5);
-        assert!(matches!(options[0].1, AllowDecision::Allow(AllowScope::Once)));
-        assert!(matches!(options[1].1, AllowDecision::Allow(AllowScope::Task)));
-        assert!(matches!(options[2].1, AllowDecision::Allow(AllowScope::File)));
-        assert!(matches!(options[3].1, AllowDecision::Allow(AllowScope::Directory)));
+        assert!(matches!(
+            options[0].1,
+            AllowDecision::Allow(AllowScope::Once)
+        ));
+        assert!(matches!(
+            options[1].1,
+            AllowDecision::Allow(AllowScope::Task)
+        ));
+        assert!(matches!(
+            options[2].1,
+            AllowDecision::Allow(AllowScope::File)
+        ));
+        assert!(matches!(
+            options[3].1,
+            AllowDecision::Allow(AllowScope::Directory)
+        ));
         assert!(matches!(options[4].1, AllowDecision::Deny));
     }
 
@@ -355,23 +370,23 @@ mod tests {
         // Test navigation logic simulation
         let mut selected = 0;
         let options_len = 5;
-        
+
         // Test up navigation
         selected = (selected + options_len - 1) % options_len;
         assert_eq!(selected, 4);
-        
+
         // Test down navigation
         selected = (selected + 1) % options_len;
         assert_eq!(selected, 0);
-        
+
         // Test wrap around
         selected = (selected + options_len - 1) % options_len;
         assert_eq!(selected, 4);
-        
+
         // Test home key
         selected = 0;
         assert_eq!(selected, 0);
-        
+
         // Test end key
         selected = options_len - 1;
         assert_eq!(selected, 4);
@@ -384,10 +399,13 @@ mod tests {
             ("Allow once", AllowDecision::Allow(AllowScope::Once)),
             ("Allow task", AllowDecision::Allow(AllowScope::Task)),
             ("Allow file", AllowDecision::Allow(AllowScope::File)),
-            ("Allow directory", AllowDecision::Allow(AllowScope::Directory)),
+            (
+                "Allow directory",
+                AllowDecision::Allow(AllowScope::Directory),
+            ),
             ("Deny", AllowDecision::Deny),
         ];
-        
+
         // Simulate Enter key press for each option
         for (i, (_, expected_decision)) in options.iter().enumerate() {
             let result = test_tui_logic(i);
@@ -410,7 +428,7 @@ mod tests {
             shadowed_by: None,
             disambiguated_name: None,
         };
-        
+
         // The actual escape handling would be in the TUI loop
         // This test ensures the task structure is valid for TUI
         assert_eq!("test", "test");
@@ -429,7 +447,7 @@ mod tests {
             shadowed_by: None,
             disambiguated_name: None,
         };
-        
+
         // Test that fallback logic handles different inputs
         // This simulates the fallback prompt logic
         let test_inputs = vec!["1", "2", "3", "4", "5"];
@@ -440,14 +458,17 @@ mod tests {
             AllowDecision::Allow(AllowScope::Directory),
             AllowDecision::Deny,
         ];
-        
+
         for (input, expected) in test_inputs.iter().zip(expected_decisions.iter()) {
             // Simulate the fallback logic
             match *input {
                 "1" => assert!(matches!(expected, AllowDecision::Allow(AllowScope::Once))),
                 "2" => assert!(matches!(expected, AllowDecision::Allow(AllowScope::Task))),
                 "3" => assert!(matches!(expected, AllowDecision::Allow(AllowScope::File))),
-                "4" => assert!(matches!(expected, AllowDecision::Allow(AllowScope::Directory))),
+                "4" => assert!(matches!(
+                    expected,
+                    AllowDecision::Allow(AllowScope::Directory)
+                )),
                 "5" => assert!(matches!(expected, AllowDecision::Deny)),
                 _ => panic!("Unexpected input"),
             }
@@ -467,22 +488,28 @@ mod tests {
             shadowed_by: None,
             disambiguated_name: None,
         };
-        
+
         let options = vec![
             ("Allow once", AllowDecision::Allow(AllowScope::Once)),
             ("Allow task", AllowDecision::Allow(AllowScope::Task)),
             ("Allow file", AllowDecision::Allow(AllowScope::File)),
-            ("Allow directory", AllowDecision::Allow(AllowScope::Directory)),
+            (
+                "Allow directory",
+                AllowDecision::Allow(AllowScope::Directory),
+            ),
             ("Deny", AllowDecision::Deny),
         ];
-        
+
         // Test that we have the expected number of options
         assert_eq!(options.len(), 5);
-        
+
         // Test that each option has the expected structure
         for (text, decision) in &options {
             assert!(!text.is_empty());
-            assert!(matches!(decision, AllowDecision::Allow(_) | AllowDecision::Deny));
+            assert!(matches!(
+                decision,
+                AllowDecision::Allow(_) | AllowDecision::Deny
+            ));
         }
     }
 }

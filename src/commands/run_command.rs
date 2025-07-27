@@ -371,7 +371,7 @@ test: ## Running tests
         assert!(result.is_ok(), "Should succeed for task without arguments");
 
         // Test with arguments that make actually supports
-        let result = execute("test -n");
+        let _result = execute("test -n");
         // This might fail in real environment, but we're testing the mock
         // The important thing is that the function handles arguments correctly
 
@@ -408,7 +408,7 @@ test: ## Running tests
         let success_code = 0;
         let failure_code = 1;
         let error_code = 255;
-        
+
         // In a real scenario, these would be ExitStatus instances
         // For now, we test the concept that different exit codes have different meanings
         assert_eq!(success_code, 0);
@@ -420,15 +420,15 @@ test: ## Running tests
     #[serial]
     fn test_execute_command_environment_setup() {
         let (project_dir, home_dir) = setup_test_env();
-        
+
         // Test that the test environment is properly set up
         assert!(project_dir.path().join("Makefile").exists());
         assert!(home_dir.path().join(".dela").exists());
-        
+
         // Test environment variables
         let home = env::var("HOME").unwrap();
         assert_eq!(home, home_dir.path().to_string_lossy());
-        
+
         drop(project_dir);
         drop(home_dir);
     }
@@ -442,18 +442,18 @@ test: ## Running tests
         // Test mock behavior
         reset_mock();
         enable_mock();
-        
+
         // Test with different mock configurations
         let env1 = TestEnvironment::new().with_executable("make");
         set_test_environment(env1);
-        
+
         let env2 = TestEnvironment::new().with_executable("npm");
         set_test_environment(env2);
-        
+
         // Test that mock can be reset
         reset_mock();
         reset_to_real_environment();
-        
+
         drop(project_dir);
         drop(home_dir);
     }

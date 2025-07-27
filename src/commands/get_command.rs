@@ -1,15 +1,12 @@
 use crate::runner::is_runner_available;
 use crate::task_discovery;
-use crate::types::{Task, TaskDefinitionType, TaskRunner};
-use std::env;
-use std::path::PathBuf;
 
 pub fn execute(task_with_args: &str) -> Result<(), String> {
     let mut parts = task_with_args.splitn(2, ' ');
     let task_name = parts.next().unwrap();
-    let args = parts.next().unwrap_or("");
+    let _args = parts.next().unwrap_or("");
 
-    let mut discovered = task_discovery::discover_tasks(&std::env::current_dir().unwrap());
+    let discovered = task_discovery::discover_tasks(&std::env::current_dir().unwrap());
 
     // Find matching tasks
     let matching_tasks = task_discovery::get_matching_tasks(&discovered, task_name);
@@ -34,7 +31,8 @@ pub fn execute(task_with_args: &str) -> Result<(), String> {
         _ => {
             // Multiple tasks found, check if any are ambiguous
             if task_discovery::is_task_ambiguous(&discovered, task_name) {
-                let error_msg = task_discovery::format_ambiguous_task_error(task_name, &matching_tasks);
+                let error_msg =
+                    task_discovery::format_ambiguous_task_error(task_name, &matching_tasks);
                 Err(error_msg)
             } else {
                 // Use the first matching task
@@ -55,9 +53,12 @@ mod tests {
     use super::*;
     use crate::environment::{TestEnvironment, reset_to_real_environment, set_test_environment};
     use crate::task_shadowing::{enable_mock, reset_mock};
+    use crate::types::{Task, TaskDefinitionType, TaskRunner};
     use serial_test::serial;
+    use std::env;
     use std::fs::{self, File};
     use std::io::Write;
+    use std::path::PathBuf;
     use tempfile::TempDir;
 
     fn setup_test_env() -> (TempDir, TempDir) {
@@ -144,10 +145,7 @@ test: ## Running tests
 
         let result = execute("nonexistent");
         assert!(result.is_err(), "Should fail when no task found");
-        assert_eq!(
-            result.unwrap_err(),
-            "No task found with name 'nonexistent'"
-        );
+        assert_eq!(result.unwrap_err(), "No task found with name 'nonexistent'");
 
         drop(project_dir);
         drop(home_dir);
@@ -167,7 +165,10 @@ test: ## Running tests
 
         let result = execute("test");
         assert!(result.is_err(), "Should fail when runner is missing");
-        assert_eq!(result.unwrap_err(), "Runner for task 'test' is not available");
+        assert_eq!(
+            result.unwrap_err(),
+            "Runner for task 'test' is not available"
+        );
 
         reset_mock();
         reset_to_real_environment();
@@ -348,7 +349,7 @@ test: ## Running tests
         // Test that task discovery works
         let discovered = task_discovery::discover_tasks(project_dir.path());
         assert!(!discovered.tasks.is_empty());
-        
+
         // Find the test task
         let test_task = discovered.tasks.iter().find(|t| t.name == "test");
         assert!(test_task.is_some());
@@ -364,20 +365,23 @@ test: ## Running tests
     #[serial]
     fn test_get_command_environment_validation() {
         let (project_dir, home_dir) = setup_test_env();
-        
+
         // Test that the test environment is properly set up
         assert!(project_dir.path().join("Makefile").exists());
         assert!(home_dir.path().join(".dela").exists());
-        
+
         // Test environment variables
         let home = env::var("HOME").unwrap();
         assert_eq!(home, home_dir.path().to_string_lossy());
-        
+
         // Test current directory
         env::set_current_dir(&project_dir).expect("Failed to change directory");
         let current_dir = env::current_dir().unwrap();
-        assert_eq!(current_dir.canonicalize().unwrap(), project_dir.path().canonicalize().unwrap());
-        
+        assert_eq!(
+            current_dir.canonicalize().unwrap(),
+            project_dir.path().canonicalize().unwrap()
+        );
+
         drop(project_dir);
         drop(home_dir);
     }
@@ -391,18 +395,18 @@ test: ## Running tests
         // Test mock behavior
         reset_mock();
         enable_mock();
-        
+
         // Test with different mock configurations
         let env1 = TestEnvironment::new().with_executable("make");
         set_test_environment(env1);
-        
+
         let env2 = TestEnvironment::new().with_executable("npm");
         set_test_environment(env2);
-        
+
         // Test that mock can be reset
         reset_mock();
         reset_to_real_environment();
-        
+
         drop(project_dir);
         drop(home_dir);
     }

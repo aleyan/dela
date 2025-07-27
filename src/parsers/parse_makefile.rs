@@ -570,7 +570,7 @@ _helper:
     #[test]
     fn test_extract_tasks_edge_cases() {
         let temp_dir = TempDir::new().unwrap();
-        
+
         // Test with no tasks
         let content = r#".PHONY: 
 # No tasks defined
@@ -578,7 +578,7 @@ _helper:
         let makefile_path = create_test_makefile(temp_dir.path(), content);
         let tasks = parse(&makefile_path).unwrap();
         assert!(tasks.is_empty());
-        
+
         // Test with only comments
         let content = r#"# This is a comment
 # Another comment
@@ -586,7 +586,7 @@ _helper:
         let makefile_path = create_test_makefile(temp_dir.path(), content);
         let tasks = parse(&makefile_path).unwrap();
         assert!(tasks.is_empty());
-        
+
         // Test with malformed content
         let content = r#".PHONY: build test
 build:
@@ -600,7 +600,7 @@ test:
     #[test]
     fn test_extract_tasks_regex_edge_cases() {
         let temp_dir = TempDir::new().unwrap();
-        
+
         // Test with complex task names
         let content = r#".PHONY: build-all test-unit deploy-prod
 build-all: ## Build all components
@@ -613,22 +613,25 @@ deploy-prod: ## Deploy to production
         let makefile_path = create_test_makefile(temp_dir.path(), content);
         let tasks = parse(&makefile_path).unwrap();
         assert_eq!(tasks.len(), 3);
-        
+
         // Check task names
         let task_names: Vec<&str> = tasks.iter().map(|t| t.name.as_str()).collect();
         assert!(task_names.contains(&"build-all"));
         assert!(task_names.contains(&"test-unit"));
         assert!(task_names.contains(&"deploy-prod"));
-        
+
         // Check descriptions
         let build_task = tasks.iter().find(|t| t.name == "build-all").unwrap();
-        assert_eq!(build_task.description.as_ref().unwrap(), "Building all components");
+        assert_eq!(
+            build_task.description.as_ref().unwrap(),
+            "Building all components"
+        );
     }
 
     #[test]
     fn test_extract_tasks_complex_content() {
         let temp_dir = TempDir::new().unwrap();
-        
+
         // Test with complex Makefile content
         let content = r#"
 # Variables
@@ -660,22 +663,22 @@ clean: ## Clean build artifacts
 "#;
         let makefile_path = create_test_makefile(temp_dir.path(), content);
         let tasks = parse(&makefile_path).unwrap();
-        
+
         // Should find at least some tasks
         assert!(tasks.len() >= 3);
-        
+
         // Check that we have some expected tasks
         let task_names: Vec<&str> = tasks.iter().map(|t| t.name.as_str()).collect();
         assert!(task_names.contains(&"build"));
         assert!(task_names.contains(&"test"));
         assert!(task_names.contains(&"clean"));
-        
+
         // Check that tasks have descriptions
         let build_task = tasks.iter().find(|t| t.name == "build");
         if let Some(task) = build_task {
             assert!(task.description.is_some());
         }
-        
+
         let test_task = tasks.iter().find(|t| t.name == "test");
         if let Some(task) = test_task {
             assert!(task.description.is_some());
@@ -685,7 +688,7 @@ clean: ## Clean build artifacts
     #[test]
     fn test_extract_tasks_error_handling() {
         let temp_dir = TempDir::new().unwrap();
-        
+
         // Test with malformed content
         let content = r#".PHONY: build test
 build:
@@ -697,7 +700,7 @@ test
         let tasks = parse(&makefile_path).unwrap();
         // Should handle malformed content gracefully
         assert!(tasks.len() >= 1);
-        
+
         // Test with empty file
         let content = "";
         let makefile_path = create_test_makefile(temp_dir.path(), content);
@@ -708,7 +711,7 @@ test
     #[test]
     fn test_extract_tasks_with_dependencies() {
         let temp_dir = TempDir::new().unwrap();
-        
+
         // Test with task dependencies
         let content = r#".PHONY: build test deploy
 build: ## Build the project
@@ -721,7 +724,7 @@ deploy: build test ## Deploy (depends on build and test)
         let makefile_path = create_test_makefile(temp_dir.path(), content);
         let tasks = parse(&makefile_path).unwrap();
         assert_eq!(tasks.len(), 3);
-        
+
         // Check that dependencies don't affect task discovery
         let task_names: Vec<&str> = tasks.iter().map(|t| t.name.as_str()).collect();
         assert!(task_names.contains(&"build"));
@@ -732,7 +735,7 @@ deploy: build test ## Deploy (depends on build and test)
     #[test]
     fn test_extract_tasks_with_variables() {
         let temp_dir = TempDir::new().unwrap();
-        
+
         // Test with Makefile variables
         let content = r#"
 BUILD_DIR = build
@@ -751,7 +754,7 @@ test: ## Run tests
         let makefile_path = create_test_makefile(temp_dir.path(), content);
         let tasks = parse(&makefile_path).unwrap();
         assert_eq!(tasks.len(), 2);
-        
+
         // Check task names
         let task_names: Vec<&str> = tasks.iter().map(|t| t.name.as_str()).collect();
         assert!(task_names.contains(&"build"));

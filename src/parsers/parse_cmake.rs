@@ -112,7 +112,11 @@ fn find_closing_paren(content: &str) -> usize {
         }
     }
 
-    if content.is_empty() { 0 } else { content.len() - 1 } // Fallback
+    if content.is_empty() {
+        0
+    } else {
+        content.len() - 1
+    } // Fallback
 }
 
 #[cfg(test)]
@@ -257,17 +261,17 @@ add_custom_target(clean)
         let content = "add_custom_target(test)";
         let result = find_closing_paren(content);
         assert_eq!(result, 22); // Position of closing parenthesis
-        
+
         // Test with opening parenthesis at end
         let content = "add_custom_target(";
         let result = find_closing_paren(content);
         assert_eq!(result, content.len() - 1); // Fallback when no closing paren found
-        
+
         // Test with nested parentheses
         let content = "add_custom_target(test(inner)outer)";
         let result = find_closing_paren(content);
         assert_eq!(result, 34);
-        
+
         // Test with multiple nested levels
         let content = "add_custom_target(test(inner(more)))";
         let result = find_closing_paren(content);
@@ -280,12 +284,12 @@ add_custom_target(clean)
         let content = "add_custom_target(\n  test\n)";
         let result = find_closing_paren(content);
         assert_eq!(result, 26);
-        
+
         // Test with quotes inside parentheses
         let content = "add_custom_target(test \"with quotes\")";
         let result = find_closing_paren(content);
         assert_eq!(result, 36);
-        
+
         // Test with escaped characters
         let content = "add_custom_target(test\\(escaped\\))";
         let result = find_closing_paren(content);
@@ -298,12 +302,12 @@ add_custom_target(clean)
         let content = "add_custom_target(test)";
         let result = find_closing_paren(content);
         assert_eq!(result, 22);
-        
+
         // Test with empty string
         let content = "";
         let result = find_closing_paren(content);
         assert_eq!(result, 0);
-        
+
         // Test with only opening parenthesis
         let content = "(";
         let result = find_closing_paren(content);
@@ -356,7 +360,10 @@ add_custom_target(
 
         // Check descriptions
         let build_task = tasks.iter().find(|t| t.name == "build-all").unwrap();
-        assert_eq!(build_task.description.as_ref().unwrap(), "Build all targets");
+        assert_eq!(
+            build_task.description.as_ref().unwrap(),
+            "Build all targets"
+        );
 
         let test_task = tasks.iter().find(|t| t.name == "test-all").unwrap();
         assert_eq!(test_task.description.as_ref().unwrap(), "Run all tests");
