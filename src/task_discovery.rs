@@ -950,6 +950,7 @@ test:
     }
 
     #[test]
+    #[serial]
     fn test_discover_tasks_with_unimplemented_parsers() {
         let temp_dir = TempDir::new().unwrap();
 
@@ -1031,6 +1032,7 @@ test:
     }
 
     #[test]
+    #[serial]
     fn test_discover_python_tasks() {
         let temp_dir = TempDir::new().unwrap();
 
@@ -1072,6 +1074,7 @@ serve = "uvicorn main:app --reload"
     }
 
     #[test]
+    #[serial]
     fn test_discover_python_poetry_tasks() {
         let temp_dir = TempDir::new().unwrap();
 
