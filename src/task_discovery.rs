@@ -967,6 +967,7 @@ test:
     }
 
     #[test]
+    #[serial]
     fn test_discover_npm_tasks() {
         let temp_dir = TempDir::new().unwrap();
 
@@ -1007,6 +1008,7 @@ test:
     }
 
     #[test]
+    #[serial]
     fn test_discover_npm_tasks_invalid_json() {
         let temp_dir = TempDir::new().unwrap();
 
@@ -1133,6 +1135,7 @@ lint = "flake8"
     }
 
     #[test]
+    #[serial]
     fn test_discover_tasks_multiple_files() {
         let temp_dir = TempDir::new().unwrap();
 
@@ -1222,11 +1225,18 @@ serve = "python -m http.server"
         assert_eq!(python_tasks.len(), 1);
 
         reset_mock();
+        reset_to_real_environment();
     }
 
     #[test]
+    #[serial]
     fn test_discover_tasks_with_name_collision() {
         let temp_dir = TempDir::new().unwrap();
+
+        // Mock package managers
+        reset_mock();
+        enable_mock();
+        mock_executable("npm");
 
         // Create Makefile with 'test' task
         let makefile_content = r#".PHONY: test cd
@@ -1280,6 +1290,9 @@ cd:
             })
             .unwrap();
         assert_eq!(node_test.description, Some("jest".to_string()));
+
+        reset_mock();
+        reset_to_real_environment();
     }
 
     #[test]

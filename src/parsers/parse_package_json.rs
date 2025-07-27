@@ -1,4 +1,4 @@
-use crate::types::{Task, TaskDefinitionType, TaskRunner};
+use crate::types::{Task, TaskDefinitionType};
 use std::path::PathBuf;
 
 /// Parse a package.json file at the given path and extract tasks
@@ -45,6 +45,7 @@ mod tests {
     use super::*;
     use crate::environment::{TestEnvironment, reset_to_real_environment, set_test_environment};
     use crate::task_shadowing::{enable_mock, reset_mock};
+    use crate::types::TaskRunner;
     use serial_test::serial;
     use std::fs::File;
     use std::io::Write;
