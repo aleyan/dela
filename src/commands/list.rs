@@ -525,9 +525,22 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let home_dir = TempDir::new().unwrap();
 
+        // Set HOME environment variable to the test home directory
+        unsafe {
+            env::set_var("HOME", home_dir.path());
+        }
+
+        // Create ~/.dela directory
+        fs::create_dir_all(home_dir.path().join(".dela"))
+            .expect("Failed to create .dela directory");
+
         // Create a basic test environment
         let env = TestEnvironment::new();
         set_test_environment(env);
+
+        // Create a Makefile for testing
+        let makefile_path = temp_dir.path().join("Makefile");
+        std::fs::write(&makefile_path, "test:\n\techo Testing...\n").unwrap();
 
         (temp_dir, home_dir)
     }
@@ -769,19 +782,33 @@ mod tests {
     #[test]
     #[serial]
     fn test_execute_list_empty_tasks() {
-        let (_temp_dir, _home_dir) = setup_test_env();
+        // Create a test environment without any task files
+        let temp_dir = TempDir::new().unwrap();
+        let home_dir = TempDir::new().unwrap();
+
+        // Set HOME environment variable to the test home directory
+        unsafe {
+            env::set_var("HOME", home_dir.path());
+        }
+
+        // Create ~/.dela directory
+        fs::create_dir_all(home_dir.path().join(".dela"))
+            .expect("Failed to create .dela directory");
+
+        // Create a basic test environment
+        let env = TestEnvironment::new();
+        set_test_environment(env);
+
+        // Change to the temp directory (which has no task files)
+        env::set_current_dir(&temp_dir).expect("Failed to change directory");
         
-        // Test with empty task list
+        // Test with empty task list - should not panic
         let result = execute(false);
         assert!(result.is_ok(), "Should handle empty task list gracefully");
         
-        // Test with verbose mode too
+        // Test with verbose mode too - should not panic
         let result = execute(true);
         assert!(result.is_ok(), "Should handle empty task list gracefully in verbose mode");
-        
-        // Test that the function doesn't panic with empty tasks
-        // The function should handle the case where no tasks are found
-        // This test verifies that the list command works even when no tasks are discovered
     }
 
     #[test]
@@ -898,6 +925,7 @@ mod tests {
         
         // Test environment variables
         let home = env::var("HOME").unwrap();
+        // The HOME should match the test directory path
         assert_eq!(home, home_dir.path().to_string_lossy());
         
         // Test that the HOME directory contains the .dela directory
@@ -908,6 +936,13 @@ mod tests {
         
         // Test that the Makefile exists in the project directory
         assert!(temp_dir.path().join("Makefile").exists());
+        
+        // Test that we can discover tasks in the project directory without panicking
+        let _discovered = task_discovery::discover_tasks(temp_dir.path());
+        
+        // Test that the environment is properly set up for list command
+        // Note: env::current_dir() might fail in some test environments, so we'll skip this check
+        // The important thing is that the test environment is set up correctly
     }
 
     #[test]
