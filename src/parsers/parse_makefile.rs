@@ -566,4 +566,204 @@ _helper:
         let task = &tasks[0];
         assert_eq!(task.name, "build");
     }
+
+    #[test]
+    fn test_extract_tasks_edge_cases() {
+        let temp_dir = TempDir::new().unwrap();
+        
+        // Test with no tasks
+        let content = r#".PHONY: 
+# No tasks defined
+"#;
+        let makefile_path = create_test_makefile(temp_dir.path(), content);
+        let tasks = parse(&makefile_path).unwrap();
+        assert!(tasks.is_empty());
+        
+        // Test with only comments
+        let content = r#"# This is a comment
+# Another comment
+"#;
+        let makefile_path = create_test_makefile(temp_dir.path(), content);
+        let tasks = parse(&makefile_path).unwrap();
+        assert!(tasks.is_empty());
+        
+        // Test with malformed content
+        let content = r#".PHONY: build test
+build:
+test:
+"#;
+        let makefile_path = create_test_makefile(temp_dir.path(), content);
+        let tasks = parse(&makefile_path).unwrap();
+        assert_eq!(tasks.len(), 2);
+    }
+
+    #[test]
+    fn test_extract_tasks_regex_edge_cases() {
+        let temp_dir = TempDir::new().unwrap();
+        
+        // Test with complex task names
+        let content = r#".PHONY: build-all test-unit deploy-prod
+build-all: ## Build all components
+	@echo "Building all components"
+test-unit: ## Run unit tests
+	@echo "Running unit tests"
+deploy-prod: ## Deploy to production
+	@echo "Deploying to production"
+"#;
+        let makefile_path = create_test_makefile(temp_dir.path(), content);
+        let tasks = parse(&makefile_path).unwrap();
+        assert_eq!(tasks.len(), 3);
+        
+        // Check task names
+        let task_names: Vec<&str> = tasks.iter().map(|t| t.name.as_str()).collect();
+        assert!(task_names.contains(&"build-all"));
+        assert!(task_names.contains(&"test-unit"));
+        assert!(task_names.contains(&"deploy-prod"));
+        
+        // Check descriptions
+        let build_task = tasks.iter().find(|t| t.name == "build-all").unwrap();
+        assert_eq!(build_task.description.as_ref().unwrap(), "Building all components");
+    }
+
+    #[test]
+    fn test_extract_tasks_complex_content() {
+        let temp_dir = TempDir::new().unwrap();
+        
+        // Test with complex Makefile content
+        let content = r#"
+# Variables
+BUILD_DIR = build
+TEST_DIR = tests
+
+.PHONY: all clean build test deploy
+
+all: build test ## Build and test everything
+
+build: ## Build the project
+	@echo "Building..."
+	mkdir -p $(BUILD_DIR)
+	@echo "Build complete"
+
+test: ## Run tests
+	@echo "Running tests..."
+	cd $(TEST_DIR) && python -m pytest
+	@echo "Tests complete"
+
+deploy: build ## Deploy the application
+	@echo "Deploying..."
+	@echo "Deploy complete"
+
+clean: ## Clean build artifacts
+	@echo "Cleaning..."
+	rm -rf $(BUILD_DIR)
+	@echo "Clean complete"
+"#;
+        let makefile_path = create_test_makefile(temp_dir.path(), content);
+        let tasks = parse(&makefile_path).unwrap();
+        
+        // Should find at least some tasks
+        assert!(tasks.len() >= 3);
+        
+        // Check that we have some expected tasks
+        let task_names: Vec<&str> = tasks.iter().map(|t| t.name.as_str()).collect();
+        assert!(task_names.contains(&"build"));
+        assert!(task_names.contains(&"test"));
+        assert!(task_names.contains(&"clean"));
+        
+        // Check that tasks have descriptions
+        let build_task = tasks.iter().find(|t| t.name == "build");
+        if let Some(task) = build_task {
+            assert!(task.description.is_some());
+        }
+        
+        let test_task = tasks.iter().find(|t| t.name == "test");
+        if let Some(task) = test_task {
+            assert!(task.description.is_some());
+        }
+    }
+
+    #[test]
+    fn test_extract_tasks_error_handling() {
+        let temp_dir = TempDir::new().unwrap();
+        
+        // Test with malformed content
+        let content = r#".PHONY: build test
+build:
+	@echo "Building"
+test
+	@echo "Testing"
+"#;
+        let makefile_path = create_test_makefile(temp_dir.path(), content);
+        let tasks = parse(&makefile_path).unwrap();
+        // Should handle malformed content gracefully
+        assert!(tasks.len() >= 1);
+        
+        // Test with empty file
+        let content = "";
+        let makefile_path = create_test_makefile(temp_dir.path(), content);
+        let tasks = parse(&makefile_path).unwrap();
+        assert!(tasks.is_empty());
+    }
+
+    #[test]
+    fn test_extract_tasks_with_dependencies() {
+        let temp_dir = TempDir::new().unwrap();
+        
+        // Test with task dependencies
+        let content = r#".PHONY: build test deploy
+build: ## Build the project
+	@echo "Building"
+test: build ## Run tests (depends on build)
+	@echo "Testing"
+deploy: build test ## Deploy (depends on build and test)
+	@echo "Deploying"
+"#;
+        let makefile_path = create_test_makefile(temp_dir.path(), content);
+        let tasks = parse(&makefile_path).unwrap();
+        assert_eq!(tasks.len(), 3);
+        
+        // Check that dependencies don't affect task discovery
+        let task_names: Vec<&str> = tasks.iter().map(|t| t.name.as_str()).collect();
+        assert!(task_names.contains(&"build"));
+        assert!(task_names.contains(&"test"));
+        assert!(task_names.contains(&"deploy"));
+    }
+
+    #[test]
+    fn test_extract_tasks_with_variables() {
+        let temp_dir = TempDir::new().unwrap();
+        
+        // Test with Makefile variables
+        let content = r#"
+BUILD_DIR = build
+TEST_DIR = tests
+
+.PHONY: build test
+
+build: ## Build the project
+	@echo "Building in $(BUILD_DIR)"
+	mkdir -p $(BUILD_DIR)
+
+test: ## Run tests
+	@echo "Testing in $(TEST_DIR)"
+	cd $(TEST_DIR) && python -m pytest
+"#;
+        let makefile_path = create_test_makefile(temp_dir.path(), content);
+        let tasks = parse(&makefile_path).unwrap();
+        assert_eq!(tasks.len(), 2);
+        
+        // Check task names
+        let task_names: Vec<&str> = tasks.iter().map(|t| t.name.as_str()).collect();
+        assert!(task_names.contains(&"build"));
+        assert!(task_names.contains(&"test"));
+    }
+
+    #[test]
+    fn test_parse_makefile_missing_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let makefile_path = temp_dir.path().join("nonexistent");
+
+        let result = parse(&makefile_path);
+        assert!(result.is_err());
+    }
 }

@@ -40,7 +40,7 @@ pub enum TaskDefinitionType {
 /// Different types of task runners supported by dela.
 /// Each variant represents a specific task runner that can execute tasks.
 /// The runner is selected based on the task definition file type and available commands.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum TaskRunner {
     /// Make tasks from Makefile
     /// Used when a Makefile is present in the project root

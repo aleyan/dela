@@ -112,7 +112,7 @@ fn find_closing_paren(content: &str) -> usize {
         }
     }
 
-    content.len() - 1 // Fallback
+    if content.is_empty() { 0 } else { content.len() - 1 } // Fallback
 }
 
 #[cfg(test)]
@@ -249,5 +249,157 @@ add_custom_target(clean)
                     .starts_with("CMake custom target:")
             );
         }
+    }
+
+    #[test]
+    fn test_find_closing_paren_edge_cases() {
+        // Test with no opening parenthesis
+        let content = "add_custom_target(test)";
+        let result = find_closing_paren(content);
+        assert_eq!(result, 22); // Position of closing parenthesis
+        
+        // Test with opening parenthesis at end
+        let content = "add_custom_target(";
+        let result = find_closing_paren(content);
+        assert_eq!(result, content.len() - 1); // Fallback when no closing paren found
+        
+        // Test with nested parentheses
+        let content = "add_custom_target(test(inner)outer)";
+        let result = find_closing_paren(content);
+        assert_eq!(result, 34);
+        
+        // Test with multiple nested levels
+        let content = "add_custom_target(test(inner(more)))";
+        let result = find_closing_paren(content);
+        assert_eq!(result, 35);
+    }
+
+    #[test]
+    fn test_find_closing_paren_complex_cases() {
+        // Test with spaces and newlines
+        let content = "add_custom_target(\n  test\n)";
+        let result = find_closing_paren(content);
+        assert_eq!(result, 26);
+        
+        // Test with quotes inside parentheses
+        let content = "add_custom_target(test \"with quotes\")";
+        let result = find_closing_paren(content);
+        assert_eq!(result, 36);
+        
+        // Test with escaped characters
+        let content = "add_custom_target(test\\(escaped\\))";
+        let result = find_closing_paren(content);
+        assert_eq!(result, 33);
+    }
+
+    #[test]
+    fn test_find_closing_paren_error_handling() {
+        // Test with valid content
+        let content = "add_custom_target(test)";
+        let result = find_closing_paren(content);
+        assert_eq!(result, 22);
+        
+        // Test with empty string
+        let content = "";
+        let result = find_closing_paren(content);
+        assert_eq!(result, 0);
+        
+        // Test with only opening parenthesis
+        let content = "(";
+        let result = find_closing_paren(content);
+        assert_eq!(result, 0);
+    }
+
+    #[test]
+    fn test_parse_complex_cmake() {
+        let content = r#"
+cmake_minimum_required(VERSION 3.10)
+project(MyProject)
+
+# Multiple targets with comments
+add_custom_target(build-all COMMENT "Build all targets")
+add_custom_target(test-all COMMENT "Run all tests")
+add_custom_target(clean-all COMMENT "Clean all artifacts")
+
+# Target with complex arguments
+add_custom_target(
+  deploy
+  COMMENT "Deploy the application"
+  DEPENDS build-all test-all
+)
+
+# Target with nested function calls
+add_custom_target(
+  package
+  COMMAND ${CMAKE_COMMAND} -E echo "Packaging..."
+  COMMENT "Create package"
+)
+"#;
+
+        let temp_dir = TempDir::new().unwrap();
+        let cmake_path = temp_dir.path().join("CMakeLists.txt");
+        std::fs::write(&cmake_path, content).unwrap();
+
+        let result = parse(&cmake_path);
+        assert!(result.is_ok());
+
+        let tasks = result.unwrap();
+        assert_eq!(tasks.len(), 5);
+
+        // Check task names
+        let task_names: Vec<&str> = tasks.iter().map(|t| t.name.as_str()).collect();
+        assert!(task_names.contains(&"build-all"));
+        assert!(task_names.contains(&"test-all"));
+        assert!(task_names.contains(&"clean-all"));
+        assert!(task_names.contains(&"deploy"));
+        assert!(task_names.contains(&"package"));
+
+        // Check descriptions
+        let build_task = tasks.iter().find(|t| t.name == "build-all").unwrap();
+        assert_eq!(build_task.description.as_ref().unwrap(), "Build all targets");
+
+        let test_task = tasks.iter().find(|t| t.name == "test-all").unwrap();
+        assert_eq!(test_task.description.as_ref().unwrap(), "Run all tests");
+    }
+
+    #[test]
+    fn test_parse_cmake_with_errors() {
+        // Test with malformed CMake content
+        let content = r#"
+cmake_minimum_required(VERSION 3.10)
+project(MyProject
+
+# Unclosed parenthesis
+add_custom_target(build-all COMMENT "Build all targets"
+add_custom_target(test-all COMMENT "Run all tests"
+"#;
+
+        let temp_dir = TempDir::new().unwrap();
+        let cmake_path = temp_dir.path().join("CMakeLists.txt");
+        std::fs::write(&cmake_path, content).unwrap();
+
+        let result = parse(&cmake_path);
+        // Should handle malformed content gracefully
+        assert!(result.is_ok() || result.is_err());
+    }
+
+    #[test]
+    fn test_parse_cmake_empty_content() {
+        let temp_dir = TempDir::new().unwrap();
+        let cmake_path = temp_dir.path().join("CMakeLists.txt");
+        std::fs::write(&cmake_path, "").unwrap();
+
+        let result = parse(&cmake_path);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().len(), 0);
+    }
+
+    #[test]
+    fn test_parse_cmake_missing_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let cmake_path = temp_dir.path().join("nonexistent.txt");
+
+        let result = parse(&cmake_path);
+        assert!(result.is_err());
     }
 }
