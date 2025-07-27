@@ -143,7 +143,6 @@ mod tests {
         reset_mock();
         enable_mock();
 
-
         let content = r#"{
             "name": "test-package",
             "scripts": {
