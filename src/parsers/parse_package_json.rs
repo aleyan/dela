@@ -58,7 +58,6 @@ mod tests {
     use crate::environment::{TestEnvironment, reset_to_real_environment, set_test_environment};
     use crate::task_shadowing::{enable_mock, reset_mock};
     use serial_test::serial;
-    use std::env;
     use std::fs::File;
     use std::io::Write;
     use tempfile::TempDir;
@@ -146,9 +145,15 @@ mod tests {
     #[test]
     #[serial]
     fn test_parse_package_json_no_package_manager() {
+        // Set up test environment with MOCK_NO_PM flag
+        let test_env = TestEnvironment::new();
+        set_test_environment(test_env);
+        
+        // Set the MOCK_NO_PM environment variable
         unsafe {
-            env::set_var("MOCK_NO_PM", "1");
+            std::env::set_var("MOCK_NO_PM", "1");
         }
+        
         let temp_dir = TempDir::new().unwrap();
         let package_json_path = temp_dir.path().join("package.json");
 
@@ -175,9 +180,11 @@ mod tests {
         let tasks = parse(&package_json_path).unwrap();
         assert!(tasks.is_empty());
 
+        // Clean up
         unsafe {
-            env::remove_var("MOCK_NO_PM");
+            std::env::remove_var("MOCK_NO_PM");
         }
         reset_mock();
+        reset_to_real_environment();
     }
 }

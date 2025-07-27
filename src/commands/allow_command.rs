@@ -73,7 +73,9 @@ pub fn execute(task_with_args: &str, allow: Option<u8>) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::environment::{TestEnvironment, set_test_environment, reset_to_real_environment};
     use serial_test::serial;
+    use std::env;
     use std::fs::{self, File};
     use std::io::Write;
     use tempfile::TempDir;
@@ -130,9 +132,11 @@ test: ## Running tests
 
         // Create a temp dir for HOME and set it up
         let home_dir = TempDir::new().expect("Failed to create temp HOME directory");
-        unsafe {
-            env::set_var("HOME", home_dir.path());
-        }
+        
+        // Set up test environment with the temp directory as HOME
+        let test_env = TestEnvironment::new()
+            .with_home(home_dir.path().to_string_lossy());
+        set_test_environment(test_env);
 
         // Create ~/.dela directory
         fs::create_dir_all(home_dir.path().join(".dela"))
@@ -152,6 +156,8 @@ test: ## Running tests
             let result = execute("test", None);
             assert!(result.is_ok(), "Should succeed for a single task");
         });
+        
+        reset_to_real_environment();
     }
 
     #[test]
@@ -165,6 +171,8 @@ test: ## Running tests
             let result = execute("test --verbose --coverage", None);
             assert!(result.is_ok(), "Should succeed for task with arguments");
         });
+        
+        reset_to_real_environment();
     }
 
     #[test]
@@ -182,6 +190,8 @@ test: ## Running tests
                 "Dela task 'test' was denied by the ~/.dela/allowlist.toml"
             );
         });
+        
+        reset_to_real_environment();
     }
 
     #[test]
@@ -199,6 +209,7 @@ test: ## Running tests
 
         drop(project_dir);
         drop(home_dir);
+        reset_to_real_environment();
     }
 
     #[test]
@@ -244,6 +255,8 @@ test: ## Running tests
             result.unwrap_err(),
             "Invalid allow choice 6. Please use a number between 2 and 5."
         );
+        
+        reset_to_real_environment();
     }
 
     #[test]
@@ -251,9 +264,11 @@ test: ## Running tests
     fn test_allow_command_uninitialized() {
         // Create a temp dir for HOME but don't create .dela directory
         let home_dir = TempDir::new().expect("Failed to create temp HOME directory");
-        unsafe {
-            env::set_var("HOME", home_dir.path());
-        }
+        
+        // Set up test environment with the temp directory as HOME
+        let test_env = TestEnvironment::new()
+            .with_home(home_dir.path().to_string_lossy());
+        set_test_environment(test_env);
 
         // Create a temp dir for the project
         let project_dir = TempDir::new().expect("Failed to create temp directory");
@@ -286,6 +301,8 @@ test: ## Running tests
             !home_dir.path().join(".dela").exists(),
             ".dela directory should not be created"
         );
+        
+        reset_to_real_environment();
     }
 
     #[test]
@@ -307,6 +324,8 @@ test: ## Running tests
             result.unwrap_err(),
             "Dela task 'test' was denied by the ~/.dela/allowlist.toml"
         );
+        
+        reset_to_real_environment();
     }
 
     #[test]
@@ -373,5 +392,7 @@ test: ## Running tests
             result.is_ok(),
             "Should succeed with npm disambiguated task name and arguments"
         );
+        
+        reset_to_real_environment();
     }
 }

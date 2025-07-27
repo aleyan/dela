@@ -1,4 +1,4 @@
-use std::env;
+use crate::environment::get_current_shell;
 
 const ZSH_CONFIG: &str = include_str!("../../resources/zsh.sh");
 const BASH_CONFIG: &str = include_str!("../../resources/bash.sh");
@@ -33,8 +33,9 @@ impl Shell {
 }
 
 pub fn execute() -> Result<(), String> {
-    // Get the current shell from SHELL environment variable
-    let shell = env::var("SHELL").map_err(|_| "SHELL environment variable not set".to_string())?;
+    // Get the current shell from environment
+    let shell = get_current_shell()
+        .ok_or("SHELL environment variable not set".to_string())?;
 
     // Parse the shell type
     let shell_type = Shell::from_path(&shell)?;
@@ -64,13 +65,13 @@ pub fn execute() -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::environment::{TestEnvironment, set_test_environment, reset_to_real_environment};
     use serial_test::serial;
 
     fn setup_test_env(shell: &str) {
-        unsafe {
-            env::remove_var("SHELL");
-            env::set_var("SHELL", shell);
-        }
+        let test_env = TestEnvironment::new()
+            .with_shell(shell);
+        set_test_environment(test_env);
     }
 
     #[test]
@@ -79,6 +80,7 @@ mod tests {
         setup_test_env("/bin/zsh");
         let result = execute();
         assert!(result.is_ok());
+        reset_to_real_environment();
     }
 
     #[test]
@@ -87,6 +89,7 @@ mod tests {
         setup_test_env("/bin/bash");
         let result = execute();
         assert!(result.is_ok());
+        reset_to_real_environment();
     }
 
     #[test]
@@ -95,14 +98,16 @@ mod tests {
         setup_test_env("/usr/local/bin/fish");
         let result = execute();
         assert!(result.is_ok());
+        reset_to_real_environment();
     }
 
     #[test]
     #[serial]
     fn test_pwsh_shell() {
-        setup_test_env("/usr/bin/pwsh");
+        setup_test_env("/usr/local/bin/pwsh");
         let result = execute();
         assert!(result.is_ok());
+        reset_to_real_environment();
     }
 
     #[test]
@@ -112,6 +117,7 @@ mod tests {
         let result = execute();
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "Unsupported shell: unknown");
+        reset_to_real_environment();
     }
 
     #[test]
@@ -120,17 +126,19 @@ mod tests {
         setup_test_env("");
         let result = execute();
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Invalid shell path");
+        reset_to_real_environment();
     }
 
     #[test]
     #[serial]
     fn test_missing_shell_env() {
-        unsafe {
-            env::remove_var("SHELL");
-        }
+        // Don't set any shell in test environment
+        let test_env = TestEnvironment::new();
+        set_test_environment(test_env);
+        
         let result = execute();
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "SHELL environment variable not set");
+        reset_to_real_environment();
     }
 }

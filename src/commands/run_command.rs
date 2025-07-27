@@ -65,20 +65,15 @@ pub fn execute(task_with_args: &str) -> Result<(), String> {
 mod tests {
     use super::*;
     use crate::environment::{TestEnvironment, reset_to_real_environment, set_test_environment};
-    #[cfg(test)]
-    use crate::task_shadowing::{enable_mock, reset_mock};
-    #[cfg(test)]
     use crate::types::TaskRunner;
     #[cfg(test)]
+    use crate::task_shadowing::{enable_mock, reset_mock};
     use serial_test::serial;
-    #[cfg(test)]
+    use std::env;
     use std::fs::{self, File};
-    #[cfg(test)]
     use std::io::Write;
-    #[cfg(test)]
     use tempfile::TempDir;
 
-    #[cfg(test)]
     fn setup_test_env() -> (TempDir, TempDir) {
         // Create a temp dir for the project
         let project_dir = TempDir::new().expect("Failed to create temp directory");
@@ -99,9 +94,11 @@ test: ## Running tests
 
         // Create a temp dir for HOME and set it up
         let home_dir = TempDir::new().expect("Failed to create temp HOME directory");
-        unsafe {
-            env::set_var("HOME", home_dir.path());
-        }
+        
+        // Set up test environment with the temp directory as HOME
+        let test_env = TestEnvironment::new()
+            .with_home(home_dir.path().to_string_lossy());
+        set_test_environment(test_env);
 
         // Create ~/.dela directory
         fs::create_dir_all(home_dir.path().join(".dela"))
