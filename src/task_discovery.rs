@@ -972,6 +972,15 @@ test:
     fn test_discover_npm_tasks() {
         let temp_dir = TempDir::new().unwrap();
 
+        // Mock npm being installed
+        reset_mock();
+        enable_mock();
+        mock_executable("npm");
+
+        // Set up test environment
+        let env = TestEnvironment::new().with_executable("npm");
+        set_test_environment(env);
+
         // Create package.json with scripts
         let content = r#"{
             "name": "test-package",
@@ -1006,6 +1015,9 @@ test:
             TaskRunner::NodeNpm | TaskRunner::NodeYarn | TaskRunner::NodePnpm | TaskRunner::NodeBun
         ));
         assert_eq!(build_task.description, Some("tsc".to_string()));
+
+        reset_mock();
+        reset_to_real_environment();
     }
 
     #[test]
@@ -1148,6 +1160,12 @@ lint = "flake8"
         mock_executable("npm");
         mock_executable("poetry");
 
+        // Set up test environment
+        let env = TestEnvironment::new()
+            .with_executable("npm")
+            .with_executable("poetry");
+        set_test_environment(env);
+
         // Create Makefile
         let makefile_content = r#".PHONY: build test
 build:
@@ -1177,6 +1195,9 @@ serve = "python -m http.server"
 "#;
         let mut pyproject = File::create(temp_dir.path().join("pyproject.toml")).unwrap();
         write!(pyproject, "{}", pyproject_content).unwrap();
+
+        // Create poetry.lock to ensure Poetry is selected
+        File::create(temp_dir.path().join("poetry.lock")).unwrap();
 
         let discovered = discover_tasks(temp_dir.path());
 
@@ -1240,6 +1261,10 @@ serve = "python -m http.server"
         reset_mock();
         enable_mock();
         mock_executable("npm");
+
+        // Set up test environment
+        let env = TestEnvironment::new().with_executable("npm");
+        set_test_environment(env);
 
         // Create Makefile with 'test' task
         let makefile_content = r#".PHONY: test cd
@@ -1353,6 +1378,15 @@ cd:
         let temp_dir = TempDir::new().unwrap();
         let package_json_path = temp_dir.path().join("package.json");
 
+        // Mock npm being installed
+        reset_mock();
+        enable_mock();
+        mock_executable("npm");
+
+        // Set up test environment
+        let env = TestEnvironment::new().with_executable("npm");
+        set_test_environment(env);
+
         let content = r#"{
             "name": "test-package",
             "scripts": {
@@ -1383,6 +1417,9 @@ cd:
             TaskRunner::NodeNpm | TaskRunner::NodeYarn | TaskRunner::NodePnpm | TaskRunner::NodeBun
         ));
         assert_eq!(build_task.description, Some("tsc".to_string()));
+
+        reset_mock();
+        reset_to_real_environment();
     }
 
     #[test]
