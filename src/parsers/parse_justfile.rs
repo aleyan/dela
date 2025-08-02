@@ -13,6 +13,7 @@ pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
         .map_err(|e| format!("Failed to read {}: {}", file_name, e))?;
 
     let mut tasks = Vec::new();
+    let lines: Vec<&str> = contents.lines().collect();
 
     // Regex to match task definitions in Justfiles
     // Matches patterns like:
@@ -24,7 +25,7 @@ pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
     // task_name *args: dependency # description
     let task_regex = Regex::new(r"^([a-zA-Z_][a-zA-Z0-9_-]*)(?:\s+\*[a-zA-Z_][a-zA-Z0-9_-]*)?:\s*(?:[a-zA-Z_][a-zA-Z0-9_-]*\s+)?(?:#\s*(.+))?$").unwrap();
 
-    for line in contents.lines() {
+    for (line_num, line) in lines.iter().enumerate() {
         let line = line.trim();
         
         // Skip empty lines and comments
@@ -35,6 +36,11 @@ pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
         if let Some(captures) = task_regex.captures(line) {
             let task_name = captures.get(1).unwrap().as_str().to_string();
             let description = captures.get(2).map(|m| m.as_str().trim().to_string());
+
+            // Validate indentation for this recipe
+            if let Err(indent_error) = validate_recipe_indentation(&lines, line_num + 1) {
+                return Err(format!("{}: {}", file_name, indent_error));
+            }
 
             tasks.push(Task {
                 name: task_name.clone(),
@@ -50,6 +56,84 @@ pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
     }
 
     Ok(tasks)
+}
+
+/// Validate that a recipe's lines use consistent indentation
+fn validate_recipe_indentation(lines: &[&str], task_line_num: usize) -> Result<(), String> {
+    let mut recipe_lines = Vec::new();
+    let mut current_line = task_line_num;
+
+    // Find all lines that belong to this recipe (indented lines after the task definition)
+    while current_line < lines.len() {
+        let line = lines[current_line];
+        
+        // Skip empty lines and comments
+        if line.trim().is_empty() || line.trim().starts_with('#') {
+            current_line += 1;
+            continue;
+        }
+
+        // Check if this line is indented (part of the recipe)
+        if is_indented_line(line) {
+            recipe_lines.push((current_line + 1, line));
+            current_line += 1;
+        } else {
+            // This line is not indented, so we've reached the end of the recipe
+            break;
+        }
+    }
+
+    // If there are no recipe lines, no validation needed
+    if recipe_lines.is_empty() {
+        return Ok(());
+    }
+
+    // Determine the indentation type of the first recipe line
+    let first_line = recipe_lines[0].1;
+    let first_indent_type = get_indentation_type(first_line);
+
+    // Validate that all recipe lines use the same indentation type
+    for (line_num, line) in recipe_lines.iter().skip(1) {
+        let indent_type = get_indentation_type(line);
+        if indent_type != first_indent_type {
+            return Err(format!(
+                "line {}: mixed indentation in recipe - found both spaces and tabs",
+                line_num
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+/// Check if a line is indented (has leading whitespace)
+fn is_indented_line(line: &str) -> bool {
+    line.starts_with(' ') || line.starts_with('\t')
+}
+
+/// Determine the indentation type of a line
+fn get_indentation_type(line: &str) -> IndentationType {
+    let leading_whitespace = line.chars().take_while(|c| c.is_whitespace()).collect::<String>();
+    
+    if leading_whitespace.is_empty() {
+        return IndentationType::None;
+    }
+    
+    if leading_whitespace.chars().all(|c| c == ' ') {
+        IndentationType::Spaces
+    } else if leading_whitespace.chars().all(|c| c == '\t') {
+        IndentationType::Tabs
+    } else {
+        IndentationType::Mixed
+    }
+}
+
+#[derive(Debug, PartialEq)]
+enum IndentationType {
+    None,
+    Spaces,
+    Tabs,
+    Mixed,
 }
 
 #[cfg(test)]
@@ -382,5 +466,320 @@ clean: # Clean	build	artifacts
 
         let clean_task = tasks.iter().find(|t| t.name == "clean").unwrap();
         assert_eq!(clean_task.description.as_deref(), Some("Clean\tbuild\tartifacts"));
+    }
+
+    #[test]
+    fn test_parse_justfile_with_spaces_indentation() {
+        let temp_dir = TempDir::new().unwrap();
+        let justfile_path = temp_dir.path().join("Justfile");
+        let mut file = File::create(&justfile_path).unwrap();
+
+        write!(
+            file,
+            r#"
+# Tasks with spaces indentation
+build: # Build the project
+    cargo build
+    cargo test
+
+deploy: # Deploy to production
+    echo "Starting deployment..."
+    docker build -t myapp .
+    docker push myapp:latest
+    echo "Deployment complete!"
+
+setup: # Setup project
+    mkdir -p build
+    cargo fetch
+"#
+        )
+        .unwrap();
+
+        let tasks = parse(&justfile_path).unwrap();
+        assert_eq!(tasks.len(), 3);
+
+        let build_task = tasks.iter().find(|t| t.name == "build").unwrap();
+        assert_eq!(build_task.description.as_deref(), Some("Build the project"));
+
+        let deploy_task = tasks.iter().find(|t| t.name == "deploy").unwrap();
+        assert_eq!(deploy_task.description.as_deref(), Some("Deploy to production"));
+
+        let setup_task = tasks.iter().find(|t| t.name == "setup").unwrap();
+        assert_eq!(setup_task.description.as_deref(), Some("Setup project"));
+    }
+
+    #[test]
+    fn test_parse_justfile_with_tabs_indentation() {
+        let temp_dir = TempDir::new().unwrap();
+        let justfile_path = temp_dir.path().join("Justfile");
+        let mut file = File::create(&justfile_path).unwrap();
+
+        write!(
+            file,
+            r#"
+# Tasks with tabs indentation
+build: # Build the project
+	cargo build
+	cargo test
+
+deploy: # Deploy to production
+	echo "Starting deployment..."
+	docker build -t myapp .
+	docker push myapp:latest
+	echo "Deployment complete!"
+
+setup: # Setup project
+	mkdir -p build
+	cargo fetch
+"#
+        )
+        .unwrap();
+
+        let tasks = parse(&justfile_path).unwrap();
+        assert_eq!(tasks.len(), 3);
+
+        let build_task = tasks.iter().find(|t| t.name == "build").unwrap();
+        assert_eq!(build_task.description.as_deref(), Some("Build the project"));
+
+        let deploy_task = tasks.iter().find(|t| t.name == "deploy").unwrap();
+        assert_eq!(deploy_task.description.as_deref(), Some("Deploy to production"));
+
+        let setup_task = tasks.iter().find(|t| t.name == "setup").unwrap();
+        assert_eq!(setup_task.description.as_deref(), Some("Setup project"));
+    }
+
+    #[test]
+    fn test_parse_justfile_with_mixed_indentation_types() {
+        let temp_dir = TempDir::new().unwrap();
+        let justfile_path = temp_dir.path().join("Justfile");
+        let mut file = File::create(&justfile_path).unwrap();
+
+        write!(
+            file,
+            r#"
+# Different recipes can use different indentation types
+build: # Build with spaces
+    cargo build
+    cargo test
+
+deploy: # Deploy with tabs
+	echo "Starting deployment..."
+	docker build -t myapp .
+	docker push myapp:latest
+
+setup: # Setup with spaces
+    mkdir -p build
+    cargo fetch
+
+clean: # Clean with tabs
+	cargo clean
+	rm -rf target/
+"#
+        )
+        .unwrap();
+
+        let tasks = parse(&justfile_path).unwrap();
+        assert_eq!(tasks.len(), 4);
+
+        let build_task = tasks.iter().find(|t| t.name == "build").unwrap();
+        assert_eq!(build_task.description.as_deref(), Some("Build with spaces"));
+
+        let deploy_task = tasks.iter().find(|t| t.name == "deploy").unwrap();
+        assert_eq!(deploy_task.description.as_deref(), Some("Deploy with tabs"));
+
+        let setup_task = tasks.iter().find(|t| t.name == "setup").unwrap();
+        assert_eq!(setup_task.description.as_deref(), Some("Setup with spaces"));
+
+        let clean_task = tasks.iter().find(|t| t.name == "clean").unwrap();
+        assert_eq!(clean_task.description.as_deref(), Some("Clean with tabs"));
+    }
+
+    #[test]
+    fn test_parse_justfile_with_mixed_indentation_error() {
+        let temp_dir = TempDir::new().unwrap();
+        let justfile_path = temp_dir.path().join("Justfile");
+        let mut file = File::create(&justfile_path).unwrap();
+
+        write!(
+            file,
+            r#"
+# This recipe has mixed indentation (spaces and tabs) - should error
+build: # Build the project
+    cargo build
+	cargo test
+    cargo fmt
+"#
+        )
+        .unwrap();
+
+        let result = parse(&justfile_path);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("mixed indentation in recipe"));
+    }
+
+    #[test]
+    fn test_parse_justfile_with_mixed_indentation_error_tabs_first() {
+        let temp_dir = TempDir::new().unwrap();
+        let justfile_path = temp_dir.path().join("Justfile");
+        let mut file = File::create(&justfile_path).unwrap();
+
+        write!(
+            file,
+            r#"
+# This recipe has mixed indentation (tabs first, then spaces) - should error
+build: # Build the project
+	cargo build
+    cargo test
+	cargo fmt
+"#
+        )
+        .unwrap();
+
+        let result = parse(&justfile_path);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("mixed indentation in recipe"));
+    }
+
+    #[test]
+    fn test_parse_justfile_with_no_recipe_lines() {
+        let temp_dir = TempDir::new().unwrap();
+        let justfile_path = temp_dir.path().join("Justfile");
+        let mut file = File::create(&justfile_path).unwrap();
+
+        write!(
+            file,
+            r#"
+# Task with no recipe lines
+build: # Build the project
+
+# Another task with no recipe lines
+test: # Run tests
+
+# Task with recipe lines
+deploy: # Deploy to production
+    echo "Deploying"
+"#
+        )
+        .unwrap();
+
+        let tasks = parse(&justfile_path).unwrap();
+        assert_eq!(tasks.len(), 3);
+
+        let build_task = tasks.iter().find(|t| t.name == "build").unwrap();
+        assert_eq!(build_task.description.as_deref(), Some("Build the project"));
+
+        let test_task = tasks.iter().find(|t| t.name == "test").unwrap();
+        assert_eq!(test_task.description.as_deref(), Some("Run tests"));
+
+        let deploy_task = tasks.iter().find(|t| t.name == "deploy").unwrap();
+        assert_eq!(deploy_task.description.as_deref(), Some("Deploy to production"));
+    }
+
+    #[test]
+    fn test_parse_justfile_with_comments_in_recipes() {
+        let temp_dir = TempDir::new().unwrap();
+        let justfile_path = temp_dir.path().join("Justfile");
+        let mut file = File::create(&justfile_path).unwrap();
+
+        write!(
+            file,
+            r#"
+# Task with comments in recipe (spaces)
+build: # Build the project
+    # This is a comment in the recipe
+    cargo build
+    # Another comment
+    cargo test
+
+# Task with comments in recipe (tabs)
+deploy: # Deploy to production
+	# This is a comment in the recipe
+	echo "Starting deployment..."
+	# Another comment
+	docker build -t myapp .
+"#
+        )
+        .unwrap();
+
+        let tasks = parse(&justfile_path).unwrap();
+        assert_eq!(tasks.len(), 2);
+
+        let build_task = tasks.iter().find(|t| t.name == "build").unwrap();
+        assert_eq!(build_task.description.as_deref(), Some("Build the project"));
+
+        let deploy_task = tasks.iter().find(|t| t.name == "deploy").unwrap();
+        assert_eq!(deploy_task.description.as_deref(), Some("Deploy to production"));
+    }
+
+    #[test]
+    fn test_indentation_validation_functions() {
+        // Test is_indented_line
+        assert!(is_indented_line("    cargo build"));
+        assert!(is_indented_line("\tcargo build"));
+        assert!(!is_indented_line("cargo build"));
+        assert!(!is_indented_line(""));
+
+        // Test get_indentation_type
+        assert_eq!(get_indentation_type("cargo build"), IndentationType::None);
+        assert_eq!(get_indentation_type("    cargo build"), IndentationType::Spaces);
+        assert_eq!(get_indentation_type("\tcargo build"), IndentationType::Tabs);
+        assert_eq!(get_indentation_type("  \tcargo build"), IndentationType::Mixed);
+        assert_eq!(get_indentation_type("\t  cargo build"), IndentationType::Mixed);
+    }
+
+    #[test]
+    fn test_parse_justfile_with_correct_mixed_indentation() {
+        let temp_dir = TempDir::new().unwrap();
+        let justfile_path = temp_dir.path().join("Justfile");
+        let mut file = File::create(&justfile_path).unwrap();
+
+        write!(
+            file,
+            r#"
+# Test Justfile demonstrating correct Justfile indentation rules
+# Different recipes can use different indentation types
+
+# Recipe using spaces
+build: # Build the project
+    cargo build
+    cargo test
+    cargo fmt
+
+# Recipe using tabs
+deploy: # Deploy to production
+	echo "Starting deployment..."
+	docker build -t myapp .
+	docker push myapp:latest
+	echo "Deployment complete!"
+
+# Another recipe using spaces
+setup: # Setup project
+    mkdir -p build
+    cargo fetch
+    echo "Setup complete"
+
+# Another recipe using tabs
+clean: # Clean project
+	cargo clean
+	rm -rf target/
+	echo "Clean complete"
+"#
+        )
+        .unwrap();
+
+        let tasks = parse(&justfile_path).unwrap();
+        assert_eq!(tasks.len(), 4);
+
+        let build_task = tasks.iter().find(|t| t.name == "build").unwrap();
+        assert_eq!(build_task.description.as_deref(), Some("Build the project"));
+
+        let deploy_task = tasks.iter().find(|t| t.name == "deploy").unwrap();
+        assert_eq!(deploy_task.description.as_deref(), Some("Deploy to production"));
+
+        let setup_task = tasks.iter().find(|t| t.name == "setup").unwrap();
+        assert_eq!(setup_task.description.as_deref(), Some("Setup project"));
+
+        let clean_task = tasks.iter().find(|t| t.name == "clean").unwrap();
+        assert_eq!(clean_task.description.as_deref(), Some("Clean project"));
     }
 } 
