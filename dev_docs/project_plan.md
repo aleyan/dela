@@ -275,7 +275,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [ ] [DTKT-133] Improve Gradle task disambiguation strategy (duplicates in same file)
   - [ ] [DTKT-136] Implement Turborepo support
   - [ ] [DTKT-136] Implement Rake support
-  - [ ] [DTKT-137] Implement Justfile parser and task discovery
+  - [x] [DTKT-137] Implement Justfile parser and task discovery
   - [ ] [DTKT-122] Add Starlark parsing for Bazel
   - [ ] [DTKT-123] Implement Bazel task running.
 

@@ -35,6 +35,8 @@ pub enum TaskDefinitionType {
     TravisCi,
     /// CMake CMakeLists.txt files
     CMake,
+    /// Justfile
+    Justfile,
 }
 
 /// Different types of task runners supported by dela.
@@ -90,6 +92,9 @@ pub enum TaskRunner {
     /// CMake task runner
     /// Used when CMakeLists.txt is present
     CMake,
+    /// Just task runner
+    /// Used when Justfile is present
+    Just,
 }
 
 /// Status of a task definition file
@@ -139,6 +144,8 @@ pub struct DiscoveredTaskDefinitions {
     pub github_actions: Option<TaskDefinitionFile>,
     /// Docker Compose files if found
     pub docker_compose: Option<TaskDefinitionFile>,
+    /// Justfile if found
+    pub justfile: Option<TaskDefinitionFile>,
 }
 
 /// Represents a discovered task that can be executed
@@ -201,6 +208,7 @@ impl TaskRunner {
                     task.source_name
                 )
             }
+            TaskRunner::Just => format!("just {}", task.source_name),
         }
     }
 
@@ -223,6 +231,7 @@ impl TaskRunner {
             TaskRunner::DockerCompose => "docker compose",
             TaskRunner::TravisCi => "travis",
             TaskRunner::CMake => "cmake",
+            TaskRunner::Just => "just",
         }
     }
 }

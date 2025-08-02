@@ -1,6 +1,7 @@
 use crate::parsers::{
-    parse_cmake, parse_docker_compose, parse_github_actions, parse_gradle, parse_makefile,
-    parse_package_json, parse_pom_xml, parse_pyproject_toml, parse_taskfile, parse_travis_ci,
+    parse_cmake, parse_docker_compose, parse_github_actions, parse_gradle, parse_justfile,
+    parse_makefile, parse_package_json, parse_pom_xml, parse_pyproject_toml, parse_taskfile,
+    parse_travis_ci,
 };
 use crate::task_shadowing::check_shadowing;
 use crate::types::{Task, TaskDefinitionFile, TaskDefinitionType, TaskFileStatus, TaskRunner};
@@ -22,6 +23,7 @@ pub struct DiscoveredTaskDefinitions {
     pub docker_compose: Option<TaskDefinitionFile>,
     pub travis_ci: Option<TaskDefinitionFile>,
     pub cmake: Option<TaskDefinitionFile>,
+    pub justfile: Option<TaskDefinitionFile>,
 }
 
 /// Result of task discovery
@@ -70,6 +72,7 @@ pub fn discover_tasks(dir: &Path) -> DiscoveredTasks {
     let _ = discover_docker_compose_tasks(dir, &mut discovered);
     let _ = discover_travis_ci_tasks(dir, &mut discovered);
     let _ = discover_cmake_tasks(dir, &mut discovered);
+    let _ = discover_justfile_tasks(dir, &mut discovered);
     discover_shell_script_tasks(dir, &mut discovered);
 
     // Process tasks to identify name collisions
@@ -736,6 +739,29 @@ fn discover_cmake_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<
         Err(e) => {
             handle_discovery_error(e, cmake_path, TaskDefinitionType::CMake, discovered);
             Err("Error parsing CMakeLists.txt".to_string())
+        }
+    }
+}
+
+fn discover_justfile_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<(), String> {
+    let justfile_path = dir.join("Justfile");
+    if !justfile_path.exists() {
+        return Ok(());
+    }
+
+    match parse_justfile::parse(&justfile_path) {
+        Ok(tasks) => {
+            handle_discovery_success(
+                tasks,
+                justfile_path.clone(),
+                TaskDefinitionType::Justfile,
+                discovered,
+            );
+            Ok(())
+        }
+        Err(e) => {
+            handle_discovery_error(e, justfile_path, TaskDefinitionType::Justfile, discovered);
+            Err("Error parsing Justfile".to_string())
         }
     }
 }
