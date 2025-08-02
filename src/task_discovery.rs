@@ -250,6 +250,7 @@ fn set_definition(discovered: &mut DiscoveredTasks, definition: TaskDefinitionFi
         }
         TaskDefinitionType::TravisCi => discovered.definitions.travis_ci = Some(definition),
         TaskDefinitionType::CMake => discovered.definitions.cmake = Some(definition),
+        TaskDefinitionType::Justfile => discovered.definitions.justfile = Some(definition),
         _ => {}
     }
 }
@@ -746,6 +747,11 @@ fn discover_cmake_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<
 fn discover_justfile_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<(), String> {
     let justfile_path = dir.join("Justfile");
     if !justfile_path.exists() {
+        discovered.definitions.justfile = Some(TaskDefinitionFile {
+            path: justfile_path.clone(),
+            definition_type: TaskDefinitionType::Justfile,
+            status: TaskFileStatus::NotFound,
+        });
         return Ok(());
     }
 
