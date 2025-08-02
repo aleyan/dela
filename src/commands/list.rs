@@ -487,6 +487,7 @@ mod tests {
                 TaskRunner::DockerCompose => TaskDefinitionType::DockerCompose,
                 TaskRunner::TravisCi => TaskDefinitionType::TravisCi,
                 TaskRunner::CMake => TaskDefinitionType::CMake,
+                TaskRunner::Just => TaskDefinitionType::Justfile,
             },
             runner,
             source_name: name.to_string(),

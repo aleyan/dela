@@ -1,0 +1,60 @@
+# Test Justfile for dela
+build: # Build the project
+    cargo build
+
+test: # Run tests
+    cargo test
+
+clean: # Clean build artifacts
+    cargo clean
+
+format: # Format code
+    cargo fmt
+
+lint: # Run linter
+    cargo clippy
+
+# Task with complex name
+build-release: # Build release version
+    cargo build --release
+
+# Task with underscore
+deploy_staging: # Deploy to staging
+    echo "Deploying to staging"
+
+# Task with multiline commands
+deploy: # Deploy to production
+    echo "Starting deployment..."
+    docker build -t myapp .
+    docker push myapp:latest
+    echo "Deployment complete!"
+
+# Task with parameters
+build-args *args: # Build with arguments
+    cargo build -- $args
+
+# Task with dependencies
+test-full: build # Run tests after building
+    cargo test --all-features
+
+# Task with conditional logic
+release: # Build release version
+    if [ "$(git branch --show-current)" = "main" ]; then
+        cargo build --release
+    else
+        echo "Not on main branch"
+        exit 1
+    fi
+
+# Task with special characters in description
+docs: # Generate #documentation with @#$%^&*
+    echo "Generating docs"
+
+# Task with description containing quotes
+lint-strict: # Run "linter" and 'check' code
+    cargo clippy --all-targets --all-features
+
+# Task with no description but lots of whitespace
+setup:    
+    mkdir -p build
+    cargo fetch 
