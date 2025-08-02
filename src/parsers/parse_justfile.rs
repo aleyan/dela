@@ -27,7 +27,7 @@ pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
 
     for (line_num, line) in lines.iter().enumerate() {
         let line = line.trim();
-        
+
         // Skip empty lines and comments
         if line.is_empty() || line.starts_with('#') {
             continue;
@@ -66,7 +66,7 @@ fn validate_recipe_indentation(lines: &[&str], task_line_num: usize) -> Result<(
     // Find all lines that belong to this recipe (indented lines after the task definition)
     while current_line < lines.len() {
         let line = lines[current_line];
-        
+
         // Skip empty lines and comments
         if line.trim().is_empty() || line.trim().starts_with('#') {
             current_line += 1;
@@ -113,12 +113,15 @@ fn is_indented_line(line: &str) -> bool {
 
 /// Determine the indentation type of a line
 fn get_indentation_type(line: &str) -> IndentationType {
-    let leading_whitespace = line.chars().take_while(|c| c.is_whitespace()).collect::<String>();
-    
+    let leading_whitespace = line
+        .chars()
+        .take_while(|c| c.is_whitespace())
+        .collect::<String>();
+
     if leading_whitespace.is_empty() {
         return IndentationType::None;
     }
-    
+
     if leading_whitespace.chars().all(|c| c == ' ') {
         IndentationType::Spaces
     } else if leading_whitespace.chars().all(|c| c == '\t') {
@@ -184,7 +187,10 @@ lint: # Run linter
         assert_eq!(test_task.runner, TaskRunner::Just);
 
         let clean_task = tasks.iter().find(|t| t.name == "clean").unwrap();
-        assert_eq!(clean_task.description.as_deref(), Some("Clean build artifacts"));
+        assert_eq!(
+            clean_task.description.as_deref(),
+            Some("Clean build artifacts")
+        );
         assert_eq!(clean_task.runner, TaskRunner::Just);
 
         let format_task = tasks.iter().find(|t| t.name == "format").unwrap();
@@ -225,16 +231,28 @@ build_release: # Build release version
         assert_eq!(tasks.len(), 4);
 
         let build_dev_task = tasks.iter().find(|t| t.name == "build-dev").unwrap();
-        assert_eq!(build_dev_task.description.as_deref(), Some("Build for development"));
+        assert_eq!(
+            build_dev_task.description.as_deref(),
+            Some("Build for development")
+        );
 
         let test_integration_task = tasks.iter().find(|t| t.name == "test-integration").unwrap();
-        assert_eq!(test_integration_task.description.as_deref(), Some("Run integration tests"));
+        assert_eq!(
+            test_integration_task.description.as_deref(),
+            Some("Run integration tests")
+        );
 
         let deploy_staging_task = tasks.iter().find(|t| t.name == "deploy-staging").unwrap();
-        assert_eq!(deploy_staging_task.description.as_deref(), Some("Deploy to staging"));
+        assert_eq!(
+            deploy_staging_task.description.as_deref(),
+            Some("Deploy to staging")
+        );
 
         let build_release_task = tasks.iter().find(|t| t.name == "build_release").unwrap();
-        assert_eq!(build_release_task.description.as_deref(), Some("Build release version"));
+        assert_eq!(
+            build_release_task.description.as_deref(),
+            Some("Build release version")
+        );
     }
 
     #[test]
@@ -332,7 +350,10 @@ lint: # Run linter
         assert_eq!(build_task.description.as_deref(), Some("Build the project"));
 
         let deploy_task = tasks.iter().find(|t| t.name == "deploy").unwrap();
-        assert_eq!(deploy_task.description.as_deref(), Some("Deploy to production"));
+        assert_eq!(
+            deploy_task.description.as_deref(),
+            Some("Deploy to production")
+        );
 
         let setup_task = tasks.iter().find(|t| t.name == "setup").unwrap();
         assert_eq!(setup_task.description, None);
@@ -387,19 +408,31 @@ docs: # Generate documentation
         assert_eq!(tasks.len(), 5);
 
         let build_task = tasks.iter().find(|t| t.name == "build").unwrap();
-        assert_eq!(build_task.description.as_deref(), Some("Build with arguments"));
+        assert_eq!(
+            build_task.description.as_deref(),
+            Some("Build with arguments")
+        );
 
         let test_task = tasks.iter().find(|t| t.name == "test").unwrap();
-        assert_eq!(test_task.description.as_deref(), Some("Run tests after building"));
+        assert_eq!(
+            test_task.description.as_deref(),
+            Some("Run tests after building")
+        );
 
         let release_task = tasks.iter().find(|t| t.name == "release").unwrap();
-        assert_eq!(release_task.description.as_deref(), Some("Build release version"));
+        assert_eq!(
+            release_task.description.as_deref(),
+            Some("Build release version")
+        );
 
         let script_task = tasks.iter().find(|t| t.name == "script").unwrap();
         assert_eq!(script_task.description.as_deref(), Some("Run a script"));
 
         let docs_task = tasks.iter().find(|t| t.name == "docs").unwrap();
-        assert_eq!(docs_task.description.as_deref(), Some("Generate documentation"));
+        assert_eq!(
+            docs_task.description.as_deref(),
+            Some("Generate documentation")
+        );
     }
 
     #[test]
@@ -447,25 +480,40 @@ clean: # Clean	build	artifacts
         assert_eq!(tasks.len(), 7);
 
         let build_task = tasks.iter().find(|t| t.name == "build").unwrap();
-        assert_eq!(build_task.description.as_deref(), Some("Build the project (with special chars: @#$%^&*)"));
+        assert_eq!(
+            build_task.description.as_deref(),
+            Some("Build the project (with special chars: @#$%^&*)")
+        );
 
         let test_task = tasks.iter().find(|t| t.name == "test").unwrap();
         assert_eq!(test_task.description, None);
 
         let deploy_task = tasks.iter().find(|t| t.name == "deploy").unwrap();
-        assert_eq!(deploy_task.description.as_deref(), Some("Deploy to: staging, production"));
+        assert_eq!(
+            deploy_task.description.as_deref(),
+            Some("Deploy to: staging, production")
+        );
 
         let docs_task = tasks.iter().find(|t| t.name == "docs").unwrap();
-        assert_eq!(docs_task.description.as_deref(), Some("Generate #documentation with #hashtags"));
+        assert_eq!(
+            docs_task.description.as_deref(),
+            Some("Generate #documentation with #hashtags")
+        );
 
         let lint_task = tasks.iter().find(|t| t.name == "lint").unwrap();
-        assert_eq!(lint_task.description.as_deref(), Some("Run \"linter\" and 'check' code"));
+        assert_eq!(
+            lint_task.description.as_deref(),
+            Some("Run \"linter\" and 'check' code")
+        );
 
         let format_task = tasks.iter().find(|t| t.name == "format").unwrap();
         assert_eq!(format_task.description.as_deref(), Some("Format code"));
 
         let clean_task = tasks.iter().find(|t| t.name == "clean").unwrap();
-        assert_eq!(clean_task.description.as_deref(), Some("Clean\tbuild\tartifacts"));
+        assert_eq!(
+            clean_task.description.as_deref(),
+            Some("Clean\tbuild\tartifacts")
+        );
     }
 
     #[test]
@@ -502,7 +550,10 @@ setup: # Setup project
         assert_eq!(build_task.description.as_deref(), Some("Build the project"));
 
         let deploy_task = tasks.iter().find(|t| t.name == "deploy").unwrap();
-        assert_eq!(deploy_task.description.as_deref(), Some("Deploy to production"));
+        assert_eq!(
+            deploy_task.description.as_deref(),
+            Some("Deploy to production")
+        );
 
         let setup_task = tasks.iter().find(|t| t.name == "setup").unwrap();
         assert_eq!(setup_task.description.as_deref(), Some("Setup project"));
@@ -542,7 +593,10 @@ setup: # Setup project
         assert_eq!(build_task.description.as_deref(), Some("Build the project"));
 
         let deploy_task = tasks.iter().find(|t| t.name == "deploy").unwrap();
-        assert_eq!(deploy_task.description.as_deref(), Some("Deploy to production"));
+        assert_eq!(
+            deploy_task.description.as_deref(),
+            Some("Deploy to production")
+        );
 
         let setup_task = tasks.iter().find(|t| t.name == "setup").unwrap();
         assert_eq!(setup_task.description.as_deref(), Some("Setup project"));
@@ -672,7 +726,10 @@ deploy: # Deploy to production
         assert_eq!(test_task.description.as_deref(), Some("Run tests"));
 
         let deploy_task = tasks.iter().find(|t| t.name == "deploy").unwrap();
-        assert_eq!(deploy_task.description.as_deref(), Some("Deploy to production"));
+        assert_eq!(
+            deploy_task.description.as_deref(),
+            Some("Deploy to production")
+        );
     }
 
     #[test]
@@ -708,7 +765,10 @@ deploy: # Deploy to production
         assert_eq!(build_task.description.as_deref(), Some("Build the project"));
 
         let deploy_task = tasks.iter().find(|t| t.name == "deploy").unwrap();
-        assert_eq!(deploy_task.description.as_deref(), Some("Deploy to production"));
+        assert_eq!(
+            deploy_task.description.as_deref(),
+            Some("Deploy to production")
+        );
     }
 
     #[test]
@@ -721,10 +781,19 @@ deploy: # Deploy to production
 
         // Test get_indentation_type
         assert_eq!(get_indentation_type("cargo build"), IndentationType::None);
-        assert_eq!(get_indentation_type("    cargo build"), IndentationType::Spaces);
+        assert_eq!(
+            get_indentation_type("    cargo build"),
+            IndentationType::Spaces
+        );
         assert_eq!(get_indentation_type("\tcargo build"), IndentationType::Tabs);
-        assert_eq!(get_indentation_type("  \tcargo build"), IndentationType::Mixed);
-        assert_eq!(get_indentation_type("\t  cargo build"), IndentationType::Mixed);
+        assert_eq!(
+            get_indentation_type("  \tcargo build"),
+            IndentationType::Mixed
+        );
+        assert_eq!(
+            get_indentation_type("\t  cargo build"),
+            IndentationType::Mixed
+        );
     }
 
     #[test]
@@ -774,7 +843,10 @@ clean: # Clean project
         assert_eq!(build_task.description.as_deref(), Some("Build the project"));
 
         let deploy_task = tasks.iter().find(|t| t.name == "deploy").unwrap();
-        assert_eq!(deploy_task.description.as_deref(), Some("Deploy to production"));
+        assert_eq!(
+            deploy_task.description.as_deref(),
+            Some("Deploy to production")
+        );
 
         let setup_task = tasks.iter().find(|t| t.name == "setup").unwrap();
         assert_eq!(setup_task.description.as_deref(), Some("Setup project"));
@@ -782,4 +854,4 @@ clean: # Clean project
         let clean_task = tasks.iter().find(|t| t.name == "clean").unwrap();
         assert_eq!(clean_task.description.as_deref(), Some("Clean project"));
     }
-} 
+}
