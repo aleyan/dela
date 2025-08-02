@@ -2719,9 +2719,12 @@ test: # Run tests
         // Check that the Justfile definition was set
         assert!(discovered.definitions.justfile.is_some());
         let justfile_def = discovered.definitions.justfile.as_ref().unwrap();
-        // On case-insensitive filesystems, creating "justfile" will be found as "Justfile"
-        // because the filesystem treats them as the same file
-        assert_eq!(justfile_def.path, dir2.join("Justfile"));
+        // The path should match what was actually found by the discovery function
+        // On case-insensitive filesystems, this will be "Justfile"
+        // On case-sensitive filesystems, this will be "justfile"
+        assert!(
+            justfile_def.path == dir2.join("Justfile") || justfile_def.path == justfile_lower_path
+        );
         assert_eq!(justfile_def.definition_type, TaskDefinitionType::Justfile);
         assert!(matches!(justfile_def.status, TaskFileStatus::Parsed));
 
@@ -2809,8 +2812,12 @@ build: # Build the project
 
         assert!(discovered.definitions.justfile.is_some());
         let justfile_def = discovered.definitions.justfile.as_ref().unwrap();
-        // On case-insensitive filesystems, this will be found as "Justfile"
-        assert_eq!(justfile_def.path, dir2.join("Justfile"));
+        // The path should match what was actually found by the discovery function
+        // On case-insensitive filesystems, this will be "Justfile"
+        // On case-sensitive filesystems, this will be "justfile"
+        assert!(
+            justfile_def.path == dir2.join("Justfile") || justfile_def.path == justfile_lower_path
+        );
         assert!(matches!(justfile_def.status, TaskFileStatus::Parsed));
 
         // Test with only dot variant (in a new directory)
