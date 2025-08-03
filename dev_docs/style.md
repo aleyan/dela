@@ -12,4 +12,4 @@ When adding new dependencies, show or run the command for the package manger to 
 
 Implementation for individual cli subcommands should be in the src/commands/ subfolder.
 
-When writing tests that mock files, always set them to `#[serial]`.
+Unit tests should go in the same file as the functionality they are testing.

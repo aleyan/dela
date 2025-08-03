@@ -85,7 +85,7 @@ Currently, `dela` supports zsh, bash, fish, and PowerShell.
 
 ### Which task runners are supported?
 
-Currently, `dela` supports make, npm, uv, poetry, Maven, Gradle, GitHub Actions, Docker Compose, CMake, and Travis CI.
+Currently, `dela` supports make, npm, pnpm, uv, poetry, Maven, Gradle, GitHub Actions, Docker Compose, CMake, Travis CI, just and task.
 
 ### Which platforms are supported?
 
