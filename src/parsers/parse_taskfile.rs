@@ -11,10 +11,17 @@ enum TaskCommand {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+enum TaskDependency {
+    String(String),
+    Map(HashMap<String, serde_yaml::Value>),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 struct TaskfileTask {
     desc: Option<String>,
     cmds: Option<Vec<TaskCommand>>,
-    deps: Option<Vec<String>>,
+    deps: Option<Vec<TaskDependency>>,
     internal: Option<bool>,
 }
 
@@ -112,12 +119,18 @@ tasks:
       - task: build
       - two
     deps: ['clean']
+  fix:
+    cmds:
+      - one
+    deps:
+      - task: build
+      - two
 "#
         )
         .unwrap();
 
         let tasks = parse(&taskfile_path).unwrap();
-        assert_eq!(tasks.len(), 4);
+        assert_eq!(tasks.len(), 5);
 
         let build_task = tasks.iter().find(|t| t.name == "build").unwrap();
         assert_eq!(build_task.description.as_deref(), Some("Build the project"));

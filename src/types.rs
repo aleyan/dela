@@ -182,7 +182,7 @@ impl TaskRunner {
             TaskRunner::PythonPoetry => format!("poetry run {}", task.source_name),
             TaskRunner::PythonPoe => format!("poe {}", task.source_name),
             TaskRunner::ShellScript => format!("./{}", task.source_name),
-            TaskRunner::Task => format!("task {}", task.source_name),
+            TaskRunner::Task => format!("task {} --", task.source_name),
             TaskRunner::Maven => format!("mvn {}", task.source_name),
             TaskRunner::Gradle => format!("gradle {}", task.source_name),
             TaskRunner::Act => format!("act -W {}", task.file_path.display()),
