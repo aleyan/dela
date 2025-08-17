@@ -11,8 +11,8 @@ RUN apk add --no-cache \
     make \
     python3 \
     uv \
-    poetry \
-    task
+    poetry && \
+    apk add --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/v3.21/community task
 
 # Create test user
 RUN adduser -D -s /bin/fish testuser

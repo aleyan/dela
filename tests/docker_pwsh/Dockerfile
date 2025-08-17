@@ -12,8 +12,8 @@ RUN apk add --no-cache \
     python3 \
     uv \
     poetry \
-    npm \
-    task
+    npm && \
+    apk add --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/v3.21/community task
 
 # Create test user
 RUN adduser -D -s /bin/pwsh testuser

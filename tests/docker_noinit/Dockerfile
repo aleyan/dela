@@ -16,8 +16,8 @@ RUN apk add --no-cache \
     npm \
     maven \
     gradle \
-    docker-cli \
-    task
+    docker-cli && \
+    apk add --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/v3.21/community task
 
 # Install act (GitHub Actions runner)
 # TODO: Get act from the package manager, once it is in a non-edge alpine release.
