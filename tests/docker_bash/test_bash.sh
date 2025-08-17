@@ -182,9 +182,34 @@ export DELA_NON_INTERACTIVE=1
 
 # Test that task is initially not allowed
 log "Testing task is initially blocked..."
+unset DELA_NON_INTERACTIVE
+unset DELA_AUTO_ALLOW
 output=$(test-task 2>&1) || true
 if ! echo "$output" | grep -q "requires approval"; then
     error "Expected task to be blocked with approval prompt, but got: $output"
+    exit 1
+fi
+
+# Test interactive allow-command functionality
+log "Testing interactive allow-command functionality..."
+echo "2" | dela allow-command test-task || (error "Failed to allow test-task" && exit 1)
+
+# Reload shell integration again
+source ~/.bashrc
+
+# Verify task is now allowed and runs
+log "Testing allowed task execution..."
+export DELA_NON_INTERACTIVE=1
+output=$(dela get-command test-task 2>&1)
+if ! echo "$output" | grep -q "make test-task"; then
+    error "Task command not found. Got: $output"
+    exit 1
+fi
+
+# Run the task
+output=$(make test-task 2>&1)
+if ! echo "$output" | grep -q "Test task executed successfully"; then
+    error "Task execution failed. Got: $output"
     exit 1
 fi
 
@@ -288,6 +313,19 @@ if ! echo "$output" | grep -q -- "--flag2=value"; then
 fi
 if ! echo "$output" | grep -q "positional"; then
     error "Expected output to contain 'positional'"
+    error "Got: $output"
+    exit 1
+fi
+
+# Test task execution with arguments
+log "Testing task execution with arguments..."
+dela allow-command task-args --allow 2 || (error "Failed to allow task-args" && exit 1)
+
+# Test task with arguments
+output=$(dr task-args --verbose 2>&1)
+if ! echo "$output" | grep -q "Arguments received: --verbose"; then
+    error "Taskfile task with arguments failed"
+    error "Expected: Arguments received: --verbose"
     error "Got: $output"
     exit 1
 fi

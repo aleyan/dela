@@ -241,4 +241,33 @@ tasks:
         assert_eq!(build_task.description.as_deref(), Some("echo to the world"));
         assert_eq!(build_task.runner, TaskRunner::Task);
     }
+
+    #[test]
+    fn test_parse_taskfile_with_shell_command() {
+        let temp_dir = TempDir::new().unwrap();
+        let taskfile_path = temp_dir.path().join("Taskfile.yml");
+        let mut file = File::create(&taskfile_path).unwrap();
+
+        write!(
+            file,
+            r#"
+version: '3'
+tasks:
+  task-args:
+    desc: Task that accepts and prints arguments
+    cmds:
+      - echo "Arguments received: {{.CLI_ARGS | join ' '}}"
+"#
+        )
+        .unwrap();
+
+        let tasks = parse(&taskfile_path).unwrap();
+
+        // Should have 1 task
+        assert_eq!(tasks.len(), 1);
+
+        let args_task = tasks.iter().find(|t| t.name == "task-args").unwrap();
+        assert_eq!(args_task.description.as_deref(), Some("Task that accepts and prints arguments"));
+        assert_eq!(args_task.runner, TaskRunner::Task);
+    }
 }

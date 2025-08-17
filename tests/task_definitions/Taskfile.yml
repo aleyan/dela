@@ -21,4 +21,7 @@ tasks:
   task-args:
     desc: Task that accepts and prints arguments
     cmds:
-      - echo "Arguments received: --verbose" 
+      - cmd: |
+          echo "Arguments received: {{.ARGS}}"
+    vars:
+      ARGS: "{{.CLI_ARGS | join \" \"}}"

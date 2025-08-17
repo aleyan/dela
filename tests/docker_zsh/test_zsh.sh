@@ -59,6 +59,9 @@ grep -q "eval \"\$(dela configure-shell)\"" ~/.zshrc || {
 
 log "3. Testing dela shell integration..."
 
+# Set non-interactive mode before loading shell integration
+export DELA_NON_INTERACTIVE=1
+
 # Source updated zshrc and check for errors
 source ~/.zshrc
 if [ $? -ne 0 ]; then
@@ -178,9 +181,34 @@ export DELA_NON_INTERACTIVE=1
 
 # Test that task is initially not allowed
 log "Testing task is initially blocked..."
+unset DELA_NON_INTERACTIVE
+unset DELA_AUTO_ALLOW
 output=$(test-task 2>&1) || true
 if ! echo "$output" | grep -q "requires approval"; then
     error "Expected task to be blocked with approval prompt, but got: $output"
+    exit 1
+fi
+
+# Test interactive allow-command functionality
+log "Testing interactive allow-command functionality..."
+echo "2" | dela allow-command test-task || (error "Failed to allow test-task" && exit 1)
+
+# Reload shell integration again
+source ~/.zshrc
+
+# Verify task is now allowed and runs
+log "Testing allowed task execution..."
+export DELA_NON_INTERACTIVE=1
+output=$(dela get-command test-task 2>&1)
+if ! echo "$output" | grep -q "make test-task"; then
+    error "Task command not found. Got: $output"
+    exit 1
+fi
+
+# Run the task
+output=$(make test-task 2>&1)
+if ! echo "$output" | grep -q "Test task executed successfully"; then
+    error "Task execution failed. Got: $output"
     exit 1
 fi
 
@@ -277,6 +305,19 @@ output=$(dr uv-run-arg --flag1 --flag2=value)
 if ! echo "$output" | grep -q "Arguments:.*--flag1.*--flag2=value"; then
     error "Arguments not passed correctly to uv command"
     error "Expected to see arguments --flag1 --flag2=value in the output"
+    error "Got: $output"
+    exit 1
+fi
+
+# Test task execution with arguments
+log "Testing task execution with arguments..."
+dela allow-command task-args --allow 2 || (error "Failed to allow task-args" && exit 1)
+
+# Test task with arguments
+output=$(dr task-args --verbose 2>&1)
+if ! echo "$output" | grep -q "Arguments received: --verbose"; then
+    error "Taskfile task with arguments failed"
+    error "Expected: Arguments received: --verbose"
     error "Got: $output"
     exit 1
 fi

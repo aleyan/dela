@@ -142,9 +142,35 @@ set -x DELA_NON_INTERACTIVE 1
 
 # Test that task is initially blocked
 log "Testing task is initially blocked..."
+set -e DELA_NON_INTERACTIVE
+set -e DELA_AUTO_ALLOW
 set output (fish -c "test-task" 2>&1); or true
 if not string match -q "*requires approval*" -- "$output"
     error "Expected task to be blocked with approval prompt, but got: $output"
+    exit 1
+end
+
+# Test interactive allow-command functionality
+log "Testing interactive allow-command functionality..."
+printf "2\n" | dela allow-command test-task >/dev/null 2>&1; or error "Failed to allow test-task"
+
+# Reload shell integration again
+source ~/.config/fish/config.fish
+eval (dela configure-shell | string collect)
+
+# Verify task is now allowed and runs
+log "Testing allowed task execution..."
+set -x DELA_NON_INTERACTIVE 1
+set output (dela get-command test-task 2>&1)
+if not string match -q "*make test-task*" -- "$output"
+    error "Task command not found. Got: $output"
+    exit 1
+end
+
+# Run the task
+set output (make test-task 2>&1)
+if not string match -q "*Test task executed successfully*" -- "$output"
+    error "Task execution failed. Got: $output"
     exit 1
 end
 
@@ -292,6 +318,24 @@ if not string match -q "*Arguments passed to print-args: --arg1 --arg2 value*" -
     echo "Full output: $output"
     error "Arguments not passed correctly through dr command"
     error "Expected: Arguments passed to print-args: --arg1 --arg2 value"
+    error "Got: $output"
+    exit 1
+end
+
+# Test task execution with arguments
+log "Testing task execution with arguments..."
+dela allow-command task-args --allow 2 >/dev/null 2>&1; or error "Failed to allow task-args"
+
+# Create a temporary script for task-args
+echo '#!/usr/bin/fish
+dr task-args --verbose' > ~/run_task_args.fish
+chmod +x ~/run_task_args.fish
+set output (~/run_task_args.fish 2>&1)
+rm ~/run_task_args.fish
+
+if not string match -q "*Arguments received: --verbose*" -- "$output"
+    error "Taskfile task with arguments failed"
+    error "Expected: Arguments received: --verbose"
     error "Got: $output"
     exit 1
 end

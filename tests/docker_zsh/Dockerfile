@@ -12,7 +12,12 @@ RUN apk add --no-cache \
     python3 \
     uv \
     poetry \
-    npm
+    curl
+
+# Install task (Taskfile runner)
+RUN curl -sL https://github.com/go-task/task/releases/download/v3.35.0/task_linux_amd64.tar.gz | \
+    tar -xz -C /usr/local/bin/ task && \
+    chmod +x /usr/local/bin/task
 
 # Create test user
 RUN adduser -D -s /bin/zsh testuser
