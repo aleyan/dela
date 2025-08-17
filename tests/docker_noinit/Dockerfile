@@ -14,15 +14,10 @@ RUN apk add --no-cache \
     poetry \
     nodejs \
     npm \
-    curl \
     maven \
     gradle \
-    docker-cli
-
-# Install task (Taskfile runner)
-RUN curl -sL https://github.com/go-task/task/releases/download/v3.35.0/task_linux_amd64.tar.gz | \
-    tar -xz -C /usr/local/bin/ task && \
-    chmod +x /usr/local/bin/task
+    docker-cli \
+    task
 
 # Install act (GitHub Actions runner)
 # TODO: Get act from the package manager, once it is in a non-edge alpine release.

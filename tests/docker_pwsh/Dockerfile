@@ -12,7 +12,8 @@ RUN apk add --no-cache \
     python3 \
     uv \
     poetry \
-    npm
+    npm \
+    task
 
 # Create test user
 RUN adduser -D -s /bin/pwsh testuser
