@@ -256,7 +256,10 @@ tasks:
   task-args:
     desc: Task that accepts and prints arguments
     cmds:
-      - echo "Arguments received: {{.CLI_ARGS | join ' '}}"
+      - cmd: |
+          echo "Arguments received: {{.ARGS}}"
+    vars:
+      ARGS: "{{.CLI_ARGS | join \" \"}}"
 "#
         )
         .unwrap();
