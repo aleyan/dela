@@ -1,4 +1,4 @@
-Dela is a CLI tool meant for developers to help them run tasks in their code projects. When working on it, please consult internal documentations.
+Dela is a CLI tool written in rust meant for developers to help them run tasks in their code projects. When working on it, please consult internal documentations.
 
 README.md - Gives an overview of dela from user perspective, you must understand this.
 dev_docs/architecture.md - Explains how the rust portion of dela fits together.
