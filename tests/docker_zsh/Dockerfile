@@ -12,7 +12,7 @@ RUN apk add --no-cache \
     python3 \
     uv \
     poetry && \
-    apk add --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/v3.21/community task
+    apk add --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/v3.21/community go-task
 
 # Create test user
 RUN adduser -D -s /bin/zsh testuser
