@@ -14,6 +14,9 @@ RUN apk add --no-cache \
     poetry && \
     apk add --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/v3.21/community go-task
 
+# symlink go-task to task
+RUN ln -s /usr/bin/go-task /usr/local/bin/task
+
 # Create test user
 RUN adduser -D -s /bin/bash testuser
 
