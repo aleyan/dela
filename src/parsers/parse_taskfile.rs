@@ -267,7 +267,10 @@ tasks:
         assert_eq!(tasks.len(), 1);
 
         let args_task = tasks.iter().find(|t| t.name == "task-args").unwrap();
-        assert_eq!(args_task.description.as_deref(), Some("Task that accepts and prints arguments"));
+        assert_eq!(
+            args_task.description.as_deref(),
+            Some("Task that accepts and prints arguments")
+        );
         assert_eq!(args_task.runner, TaskRunner::Task);
     }
 }
