@@ -14,10 +14,14 @@ RUN apk add --no-cache \
     poetry \
     nodejs \
     npm \
-    task \
     maven \
     gradle \
-    docker-cli
+    docker-cli && \
+    apk add --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/v3.21/community go-task
+
+# symlink go-task to task
+RUN ln -s /usr/bin/go-task /usr/local/bin/task
+
 
 # Install act (GitHub Actions runner)
 # TODO: Get act from the package manager, once it is in a non-edge alpine release.

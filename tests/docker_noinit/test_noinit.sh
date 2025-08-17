@@ -437,7 +437,7 @@ else
 fi
 
 # Verify column width consistency
-UNIQUE_WIDTHS=$(grep -E "^  [^│]+" "$TEST_OUTPUT_FILE" | grep -v "footnotes" | grep -v "─" | awk '{print length($1)}' | sort | uniq | wc -l)
+UNIQUE_WIDTHS=$(grep -E "^  [^│]+" list_output.txt | grep -v "footnotes" | grep -v "─" | awk '{print length($1)}' | sort | uniq | wc -l)
 if [ "$UNIQUE_WIDTHS" -eq 1 ]; then
     echo "${GREEN}✓ All sections use the same column width (consistent fixed-width formatting)${NC}"
 else

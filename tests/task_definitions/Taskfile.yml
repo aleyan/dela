@@ -16,4 +16,12 @@ tasks:
     deps:
       - task-test
     cmds:
-      - echo "Dependency task executed successfully" 
+      - echo "Dependency task executed successfully"
+
+  task-args:
+    desc: Task that accepts and prints arguments
+    cmds:
+      - cmd: |
+          echo "Arguments received: {{.ARGS}}"
+    vars:
+      ARGS: "{{.CLI_ARGS | join \" \"}}"

@@ -690,14 +690,30 @@ mod tests {
     #[test]
     #[serial]
     fn test_task_entry_formatting() {
+        use crate::task_shadowing::{enable_mock, mock_executable, reset_mock};
         use crate::types::{Task, TaskDefinitionType, TaskRunner};
+
+        // Set up test environment
+        let (temp_dir, _home_dir) = setup_test_env();
+        let temp_path = temp_dir.path();
+
+        // Create a Makefile to indicate Make is available
+        let makefile_path = temp_path.join("Makefile");
+        File::create(&makefile_path).unwrap();
+
+        // Enable mock environment and make 'make' available
+        reset_mock();
+        enable_mock();
+        let env = TestEnvironment::new().with_executable("make");
+        set_test_environment(env);
+        mock_executable("make");
 
         // Force colors in test environment
         colored::control::set_override(true);
 
         let task = Task {
             name: "build".to_string(),
-            file_path: std::path::PathBuf::from("Makefile"),
+            file_path: makefile_path,
             definition_type: TaskDefinitionType::Makefile,
             runner: TaskRunner::Make,
             source_name: "build".to_string(),
@@ -712,6 +728,10 @@ mod tests {
         assert!(formatted.contains("\u{1b}[37m")); // white
         assert!(formatted.contains("build"));
         assert!(formatted.contains("Building the project"));
+
+        // Clean up
+        reset_mock();
+        reset_to_real_environment();
     }
 
     #[test]
@@ -746,6 +766,23 @@ mod tests {
     #[test]
     #[serial]
     fn test_unavailable_task_coloring() {
+        use crate::task_shadowing::{enable_mock, mock_executable, reset_mock};
+
+        // Set up test environment
+        let (temp_dir, _home_dir) = setup_test_env();
+        let temp_path = temp_dir.path();
+
+        // Create a Makefile to indicate Make is available
+        let makefile_path = temp_path.join("Makefile");
+        File::create(&makefile_path).unwrap();
+
+        // Enable mock environment and make 'make' available
+        reset_mock();
+        enable_mock();
+        let env = TestEnvironment::new().with_executable("make");
+        set_test_environment(env);
+        mock_executable("make");
+
         // Force colors in test environment
         colored::control::set_override(true);
 
@@ -759,12 +796,16 @@ mod tests {
         assert!(formatted_travis.contains("build"));
 
         // Test Make task (runner available)
-        let make_task = create_test_task("build", PathBuf::from("Makefile"), TaskRunner::Make);
+        let make_task = create_test_task("build", makefile_path, TaskRunner::Make);
         let formatted_make = format_task_entry(&make_task, false, 18);
 
         // Should be green (available)
         assert!(formatted_make.contains("\u{1b}[32m")); // green
         assert!(formatted_make.contains("build"));
+
+        // Clean up
+        reset_mock();
+        reset_to_real_environment();
     }
 
     // ... existing test code ...

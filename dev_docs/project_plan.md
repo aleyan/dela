@@ -86,6 +86,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [x] [DTKT-22] Ensure environment variables and working directory are properly propagated.
   - [x] [DTKT-87] Implement task runner installation detection
   - [x] [DTKT-88] Implement task runner disambiguation eg(npm vs yarn vs bun)
+  - [ ] [DTKT-138] Support environments where Taskfile is invoked via `go-task` instead of `task`
 
 - [ ] **`run` Command and Bare-Command Invocation**
   - [x] [DTKT-23] Complete `dela run <task>` for direct execution.
