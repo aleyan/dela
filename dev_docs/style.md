@@ -13,3 +13,8 @@ When adding new dependencies, show or run the command for the package manger to 
 Implementation for individual cli subcommands should be in the src/commands/ subfolder.
 
 Unit tests should go in the same file as the functionality they are testing.
+
+Comments should explain why something is done, not what is done. Prefer no or few comments over a lot of comments.
+
+When working on feature, do a git diff against main, and make sure that no unnecessary or temporary code snuck in.
+
