@@ -5,9 +5,9 @@ Here’s a simplified MCP design summary for dela that sticks to your five tools
 Dela MCP (minimal) — Design Summary
 
 Scope (only 5 tools)
-	•	list_tasks(runner?, include_shadowing?)
-	•	get_task(name)
-	•	get_command(task, args[])
+	•	list_tasks(runner?) → returns tasks with uniqified names (e.g., build-m)
+	•	get_task(name) → accepts uniqified names
+	•	get_command(task, args[]) → accepts uniqified names
 	•	run_task(op, …) → handles start / status / stop in one tool
 	•	read_allowlist(namespace?) → read-only
 
@@ -66,18 +66,12 @@ We keep types::Task internal; map to stable DTOs:
 
 #[derive(serde::Serialize, schemars::JsonSchema)]
 pub struct TaskDto {
-  pub name: String,          // disambiguated if applicable
-  pub source_name: String,   // original in file
+  pub name: String,          // uniqified name (e.g., build-m)
+  pub source_name: String,   // original name in file
   pub runner: String,        // short_name()
   pub file_path: String,
   pub description: Option<String>,
-  pub ambiguous: bool,
-  pub shadowed_by: Option<ShadowDto>,
 }
-
-#[derive(serde::Serialize, schemars::JsonSchema)]
-#[serde(tag="kind")]
-pub enum ShadowDto { Builtin { shell: String }, PathExecutable { path: String } }
 
 #[derive(serde::Serialize, schemars::JsonSchema)]
 pub struct JobStatusDto {
@@ -99,11 +93,11 @@ Tool schemas (JSON)
 
 Args
 
-{ "runner": null, "include_shadowing": true }
+{ "runner": null }
 
 Result
 
-{ "tasks": [ TaskDto, ... ] }
+{ "tasks": [ TaskDto, ... ] }  // Each task has uniqified name (e.g., build-m) and original name
 
 2) get_task
 
@@ -280,9 +274,9 @@ Security & Limits
 ⸻
 
 Test checklist (AAA)
-	•	Arrange: fixture repo with Makefile, package.json, disambiguation, shadowing.
+	•	Arrange: fixture repo with Makefile, package.json, tasks with same names.
 	•	Act: JSON calls to list/get/get_command; start a long runner that prints every 100ms; poll status; stop.
-	•	Assert: status transitions, logging notifications, allowlist denials.
+	•	Assert: status transitions, logging notifications, allowlist denials, uniqified names.
 
 ⸻
 

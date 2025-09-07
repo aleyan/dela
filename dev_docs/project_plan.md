@@ -267,10 +267,30 @@ This plan outlines the major development phases and tasks for building `dela`, a
 
 ## Phase 10: Add MCP Support
 
-- [ ] **Minimal MCP support**
-  - [ ] 
-- [ ] **Feature Full MCP support**
-  - [ ] 
+This phase delivers the minimal MCP server (using rmcp over stdio) with five tools and long-running job support. MCP cannot modify allowlists.
+
+- [ ] **Core MCP Implementation**
+  - [ ] [DTKT-141] MCP module & server skeleton (src/mcp/mod.rs, src/mcp/server.rs)
+  - [ ] [DTKT-142] Read-only MCP allowlist loader with PolicyNamespace support
+  - [ ] [DTKT-143] Wire DTOs for tasks with uniqified names (TaskDto)
+  - [ ] [DTKT-144] Implement list_tasks with runner filtering
+  - [ ] [DTKT-145] Implement get_task with uniqified name support
+  - [ ] [DTKT-146] Implement get_command with runner availability check
+  - [ ] [DTKT-147] Job manager core with ring buffer and state tracking
+  - [ ] [DTKT-148] run_task operations (start/status/stop) with streaming
+  - [ ] [DTKT-149] Job resources and log paging support
+  - [ ] [DTKT-150] Read-only allowlist access for both namespaces
+  - [ ] [DTKT-151] MCP allowlist enforcement with precedence rules
+  - [ ] [DTKT-152] Resource limits and safety boundaries
+  - [ ] [DTKT-153] Standardized error taxonomy and mapping
+
+- [ ] **Testing and Documentation**
+  - [ ] [DTKT-154] Unit tests for DTOs and core functionality
+  - [ ] [DTKT-155] Integration tests for long-running jobs
+  - [ ] [DTKT-156] CI smoke tests for MCP startup
+  - [ ] [DTKT-157] Wire JSON examples in mcp_design.md
+  - [ ] [DTKT-158] IDE config snippets in README.md
+  - [ ] [DTKT-159] MCP allowlist documentation
 
 ## Icebox and Future Enhancements (Post-Launch)
 
