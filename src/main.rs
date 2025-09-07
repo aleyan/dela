@@ -4,6 +4,7 @@ mod allowlist;
 mod builtins;
 mod commands;
 mod environment;
+mod mcp;
 mod parsers;
 mod prompt;
 mod runner;
@@ -61,6 +62,19 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Start the MCP server for IDE integration
+    ///
+    /// Starts an MCP server that exposes dela's task management capabilities
+    /// via a structured protocol. This is meant for IDE integration.
+    ///
+    /// Example: dela mcp
+    /// Example: dela mcp --cwd /path/to/project
+    Mcp {
+        /// Working directory for the MCP server
+        #[arg(long, default_value = ".")]
+        cwd: String,
+    },
+
     /// Initialize dela and configure shell integration
     ///
     /// This command will:
@@ -120,6 +134,10 @@ fn main() {
     let cli = Cli::parse();
 
     let result = match cli.command {
+        Commands::Mcp { cwd } => {
+            let server = mcp::DelaMcpServer::new(std::path::PathBuf::from(cwd));
+            rmcp::stdio::serve_stdio(server).map_err(|e| e.to_string())
+        }
         Commands::Init => commands::init::execute(),
         Commands::ConfigureShell => commands::configure_shell::execute(),
         Commands::List { verbose } => commands::list::execute(verbose),
