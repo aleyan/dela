@@ -211,8 +211,8 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [ ] [DTKT-114] Publish docs to read the docs.
 
 - [ ] **Versioning and Release**
-  - [ ] [DTKT-47] Bump version in `Cargo.toml`.
-  - [ ] [DTKT-48] Publish to crates.io.
+  - [x] [DTKT-47] Bump version in `Cargo.toml`.
+  - [x] [DTKT-48] Publish to crates.io.
   - [ ] [DTKT-49] Tag a stable release in the repository.
   - [ ] [DTKT-115] Mark realeses on github.
 
@@ -265,6 +265,13 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [x] [DTKT-134] Implement CMake `CMakeLists.txt` parser and task discovery
   - [x] [DTKT-135] Implement Travis CI `.travis.yml` parser and task discovery
 
+## Phase 10: Add MCP Support
+
+- [ ] **Minimal MCP support**
+  - [ ] 
+- [ ] **Feature Full MCP support**
+  - [ ] 
+
 ## Icebox and Future Enhancements (Post-Launch)
 
 - [ ] **Desirable**
@@ -286,15 +293,5 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [ ] [DTKT-54] Introduce optional `~/.dela/config.toml` for global settings.
   - [ ] [DTKT-55] Add more flexible user preferences.
 
-
-## Timeline & Dependencies
-
-- **Phase 1** (Task Discovery & Parsing & CLI) is foundational and should be completed first.
-- **Phase 2** (Shell Integration and Basic CLI) can proceed in parallel with Phase 1.
-- **Phase 3** (Task Execution & Workflow) depends on both Phase 1 and 2 being completed.
-- **Phase 4** (Security & Allowlist Management) requires Phase 3's task execution to be functional.
-- **Phase 5** (Expand shell capabilities) builds upon Phase 2's shell integration work.
-- **Phase 6** (Testing & Quality Assurance) can begin after Phase 4, running in parallel with Phase 5.
-- **Phase 7** (Documentation & Release) should commence after all other phases are substantially complete.
 
 Mark these items `[x]` when completed to track progress. This checklist format facilitates easy status updates for individuals and teams working on different tasks.
