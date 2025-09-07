@@ -211,8 +211,8 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [ ] [DTKT-114] Publish docs to read the docs.
 
 - [ ] **Versioning and Release**
-  - [ ] [DTKT-47] Bump version in `Cargo.toml`.
-  - [ ] [DTKT-48] Publish to crates.io.
+  - [x] [DTKT-47] Bump version in `Cargo.toml`.
+  - [x] [DTKT-48] Publish to crates.io.
   - [ ] [DTKT-49] Tag a stable release in the repository.
   - [ ] [DTKT-115] Mark realeses on github.
 
@@ -265,6 +265,33 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [x] [DTKT-134] Implement CMake `CMakeLists.txt` parser and task discovery
   - [x] [DTKT-135] Implement Travis CI `.travis.yml` parser and task discovery
 
+## Phase 10: Add MCP Support
+
+This phase delivers the minimal MCP server (using rmcp over stdio) with five tools and long-running job support. MCP cannot modify allowlists.
+
+- [ ] **Core MCP Implementation**
+  - [ ] [DTKT-141] MCP module & server skeleton (src/mcp/mod.rs, src/mcp/server.rs)
+  - [ ] [DTKT-142] Read-only MCP allowlist loader with PolicyNamespace support
+  - [ ] [DTKT-143] Wire DTOs for tasks with uniqified names (TaskDto)
+  - [ ] [DTKT-144] Implement list_tasks with runner filtering
+  - [ ] [DTKT-145] Implement get_task with uniqified name support
+  - [ ] [DTKT-146] Implement get_command with runner availability check
+  - [ ] [DTKT-147] Job manager core with ring buffer and state tracking
+  - [ ] [DTKT-148] run_task operations (start/status/stop) with streaming
+  - [ ] [DTKT-149] Job resources and log paging support
+  - [ ] [DTKT-150] Read-only allowlist access for both namespaces
+  - [ ] [DTKT-151] MCP allowlist enforcement with precedence rules
+  - [ ] [DTKT-152] Resource limits and safety boundaries
+  - [ ] [DTKT-153] Standardized error taxonomy and mapping
+
+- [ ] **Testing and Documentation**
+  - [ ] [DTKT-154] Unit tests for DTOs and core functionality
+  - [ ] [DTKT-155] Integration tests for long-running jobs
+  - [ ] [DTKT-156] CI smoke tests for MCP startup
+  - [ ] [DTKT-157] Wire JSON examples in mcp_design.md
+  - [ ] [DTKT-158] IDE config snippets in README.md
+  - [ ] [DTKT-159] MCP allowlist documentation
+
 ## Icebox and Future Enhancements (Post-Launch)
 
 - [ ] **Desirable**
@@ -286,15 +313,5 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [ ] [DTKT-54] Introduce optional `~/.dela/config.toml` for global settings.
   - [ ] [DTKT-55] Add more flexible user preferences.
 
-
-## Timeline & Dependencies
-
-- **Phase 1** (Task Discovery & Parsing & CLI) is foundational and should be completed first.
-- **Phase 2** (Shell Integration and Basic CLI) can proceed in parallel with Phase 1.
-- **Phase 3** (Task Execution & Workflow) depends on both Phase 1 and 2 being completed.
-- **Phase 4** (Security & Allowlist Management) requires Phase 3's task execution to be functional.
-- **Phase 5** (Expand shell capabilities) builds upon Phase 2's shell integration work.
-- **Phase 6** (Testing & Quality Assurance) can begin after Phase 4, running in parallel with Phase 5.
-- **Phase 7** (Documentation & Release) should commence after all other phases are substantially complete.
 
 Mark these items `[x]` when completed to track progress. This checklist format facilitates easy status updates for individuals and teams working on different tasks.
