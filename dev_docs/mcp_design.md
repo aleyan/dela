@@ -27,6 +27,13 @@ cargo add serde serde_json --features derive
 cargo add schemars
 cargo add tracing tracing-subscriber
 
+Libraries and their roles:
+	•	rmcp - The core MCP protocol library. Handles stdio transport, tool routing, and logging notifications. We use it to define and expose our five tools via #[tool] attributes.
+	•	tokio - Async runtime for Rust. Powers our job management with async process spawning, ring buffers, and graceful shutdown. The 'full' feature gives us process management and IO utilities.
+	•	serde/serde_json - Serialization framework for Rust. Handles all JSON encoding/decoding of our DTOs and tool parameters. The 'derive' feature lets us auto-generate serializers.
+	•	schemars - JSON Schema generation. Used with #[derive(JsonSchema)] to document our DTOs and tool parameters. Helps IDEs understand our protocol.
+	•	tracing - Modern instrumentation framework. Used to emit structured job output events that rmcp turns into logging notifications for streaming.
+	•	tracing-subscriber - The runtime part of tracing that formats our events into rmcp-compatible notifications and handles log routing.
 
 ⸻
 
