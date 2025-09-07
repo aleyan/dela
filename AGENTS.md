@@ -6,3 +6,4 @@ dev_docs/design.md - Overall experience
 dev_docs/style.md - How to write the rust code
 dev_docs/testing.md - Information about unit and integration tests
 dev_docs/project_plan.md - Contains tickets to work on in DTKT-### format. Check these off when you finish something.
+dev_docs/mcp_design.md - Detailed design, including examples, of how the mcp service will function.
