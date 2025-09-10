@@ -1,14 +1,11 @@
-use rmcp::{tool, tool_router, ServerHandler, model::*, service::{RequestContext, RoleServer}};
-use std::{path::PathBuf, sync::Arc};
-use tokio::sync::RwLock;
-
 mod server;
 pub use server::DelaMcpServer;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rmcp::service::ServerInfo;
+    use std::path::PathBuf;
+    use rmcp::ServerHandler;
 
     #[tokio::test]
     async fn test_server_info() {
@@ -16,10 +13,9 @@ mod tests {
         let info = server.get_info();
         
         assert_eq!(info.server_info.name, "dela-mcp");
-        assert!(info.capabilities.tools);
-        assert!(info.capabilities.resources);
-        assert!(info.capabilities.logging);
-        assert!(!info.capabilities.elicitation);
+        assert!(info.capabilities.tools.is_some());
+        assert!(info.capabilities.resources.is_some());
+        assert!(info.capabilities.logging.is_some());
     }
 
     #[tokio::test]

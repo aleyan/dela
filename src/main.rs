@@ -130,13 +130,20 @@ enum Commands {
     },
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let cli = Cli::parse();
 
     let result = match cli.command {
         Commands::Mcp { cwd } => {
             let server = mcp::DelaMcpServer::new(std::path::PathBuf::from(cwd));
-            rmcp::stdio::serve_stdio(server).map_err(|e| e.to_string())
+            let result = rmcp::serve_server(server, rmcp::transport::io::stdio())
+                .await
+                .map_err(|e| e.to_string());
+            match result {
+                Ok(_) => Ok(()),
+                Err(e) => Err(e),
+            }
         }
         Commands::Init => commands::init::execute(),
         Commands::ConfigureShell => commands::configure_shell::execute(),
