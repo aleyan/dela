@@ -41,6 +41,20 @@ impl TaskDto {
     }
 }
 
+/// Parameters for the list_tasks MCP tool
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ListTasksArgs {
+    /// Optional runner filter - if provided, only return tasks for this runner
+    /// Examples: "make", "npm", "gradle", "poetry"
+    pub runner: Option<String>,
+}
+
+impl Default for ListTasksArgs {
+    fn default() -> Self {
+        Self { runner: None }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -255,6 +269,46 @@ mod tests {
         // Both should have different uniqified names but same source name
         assert_ne!(dtos[0].name, dtos[1].name);
         assert_eq!(dtos[0].source_name, dtos[1].source_name);
+    }
+
+    #[test]
+    fn test_list_tasks_args_default() {
+        // Arrange & Act
+        let args = ListTasksArgs::default();
+
+        // Assert
+        assert_eq!(args.runner, None);
+    }
+
+    #[test]
+    fn test_list_tasks_args_with_runner() {
+        // Arrange & Act
+        let args = ListTasksArgs {
+            runner: Some("make".to_string()),
+        };
+
+        // Assert
+        assert_eq!(args.runner, Some("make".to_string()));
+    }
+
+    #[test]
+    fn test_list_tasks_args_serialization() {
+        // Arrange
+        let args_with_runner = ListTasksArgs {
+            runner: Some("npm".to_string()),
+        };
+        let args_without_runner = ListTasksArgs { runner: None };
+
+        // Act
+        let json_with = serde_json::to_string(&args_with_runner).expect("Should serialize");
+        let json_without = serde_json::to_string(&args_without_runner).expect("Should serialize");
+
+        let deserialized_with: ListTasksArgs = serde_json::from_str(&json_with).expect("Should deserialize");
+        let deserialized_without: ListTasksArgs = serde_json::from_str(&json_without).expect("Should deserialize");
+
+        // Assert
+        assert_eq!(args_with_runner, deserialized_with);
+        assert_eq!(args_without_runner, deserialized_without);
     }
 }
 

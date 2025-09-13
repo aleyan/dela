@@ -272,7 +272,7 @@ This phase delivers the minimal MCP server (using rmcp over stdio) with five too
 - [ ] **Core MCP Implementation**
   - [x] [DTKT-141] MCP module & server skeleton (src/mcp/mod.rs, src/mcp/server.rs)
   - [x] [DTKT-143] Wire DTOs for tasks with uniqified names (TaskDto)
-  - [ ] [DTKT-144] Implement list_tasks with runner filtering
+  - [x] [DTKT-144] Implement list_tasks with runner filtering
   - [ ] [DTKT-145] Implement get_task with uniqified name support
   - [ ] [DTKT-146] Implement get_command with runner availability check
   - [ ] [DTKT-142] Read-only MCP allowlist loader with PolicyNamespace support

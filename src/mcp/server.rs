@@ -1,7 +1,7 @@
 use rmcp::{tool, tool_router, ServerHandler, model::*};
 use std::path::PathBuf;
 use crate::task_discovery;
-use super::dto::TaskDto;
+use super::dto::{TaskDto, ListTasksArgs};
 
 /// MCP server for dela that exposes task management capabilities
 #[derive(Clone)]
@@ -24,15 +24,21 @@ impl DelaMcpServer {
 #[tool_router]
 impl DelaMcpServer {
     #[tool(description = "List tasks")]
-    pub async fn list_tasks(&self) -> Result<CallToolResult, ErrorData> {
+    pub async fn list_tasks(&self, Parameters(args): Parameters<ListTasksArgs>) -> Result<CallToolResult, ErrorData> {
         // Discover tasks in the current directory
         let mut discovered = task_discovery::discover_tasks(&self.root);
         
         // Process task disambiguation to generate uniqified names
         task_discovery::process_task_disambiguation(&mut discovered);
         
+        // Apply runner filtering if specified
+        let mut tasks = discovered.tasks;
+        if let Some(runner_filter) = &args.runner {
+            tasks.retain(|task| task.runner.short_name() == runner_filter);
+        }
+        
         // Convert to DTOs
-        let task_dtos: Vec<TaskDto> = discovered.tasks.iter().map(TaskDto::from_task).collect();
+        let task_dtos: Vec<TaskDto> = tasks.iter().map(TaskDto::from_task).collect();
         
         Ok(CallToolResult::success(vec![Content::json(&serde_json::json!({
             "tasks": task_dtos
@@ -91,15 +97,17 @@ mod tests {
 
     #[tokio::test]
     async fn test_list_tasks_empty() {
-        // Use a temporary directory that doesn't contain any task files
+        // Arrange
         let temp_dir = std::env::temp_dir();
         let server = DelaMcpServer::new(temp_dir);
-        let result = server.list_tasks().await.unwrap();
+        let args = Parameters(ListTasksArgs::default());
         
-        // Should return a JSON response with an empty tasks array
+        // Act
+        let result = server.list_tasks(args).await.unwrap();
+        
+        // Assert
         assert_eq!(result.content.len(), 1);
-        // We can't easily test the JSON content without unwrapping the Content
-        // but we know it should be valid since it succeeded
+        // Should return a JSON response with an empty tasks array
     }
 
     #[tokio::test]
@@ -117,7 +125,7 @@ mod tests {
         use tempfile::TempDir;
         use std::fs;
         
-        // Create a temporary directory with test task files
+        // Arrange
         let temp_dir = TempDir::new().unwrap();
         let temp_path = temp_dir.path();
         
@@ -142,14 +150,106 @@ test:
 }"#;
         fs::write(temp_path.join("package.json"), package_json_content).unwrap();
         
-        // Test the list_tasks functionality
         let server = DelaMcpServer::new(temp_path.to_path_buf());
-        let result = server.list_tasks().await.unwrap();
+        let args = Parameters(ListTasksArgs::default());
         
-        // Should return a JSON response
+        // Act
+        let result = server.list_tasks(args).await.unwrap();
+        
+        // Assert
         assert_eq!(result.content.len(), 1);
-        
         // The test succeeded, which means TaskDto conversion worked
-        // In a real integration test, we could parse the JSON and verify the structure
+    }
+
+    #[tokio::test]
+    async fn test_list_tasks_with_runner_filter() {
+        use tempfile::TempDir;
+        use std::fs;
+        
+        // Arrange
+        let temp_dir = TempDir::new().unwrap();
+        let temp_path = temp_dir.path();
+        
+        // Create a Makefile with tasks
+        let makefile_content = r#"build:
+	echo "Building with make"
+
+test:
+	echo "Testing with make"
+"#;
+        fs::write(temp_path.join("Makefile"), makefile_content).unwrap();
+        
+        // Create a package.json with tasks
+        let package_json_content = r#"{
+  "name": "test-project",
+  "scripts": {
+    "test": "jest",
+    "start": "node server.js",
+    "build": "webpack"
+  }
+}"#;
+        fs::write(temp_path.join("package.json"), package_json_content).unwrap();
+        
+        let server = DelaMcpServer::new(temp_path.to_path_buf());
+        
+        // Act & Assert - Test filtering by "make"
+        let make_args = Parameters(ListTasksArgs {
+            runner: Some("make".to_string()),
+        });
+        let make_result = server.list_tasks(make_args).await.unwrap();
+        assert_eq!(make_result.content.len(), 1);
+        
+        // Act & Assert - Test filtering by "npm"  
+        let npm_args = Parameters(ListTasksArgs {
+            runner: Some("npm".to_string()),
+        });
+        let npm_result = server.list_tasks(npm_args).await.unwrap();
+        assert_eq!(npm_result.content.len(), 1);
+        
+        // Act & Assert - Test filtering by non-existent runner
+        let nonexistent_args = Parameters(ListTasksArgs {
+            runner: Some("nonexistent".to_string()),
+        });
+        let nonexistent_result = server.list_tasks(nonexistent_args).await.unwrap();
+        assert_eq!(nonexistent_result.content.len(), 1);
+        // Should return empty tasks array
+        
+        // Act & Assert - Test no filter (should return all tasks)
+        let all_args = Parameters(ListTasksArgs::default());
+        let all_result = server.list_tasks(all_args).await.unwrap();
+        assert_eq!(all_result.content.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_list_tasks_runner_filter_case_sensitivity() {
+        use tempfile::TempDir;
+        use std::fs;
+        
+        // Arrange
+        let temp_dir = TempDir::new().unwrap();
+        let temp_path = temp_dir.path();
+        
+        // Create a Makefile
+        let makefile_content = r#"build:
+	echo "Building"
+"#;
+        fs::write(temp_path.join("Makefile"), makefile_content).unwrap();
+        
+        let server = DelaMcpServer::new(temp_path.to_path_buf());
+        
+        // Act & Assert - Test exact match
+        let exact_args = Parameters(ListTasksArgs {
+            runner: Some("make".to_string()),
+        });
+        let exact_result = server.list_tasks(exact_args).await.unwrap();
+        assert_eq!(exact_result.content.len(), 1);
+        
+        // Act & Assert - Test case mismatch (should return empty)
+        let case_args = Parameters(ListTasksArgs {
+            runner: Some("MAKE".to_string()),
+        });
+        let case_result = server.list_tasks(case_args).await.unwrap();
+        assert_eq!(case_result.content.len(), 1);
+        // Should return empty tasks array since "MAKE" != "make"
     }
 }
