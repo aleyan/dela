@@ -1,5 +1,9 @@
 mod server;
+mod dto;
+
 pub use server::DelaMcpServer;
+// TaskDto is used internally and re-exported when needed
+use dto::TaskDto;
 
 #[cfg(test)]
 mod tests {

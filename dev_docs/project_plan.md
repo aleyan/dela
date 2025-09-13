@@ -270,9 +270,9 @@ This plan outlines the major development phases and tasks for building `dela`, a
 This phase delivers the minimal MCP server (using rmcp over stdio) with five tools and long-running job support. MCP cannot modify allowlists.
 
 - [ ] **Core MCP Implementation**
-  - [ ] [DTKT-141] MCP module & server skeleton (src/mcp/mod.rs, src/mcp/server.rs)
+  - [x] [DTKT-141] MCP module & server skeleton (src/mcp/mod.rs, src/mcp/server.rs)
   - [ ] [DTKT-142] Read-only MCP allowlist loader with PolicyNamespace support
-  - [ ] [DTKT-143] Wire DTOs for tasks with uniqified names (TaskDto)
+  - [x] [DTKT-143] Wire DTOs for tasks with uniqified names (TaskDto)
   - [ ] [DTKT-144] Implement list_tasks with runner filtering
   - [ ] [DTKT-145] Implement get_task with uniqified name support
   - [ ] [DTKT-146] Implement get_command with runner availability check
