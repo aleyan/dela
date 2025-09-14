@@ -276,7 +276,6 @@ Implement the minimal surface so editors can start using MCP immediately for dis
 - [x] [DTKT-143] Wire DTOs for tasks with uniqified names (TaskDto)
 - [x] [DTKT-144] Implement list_tasks with runner filtering
 - [x] **[DTKT-160]** Extend `TaskDto` to **enriched fields**: `command`, `runner_available`, `allowlisted`, `file_path`
-- [ ] **[DTKT-161]** Implement MCP allowlist **loader** (read-only) and evaluator (MCP namespace)
 - [ ] **[DTKT-162]** Implement `list_tasks` enrichment: compute command, test runner availability, and allowlist flag
 - [ ] **[DTKT-163]** Implement **task_start (quick)**:
   - Spawn the task, capture stdout/stderr up to **1s**
@@ -296,6 +295,7 @@ Implement the minimal surface so editors can start using MCP immediately for dis
 ### Phase 10B — **Full Long-Running / Background Tasks**
 Add PID management, output buffers, and controls.
 
+- [ ] **[DTKT-161]** Implement MCP allowlist **loader** (read-only) and evaluator (MCP namespace)
 - [ ] **[DTKT-170]** Introduce in-memory **PID → Job** map with metadata (started_at, unique_name, args) and GC policy
 - [ ] **[DTKT-171]** Add **ring buffer** for combined stdout/stderr per PID (bounded, configurable)
 - [ ] **[DTKT-172]** Complete `status` to list **all running PIDs** with minimal info
