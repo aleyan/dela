@@ -1,4 +1,9 @@
-Here’s a simplified MCP design summary for dela that sticks to your five tools, uses rmcp, and adds a clean way to handle long-running tasks.
+⸻
+
+Note for humans. You can start the the dev mcp server with inspector like this.
+```sh
+npx @modelcontextprotocol/inspector cargo run -- mcp
+```
 
 ⸻
 
