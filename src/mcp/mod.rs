@@ -2,6 +2,13 @@ mod server;
 mod dto;
 
 pub use server::DelaMcpServer;
+pub use dto::ListTasksArgs;
+
+/// Convenience runner for the CLI subcommand to ensure we actually
+/// serve MCP over stdio (no stdout noise).
+pub async fn run_stdio_server(root: std::path::PathBuf) -> Result<(), rmcp::model::ErrorData> {
+    DelaMcpServer::new(root).serve_stdio().await
+}
 
 #[cfg(test)]
 mod tests {

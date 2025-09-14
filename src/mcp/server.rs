@@ -1,5 +1,6 @@
-use rmcp::{tool, tool_router, ServerHandler, model::*, handler::server::wrapper::Parameters, service::{RequestContext, RoleServer}, handler::server::tool::ToolRouter};
+use rmcp::{tool, tool_router, ServerHandler, model::*, handler::server::wrapper::Parameters, service::{RequestContext, RoleServer}, ServiceExt};
 use std::path::PathBuf;
+use tokio::io::{stdin, stdout};
 use crate::task_discovery;
 use super::dto::{TaskDto, ListTasksArgs};
 
@@ -7,21 +8,31 @@ use super::dto::{TaskDto, ListTasksArgs};
 #[derive(Clone)]
 pub struct DelaMcpServer {
     root: PathBuf,
-    tool_router: ToolRouter<Self>,
 }
 
 impl DelaMcpServer {
     /// Create a new MCP server instance
     pub fn new(root: PathBuf) -> Self {
-        Self { 
-            root,
-            tool_router: Self::tool_router(),
-        }
+        Self { root }
     }
 
     /// Get the root path this server operates in
     pub fn root(&self) -> &PathBuf {
         &self.root
+    }
+
+    /// Start an MCP stdio server and block until shutdown.
+    /// IMPORTANT: Do not print to stdout; MCP JSON-RPC uses stdout.
+    pub async fn serve_stdio(self) -> Result<(), ErrorData> {
+        // Use (stdin, stdout) as the transport. rmcp will complete initialization
+        // and then we block on waiting() to keep the process alive for Inspector.
+        let transport = (stdin(), stdout());
+        let server = self.serve(transport).await.map_err(|e| {
+            ErrorData::new(ErrorCode::INTERNAL_ERROR, "Failed to start MCP server", None)
+        })?; // completes MCP initialize
+        // Block until client disconnect / shutdown
+        let _ = server.waiting().await;
+        Ok(())
     }
 }
 
@@ -84,12 +95,12 @@ impl DelaMcpServer {
 
 impl ServerHandler for DelaMcpServer {
     fn get_info(&self) -> ServerInfo {
-        eprintln!("DEBUG: get_info called");
         ServerInfo {
             protocol_version: ProtocolVersion::V_2024_11_05,
             capabilities: ServerCapabilities::builder()
                 .enable_tools()
-                .enable_logging()
+                // Disable logging for now since we don't need it for Phase 10A
+                // .enable_logging()
                 .build(),
             server_info: Implementation {
                 name: "dela-mcp".into(),
@@ -107,7 +118,6 @@ impl ServerHandler for DelaMcpServer {
         request: InitializeRequestParam,
         context: RequestContext<RoleServer>,
     ) -> Result<InitializeResult, ErrorData> {
-        eprintln!("DEBUG: initialize called");
         if context.peer.peer_info().is_none() {
             context.peer.set_peer_info(request);
         }

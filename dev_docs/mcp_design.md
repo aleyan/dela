@@ -2,10 +2,18 @@
 
 Note for humans. You can start the dev MCP server with Inspector like this (recommended: run the built binary directly to avoid `cargo run` arg parsing issues):
 ```sh
-# Debug build
+# Debug build (recommended while iterating)
 cargo build --quiet
-npx @modelcontextprotocol/inspector ./target/debug/dela mcp
+MCPI_NO_COLOR=1 RUST_LOG=warn npx @modelcontextprotocol/inspector ./target/debug/dela mcp
+
+# Or release build
+cargo build --release --quiet
+MCPI_NO_COLOR=1 RUST_LOG=warn npx @modelcontextprotocol/inspector ./target/release/dela mcp
 ```
+
+**Protocol hygiene:** never print to **stdout** before/while serving MCP over stdio.
+All human/debug output must go to **stderr**. The server should enter
+`DelaMcpServer::serve_stdio()` and block until shutdown so the Inspector can establish the SSE session.
 ⸻
 
 # Dela MCP — Revised Design (First-Principles)

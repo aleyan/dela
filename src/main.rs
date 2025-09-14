@@ -136,15 +136,9 @@ async fn main() {
 
     let result = match cli.command {
         Commands::Mcp { cwd } => {
-            use rmcp::service::ServiceExt;
-            let server = mcp::DelaMcpServer::new(std::path::PathBuf::from(cwd));
-            let result = server.serve(rmcp::transport::io::stdio())
+            mcp::run_stdio_server(std::path::PathBuf::from(cwd))
                 .await
-                .map_err(|e| e.to_string());
-            match result {
-                Ok(_) => Ok(()),
-                Err(e) => Err(e),
-            }
+                .map_err(|e| e.to_string())
         }
         Commands::Init => commands::init::execute(),
         Commands::ConfigureShell => commands::configure_shell::execute(),
