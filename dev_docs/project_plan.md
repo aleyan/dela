@@ -275,7 +275,7 @@ Implement the minimal surface so editors can start using MCP immediately for dis
 - [x] [DTKT-141] MCP module & server skeleton (src/mcp/mod.rs, src/mcp/server.rs)
 - [x] [DTKT-143] Wire DTOs for tasks with uniqified names (TaskDto)
 - [x] [DTKT-144] Implement list_tasks with runner filtering
-- [ ] **[DTKT-160]** Extend `TaskDto` to **enriched fields**: `command`, `runner_available`, `allowlisted`, `file_path`
+- [x] **[DTKT-160]** Extend `TaskDto` to **enriched fields**: `command`, `runner_available`, `allowlisted`, `file_path`
 - [ ] **[DTKT-161]** Implement MCP allowlist **loader** (read-only) and evaluator (MCP namespace)
 - [ ] **[DTKT-162]** Implement `list_tasks` enrichment: compute command, test runner availability, and allowlist flag
 - [ ] **[DTKT-163]** Implement **task_start (quick)**:
