@@ -1,4 +1,4 @@
-use rmcp::{tool, tool_router, ServerHandler, model::*, handler::server::wrapper::Parameters};
+use rmcp::{tool, tool_router, ServerHandler, model::*, handler::server::wrapper::Parameters, service::{RequestContext, RoleServer}, handler::server::tool::ToolRouter};
 use std::path::PathBuf;
 use crate::task_discovery;
 use super::dto::{TaskDto, ListTasksArgs};
@@ -7,12 +7,16 @@ use super::dto::{TaskDto, ListTasksArgs};
 #[derive(Clone)]
 pub struct DelaMcpServer {
     root: PathBuf,
+    tool_router: ToolRouter<Self>,
 }
 
 impl DelaMcpServer {
     /// Create a new MCP server instance
     pub fn new(root: PathBuf) -> Self {
-        Self { root }
+        Self { 
+            root,
+            tool_router: Self::tool_router(),
+        }
     }
 
     /// Get the root path this server operates in
@@ -80,6 +84,7 @@ impl DelaMcpServer {
 
 impl ServerHandler for DelaMcpServer {
     fn get_info(&self) -> ServerInfo {
+        eprintln!("DEBUG: get_info called");
         ServerInfo {
             protocol_version: ProtocolVersion::V_2024_11_05,
             capabilities: ServerCapabilities::builder()
@@ -96,6 +101,21 @@ impl ServerHandler for DelaMcpServer {
             ),
         }
     }
+
+    async fn initialize(
+        &self,
+        request: InitializeRequestParam,
+        context: RequestContext<RoleServer>,
+    ) -> Result<InitializeResult, ErrorData> {
+        eprintln!("DEBUG: initialize called");
+        if context.peer.peer_info().is_none() {
+            context.peer.set_peer_info(request);
+        }
+        Ok(self.get_info())
+    }
+
+    // Let the #[tool_router] macro implement call_tool and list_tools
+
 }
 
 #[cfg(test)]

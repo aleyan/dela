@@ -51,8 +51,10 @@ run:
 	cargo run $(ARGS)
 
 inspect_mcp:
-	@echo "Inspecting MCP server..."
-	RUSTFLAGS="-A warnings" npx @modelcontextprotocol/inspector cargo run --quiet -- mcp
+	@echo "Inspecting MCP server (debug build + stdio via Inspector)..."
+	@cargo build --quiet
+	RUSTFLAGS="-A warnings" npx @modelcontextprotocol/inspector ./target/debug/dela mcp
+
 
 # Publish to crates.io
 publish: tests tests_integration

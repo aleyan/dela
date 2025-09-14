@@ -1,10 +1,11 @@
 ⸻
 
-Note for humans. You can start the dev MCP server with Inspector like this.
+Note for humans. You can start the dev MCP server with Inspector like this (recommended: run the built binary directly to avoid `cargo run` arg parsing issues):
 ```sh
-npx @modelcontextprotocol/inspector cargo run --quiet -- mcp
+# Debug build
+cargo build --quiet
+npx @modelcontextprotocol/inspector ./target/debug/dela mcp
 ```
-
 ⸻
 
 # Dela MCP — Revised Design (First-Principles)
