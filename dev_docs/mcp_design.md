@@ -2,7 +2,7 @@
 
 Note for humans. You can start the dev MCP server with Inspector like this.
 ```sh
-npx @modelcontextprotocol/inspector cargo run -- mcp
+npx @modelcontextprotocol/inspector cargo run --quiet -- mcp
 ```
 
 ⸻

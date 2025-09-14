@@ -50,6 +50,10 @@ run:
 	@echo "Build and run dela binary with args"
 	cargo run $(ARGS)
 
+inspect_mcp:
+	@echo "Inspecting MCP server..."
+	npx @modelcontextprotocol/inspector cargo run --quiet -- mcp
+
 # Publish to crates.io
 publish: tests tests_integration
 	@echo "Publishing dela to crates.io"

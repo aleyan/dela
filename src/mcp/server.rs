@@ -1,4 +1,4 @@
-use rmcp::{tool, tool_router, ServerHandler, model::*};
+use rmcp::{tool, tool_router, ServerHandler, model::*, handler::server::wrapper::Parameters};
 use std::path::PathBuf;
 use crate::task_discovery;
 use super::dto::{TaskDto, ListTasksArgs};
@@ -45,27 +45,35 @@ impl DelaMcpServer {
         })).expect("Failed to serialize JSON")]))
     }
 
-    #[tool(description = "Get task details")]
-    pub async fn get_task(&self) -> Result<CallToolResult, ErrorData> {
-        // Stub implementation - will be filled in with DTKT-145
+    #[tool(description = "List all running tasks with PIDs")]
+    pub async fn status(&self) -> Result<CallToolResult, ErrorData> {
+        // Stub implementation - Phase 10A returns empty array
+        Ok(CallToolResult::success(vec![Content::json(&serde_json::json!({
+            "running": []
+        })).expect("Failed to serialize JSON")]))
+    }
+
+    #[tool(description = "Start a task (≤1s capture, then background)")]
+    pub async fn task_start(&self) -> Result<CallToolResult, ErrorData> {
+        // Stub implementation - will be filled in with DTKT-163
         Err(ErrorData::new(ErrorCode::INTERNAL_ERROR, "Not implemented", None))
     }
 
-    #[tool(description = "Get shell command (no exec)")]
-    pub async fn get_command(&self) -> Result<CallToolResult, ErrorData> {
-        // Stub implementation - will be filled in with DTKT-146
+    #[tool(description = "Status for a single unique_name (may have multiple PIDs)")]
+    pub async fn task_status(&self) -> Result<CallToolResult, ErrorData> {
+        // Stub implementation - will be filled in with Phase 10B
         Err(ErrorData::new(ErrorCode::INTERNAL_ERROR, "Not implemented", None))
     }
 
-    #[tool(description = "Start/stop/status for tasks")]
-    pub async fn run_task(&self) -> Result<CallToolResult, ErrorData> {
-        // Stub implementation - will be filled in with DTKT-147/148
+    #[tool(description = "Tail last N lines for a PID")]
+    pub async fn task_output(&self) -> Result<CallToolResult, ErrorData> {
+        // Stub implementation - will be filled in with Phase 10B
         Err(ErrorData::new(ErrorCode::INTERNAL_ERROR, "Not implemented", None))
     }
 
-    #[tool(description = "Read allowlist (read-only)")]
-    pub async fn read_allowlist(&self) -> Result<CallToolResult, ErrorData> {
-        // Stub implementation - will be filled in with DTKT-150
+    #[tool(description = "Stop a PID with graceful timeout")]
+    pub async fn task_stop(&self) -> Result<CallToolResult, ErrorData> {
+        // Stub implementation - will be filled in with Phase 10B
         Err(ErrorData::new(ErrorCode::INTERNAL_ERROR, "Not implemented", None))
     }
 }
@@ -76,7 +84,6 @@ impl ServerHandler for DelaMcpServer {
             protocol_version: ProtocolVersion::V_2024_11_05,
             capabilities: ServerCapabilities::builder()
                 .enable_tools()
-                .enable_resources()
                 .enable_logging()
                 .build(),
             server_info: Implementation {
@@ -84,7 +91,7 @@ impl ServerHandler for DelaMcpServer {
                 version: env!("CARGO_PKG_VERSION").into(),
             },
             instructions: Some(
-                "List and run tasks gated by an MCP allowlist; long-running tasks stream logs as notifications."
+                "List tasks, start them (≤1s capture then background), and manage running tasks via PID; all execution gated by an MCP allowlist."
                     .into(),
             ),
         }
@@ -114,10 +121,13 @@ mod tests {
     async fn test_unimplemented_tools() {
         let server = DelaMcpServer::new(PathBuf::from("."));
         
-        assert!(server.get_task().await.is_err());
-        assert!(server.get_command().await.is_err());
-        assert!(server.run_task().await.is_err());
-        assert!(server.read_allowlist().await.is_err());
+        assert!(server.task_start().await.is_err());
+        assert!(server.task_status().await.is_err());
+        assert!(server.task_output().await.is_err());
+        assert!(server.task_stop().await.is_err());
+        
+        // Status should work (returns empty array in Phase 10A)
+        assert!(server.status().await.is_ok());
     }
 
     #[tokio::test]

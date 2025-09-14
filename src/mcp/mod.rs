@@ -2,8 +2,6 @@ mod server;
 mod dto;
 
 pub use server::DelaMcpServer;
-// TaskDto is used internally and re-exported when needed
-use dto::TaskDto;
 
 #[cfg(test)]
 mod tests {
@@ -18,8 +16,9 @@ mod tests {
         
         assert_eq!(info.server_info.name, "dela-mcp");
         assert!(info.capabilities.tools.is_some());
-        assert!(info.capabilities.resources.is_some());
         assert!(info.capabilities.logging.is_some());
+        // Resources disabled in Phase 10A
+        assert!(info.capabilities.resources.is_none());
     }
 
     #[tokio::test]
