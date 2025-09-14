@@ -267,30 +267,48 @@ This plan outlines the major development phases and tasks for building `dela`, a
 
 ## Phase 10: Add MCP Support
 
-This phase delivers the minimal MCP server (using rmcp over stdio) with five tools and long-running job support. MCP cannot modify allowlists.
+This phase delivers an MCP server (rmcp over stdio) with a **quick-path** first, then **full background** support. MCP cannot modify allowlists.
 
-- [ ] **Core MCP Implementation**
-  - [x] [DTKT-141] MCP module & server skeleton (src/mcp/mod.rs, src/mcp/server.rs)
-  - [x] [DTKT-143] Wire DTOs for tasks with uniqified names (TaskDto)
-  - [x] [DTKT-144] Implement list_tasks with runner filtering
-  - [ ] [DTKT-145] Implement get_task with uniqified name support
-  - [ ] [DTKT-146] Implement get_command with runner availability check
-  - [ ] [DTKT-142] Read-only MCP allowlist loader with PolicyNamespace support
-  - [ ] [DTKT-147] Job manager core with ring buffer and state tracking
-  - [ ] [DTKT-148] run_task operations (start/status/stop) with streaming
-  - [ ] [DTKT-149] Job resources and log paging support
-  - [ ] [DTKT-150] Read-only allowlist access for both namespaces
-  - [ ] [DTKT-151] MCP allowlist enforcement with precedence rules
-  - [ ] [DTKT-152] Resource limits and safety boundaries
-  - [ ] [DTKT-153] Standardized error taxonomy and mapping
+### Phase 10A — **Quick Tasks Only** (finish ≤ 1s; background not required to use MVP)
+Implement the minimal surface so editors can start using MCP immediately for discover/run workflows. Order below is implementation order.
 
-- [ ] **Testing and Documentation**
-  - [ ] [DTKT-154] Unit tests for DTOs and core functionality
-  - [ ] [DTKT-155] Integration tests for long-running jobs
-  - [ ] [DTKT-156] CI smoke tests for MCP startup
-  - [ ] [DTKT-157] Wire JSON examples in mcp_design.md
-  - [ ] [DTKT-158] IDE config snippets in README.md
-  - [ ] [DTKT-159] MCP allowlist documentation
+- [x] [DTKT-141] MCP module & server skeleton (src/mcp/mod.rs, src/mcp/server.rs)
+- [x] [DTKT-143] Wire DTOs for tasks with uniqified names (TaskDto)
+- [x] [DTKT-144] Implement list_tasks with runner filtering
+- [ ] **[DTKT-160]** Extend `TaskDto` to **enriched fields**: `command`, `runner_available`, `allowlisted`, `file_path`
+- [ ] **[DTKT-161]** Implement MCP allowlist **loader** (read-only) and evaluator (MCP namespace)
+- [ ] **[DTKT-162]** Implement `list_tasks` enrichment: compute command, test runner availability, and allowlist flag
+- [ ] **[DTKT-163]** Implement **task_start (quick)**:
+  - Spawn the task, capture stdout/stderr up to **1s**
+  - If exits ≤1s → return `{ state: "exited", exit_code, initial_output }`
+  - If still running → return `{ state: "running", pid, initial_output }` **but do not persist/manage background yet** (documented limitation)
+- [ ] **[DTKT-164]** Implement **status** that returns an **empty array** in Quick phase (documented that background processes are unsupported yet)
+- [ ] **[DTKT-165]** Error taxonomy for **NotAllowlisted**, **RunnerUnavailable**, **TaskNotFound**
+- [ ] **[DTKT-166]** Unit tests for `list_tasks` enrichment and `task_start` quick path
+- [ ] **[DTKT-167]** CI smoke tests for MCP startup + quick start/exit flows
+- [ ] **[DTKT-168]** Update `dev_docs/mcp_design.md` schemas and examples (this doc)
+- [ ] **[DTKT-169]** README: quick MCP usage snippet + Inspector command
+
+**Deliverable (10A):** `list_tasks` with enriched metadata and `task_start` that is already useful for short tasks (≤1s). Background control is clearly marked as "coming next".
+
+---
+
+### Phase 10B — **Full Long-Running / Background Tasks**
+Add PID management, output buffers, and controls.
+
+- [ ] **[DTKT-170]** Introduce in-memory **PID → Job** map with metadata (started_at, unique_name, args) and GC policy
+- [ ] **[DTKT-171]** Add **ring buffer** for combined stdout/stderr per PID (bounded, configurable)
+- [ ] **[DTKT-172]** Complete `status` to list **all running PIDs** with minimal info
+- [ ] **[DTKT-173]** Implement `task_status` (filter by unique_name, return many PIDs)
+- [ ] **[DTKT-174]** Implement `task_output` **tail last N lines** (default 200); add truncation flag
+- [ ] **[DTKT-175]** Implement `task_stop` with **TERM + grace + KILL**
+- [ ] **[DTKT-176]** Concurrency and safety limits (max concurrent jobs, per-message chunk cap)
+- [ ] **[DTKT-177]** Optional MCP **logging notifications** while running (tracing + subscriber)
+- [ ] **[DTKT-178]** (Optional) Resources `job://<pid>`, `joblog://<pid>?from=…`
+- [ ] **[DTKT-179]** Integration tests for long-running jobs: start → status → output → stop
+- [ ] **[DTKT-180]** Documentation: full background control, limits, examples
+
+**Deliverable (10B):** Robust PID-based background task management compatible with editors, with log tailing and stop.
 
 ## Icebox and Future Enhancements (Post-Launch)
 
