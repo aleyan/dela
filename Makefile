@@ -54,7 +54,7 @@ inspect_mcp:
 	@echo "Inspecting MCP server (debug build + stdio via Inspector)..."
 	@cargo build --quiet
 	# Avoid any stdout noise; Inspector expects clean MCP JSON-RPC on stdout.
-	MCPI_NO_COLOR=1 RUST_LOG=warn RUSTFLAGS="-A warnings" npx @modelcontextprotocol/inspector ./target/debug/dela mcp
+	MCPI_NO_COLOR=1 RUST_LOG=warn RUSTFLAGS="-A warnings" npx @modelcontextprotocol/inspector ./target/debug/dela mcp --cwd $(PWD)
 
 
 # Publish to crates.io

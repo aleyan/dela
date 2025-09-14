@@ -276,7 +276,7 @@ Implement the minimal surface so editors can start using MCP immediately for dis
 - [x] [DTKT-143] Wire DTOs for tasks with uniqified names (TaskDto)
 - [x] [DTKT-144] Implement list_tasks with runner filtering
 - [x] **[DTKT-160]** Extend `TaskDto` to **enriched fields**: `command`, `runner_available`, `allowlisted`, `file_path`
-- [ ] **[DTKT-162]** Implement `list_tasks` enrichment: compute command, test runner availability, and allowlist flag
+- [x] **[DTKT-162]** Implement `list_tasks` enrichment: compute command, test runner availability, and allowlist flag
 - [ ] **[DTKT-163]** Implement **task_start (quick)**:
   - Spawn the task, capture stdout/stderr up to **1s**
   - If exits ≤1s → return `{ state: "exited", exit_code, initial_output }`

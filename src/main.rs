@@ -135,11 +135,7 @@ async fn main() {
     let cli = Cli::parse();
 
     let result = match cli.command {
-        Commands::Mcp { cwd } => {
-            mcp::run_stdio_server(std::path::PathBuf::from(cwd))
-                .await
-                .map_err(|e| e.to_string())
-        }
+        Commands::Mcp { cwd } => commands::mcp::execute(cwd).await,
         Commands::Init => commands::init::execute(),
         Commands::ConfigureShell => commands::configure_shell::execute(),
         Commands::List { verbose } => commands::list::execute(verbose),
