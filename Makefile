@@ -52,7 +52,7 @@ run:
 
 inspect_mcp:
 	@echo "Inspecting MCP server..."
-	npx @modelcontextprotocol/inspector cargo run --quiet -- mcp
+	RUSTFLAGS="-A warnings" npx @modelcontextprotocol/inspector cargo run --quiet -- mcp
 
 # Publish to crates.io
 publish: tests tests_integration
