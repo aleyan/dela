@@ -1,6 +1,7 @@
-# syntax=docker/dockerfile:1.4
-# Build stage using common builder
-FROM dela-builder AS builder
+#!/bin/bash
+set -e
 
-# Test environment
-FROM alpine:3.21
+# This script will be mounted and executed by the Docker container
+# It's a simple wrapper around run.sh
+
+exec /home/testuser/mcp_tests/run.sh
