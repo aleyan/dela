@@ -26,6 +26,9 @@ test_unit: _builder
 test_noinit: _builder
 	VERBOSE=$(VERBOSE) ./tests/run_tests.sh noinit;
 
+test_mcp: _builder
+	VERBOSE=$(VERBOSE) ./tests/run_tests.sh mcp;
+
 test_zsh: _builder
 	VERBOSE=$(VERBOSE) ./tests/run_tests.sh zsh;
 
