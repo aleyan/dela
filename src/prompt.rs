@@ -178,7 +178,7 @@ fn ui(f: &mut Frame, task: &Task, options: &[(&str, AllowDecision)], selected: u
             ]
             .as_ref(),
         )
-        .split(f.size());
+        .split(f.area());
 
     // Header
     let header_text = vec![

@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Data Transfer Object for tasks exposed via MCP
-/// 
+///
 /// This struct represents the stable wire format for tasks,
 /// mapping from internal Task representations to a format
 /// suitable for external MCP clients.
@@ -15,11 +15,11 @@ pub struct TaskDto {
     /// The uniqified name (disambiguated name if available, otherwise original name)
     /// Examples: "build", "test-m", "start-n"
     pub unique_name: String,
-    
+
     /// The original name as it appears in the source file
     /// Examples: "build", "test", "start"
     pub source_name: String,
-    
+
     /// Short name of the task runner
     /// Examples: "make", "npm", "gradle"
     pub runner: String,
@@ -33,10 +33,10 @@ pub struct TaskDto {
 
     /// Whether this task is allowed by the MCP allowlist
     pub allowlisted: bool,
-    
+
     /// Path to the file containing this task
     pub file_path: String,
-    
+
     /// Description of the task if available
     pub description: Option<String>,
 }
@@ -321,17 +321,17 @@ mod tests {
 
         // Assert
         assert_eq!(dtos.len(), 2);
-        
+
         assert_eq!(dtos[0].unique_name, "test-m");
         assert_eq!(dtos[0].source_name, "test");
         assert_eq!(dtos[0].runner, "make");
         assert_eq!(dtos[0].command, "make test");
-        
+
         assert_eq!(dtos[1].unique_name, "test-n");
         assert_eq!(dtos[1].source_name, "test");
         assert_eq!(dtos[1].runner, "npm");
         assert_eq!(dtos[1].command, "npm run test");
-        
+
         // Both should have different uniqified names but same source name
         assert_ne!(dtos[0].unique_name, dtos[1].unique_name);
         assert_eq!(dtos[0].source_name, dtos[1].source_name);
@@ -516,7 +516,6 @@ mod tests {
         );
         assert_eq!(dto.runner_available, false); // Travis CI is never available locally
     }
-
 }
 
 /// Arguments for the task_start tool
