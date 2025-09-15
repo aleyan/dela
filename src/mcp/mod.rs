@@ -1,8 +1,8 @@
-mod server;
 mod dto;
+mod server;
 
+pub use dto::{ListTasksArgs, StartResultDto, TaskStartArgs};
 pub use server::DelaMcpServer;
-pub use dto::ListTasksArgs;
 
 /// Convenience runner for the CLI subcommand to ensure we actually
 /// serve MCP over stdio (no stdout noise).
@@ -13,14 +13,14 @@ pub async fn run_stdio_server(root: std::path::PathBuf) -> Result<(), rmcp::mode
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
     use rmcp::ServerHandler;
+    use std::path::PathBuf;
 
     #[tokio::test]
     async fn test_server_info() {
         let server = DelaMcpServer::new(PathBuf::from("."));
         let info = server.get_info();
-        
+
         assert_eq!(info.server_info.name, "dela-mcp");
         assert!(info.capabilities.tools.is_some());
         // Logging disabled in Phase 10A

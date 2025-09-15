@@ -1,11 +1,12 @@
-use serde::{Deserialize, Serialize};
-use schemars::JsonSchema;
-use crate::types::Task;
-use crate::runner::is_runner_available;
 use crate::allowlist::is_task_allowed;
+use crate::runner::is_runner_available;
+use crate::types::Task;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Data Transfer Object for tasks exposed via MCP
-/// 
+///
 /// This struct represents the stable wire format for tasks,
 /// mapping from internal Task representations to a format
 /// suitable for external MCP clients.
@@ -14,28 +15,28 @@ pub struct TaskDto {
     /// The uniqified name (disambiguated name if available, otherwise original name)
     /// Examples: "build", "test-m", "start-n"
     pub unique_name: String,
-    
+
     /// The original name as it appears in the source file
     /// Examples: "build", "test", "start"
     pub source_name: String,
-    
+
     /// Short name of the task runner
     /// Examples: "make", "npm", "gradle"
     pub runner: String,
-    
+
     /// Fully expanded shell command that would be executed
     /// Examples: "make build", "npm run test", "gradle clean"
     pub command: String,
-    
+
     /// Whether the runner binary is available on the system
     pub runner_available: bool,
-    
+
     /// Whether this task is allowed by the MCP allowlist
     pub allowlisted: bool,
-    
+
     /// Path to the file containing this task
     pub file_path: String,
-    
+
     /// Description of the task if available
     pub description: Option<String>,
 }
@@ -45,12 +46,18 @@ impl TaskDto {
     /// This method provides basic fields without enrichment
     pub fn from_task(task: &Task) -> Self {
         Self {
-            unique_name: task.disambiguated_name.as_ref().unwrap_or(&task.name).clone(),
+            unique_name: task
+                .disambiguated_name
+                .as_ref()
+                .unwrap_or(&task.name)
+                .clone(),
             source_name: task.source_name.clone(),
             runner: task.runner.short_name().to_string(),
             command: task.runner.get_command(task),
             runner_available: is_runner_available(&task.runner),
-            allowlisted: is_task_allowed(task).map(|(allowed, denied)| allowed && !denied).unwrap_or(false),
+            allowlisted: is_task_allowed(task)
+                .map(|(allowed, denied)| allowed && !denied)
+                .unwrap_or(false),
             file_path: task.file_path.to_string_lossy().to_string(),
             description: task.description.clone(),
         }
@@ -60,12 +67,18 @@ impl TaskDto {
     /// This method computes all enriched fields including command, runner availability, and allowlist status
     pub fn from_task_enriched(task: &Task) -> Self {
         Self {
-            unique_name: task.disambiguated_name.as_ref().unwrap_or(&task.name).clone(),
+            unique_name: task
+                .disambiguated_name
+                .as_ref()
+                .unwrap_or(&task.name)
+                .clone(),
             source_name: task.source_name.clone(),
             runner: task.runner.short_name().to_string(),
             command: task.runner.get_command(task),
             runner_available: is_runner_available(&task.runner),
-            allowlisted: is_task_allowed(task).map(|(allowed, denied)| allowed && !denied).unwrap_or(false),
+            allowlisted: is_task_allowed(task)
+                .map(|(allowed, denied)| allowed && !denied)
+                .unwrap_or(false),
             file_path: task.file_path.to_string_lossy().to_string(),
             description: task.description.clone(),
         }
@@ -89,7 +102,7 @@ impl Default for ListTasksArgs {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{Task, TaskRunner, TaskDefinitionType};
+    use crate::types::{Task, TaskDefinitionType, TaskRunner};
     use std::path::PathBuf;
 
     #[test]
@@ -208,10 +221,19 @@ mod tests {
             let dto = TaskDto::from_task(&task);
 
             // Assert
-            assert_eq!(dto.runner, expected_short_name, "Failed for runner {:?}", runner);
+            assert_eq!(
+                dto.runner, expected_short_name,
+                "Failed for runner {:?}",
+                runner
+            );
             // Also verify the command is generated correctly
-            assert!(dto.command.contains(expected_short_name) || expected_short_name == "docker compose", 
-                   "Command '{}' should contain runner '{}'", dto.command, expected_short_name);
+            assert!(
+                dto.command.contains(expected_short_name)
+                    || expected_short_name == "docker compose",
+                "Command '{}' should contain runner '{}'",
+                dto.command,
+                expected_short_name
+            );
         }
     }
 
@@ -238,7 +260,10 @@ mod tests {
         assert_eq!(dto.runner, "npm");
         assert_eq!(dto.command, "npm run serve");
         assert_eq!(dto.file_path, "/home/user/projects/my-app/package.json");
-        assert_eq!(dto.description, Some("Start development server".to_string()));
+        assert_eq!(
+            dto.description,
+            Some("Start development server".to_string())
+        );
     }
 
     #[test]
@@ -296,17 +321,17 @@ mod tests {
 
         // Assert
         assert_eq!(dtos.len(), 2);
-        
+
         assert_eq!(dtos[0].unique_name, "test-m");
         assert_eq!(dtos[0].source_name, "test");
         assert_eq!(dtos[0].runner, "make");
         assert_eq!(dtos[0].command, "make test");
-        
+
         assert_eq!(dtos[1].unique_name, "test-n");
         assert_eq!(dtos[1].source_name, "test");
         assert_eq!(dtos[1].runner, "npm");
         assert_eq!(dtos[1].command, "npm run test");
-        
+
         // Both should have different uniqified names but same source name
         assert_ne!(dtos[0].unique_name, dtos[1].unique_name);
         assert_eq!(dtos[0].source_name, dtos[1].source_name);
@@ -344,8 +369,10 @@ mod tests {
         let json_with = serde_json::to_string(&args_with_runner).expect("Should serialize");
         let json_without = serde_json::to_string(&args_without_runner).expect("Should serialize");
 
-        let deserialized_with: ListTasksArgs = serde_json::from_str(&json_with).expect("Should deserialize");
-        let deserialized_without: ListTasksArgs = serde_json::from_str(&json_without).expect("Should deserialize");
+        let deserialized_with: ListTasksArgs =
+            serde_json::from_str(&json_with).expect("Should deserialize");
+        let deserialized_without: ListTasksArgs =
+            serde_json::from_str(&json_without).expect("Should deserialize");
 
         // Assert
         assert_eq!(args_with_runner, deserialized_with);
@@ -376,7 +403,7 @@ mod tests {
         assert_eq!(dto.command, "make build");
         assert_eq!(dto.file_path, "/project/Makefile");
         assert_eq!(dto.description, Some("Build the project".to_string()));
-        
+
         // These fields depend on system state but should be present
         assert!(dto.runner_available == true || dto.runner_available == false);
         assert!(dto.allowlisted == true || dto.allowlisted == false);
@@ -397,7 +424,11 @@ mod tests {
             (TaskRunner::Maven, "compile", "mvn compile"),
             (TaskRunner::Gradle, "build", "gradle build"),
             (TaskRunner::Just, "test", "just test"),
-            (TaskRunner::CMake, "all", "cmake -S . -B build && cmake --build build --target all"),
+            (
+                TaskRunner::CMake,
+                "all",
+                "cmake -S . -B build && cmake --build build --target all",
+            ),
         ];
 
         for (runner, task_name, expected_command) in test_cases {
@@ -417,7 +448,11 @@ mod tests {
             let dto = TaskDto::from_task_enriched(&task);
 
             // Assert
-            assert_eq!(dto.command, expected_command, "Failed for runner {:?}", runner);
+            assert_eq!(
+                dto.command, expected_command,
+                "Failed for runner {:?}",
+                runner
+            );
         }
     }
 
@@ -447,7 +482,11 @@ mod tests {
             let dto = TaskDto::from_task_enriched(&task);
 
             // Assert
-            assert_eq!(dto.command, expected_command, "Failed for docker compose task '{}'", task_name);
+            assert_eq!(
+                dto.command, expected_command,
+                "Failed for docker compose task '{}'",
+                task_name
+            );
         }
     }
 
@@ -471,7 +510,10 @@ mod tests {
         // Assert
         assert_eq!(dto.unique_name, "test");
         assert_eq!(dto.runner, "travis");
-        assert_eq!(dto.command, "# Travis CI task 'test' - not executable locally");
+        assert_eq!(
+            dto.command,
+            "# Travis CI task 'test' - not executable locally"
+        );
         assert_eq!(dto.runner_available, false); // Travis CI is never available locally
     }
 
@@ -498,3 +540,39 @@ mod tests {
     }
 }
 
+/// Arguments for the task_start tool
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct TaskStartArgs {
+    /// The unique name of the task to start
+    pub unique_name: String,
+
+    /// Optional arguments to pass to the task
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub args: Option<Vec<String>>,
+
+    /// Optional environment variables to set
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub env: Option<HashMap<String, String>>,
+
+    /// Optional working directory (if None, uses server's root directory)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cwd: Option<String>,
+}
+
+/// Result of starting a task
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct StartResultDto {
+    /// Current state of the task: "exited", "running", or "failed"
+    pub state: String,
+
+    /// Process ID if the task is running
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pid: Option<i32>,
+
+    /// Exit code if the task has exited
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exit_code: Option<i32>,
+
+    /// Combined stdout and stderr captured during the first second
+    pub initial_output: String,
+}

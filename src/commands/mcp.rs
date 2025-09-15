@@ -1,5 +1,5 @@
-use std::path::PathBuf;
 use crate::mcp;
+use std::path::PathBuf;
 
 /// Execute the MCP command
 pub async fn execute(cwd: String) -> Result<(), String> {
@@ -15,7 +15,7 @@ pub async fn execute(cwd: String) -> Result<(), String> {
     } else {
         PathBuf::from(cwd)
     };
-    
+
     mcp::run_stdio_server(root_path)
         .await
         .map_err(|e| e.to_string())
