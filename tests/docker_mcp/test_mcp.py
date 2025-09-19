@@ -185,6 +185,295 @@ def test_mcp_protocol():
         if process.poll() is None:
             process.kill()
     
+    # Test 4: Test MCP status tool
+    print("Test 4: Testing MCP status tool")
+    
+    process = start_mcp_process(cwd)
+    
+    try:
+        # Send status request
+        status_request = {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "method": "tools/call",
+            "params": {
+                "name": "status",
+                "arguments": {}
+            }
+        }
+        
+        process.stdin.write(json.dumps(status_request) + "\n")
+        process.stdin.flush()
+        
+        # Wait for response
+        time.sleep(2)
+        
+        # Read response
+        stdout, stderr = process.communicate(timeout=5)
+        
+        if "running" in stdout and "[]" in stdout:
+            print("✓ MCP status tool works (returns empty array in Phase 10A)")
+        else:
+            print("✗ MCP status tool failed")
+            print("STDOUT:", stdout)
+            print("STDERR:", stderr)
+            return False
+            
+    except subprocess.TimeoutExpired:
+        print("✗ MCP status tool timed out")
+        process.kill()
+        return False
+    except Exception as e:
+        print(f"✗ MCP status tool error: {e}")
+        process.kill()
+        return False
+    finally:
+        if process.poll() is None:
+            process.kill()
+    
+    # Test 5: Test MCP task_start quick execution
+    print("Test 5: Testing MCP task_start quick execution")
+    
+    process = start_mcp_process(cwd)
+    
+    try:
+        # Send task_start request for a quick task
+        task_start_request = {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "method": "tools/call",
+            "params": {
+                "name": "task_start",
+                "arguments": {
+                    "unique_name": "test-task"
+                }
+            }
+        }
+        
+        process.stdin.write(json.dumps(task_start_request) + "\n")
+        process.stdin.flush()
+        
+        # Wait for response
+        time.sleep(3)
+        
+        # Read response
+        stdout, stderr = process.communicate(timeout=5)
+        
+        if "ok" in stdout and "result" in stdout:
+            print("✓ MCP task_start quick execution works")
+        else:
+            print("✗ MCP task_start quick execution failed")
+            print("STDOUT:", stdout)
+            print("STDERR:", stderr)
+            return False
+            
+    except subprocess.TimeoutExpired:
+        print("✗ MCP task_start quick execution timed out")
+        process.kill()
+        return False
+    except Exception as e:
+        print(f"✗ MCP task_start quick execution error: {e}")
+        process.kill()
+        return False
+    finally:
+        if process.poll() is None:
+            process.kill()
+    
+    # Test 6: Test MCP task_start with arguments
+    print("Test 6: Testing MCP task_start with arguments")
+    
+    process = start_mcp_process(cwd)
+    
+    try:
+        # Send task_start request with arguments
+        task_start_request = {
+            "jsonrpc": "2.0",
+            "id": 6,
+            "method": "tools/call",
+            "params": {
+                "name": "task_start",
+                "arguments": {
+                    "unique_name": "print-args",
+                    "args": ["--verbose", "--debug"]
+                }
+            }
+        }
+        
+        process.stdin.write(json.dumps(task_start_request) + "\n")
+        process.stdin.flush()
+        
+        # Wait for response
+        time.sleep(3)
+        
+        # Read response
+        stdout, stderr = process.communicate(timeout=5)
+        
+        if "ok" in stdout and "result" in stdout:
+            print("✓ MCP task_start with arguments works")
+        else:
+            print("✗ MCP task_start with arguments failed")
+            print("STDOUT:", stdout)
+            print("STDERR:", stderr)
+            return False
+            
+    except subprocess.TimeoutExpired:
+        print("✗ MCP task_start with arguments timed out")
+        process.kill()
+        return False
+    except Exception as e:
+        print(f"✗ MCP task_start with arguments error: {e}")
+        process.kill()
+        return False
+    finally:
+        if process.poll() is None:
+            process.kill()
+    
+    # Test 7: Test MCP error taxonomy - TaskNotFound
+    print("Test 7: Testing MCP error taxonomy - TaskNotFound")
+    
+    process = start_mcp_process(cwd)
+    
+    try:
+        # Send task_start request for non-existent task
+        task_start_request = {
+            "jsonrpc": "2.0",
+            "id": 7,
+            "method": "tools/call",
+            "params": {
+                "name": "task_start",
+                "arguments": {
+                    "unique_name": "nonexistent-task"
+                }
+            }
+        }
+        
+        process.stdin.write(json.dumps(task_start_request) + "\n")
+        process.stdin.flush()
+        
+        # Wait for response
+        time.sleep(2)
+        
+        # Read response
+        stdout, stderr = process.communicate(timeout=5)
+        
+        if "error" in stdout and "not found" in stdout:
+            print("✓ MCP error taxonomy - TaskNotFound works")
+        else:
+            print("✗ MCP error taxonomy - TaskNotFound failed")
+            print("STDOUT:", stdout)
+            print("STDERR:", stderr)
+            return False
+            
+    except subprocess.TimeoutExpired:
+        print("✗ MCP error taxonomy - TaskNotFound timed out")
+        process.kill()
+        return False
+    except Exception as e:
+        print(f"✗ MCP error taxonomy - TaskNotFound error: {e}")
+        process.kill()
+        return False
+    finally:
+        if process.poll() is None:
+            process.kill()
+    
+    # Test 8: Test MCP error taxonomy - NotAllowlisted
+    print("Test 8: Testing MCP error taxonomy - NotAllowlisted")
+    
+    process = start_mcp_process(cwd)
+    
+    try:
+        # Send task_start request for task not in allowlist
+        task_start_request = {
+            "jsonrpc": "2.0",
+            "id": 8,
+            "method": "tools/call",
+            "params": {
+                "name": "task_start",
+                "arguments": {
+                    "unique_name": "custom-exe"  # This task exists but is not in allowlist
+                }
+            }
+        }
+        
+        process.stdin.write(json.dumps(task_start_request) + "\n")
+        process.stdin.flush()
+        
+        # Wait for response
+        time.sleep(2)
+        
+        # Read response
+        stdout, stderr = process.communicate(timeout=5)
+        
+        if "error" in stdout and ("not allowlisted" in stdout or "NotAllowlisted" in stdout):
+            print("✓ MCP error taxonomy - NotAllowlisted works")
+        else:
+            print("✗ MCP error taxonomy - NotAllowlisted failed")
+            print("STDOUT:", stdout)
+            print("STDERR:", stderr)
+            return False
+            
+    except subprocess.TimeoutExpired:
+        print("✗ MCP error taxonomy - NotAllowlisted timed out")
+        process.kill()
+        return False
+    except Exception as e:
+        print(f"✗ MCP error taxonomy - NotAllowlisted error: {e}")
+        process.kill()
+        return False
+    finally:
+        if process.poll() is None:
+            process.kill()
+    
+    # Test 9: Test MCP list_tasks enriched fields
+    print("Test 9: Testing MCP list_tasks enriched fields")
+    
+    process = start_mcp_process(cwd)
+    
+    try:
+        # Send list_tasks request
+        list_tasks_request = {
+            "jsonrpc": "2.0",
+            "id": 9,
+            "method": "tools/call",
+            "params": {
+                "name": "list_tasks",
+                "arguments": {}
+            }
+        }
+        
+        process.stdin.write(json.dumps(list_tasks_request) + "\n")
+        process.stdin.flush()
+        
+        # Wait for response
+        time.sleep(2)
+        
+        # Read response
+        stdout, stderr = process.communicate(timeout=5)
+        
+        # Check for enriched fields in the response
+        if ("unique_name" in stdout and "source_name" in stdout and 
+            "runner" in stdout and "command" in stdout and 
+            "runner_available" in stdout and "allowlisted" in stdout and 
+            "file_path" in stdout):
+            print("✓ MCP list_tasks enriched fields work")
+        else:
+            print("✗ MCP list_tasks enriched fields failed")
+            print("STDOUT:", stdout)
+            print("STDERR:", stderr)
+            return False
+            
+    except subprocess.TimeoutExpired:
+        print("✗ MCP list_tasks enriched fields timed out")
+        process.kill()
+        return False
+    except Exception as e:
+        print(f"✗ MCP list_tasks enriched fields error: {e}")
+        process.kill()
+        return False
+    finally:
+        if process.poll() is None:
+            process.kill()
+    
     print("✓ All MCP protocol integration tests passed!")
     return True
 
