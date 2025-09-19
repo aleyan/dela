@@ -29,10 +29,10 @@ RUN mkdir -p /home/testuser/test_project /home/testuser/.dela && \
     chown -R testuser:testuser /home/testuser && \
     chmod -R 755 /home/testuser/.dela
 
-# Create initial allowlist
+# Create allowlist with MCP-allowlisted tasks
 RUN echo 'entries = [' > /home/testuser/.dela/allowlist.toml && \
-    echo '  { path = "/home/testuser/test_project/package.json", scope = "Task", tasks = ["npm-test", "npm-start"] }' >> /home/testuser/.dela/allowlist.toml && \
-    echo '  { path = "/home/testuser/test_project/Makefile", scope = "Task", tasks = ["make-build", "make-test"] }' >> /home/testuser/.dela/allowlist.toml && \
+    echo '  { path = "/home/testuser/test_project/package.json", scope = "Task", tasks = ["npm-test", "npm-start"] },' >> /home/testuser/.dela/allowlist.toml && \
+    echo '  { path = "/home/testuser/test_project/Makefile", scope = "Task", tasks = ["make-build", "make-test", "test-task", "another-task", "print-args"] }' >> /home/testuser/.dela/allowlist.toml && \
     echo ']' >> /home/testuser/.dela/allowlist.toml && \
     chown testuser:testuser /home/testuser/.dela/allowlist.toml && \
     chmod 644 /home/testuser/.dela/allowlist.toml
@@ -56,5 +56,5 @@ ENV HOME=/home/testuser
 ENV SHELL=/bin/bash
 ENV PATH="/home/testuser/.local/bin:${PATH}"
 
-# Entry point script will be mounted
-CMD ["bash", "/home/testuser/test_script.sh"]
+# Run the MCP tests directly
+CMD ["bash", "/home/testuser/mcp_tests/run.sh"]

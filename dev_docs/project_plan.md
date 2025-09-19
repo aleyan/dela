@@ -281,12 +281,11 @@ Implement the minimal surface so editors can start using MCP immediately for dis
   - Spawn the task, capture stdout/stderr up to **1s**
   - If exits ≤1s → return `{ state: "exited", exit_code, initial_output }`
   - If still running → return `{ state: "running", pid, initial_output }` **but do not persist/manage background yet** (documented limitation)
-- [ ] **[DTKT-164]** Implement **status** that returns an **empty array** in Quick phase (documented that background processes are unsupported yet)
-- [ ] **[DTKT-165]** Error taxonomy for **NotAllowlisted**, **RunnerUnavailable**, **TaskNotFound**
-- [ ] **[DTKT-166]** Unit tests for `list_tasks` enrichment and `task_start` quick path
-- [ ] **[DTKT-167]** CI smoke tests for MCP startup + quick start/exit flows
-- [ ] **[DTKT-168]** Update `dev_docs/mcp_design.md` schemas and examples (this doc)
-- [ ] **[DTKT-169]** README: quick MCP usage snippet + Inspector command
+- [x] **[DTKT-164]** Implement **status** that returns an **empty array** in Quick phase (documented that background processes are unsupported yet)
+- [x] **[DTKT-165]** Error taxonomy for **NotAllowlisted**, **RunnerUnavailable**, **TaskNotFound**
+- [x] **[DTKT-166]** Unit tests for `list_tasks` enrichment and `task_start` quick path
+- [x] **[DTKT-167]** Dockerized integeration tests for MCP startup + quick start/exit flows
+- [x] **[DTKT-168]** Update `dev_docs/mcp_design.md` schemas and examples (this doc)
 
 **Deliverable (10A):** `list_tasks` with enriched metadata and `task_start` that is already useful for short tasks (≤1s). Background control is clearly marked as "coming next".
 
@@ -307,6 +306,7 @@ Add PID management, output buffers, and controls.
 - [ ] **[DTKT-178]** (Optional) Resources `job://<pid>`, `joblog://<pid>?from=…`
 - [ ] **[DTKT-179]** Integration tests for long-running jobs: start → status → output → stop
 - [ ] **[DTKT-180]** Documentation: full background control, limits, examples
+- [ ] **[DTKT-169]** README: quick MCP usage snippet, Inspector command in the development section
 
 **Deliverable (10B):** Robust PID-based background task management compatible with editors, with log tailing and stop.
 

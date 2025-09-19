@@ -1,7 +1,9 @@
 mod dto;
+mod errors;
 mod server;
 
 pub use dto::{ListTasksArgs, StartResultDto, TaskStartArgs};
+pub use errors::DelaError;
 pub use server::DelaMcpServer;
 
 /// Convenience runner for the CLI subcommand to ensure we actually
