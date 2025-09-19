@@ -60,12 +60,22 @@ impl DelaError {
         match self {
             DelaError::NotAllowlisted { task_name, hint } => ErrorData {
                 code: DelaErrorCode::NOT_ALLOWLISTED.into(),
-                message: Cow::Owned(format!("Task '{}' is not allowlisted for MCP execution", task_name)),
+                message: Cow::Owned(format!(
+                    "Task '{}' is not allowlisted for MCP execution",
+                    task_name
+                )),
                 data: hint.as_ref().map(|h| Value::String(h.clone())),
             },
-            DelaError::RunnerUnavailable { runner_name, task_name, hint } => ErrorData {
+            DelaError::RunnerUnavailable {
+                runner_name,
+                task_name,
+                hint,
+            } => ErrorData {
                 code: DelaErrorCode::RUNNER_UNAVAILABLE.into(),
-                message: Cow::Owned(format!("Runner '{}' is not available for task '{}'", runner_name, task_name)),
+                message: Cow::Owned(format!(
+                    "Runner '{}' is not available for task '{}'",
+                    runner_name, task_name
+                )),
                 data: hint.as_ref().map(|h| Value::String(h.clone())),
             },
             DelaError::TaskNotFound { task_name, hint } => ErrorData {
@@ -92,12 +102,17 @@ impl DelaError {
     /// Create a RunnerUnavailable error with a helpful hint
     pub fn runner_unavailable(runner_name: String, task_name: String) -> Self {
         let hint = match runner_name.as_str() {
-            "make" => Some("Install make: brew install make (macOS) or apt-get install make (Ubuntu)".to_string()),
+            "make" => Some(
+                "Install make: brew install make (macOS) or apt-get install make (Ubuntu)"
+                    .to_string(),
+            ),
             "npm" => Some("Install Node.js and npm: https://nodejs.org/".to_string()),
             "gradle" => Some("Install Gradle: https://gradle.org/install/".to_string()),
             "maven" => Some("Install Maven: https://maven.apache.org/install.html".to_string()),
             "python" => Some("Install Python: https://python.org/downloads/".to_string()),
-            "uv" => Some("Install uv: pip install uv or https://github.com/astral-sh/uv".to_string()),
+            "uv" => {
+                Some("Install uv: pip install uv or https://github.com/astral-sh/uv".to_string())
+            }
             "just" => Some("Install just: https://github.com/casey/just#installation".to_string()),
             _ => Some(format!("Install {} to run this task", runner_name)),
         };
@@ -137,29 +152,57 @@ mod tests {
     fn test_not_allowlisted_error() {
         let error = DelaError::not_allowlisted("build".to_string());
         let error_data = error.to_error_data();
-        
+
         assert_eq!(error_data.code.0, -32010);
         assert!(error_data.message.contains("not allowlisted"));
-        assert!(error_data.data.as_ref().unwrap().as_str().unwrap().contains("Ask a human"));
+        assert!(
+            error_data
+                .data
+                .as_ref()
+                .unwrap()
+                .as_str()
+                .unwrap()
+                .contains("Ask a human")
+        );
     }
 
     #[test]
     fn test_runner_unavailable_error() {
         let error = DelaError::runner_unavailable("make".to_string(), "build".to_string());
         let error_data = error.to_error_data();
-        
+
         assert_eq!(error_data.code.0, -32011);
-        assert!(error_data.message.contains("Runner 'make' is not available"));
-        assert!(error_data.data.as_ref().unwrap().as_str().unwrap().contains("brew install make"));
+        assert!(
+            error_data
+                .message
+                .contains("Runner 'make' is not available")
+        );
+        assert!(
+            error_data
+                .data
+                .as_ref()
+                .unwrap()
+                .as_str()
+                .unwrap()
+                .contains("brew install make")
+        );
     }
 
     #[test]
     fn test_task_not_found_error() {
         let error = DelaError::task_not_found("nonexistent".to_string());
         let error_data = error.to_error_data();
-        
+
         assert_eq!(error_data.code.0, -32012);
         assert!(error_data.message.contains("not found"));
-        assert!(error_data.data.as_ref().unwrap().as_str().unwrap().contains("list_tasks"));
+        assert!(
+            error_data
+                .data
+                .as_ref()
+                .unwrap()
+                .as_str()
+                .unwrap()
+                .contains("list_tasks")
+        );
     }
 }

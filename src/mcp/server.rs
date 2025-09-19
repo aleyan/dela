@@ -126,7 +126,8 @@ impl DelaMcpServer {
             return Err(DelaError::runner_unavailable(
                 task.runner.short_name().to_string(),
                 args.unique_name.clone(),
-            ).into());
+            )
+            .into());
         }
 
         // Build the command
@@ -137,7 +138,8 @@ impl DelaMcpServer {
             return Err(DelaError::internal_error(
                 "Empty command generated".to_string(),
                 Some("Check task definition and runner configuration".to_string()),
-            ).into());
+            )
+            .into());
         }
 
         let executable = parts.remove(0);
@@ -384,7 +386,8 @@ impl ServerHandler for DelaMcpServer {
             _ => Err(DelaError::internal_error(
                 format!("Tool not found: {}", request.name),
                 Some("Use 'list_tools' to see available tools".to_string()),
-            ).into()),
+            )
+            .into()),
         }
     }
 
@@ -602,7 +605,11 @@ mod tests {
                 let obj = json.as_object().unwrap();
                 assert!(obj.contains_key("running"));
                 let running = obj["running"].as_array().unwrap();
-                assert_eq!(running.len(), 0, "Status should return empty array in Phase 10A");
+                assert_eq!(
+                    running.len(),
+                    0,
+                    "Status should return empty array in Phase 10A"
+                );
             }
             _ => panic!("Expected text content with JSON"),
         }
@@ -814,14 +821,14 @@ test: ## Run tests
                 let json: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
                 let obj = json.as_object().unwrap();
                 assert!(obj.contains_key("tasks"));
-                
+
                 let tasks = obj["tasks"].as_array().unwrap();
                 assert!(!tasks.is_empty(), "Should have at least one task");
-                
+
                 // Check that each task has all the enriched fields
                 for task in tasks {
                     let task_obj = task.as_object().unwrap();
-                    
+
                     // Required fields
                     assert!(task_obj.contains_key("unique_name"));
                     assert!(task_obj.contains_key("source_name"));
@@ -830,10 +837,10 @@ test: ## Run tests
                     assert!(task_obj.contains_key("runner_available"));
                     assert!(task_obj.contains_key("allowlisted"));
                     assert!(task_obj.contains_key("file_path"));
-                    
+
                     // Optional fields
                     assert!(task_obj.contains_key("description"));
-                    
+
                     // Verify field types
                     assert!(task_obj["unique_name"].is_string());
                     assert!(task_obj["source_name"].is_string());
@@ -842,11 +849,14 @@ test: ## Run tests
                     assert!(task_obj["runner_available"].is_boolean());
                     assert!(task_obj["allowlisted"].is_boolean());
                     assert!(task_obj["file_path"].is_string());
-                    
+
                     // Verify command contains the runner
                     let runner = task_obj["runner"].as_str().unwrap();
                     let command = task_obj["command"].as_str().unwrap();
-                    assert!(command.starts_with(runner), "Command should start with runner name");
+                    assert!(
+                        command.starts_with(runner),
+                        "Command should start with runner name"
+                    );
                 }
             }
             _ => panic!("Expected text content"),
@@ -924,7 +934,7 @@ test:
         // Arrange - Create a test directory with a Makefile
         let temp_dir = TempDir::new().unwrap();
         let temp_path = temp_dir.path();
-        
+
         let makefile_content = r#"build:
 	echo "Building"
 "#;
@@ -952,9 +962,20 @@ test:
         let error = DelaError::runner_unavailable("make".to_string(), "build".to_string());
         let error_data = error.to_error_data();
         assert_eq!(error_data.code.0, -32011); // RUNNER_UNAVAILABLE
-        assert!(error_data.message.contains("Runner 'make' is not available"));
+        assert!(
+            error_data
+                .message
+                .contains("Runner 'make' is not available")
+        );
         assert!(error_data.data.is_some());
-        assert!(error_data.data.unwrap().as_str().unwrap().contains("brew install make"));
+        assert!(
+            error_data
+                .data
+                .unwrap()
+                .as_str()
+                .unwrap()
+                .contains("brew install make")
+        );
 
         // Test 3: NotAllowlisted error
         let error = DelaError::not_allowlisted("build".to_string());
@@ -962,10 +983,18 @@ test:
         assert_eq!(error_data.code.0, -32010); // NOT_ALLOWLISTED
         assert!(error_data.message.contains("not allowlisted"));
         assert!(error_data.data.is_some());
-        assert!(error_data.data.unwrap().as_str().unwrap().contains("Ask a human"));
+        assert!(
+            error_data
+                .data
+                .unwrap()
+                .as_str()
+                .unwrap()
+                .contains("Ask a human")
+        );
 
         // Test 4: InternalError
-        let error = DelaError::internal_error("Test error".to_string(), Some("Test hint".to_string()));
+        let error =
+            DelaError::internal_error("Test error".to_string(), Some("Test hint".to_string()));
         let error_data = error.to_error_data();
         assert_eq!(error_data.code.0, -32603); // INTERNAL_ERROR
         assert!(error_data.message.contains("Test error"));
@@ -981,7 +1010,7 @@ test:
         // Arrange - Create a test directory with a quick-executing task
         let temp_dir = TempDir::new().unwrap();
         let temp_path = temp_dir.path();
-        
+
         // Create a Makefile with a quick echo task
         let makefile_content = r#"quick-echo:
 	echo "Hello from quick task"
@@ -1009,11 +1038,12 @@ test:
                 let content = &call_result.content[0];
                 match &content.raw {
                     RawContent::Text(text_content) => {
-                        let json: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
+                        let json: serde_json::Value =
+                            serde_json::from_str(&text_content.text).unwrap();
                         let obj = json.as_object().unwrap();
                         assert!(obj.contains_key("ok"));
                         assert!(obj.contains_key("result"));
-                        
+
                         let result_obj = obj["result"].as_object().unwrap();
                         assert!(result_obj.contains_key("state"));
                         // Should be either "exited" (quick completion) or "running" (backgrounded)
@@ -1038,7 +1068,7 @@ test:
         // Arrange - Create a test directory with a task that accepts arguments
         let temp_dir = TempDir::new().unwrap();
         let temp_path = temp_dir.path();
-        
+
         // Create a Makefile with a task that uses arguments
         let makefile_content = r#"test-args:
 	echo "Args: $(ARGS)"
@@ -1077,7 +1107,7 @@ test:
         // Arrange - Create a test directory with a task that uses environment variables
         let temp_dir = TempDir::new().unwrap();
         let temp_path = temp_dir.path();
-        
+
         // Create a Makefile with a task that uses environment variables
         let makefile_content = r#"test-env:
 	echo "ENV_VAR: $$ENV_VAR"
@@ -1087,7 +1117,7 @@ test:
         let server = DelaMcpServer::new(temp_path.to_path_buf());
         let mut env_vars = std::collections::HashMap::new();
         env_vars.insert("ENV_VAR".to_string(), "test_value".to_string());
-        
+
         let args = Parameters(TaskStartArgs {
             unique_name: "test-env".to_string(),
             args: None,
@@ -1119,7 +1149,7 @@ test:
         // Arrange - Create a test directory with a task that uses working directory
         let temp_dir = TempDir::new().unwrap();
         let temp_path = temp_dir.path();
-        
+
         // Create a Makefile with a task that uses working directory
         let makefile_content = r#"test-cwd:
 	pwd
