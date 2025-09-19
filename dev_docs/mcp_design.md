@@ -61,12 +61,12 @@ Libraries and their roles:
 	•	tracing-subscriber - (Phase 2) Formats events into rmcp-compatible notifications and handles log routing.
 
 ## Permissioning (Allowlist)
-- MCP namespace uses a **separate read-only** file: `~/.dela/mcp_allowlist.toml`
-- Human CLI continues to use `~/.dela/allowlist.toml`
-- All execution tools (notably **task_start**) evaluate **only** the MCP allowlist with precedence:
+- MCP server uses the **same allowlist** as the human CLI: `~/.dela/allowlist.toml`
+- All execution tools (notably **task_start**) evaluate the allowlist with precedence:
   - **Deny > Directory > File > Task**
-  - If no hit → **deny** with `NotAllowlisted`
-- Maintenance occurs **outside** MCP (future `dela allow --mcp …` CLI).
+  - If no hit → **deny** with `NotAllowlisted` error
+- Maintenance occurs via the regular `dela allow` CLI commands
+- Tasks must be explicitly allowlisted to be executed via MCP
 
 ⸻
 
@@ -86,34 +86,41 @@ Libraries and their roles:
 We keep `types::Task` internal; map to stable DTOs that are editor-friendly.
 
 ```rust
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub struct TaskDto {
-  pub unique_name: String,      // e.g., "build-m"
+  pub unique_name: String,      // e.g., "build-m", "test-n"
   pub source_name: String,      // original name in file
-  pub runner: String,           // short_name()
+  pub runner: String,           // short_name() - "make", "npm", "gradle", etc.
   pub command: String,          // fully-expanded shell command
-  pub runner_available: bool,   // is the runner usable
-  pub allowlisted: bool,        // allowlist decision (MCP namespace)
+  pub runner_available: bool,   // is the runner usable on this system
+  pub allowlisted: bool,        // allowlist decision (based on ~/.dela/allowlist.toml)
   pub file_path: String,        // absolute or repo-root relative string
-  pub description: Option<String>,
+  pub description: Option<String>, // task description if available
 }
 
-#[derive(serde::Serialize, schemars::JsonSchema)]
-pub struct RunningTaskDto {
-  pub pid: i32,
-  pub unique_name: String,
-  pub args: Vec<String>,
-  pub started_at: String,       // RFC3339
-  pub state: String,            // running|exited|stopped|failed (Phase 2 expands)
+#[derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+pub struct ListTasksArgs {
+  pub runner: Option<String>,   // optional filter by runner type
 }
 
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+pub struct TaskStartArgs {
+  pub unique_name: String,      // the unique name of the task to start
+  pub args: Option<Vec<String>>, // optional arguments to pass to the task
+  pub env: Option<HashMap<String, String>>, // optional environment variables
+  pub cwd: Option<String>,      // optional working directory
+}
+
+#[derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub struct StartResultDto {
-  pub state: String,            // exited|running|failed
+  pub state: String,            // "exited"|"running"|"failed"
   pub pid: Option<i32>,         // present if running
   pub exit_code: Option<i32>,   // present if exited/failed
   pub initial_output: String,   // combined stdout+stderr captured during first-second
 }
+
+// Note: RunningTaskDto, TaskStatusArgs, TaskOutputArgs, TaskStopArgs are Phase 2
+// and not yet implemented in the current version.
 ```
 
 
@@ -124,11 +131,18 @@ pub struct StartResultDto {
 ### 1) list_tasks
 **Args**
 ```json
-{ "runner": null }
+{ "runner": "make" }
 ```
 **Result**
 ```json
-{ "tasks": [ TaskDto, ... ] }
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "{\"tasks\": [{\"unique_name\": \"build-m\", \"source_name\": \"build\", \"runner\": \"make\", \"command\": \"make build\", \"runner_available\": true, \"allowlisted\": true, \"file_path\": \"/project/Makefile\", \"description\": \"Build the project\"}]}"
+    }
+  ]
+}
 ```
 
 ### 2) status
@@ -138,58 +152,152 @@ pub struct StartResultDto {
 ```
 **Result**
 ```json
-{ "running": [ RunningTaskDto, ... ] }
+{
+  "content": [
+    {
+      "type": "text", 
+      "text": "{\"running\": []}"
+    }
+  ]
+}
 ```
+*Note: Phase 10A returns empty array - background processes not yet supported*
 
 ### 3) task_start
 **Args**
 ```json
 {
-  "unique_name": "dev-n",
-  "args": ["--port","5173"],
-  "env": { "NODE_ENV":"development" },
-  "cwd": null
+  "unique_name": "test-task",
+  "args": ["--verbose", "--debug"],
+  "env": { "NODE_ENV": "development" },
+  "cwd": "/path/to/project"
 }
 ```
-**Result**
+**Result (success)**
 ```json
-{ "ok": true, "result": StartResultDto }
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "{\"state\": \"exited\", \"exit_code\": 0, \"initial_output\": \"Test task executed successfully\\n\"}"
+    }
+  ]
+}
 ```
-**Denied example**
+**Result (running)**
 ```json
-{ "ok": false, "code": "NotAllowlisted", "hint": "Ask a human to grant MCP access." }
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "{\"state\": \"running\", \"pid\": 12345, \"initial_output\": \"Starting long-running task...\\n\"}"
+    }
+  ]
+}
+```
+**Error (NotAllowlisted)**
+```json
+{
+  "error": {
+    "code": -32010,
+    "message": "Task 'custom-exe' is not allowlisted for MCP execution",
+    "data": "Ask a human to grant MCP access to this task"
+  }
+}
+```
+**Error (TaskNotFound)**
+```json
+{
+  "error": {
+    "code": -32012,
+    "message": "Task 'nonexistent-task' not found",
+    "data": "Use 'list_tasks' to see available tasks"
+  }
+}
+```
+**Error (RunnerUnavailable)**
+```json
+{
+  "error": {
+    "code": -32011,
+    "message": "Runner 'make' is not available for task 'build'",
+    "data": "Install make: brew install make (macOS) or apt-get install make (Ubuntu)"
+  }
+}
 ```
 
-### 4) task_status
-**Args**
+## Error Taxonomy
+
+The MCP server uses a structured error system with specific error codes and helpful messages:
+
+### Error Codes
+- **-32010** `NOT_ALLOWLISTED` - Task is not allowlisted for MCP execution
+- **-32011** `RUNNER_UNAVAILABLE` - Required task runner is not available on the system  
+- **-32012** `TASK_NOT_FOUND` - Task with the given name was not found
+- **-32603** `INTERNAL_ERROR` - Generic internal server error
+
+### Error Structure
+All errors follow the JSON-RPC 2.0 error format:
 ```json
-{ "unique_name": "dev-n" }
-```
-**Result**
-```json
-{ "running": [ RunningTaskDto, ... ] }
+{
+  "error": {
+    "code": -32010,
+    "message": "Task 'custom-exe' is not allowlisted for MCP execution", 
+    "data": "Ask a human to grant MCP access to this task"
+  }
+}
 ```
 
-### 5) task_output
-**Args**
-```json
-{ "pid": 12345, "last": 200 }
-```
-**Result**
-```json
-{ "lines": ["...", "..."], "truncated": false }
-```
-(Phase 2 may add `"from": 4096` for byte-cursor paging.)
+### Error Examples
 
-### 6) task_stop
-**Args**
+**NotAllowlisted Error**
 ```json
-{ "pid": 12345, "grace_ms": 5000 }
+{
+  "error": {
+    "code": -32010,
+    "message": "Task 'deploy' is not allowlisted for MCP execution",
+    "data": "Ask a human to grant MCP access to this task"
+  }
+}
 ```
-**Result**
+
+**RunnerUnavailable Error**
 ```json
-{ "ok": true }
+{
+  "error": {
+    "code": -32011,
+    "message": "Runner 'make' is not available for task 'build'",
+    "data": "Install make: brew install make (macOS) or apt-get install make (Ubuntu)"
+  }
+}
 ```
+
+**TaskNotFound Error**
+```json
+{
+  "error": {
+    "code": -32012,
+    "message": "Task 'nonexistent-task' not found",
+    "data": "Use 'list_tasks' to see available tasks"
+  }
+}
+```
+
+**Internal Error**
+```json
+{
+  "error": {
+    "code": -32603,
+    "message": "Failed to start process: No such file or directory",
+    "data": "Check if the command and arguments are valid"
+  }
+}
+```
+
+### Phase 2 Tools (Not Yet Implemented)
+- **task_status** - Return status for running instances of a given unique_name
+- **task_output** - Return the last N lines of output for a PID
+- **task_stop** - Stop a running task by PID
 
 ⸻
 
@@ -200,81 +308,59 @@ pub struct StartResultDto {
 
 ⸻
 
-## Server layout (skeleton)
+## Server Implementation
 
-// src/mcp/server.rs
-use rmcp::{tool, tool_router, ServerHandler, model::*, service::{RequestContext, RoleServer}};
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
-use tokio::{process::Command, io::{AsyncBufReadExt, BufReader}};
-use tokio::sync::{Mutex, RwLock};
-use crate::{task_discovery, runner, allowlist, types};
+The MCP server is implemented in `src/mcp/server.rs` with the following key components:
 
-#[derive(Clone)]
+### Core Structure
+```rust
 pub struct DelaMcpServer {
-  root: PathBuf,
-  jobs: Arc<RwLock<HashMap<i32, Job>>>, // PID → Job { child_handle, ring_buffer, started_at, ... }
-}
-
-#[tool_router]
-impl DelaMcpServer {
-  #[tool(description="List tasks")]
-  pub async fn list_tasks(&self, Parameters(ListArgs{ runner }): Parameters<ListArgs>)
-    -> Result<CallToolResult, ErrorData> {
-    let d = task_discovery::discover_tasks(&self.root);
-    let mut tasks = d.tasks;
-    if let Some(r) = runner { tasks.retain(|t| t.runner.short_name()==r); }
-    // compute command, runner_available, allowlisted
-    let dtos: Vec<TaskDto> = tasks.iter().map(TaskDto::from_task_enriched(/* runner_available, allowlisted */)).collect();
-    Ok(CallToolResult::success(vec![Content::json(&serde_json::json!({ "tasks": dtos }))]))
-  }
-
-  #[tool(description="List all running tasks with PIDs")]
-  pub async fn status(&self) -> Result<CallToolResult, ErrorData> {
-    let running = self.snapshot_running().await; // Vec<RunningTaskDto>
-    Ok(CallToolResult::success(vec![Content::json(&serde_json::json!({ "running": running }))]))
-  }
-
-  #[tool(description="Start a task (≤1s capture, then background)")]
-  pub async fn task_start(&self, Parameters(StartArgs{ unique_name, args, env, cwd }): Parameters<StartArgs>)
-    -> Result<CallToolResult, ErrorData> {
-    self.ensure_allowlisted(&unique_name, &cwd, &args, &env)?; // NotAllowlisted error otherwise
-    let result = self.start_with_first_second_capture(unique_name, args.unwrap_or_default(), env, cwd).await?;
-    Ok(CallToolResult::success(vec![Content::json(&serde_json::to_value(result).unwrap())]))
-  }
-
-  #[tool(description="Status for a single unique_name (may have multiple PIDs)")]
-  pub async fn task_status(&self, Parameters(TaskStatusArgs{ unique_name }): Parameters<TaskStatusArgs>)
-    -> Result<CallToolResult, ErrorData> {
-    let running = self.snapshot_running_by_unique_name(&unique_name).await;
-    Ok(CallToolResult::success(vec![Content::json(&serde_json::json!({ "running": running }))]))
-  }
-
-  #[tool(description="Tail last N lines for a PID")]
-  pub async fn task_output(&self, Parameters(TaskOutputArgs{ pid, last }): Parameters<TaskOutputArgs>)
-    -> Result<CallToolResult, ErrorData> {
-    let (lines, truncated) = self.tail_output(pid, last.unwrap_or(200)).await?;
-    Ok(CallToolResult::success(vec![Content::json(&serde_json::json!({ "lines": lines, "truncated": truncated }))]))
-  }
-
-  #[tool(description="Stop a PID with graceful timeout")]
-  pub async fn task_stop(&self, Parameters(TaskStopArgs{ pid, grace_ms }): Parameters<TaskStopArgs>)
-    -> Result<CallToolResult, ErrorData> {
-    self.stop_job(pid, grace_ms.unwrap_or(5000)).await?;
-    Ok(CallToolResult::success(vec![Content::json(&serde_json::json!({ "ok": true }))]))
-  }
+    root: PathBuf,  // Working directory for task discovery
 }
 
 impl ServerHandler for DelaMcpServer {
-  fn get_info(&self) -> ServerInfo {
-    ServerInfo {
-      protocol_version: ProtocolVersion::V_2024_11_05,
-      capabilities: ServerCapabilities::builder().enable_tools().enable_logging().build(),
-      server_info: Implementation { name: "dela-mcp".into(), version: env!("CARGO_PKG_VERSION").into() },
-      instructions: Some("List tasks, start them (≤1s capture then background), and manage running tasks via PID; all execution gated by an MCP allowlist.".into()),
+    fn get_info(&self) -> ServerInfo {
+        ServerInfo {
+            protocol_version: ProtocolVersion::V_2024_11_05,
+            capabilities: ServerCapabilities::builder().enable_tools().build(),
+            server_info: Implementation { 
+                name: "dela-mcp".into(), 
+                version: env!("CARGO_PKG_VERSION").into() 
+            },
+            instructions: Some(
+                "List tasks, start them (≤1s capture then background), and manage running tasks via PID; all execution gated by an MCP allowlist.".into()
+            ),
+        }
     }
-  }
-  // (Phase 2) implement read_resource for job:// and joblog:// if we enable resources
 }
+```
+
+### Implemented Tools (Phase 10A)
+
+**list_tasks** - Lists all available tasks with enriched metadata
+- Filters by runner type if specified
+- Returns `TaskDto` objects with command, runner availability, and allowlist status
+- Handles task disambiguation (e.g., "test-m", "test-n")
+
+**status** - Returns running tasks (Phase 10A: empty array)
+- Currently returns empty array as background process management is not yet implemented
+- Will be enhanced in Phase 2 with actual running task tracking
+
+**task_start** - Starts a task with optional arguments, environment, and working directory
+- Validates task exists and is allowlisted
+- Checks runner availability
+- Captures output for first second, then backgrounds if still running
+- Returns `StartResultDto` with state, PID, exit code, and initial output
+
+### Error Handling
+- Uses structured error taxonomy with specific error codes
+- Provides helpful error messages and resolution hints
+- Follows JSON-RPC 2.0 error format
+
+### Phase 2 Tools (Not Yet Implemented)
+- **task_status** - Status for running instances of a specific task
+- **task_output** - Tail output for a running task by PID
+- **task_stop** - Stop a running task by PID
 
 ## Job runner internals
 - Spawn via `tokio::process::Command` with stdin closed; capture stdout/stderr.
