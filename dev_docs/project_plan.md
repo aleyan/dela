@@ -281,7 +281,7 @@ Implement the minimal surface so editors can start using MCP immediately for dis
   - Spawn the task, capture stdout/stderr up to **1s**
   - If exits ≤1s → return `{ state: "exited", exit_code, initial_output }`
   - If still running → return `{ state: "running", pid, initial_output }` **but do not persist/manage background yet** (documented limitation)
-- [ ] **[DTKT-164]** Implement **status** that returns an **empty array** in Quick phase (documented that background processes are unsupported yet)
+- [x] **[DTKT-164]** Implement **status** that returns an **empty array** in Quick phase (documented that background processes are unsupported yet)
 - [ ] **[DTKT-165]** Error taxonomy for **NotAllowlisted**, **RunnerUnavailable**, **TaskNotFound**
 - [ ] **[DTKT-166]** Unit tests for `list_tasks` enrichment and `task_start` quick path
 - [ ] **[DTKT-167]** CI smoke tests for MCP startup + quick start/exit flows

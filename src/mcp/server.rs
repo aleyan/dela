@@ -375,6 +375,10 @@ impl ServerHandler for DelaMcpServer {
                 })?;
                 self.list_tasks(Parameters(args)).await
             }
+            "status" => {
+                // Status tool takes no arguments
+                self.status().await
+            }
             "task_start" => {
                 let args: TaskStartArgs = serde_json::from_value(serde_json::Value::Object(
                     request.arguments.unwrap_or_default(),
@@ -516,11 +520,29 @@ impl ServerHandler for DelaMcpServer {
             serde_json::Value::Array(vec![serde_json::Value::String("unique_name".to_string())]),
         );
 
+        // Schema for status (no arguments)
+        let mut status_schema = Map::new();
+        status_schema.insert(
+            "type".to_string(),
+            serde_json::Value::String("object".to_string()),
+        );
+        status_schema.insert(
+            "properties".to_string(),
+            serde_json::Value::Object(Map::new()),
+        );
+
         let tools = vec![
             Tool {
                 name: "list_tasks".into(),
                 description: Some("List tasks".into()),
                 input_schema: Arc::new(list_tasks_schema),
+                annotations: None,
+                output_schema: None,
+            },
+            Tool {
+                name: "status".into(),
+                description: Some("List all running tasks with PIDs (Phase 10A: returns empty array - background processes not yet supported)".into()),
+                input_schema: Arc::new(status_schema),
                 annotations: None,
                 output_schema: None,
             },
@@ -572,6 +594,30 @@ mod tests {
 
         // Status should work (returns empty array in Phase 10A)
         assert!(server.status().await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_status_returns_empty_array() {
+        // Arrange
+        let temp_dir = std::env::temp_dir();
+        let server = DelaMcpServer::new(temp_dir);
+
+        // Act
+        let result = server.status().await.unwrap();
+
+        // Assert
+        assert_eq!(result.content.len(), 1);
+        let content = &result.content[0];
+        match &content.raw {
+            RawContent::Text(text_content) => {
+                let json: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
+                let obj = json.as_object().unwrap();
+                assert!(obj.contains_key("running"));
+                let running = obj["running"].as_array().unwrap();
+                assert_eq!(running.len(), 0, "Status should return empty array in Phase 10A");
+            }
+            _ => panic!("Expected text content with JSON"),
+        }
     }
 
     #[tokio::test]
