@@ -283,7 +283,7 @@ Implement the minimal surface so editors can start using MCP immediately for dis
   - If still running → return `{ state: "running", pid, initial_output }` **but do not persist/manage background yet** (documented limitation)
 - [x] **[DTKT-164]** Implement **status** that returns an **empty array** in Quick phase (documented that background processes are unsupported yet)
 - [x] **[DTKT-165]** Error taxonomy for **NotAllowlisted**, **RunnerUnavailable**, **TaskNotFound**
-- [ ] **[DTKT-166]** Unit tests for `list_tasks` enrichment and `task_start` quick path
+- [x] **[DTKT-166]** Unit tests for `list_tasks` enrichment and `task_start` quick path
 - [ ] **[DTKT-167]** Dockerized integeration tests for MCP startup + quick start/exit flows
 - [ ] **[DTKT-168]** Update `dev_docs/mcp_design.md` schemas and examples (this doc)
 - [ ] **[DTKT-169]** README: quick MCP usage snippet + Inspector command
