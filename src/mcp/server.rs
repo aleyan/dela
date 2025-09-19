@@ -1,4 +1,5 @@
 use super::dto::{ListTasksArgs, StartResultDto, TaskDto, TaskStartArgs};
+use super::errors::DelaError;
 use crate::allowlist::is_task_allowed;
 use crate::runner::is_runner_available;
 use crate::task_discovery;
@@ -39,10 +40,9 @@ impl DelaMcpServer {
         let transport = (stdin(), stdout());
         let server = self.serve(transport).await.map_err(|e| {
             eprintln!("MCP server startup error: {:?}", e);
-            ErrorData::new(
-                ErrorCode::INTERNAL_ERROR,
+            DelaError::internal_error(
                 format!("Failed to start MCP server: {}", e),
-                None,
+                Some("Check MCP configuration and transport setup".to_string()),
             )
         })?; // completes MCP initialize
         // Block until client disconnect / shutdown
@@ -107,32 +107,26 @@ impl DelaMcpServer {
                 let unique_name = t.disambiguated_name.as_ref().unwrap_or(&t.name);
                 unique_name == &args.unique_name
             })
-            .ok_or_else(|| ErrorData::new(ErrorCode::INVALID_PARAMS, "Task not found", None))?;
+            .ok_or_else(|| DelaError::task_not_found(args.unique_name.clone()))?;
 
         // Check if task is allowlisted
         let (is_allowed, _) = is_task_allowed(task).map_err(|e| {
-            ErrorData::new(
-                ErrorCode::INTERNAL_ERROR,
+            DelaError::internal_error(
                 format!("Allowlist check failed: {}", e),
-                None,
+                Some("Check allowlist configuration".to_string()),
             )
         })?;
 
         if !is_allowed {
-            return Err(ErrorData::new(
-                ErrorCode::INVALID_PARAMS,
-                "Task not allowlisted",
-                None,
-            ));
+            return Err(DelaError::not_allowlisted(args.unique_name.clone()).into());
         }
 
         // Check if runner is available
         if !is_runner_available(&task.runner) {
-            return Err(ErrorData::new(
-                ErrorCode::INVALID_PARAMS,
-                "Runner not available",
-                None,
-            ));
+            return Err(DelaError::runner_unavailable(
+                task.runner.short_name().to_string(),
+                args.unique_name.clone(),
+            ).into());
         }
 
         // Build the command
@@ -140,11 +134,10 @@ impl DelaMcpServer {
         let mut parts: Vec<&str> = full_command.split_whitespace().collect();
 
         if parts.is_empty() {
-            return Err(ErrorData::new(
-                ErrorCode::INTERNAL_ERROR,
-                "Empty command generated",
-                None,
-            ));
+            return Err(DelaError::internal_error(
+                "Empty command generated".to_string(),
+                Some("Check task definition and runner configuration".to_string()),
+            ).into());
         }
 
         let executable = parts.remove(0);
@@ -177,10 +170,9 @@ impl DelaMcpServer {
 
         // Start the process
         let mut child = cmd.spawn().map_err(|e| {
-            ErrorData::new(
-                ErrorCode::INTERNAL_ERROR,
+            DelaError::internal_error(
                 format!("Failed to start process: {}", e),
-                None,
+                Some("Check if the command and arguments are valid".to_string()),
             )
         })?;
 
@@ -266,10 +258,9 @@ impl DelaMcpServer {
             Err(_) => {
                 // Process completed within 1 second
                 let exit_status = child.wait().await.map_err(|e| {
-                    ErrorData::new(
-                        ErrorCode::INTERNAL_ERROR,
+                    DelaError::internal_error(
                         format!("Failed to wait for process: {}", e),
-                        None,
+                        Some("Process may have terminated unexpectedly".to_string()),
                     )
                 })?;
 
@@ -367,10 +358,9 @@ impl ServerHandler for DelaMcpServer {
                     request.arguments.unwrap_or_default(),
                 ))
                 .map_err(|e| {
-                    ErrorData::new(
-                        ErrorCode::INVALID_PARAMS,
+                    DelaError::internal_error(
                         format!("Invalid arguments: {}", e),
-                        None,
+                        Some("Check argument format and types".to_string()),
                     )
                 })?;
                 self.list_tasks(Parameters(args)).await
@@ -384,19 +374,17 @@ impl ServerHandler for DelaMcpServer {
                     request.arguments.unwrap_or_default(),
                 ))
                 .map_err(|e| {
-                    ErrorData::new(
-                        ErrorCode::INVALID_PARAMS,
+                    DelaError::internal_error(
                         format!("Invalid arguments: {}", e),
-                        None,
+                        Some("Check argument format and types".to_string()),
                     )
                 })?;
                 self.task_start(Parameters(args)).await
             }
-            _ => Err(ErrorData::new(
-                ErrorCode::METHOD_NOT_FOUND,
+            _ => Err(DelaError::internal_error(
                 format!("Tool not found: {}", request.name),
-                None,
-            )),
+                Some("Use 'list_tools' to see available tools".to_string()),
+            ).into()),
         }
     }
 
@@ -848,7 +836,67 @@ test:
         // Assert
         assert!(result.is_err());
         let error = result.unwrap_err();
-        assert!(error.message.contains("Task not found"));
+        assert!(error.message.contains("not found"));
+        assert!(error.message.contains("nonexistent-task"));
+        // Check that it's a TASK_NOT_FOUND error
+        assert_eq!(error.code.0, -32012);
+    }
+
+    #[tokio::test]
+    async fn test_error_taxonomy() {
+        use std::fs;
+        use tempfile::TempDir;
+
+        // Arrange - Create a test directory with a Makefile
+        let temp_dir = TempDir::new().unwrap();
+        let temp_path = temp_dir.path();
+        
+        let makefile_content = r#"build:
+	echo "Building"
+"#;
+        fs::write(temp_path.join("Makefile"), makefile_content).unwrap();
+
+        let server = DelaMcpServer::new(temp_path.to_path_buf());
+
+        // Test 1: TaskNotFound error
+        let args = Parameters(TaskStartArgs {
+            unique_name: "nonexistent-task".to_string(),
+            args: None,
+            env: None,
+            cwd: None,
+        });
+        let result = server.task_start(args).await;
+        assert!(result.is_err());
+        let error = result.unwrap_err();
+        assert_eq!(error.code.0, -32012); // TASK_NOT_FOUND
+        assert!(error.message.contains("not found"));
+        assert!(error.data.is_some());
+        assert!(error.data.unwrap().as_str().unwrap().contains("list_tasks"));
+
+        // Test 2: RunnerUnavailable error (simulate by using a non-existent runner)
+        // This is harder to test without mocking, so we'll test the error creation directly
+        let error = DelaError::runner_unavailable("make".to_string(), "build".to_string());
+        let error_data = error.to_error_data();
+        assert_eq!(error_data.code.0, -32011); // RUNNER_UNAVAILABLE
+        assert!(error_data.message.contains("Runner 'make' is not available"));
+        assert!(error_data.data.is_some());
+        assert!(error_data.data.unwrap().as_str().unwrap().contains("brew install make"));
+
+        // Test 3: NotAllowlisted error
+        let error = DelaError::not_allowlisted("build".to_string());
+        let error_data = error.to_error_data();
+        assert_eq!(error_data.code.0, -32010); // NOT_ALLOWLISTED
+        assert!(error_data.message.contains("not allowlisted"));
+        assert!(error_data.data.is_some());
+        assert!(error_data.data.unwrap().as_str().unwrap().contains("Ask a human"));
+
+        // Test 4: InternalError
+        let error = DelaError::internal_error("Test error".to_string(), Some("Test hint".to_string()));
+        let error_data = error.to_error_data();
+        assert_eq!(error_data.code.0, -32603); // INTERNAL_ERROR
+        assert!(error_data.message.contains("Test error"));
+        assert!(error_data.data.is_some());
+        assert_eq!(error_data.data.unwrap().as_str().unwrap(), "Test hint");
     }
 
     #[tokio::test]
