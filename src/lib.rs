@@ -5,6 +5,7 @@ pub mod builtins;
 pub mod colors;
 pub mod commands;
 pub mod environment;
+pub mod mcp;
 pub mod parsers;
 pub mod prompt;
 pub mod runner;

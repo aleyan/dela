@@ -26,6 +26,9 @@ test_unit: _builder
 test_noinit: _builder
 	VERBOSE=$(VERBOSE) ./tests/run_tests.sh noinit;
 
+test_mcp: _builder
+	VERBOSE=$(VERBOSE) ./tests/run_tests.sh mcp;
+
 test_zsh: _builder
 	VERBOSE=$(VERBOSE) ./tests/run_tests.sh zsh;
 
@@ -49,6 +52,13 @@ install:
 run:
 	@echo "Build and run dela binary with args"
 	cargo run $(ARGS)
+
+inspect_mcp:
+	@echo "Inspecting MCP server (debug build + stdio via Inspector)..."
+	@cargo build --quiet
+	# Avoid any stdout noise; Inspector expects clean MCP JSON-RPC on stdout.
+	MCPI_NO_COLOR=1 RUST_LOG=warn RUSTFLAGS="-A warnings" npx @modelcontextprotocol/inspector ./target/debug/dela mcp --cwd $(PWD)
+
 
 # Publish to crates.io
 publish: tests tests_integration

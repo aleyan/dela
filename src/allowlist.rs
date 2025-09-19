@@ -60,45 +60,72 @@ fn path_matches(task_path: &Path, allowlist_path: &Path, allow_subdirs: bool) ->
     }
 }
 
-/// Check if a given task is allowed, based on the loaded allowlist
-/// If the task is not in the allowlist, prompt the user for a decision
-pub fn check_task_allowed(task: &Task) -> Result<bool, String> {
+/// Check if a given task is explicitly allowed or denied by the allowlist
+/// Returns (explicitly_allowed, explicitly_denied) - both false means not found in allowlist
+/// This is the core allowlist checking logic without any prompting or persistence
+pub fn is_task_allowed(task: &Task) -> Result<(bool, bool), String> {
     // Only proceed with allowlist operations if dela is initialized
-    let mut allowlist = load_allowlist()?;
+    let allowlist = load_allowlist()?;
 
-    // Check each entry to see if it matches
+    // First pass: Check for deny entries (highest precedence)
+    for entry in &allowlist.entries {
+        if let AllowScope::Deny = entry.scope {
+            if path_matches(&task.file_path, &entry.path, true) {
+                return Ok((false, true));
+            }
+        }
+    }
+
+    // Second pass: Check for allow entries
     for entry in &allowlist.entries {
         match entry.scope {
-            AllowScope::Deny => {
-                if path_matches(&task.file_path, &entry.path, true) {
-                    return Ok(false);
-                }
-            }
             AllowScope::Directory => {
                 if path_matches(&task.file_path, &entry.path, true) {
-                    return Ok(true);
+                    return Ok((true, false));
                 }
             }
             AllowScope::File => {
                 if path_matches(&task.file_path, &entry.path, false) {
-                    return Ok(true);
+                    return Ok((true, false));
                 }
             }
             AllowScope::Task => {
                 if path_matches(&task.file_path, &entry.path, false) {
                     if let Some(ref tasks) = entry.tasks {
                         if tasks.contains(&task.name) {
-                            return Ok(true);
+                            return Ok((true, false));
                         }
                     }
                 }
             }
-            AllowScope::Once => {
-                // Once is ephemeral and not stored in the allowlist
+            AllowScope::Deny | AllowScope::Once => {
+                // Already handled deny in first pass, skip Once
                 continue;
             }
         }
     }
+
+    // If no matching entry found, return (false, false) - not found
+    Ok((false, false))
+}
+
+/// Check if a given task is allowed, based on the loaded allowlist
+/// If the task is not in the allowlist, prompt the user for a decision
+pub fn check_task_allowed(task: &Task) -> Result<bool, String> {
+    // Check if task is explicitly allowed or denied
+    let (explicitly_allowed, explicitly_denied) = is_task_allowed(task)?;
+
+    if explicitly_denied {
+        return Ok(false);
+    }
+    if explicitly_allowed {
+        return Ok(true);
+    }
+
+    // Task not found in allowlist, prompt the user
+
+    // Only proceed with allowlist operations if dela is initialized
+    let mut allowlist = load_allowlist()?;
 
     // If no matching entry found, prompt the user
     match prompt::prompt_for_task(task)? {
@@ -262,5 +289,164 @@ mod tests {
         // Directory match with subdirs
         assert!(path_matches(&file, &base, true));
         assert!(path_matches(&subdir, &base, true));
+    }
+
+    #[test]
+    #[serial]
+    fn test_is_task_allowed_empty_allowlist() {
+        let (_temp_dir, task) = setup_test_env();
+
+        // With empty allowlist, task should return (false, false) - not found
+        assert_eq!(is_task_allowed(&task).unwrap(), (false, false));
+
+        reset_to_real_environment();
+    }
+
+    #[test]
+    #[serial]
+    fn test_is_task_allowed_file_scope() {
+        let (temp_dir, task) = setup_test_env();
+
+        // Create allowlist with file scope
+        let mut allowlist = Allowlist::default();
+        let entry = AllowlistEntry {
+            path: PathBuf::from("Makefile"),
+            scope: AllowScope::File,
+            tasks: None,
+        };
+        allowlist.entries.push(entry);
+        save_allowlist(&allowlist).unwrap();
+
+        // Task should be allowed
+        assert_eq!(is_task_allowed(&task).unwrap(), (true, false));
+
+        drop(temp_dir);
+        reset_to_real_environment();
+    }
+
+    #[test]
+    #[serial]
+    fn test_is_task_allowed_task_scope() {
+        let (temp_dir, task) = setup_test_env();
+
+        // Create allowlist with task scope for specific task
+        let mut allowlist = Allowlist::default();
+        let entry = AllowlistEntry {
+            path: PathBuf::from("Makefile"),
+            scope: AllowScope::Task,
+            tasks: Some(vec!["test-task".to_string()]),
+        };
+        allowlist.entries.push(entry);
+        save_allowlist(&allowlist).unwrap();
+
+        // Task should be allowed
+        assert_eq!(is_task_allowed(&task).unwrap(), (true, false));
+
+        // Create a different task that should not be found
+        let other_task = create_test_task("other-task", PathBuf::from("Makefile"));
+        assert_eq!(is_task_allowed(&other_task).unwrap(), (false, false));
+
+        drop(temp_dir);
+        reset_to_real_environment();
+    }
+
+    #[test]
+    #[serial]
+    fn test_is_task_allowed_directory_scope() {
+        let (temp_dir, _task) = setup_test_env();
+
+        // Create allowlist with directory scope
+        let mut allowlist = Allowlist::default();
+        let entry = AllowlistEntry {
+            path: PathBuf::from("/project"),
+            scope: AllowScope::Directory,
+            tasks: None,
+        };
+        allowlist.entries.push(entry);
+        save_allowlist(&allowlist).unwrap();
+
+        // Task in subdirectory should be allowed
+        let subdir_task = create_test_task("build", PathBuf::from("/project/subdir/Makefile"));
+        assert_eq!(is_task_allowed(&subdir_task).unwrap(), (true, false));
+
+        // Task outside directory should not be found
+        let outside_task = create_test_task("build", PathBuf::from("/other/Makefile"));
+        assert_eq!(is_task_allowed(&outside_task).unwrap(), (false, false));
+
+        drop(temp_dir);
+        reset_to_real_environment();
+    }
+
+    #[test]
+    #[serial]
+    fn test_is_task_allowed_deny_scope() {
+        let (temp_dir, task) = setup_test_env();
+
+        // Create allowlist with deny scope
+        let mut allowlist = Allowlist::default();
+        let entry = AllowlistEntry {
+            path: PathBuf::from("Makefile"),
+            scope: AllowScope::Deny,
+            tasks: None,
+        };
+        allowlist.entries.push(entry);
+        save_allowlist(&allowlist).unwrap();
+
+        // Task should be denied
+        assert_eq!(is_task_allowed(&task).unwrap(), (false, true));
+
+        drop(temp_dir);
+        reset_to_real_environment();
+    }
+
+    #[test]
+    #[serial]
+    fn test_is_task_allowed_precedence() {
+        let (temp_dir, task) = setup_test_env();
+
+        // Create allowlist with both allow and deny entries
+        // Deny should take precedence when both match
+        let mut allowlist = Allowlist::default();
+
+        // First add an allow entry
+        let allow_entry = AllowlistEntry {
+            path: PathBuf::from("Makefile"),
+            scope: AllowScope::File,
+            tasks: None,
+        };
+        allowlist.entries.push(allow_entry);
+
+        // Then add a deny entry for the same path
+        let deny_entry = AllowlistEntry {
+            path: PathBuf::from("Makefile"),
+            scope: AllowScope::Deny,
+            tasks: None,
+        };
+        allowlist.entries.push(deny_entry);
+
+        save_allowlist(&allowlist).unwrap();
+
+        // Task should be denied (deny takes precedence)
+        assert_eq!(is_task_allowed(&task).unwrap(), (false, true));
+
+        drop(temp_dir);
+        reset_to_real_environment();
+    }
+
+    #[test]
+    #[serial]
+    fn test_is_task_allowed_uninitialized() {
+        // Set up environment without .dela directory
+        let temp_dir = TempDir::new().unwrap();
+        let test_env = TestEnvironment::new().with_home(temp_dir.path().to_string_lossy());
+        set_test_environment(test_env);
+
+        let task = create_test_task("test-task", PathBuf::from("Makefile"));
+
+        // Task should return error when dela is not initialized
+        assert!(is_task_allowed(&task).is_err());
+
+        drop(temp_dir);
+        reset_to_real_environment();
     }
 }
