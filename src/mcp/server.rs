@@ -15,7 +15,7 @@ use rmcp::{
     tool,
 };
 use std::path::PathBuf;
-use tokio::io::{stdin, stdout, AsyncReadExt};
+use tokio::io::{AsyncReadExt, stdin, stdout};
 use tokio::process::Command;
 use tokio::time::{Duration, timeout};
 
@@ -238,7 +238,6 @@ impl DelaMcpServer {
             let stdout_handle = child.stdout.take();
             let stderr_handle = child.stderr.take();
 
-
             // Read from both stdout and stderr concurrently with proper timeout handling
             let stdout_task = if let Some(mut stdout) = stdout_handle {
                 tokio::spawn(async move {
@@ -256,7 +255,9 @@ impl DelaMcpServer {
                             }
                         }
                         output
-                    }).await {
+                    })
+                    .await
+                    {
                         Ok(output) => output,
                         Err(_) => String::new(), // Timeout or error
                     }
@@ -281,7 +282,9 @@ impl DelaMcpServer {
                             }
                         }
                         output
-                    }).await {
+                    })
+                    .await
+                    {
                         Ok(output) => output,
                         Err(_) => String::new(), // Timeout or error
                     }
@@ -481,7 +484,7 @@ impl DelaMcpServer {
         let lines = job.get_output_lines(Some(requested_lines));
         let total_lines = job.output_buffer.len();
         let total_bytes = job.output_buffer.total_bytes();
-        
+
         // Check if output was truncated
         let is_truncated = total_lines > requested_lines;
         let buffer_full = job.output_buffer.is_full();
@@ -516,43 +519,48 @@ impl DelaMcpServer {
                 // Try to fit as many lines as possible within the limit
                 let mut truncated_lines = Vec::new();
                 let mut current_size = 0;
-                
+
                 for line in &lines {
                     let line_json = serde_json::to_string(line).unwrap_or_default();
-                    if current_size + line_json.len() + 100 < MAX_CHUNK_SIZE { // 100 bytes buffer for JSON structure
+                    if current_size + line_json.len() + 100 < MAX_CHUNK_SIZE {
+                        // 100 bytes buffer for JSON structure
                         truncated_lines.push(line.clone());
                         current_size += line_json.len();
                     } else {
                         break;
                     }
                 }
-                
+
                 if truncated_lines.is_empty() && !lines.is_empty() {
                     // If even one line is too big, truncate it
                     let first_line = &lines[0];
                     let mut truncated_line = first_line.clone();
-                    if truncated_line.len() > MAX_CHUNK_SIZE - 200 { // 200 bytes buffer
+                    if truncated_line.len() > MAX_CHUNK_SIZE - 200 {
+                        // 200 bytes buffer
                         truncated_line.truncate(MAX_CHUNK_SIZE - 200);
                         truncated_line.push_str("... [truncated]");
                     }
                     truncated_lines.push(truncated_line);
                 }
-                
+
                 truncated_lines
             } else {
                 lines
             };
 
             response["lines"] = serde_json::Value::Array(
-                truncated_lines.into_iter().map(|line| serde_json::Value::String(line)).collect()
+                truncated_lines
+                    .into_iter()
+                    .map(|line| serde_json::Value::String(line))
+                    .collect(),
             );
             response["chunk_truncated"] = serde_json::Value::Bool(true);
-            response["max_chunk_size"] = serde_json::Value::Number(serde_json::Number::from(MAX_CHUNK_SIZE));
+            response["max_chunk_size"] =
+                serde_json::Value::Number(serde_json::Number::from(MAX_CHUNK_SIZE));
         }
 
         Ok(CallToolResult::success(vec![
-            Content::json(&response)
-                .expect("Failed to serialize JSON"),
+            Content::json(&response).expect("Failed to serialize JSON"),
         ]))
     }
 
@@ -578,21 +586,27 @@ impl DelaMcpServer {
 
         // Stop the job gracefully with TERM + grace + KILL
         let grace_period = args.grace_period.unwrap_or(5); // Default 5 seconds
-        let stop_result = self.job_manager.stop_job_graceful(args.pid, grace_period).await.map_err(|e| {
-            DelaError::internal_error(
-                format!("Failed to stop job: {}", e),
-                Some("Job management error".to_string()),
-            )
-        })?;
+        let stop_result = self
+            .job_manager
+            .stop_job_graceful(args.pid, grace_period)
+            .await
+            .map_err(|e| {
+                DelaError::internal_error(
+                    format!("Failed to stop job: {}", e),
+                    Some("Job management error".to_string()),
+                )
+            })?;
 
         // Determine the response based on how the job was stopped
         let (status, message) = match stop_result {
-            crate::mcp::job_manager::StopResult::Graceful(exit_code) => {
-                ("stopped_gracefully", format!("Process stopped gracefully with exit code {}", exit_code))
-            }
-            crate::mcp::job_manager::StopResult::Forced => {
-                ("stopped_forced", "Process was force-killed after grace period".to_string())
-            }
+            crate::mcp::job_manager::StopResult::Graceful(exit_code) => (
+                "stopped_gracefully",
+                format!("Process stopped gracefully with exit code {}", exit_code),
+            ),
+            crate::mcp::job_manager::StopResult::Forced => (
+                "stopped_forced",
+                "Process was force-killed after grace period".to_string(),
+            ),
             crate::mcp::job_manager::StopResult::Failed(reason) => {
                 ("stop_failed", format!("Failed to stop process: {}", reason))
             }
@@ -920,7 +934,9 @@ impl ServerHandler for DelaMcpServer {
         );
         task_output_truncation_prop.insert(
             "description".to_string(),
-            serde_json::Value::String("Whether to include detailed truncation information (default: false)".to_string()),
+            serde_json::Value::String(
+                "Whether to include detailed truncation information (default: false)".to_string(),
+            ),
         );
         task_output_properties.insert(
             "show_truncation".to_string(),
@@ -962,7 +978,9 @@ impl ServerHandler for DelaMcpServer {
         );
         task_stop_grace_prop.insert(
             "description".to_string(),
-            serde_json::Value::String("Grace period in seconds before sending SIGKILL (default: 5)".to_string()),
+            serde_json::Value::String(
+                "Grace period in seconds before sending SIGKILL (default: 5)".to_string(),
+            ),
         );
         task_stop_properties.insert(
             "grace_period".to_string(),
@@ -1063,7 +1081,7 @@ mod tests {
             lines: Some(10),
             show_truncation: None,
         };
-        let stop_args = TaskStopArgs { 
+        let stop_args = TaskStopArgs {
             pid: 12345,
             grace_period: None,
         };
@@ -1451,7 +1469,10 @@ mod tests {
         // Add some output to the job
         server
             .job_manager
-            .add_job_output(pid as u32, "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n".to_string())
+            .add_job_output(
+                pid as u32,
+                "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n".to_string(),
+            )
             .await
             .unwrap();
 
@@ -1475,7 +1496,7 @@ mod tests {
                 assert!(obj["lines"].is_array());
                 assert_eq!(obj["total_lines"], 5);
                 assert_eq!(obj["truncated"], true);
-                
+
                 // Check truncation info is present
                 assert!(obj.contains_key("truncation_info"));
                 let truncation_info = &obj["truncation_info"];
@@ -1547,7 +1568,7 @@ mod tests {
                 assert!(obj["lines"].is_array());
                 assert_eq!(obj["total_lines"], 2);
                 assert_eq!(obj["truncated"], false); // No truncation since we have fewer lines than requested
-                
+
                 // Check truncation info is present
                 assert!(obj.contains_key("truncation_info"));
                 let truncation_info = &obj["truncation_info"];
@@ -1766,7 +1787,7 @@ mod tests {
             gc_interval_seconds: 300,
         };
         let job_manager = crate::mcp::job_manager::JobManager::with_config(config);
-        
+
         // Start jobs up to the limit
         let metadata = crate::mcp::job_manager::JobMetadata {
             started_at: std::time::Instant::now(),
@@ -1787,7 +1808,10 @@ mod tests {
         let child1 = cmd1.spawn().unwrap();
         let pid1 = child1.id().unwrap();
 
-        job_manager.start_job(pid1 as u32, metadata.clone(), child1).await.unwrap();
+        job_manager
+            .start_job(pid1 as u32, metadata.clone(), child1)
+            .await
+            .unwrap();
 
         // Start second job
         let mut cmd2 = tokio::process::Command::new("echo");
@@ -1797,7 +1821,10 @@ mod tests {
         let child2 = cmd2.spawn().unwrap();
         let pid2 = child2.id().unwrap();
 
-        job_manager.start_job(pid2 as u32, metadata.clone(), child2).await.unwrap();
+        job_manager
+            .start_job(pid2 as u32, metadata.clone(), child2)
+            .await
+            .unwrap();
 
         // Try to start third job - should fail
         let mut cmd3 = tokio::process::Command::new("echo");
@@ -1872,13 +1899,13 @@ mod tests {
             RawContent::Text(text_content) => {
                 let json: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
                 let obj = json.as_object().unwrap();
-                
+
                 // Should have chunk truncation info
                 assert!(obj.contains_key("chunk_truncated"));
                 assert_eq!(obj["chunk_truncated"], true);
                 assert!(obj.contains_key("max_chunk_size"));
                 assert_eq!(obj["max_chunk_size"], 8192); // 8KB
-                
+
                 // Lines should be present (may or may not be truncated depending on implementation)
                 let lines = obj["lines"].as_array().unwrap();
                 assert_eq!(lines.len(), 1);

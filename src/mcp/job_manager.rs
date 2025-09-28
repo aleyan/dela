@@ -362,7 +362,11 @@ impl JobManager {
     }
 
     /// Gracefully stop a job (SIGTERM + grace period + SIGKILL)
-    pub async fn stop_job_graceful(&self, pid: u32, grace_period_seconds: u64) -> Result<StopResult, String> {
+    pub async fn stop_job_graceful(
+        &self,
+        pid: u32,
+        grace_period_seconds: u64,
+    ) -> Result<StopResult, String> {
         use tokio::time::{Duration, timeout};
 
         // First, try to get the process from our managed processes
@@ -403,7 +407,7 @@ impl JobManager {
                 Err(_) => {
                     // Grace period expired, send SIGKILL
                     drop(processes); // Release the lock before trying to kill
-                    
+
                     // Try to kill the process using system kill command
                     let kill_result = tokio::process::Command::new("kill")
                         .arg("-9")
@@ -417,7 +421,9 @@ impl JobManager {
                                 // Update job state to stopped
                                 let mut jobs = self.jobs.write().await;
                                 if let Some(job) = jobs.get_mut(&pid) {
-                                    job.mark_failed("Stopped with SIGKILL after grace period".to_string());
+                                    job.mark_failed(
+                                        "Stopped with SIGKILL after grace period".to_string(),
+                                    );
                                 }
                                 Ok(StopResult::Forced)
                             } else {
@@ -435,7 +441,10 @@ impl JobManager {
                             if let Some(job) = jobs.get_mut(&pid) {
                                 job.mark_failed(format!("Failed to execute kill command: {}", e));
                             }
-                            Ok(StopResult::Failed(format!("Failed to execute kill command: {}", e)))
+                            Ok(StopResult::Failed(format!(
+                                "Failed to execute kill command: {}",
+                                e
+                            )))
                         }
                     }
                 }

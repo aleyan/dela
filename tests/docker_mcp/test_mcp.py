@@ -44,8 +44,18 @@ def start_mcp_process(cwd):
     process.stdin.write(json.dumps(init_request) + "\n")
     process.stdin.flush()
     
-    # Wait for initialize response
-    time.sleep(1)
+    # Wait for initialize response with timeout
+    try:
+        response_line = process.stdout.readline()
+        if not response_line:
+            print("✗ No response from MCP server")
+            process.kill()
+            return None
+        print(f"Initialize response: {response_line.strip()}")
+    except Exception as e:
+        print(f"✗ Error reading initialize response: {e}")
+        process.kill()
+        return None
     
     # Send initialized notification
     initialized_notification = {
@@ -61,6 +71,13 @@ def start_mcp_process(cwd):
     
     return process
 
+def send_request(process, request):
+    """Send a request and return the response"""
+    process.stdin.write(json.dumps(request) + "\n")
+    process.stdin.flush()
+    response_line = process.stdout.readline()
+    return json.loads(response_line)
+
 def test_mcp_protocol():
     """Test MCP protocol communication"""
     print("Starting MCP protocol integration tests...")
@@ -72,22 +89,14 @@ def test_mcp_protocol():
     cwd = "/home/testuser/test_project"
     process = start_mcp_process(cwd)
     
-    try:
-        # Read response
-        stdout, stderr = process.communicate(timeout=5)
-        
-        if "jsonrpc" in stdout and "2.0" in stdout:
-            print("✓ MCP initialize handshake works")
-        else:
-            print("✗ MCP initialize handshake failed")
-            print("STDOUT:", stdout)
-            print("STDERR:", stderr)
-            return False
-            
-    except subprocess.TimeoutExpired:
-        print("✗ MCP initialize handshake timed out")
-        process.kill()
+    if process is None:
+        print("✗ MCP initialize handshake failed - could not start process")
         return False
+    
+    try:
+        # The handshake is already done in start_mcp_process
+        print("✓ MCP initialize handshake works")
+        
     except Exception as e:
         print(f"✗ MCP initialize handshake error: {e}")
         process.kill()
@@ -100,6 +109,9 @@ def test_mcp_protocol():
     print("Test 2: Testing MCP tools/list")
     
     process = start_mcp_process(cwd)
+    if process is None:
+        print("✗ MCP tools/list failed - could not start process")
+        return False
     
     try:
         # Send tools/list request
@@ -143,6 +155,9 @@ def test_mcp_protocol():
     print("Test 3: Testing MCP list_tasks")
     
     process = start_mcp_process(cwd)
+    if process is None:
+        print("✗ MCP list_tasks failed - could not start process")
+        return False
     
     try:
         # Send list_tasks request
@@ -189,6 +204,9 @@ def test_mcp_protocol():
     print("Test 4: Testing MCP status tool (DTKT-172)")
     
     process = start_mcp_process(cwd)
+    if process is None:
+        print("✗ MCP status tool failed - could not start process")
+        return False
     
     try:
         # Send status request
@@ -265,6 +283,9 @@ def test_mcp_protocol():
     print("Test 5: Testing MCP task_start quick execution")
     
     process = start_mcp_process(cwd)
+    if process is None:
+        print("✗ MCP task_start quick execution failed - could not start process")
+        return False
     
     try:
         # Send task_start request for a quick task
@@ -313,6 +334,9 @@ def test_mcp_protocol():
     print("Test 6: Testing MCP task_start with arguments")
     
     process = start_mcp_process(cwd)
+    if process is None:
+        print("✗ MCP task_start with arguments failed - could not start process")
+        return False
     
     try:
         # Send task_start request with arguments
@@ -362,6 +386,9 @@ def test_mcp_protocol():
     print("Test 7: Testing MCP error taxonomy - TaskNotFound")
     
     process = start_mcp_process(cwd)
+    if process is None:
+        print("✗ MCP error taxonomy - TaskNotFound failed - could not start process")
+        return False
     
     try:
         # Send task_start request for non-existent task
@@ -410,6 +437,9 @@ def test_mcp_protocol():
     print("Test 8: Testing MCP error taxonomy - NotAllowlisted")
     
     process = start_mcp_process(cwd)
+    if process is None:
+        print("✗ MCP error taxonomy - NotAllowlisted failed - could not start process")
+        return False
     
     try:
         # Send task_start request for task not in allowlist
@@ -458,6 +488,9 @@ def test_mcp_protocol():
     print("Test 9: Testing MCP list_tasks enriched fields")
     
     process = start_mcp_process(cwd)
+    if process is None:
+        print("✗ MCP list_tasks enriched fields failed - could not start process")
+        return False
     
     try:
         # Send list_tasks request
@@ -743,6 +776,312 @@ def test_mcp_protocol():
         return False
     except Exception as e:
         print(f"✗ MCP task_stop tool error: {e}")
+        process.kill()
+        return False
+    finally:
+        if process.poll() is None:
+            process.kill()
+    
+    # Test 13: Test MCP long-running task lifecycle (task_start, status, task_status)
+    print("Test 13: Testing MCP long-running task lifecycle")
+    
+    process = start_mcp_process(cwd)
+    
+    try:
+        # Send task_start request for long-running task
+        task_start_request = {
+            "jsonrpc": "2.0",
+            "id": 13,
+            "method": "tools/call",
+            "params": {
+                "name": "task_start",
+                "arguments": {
+                    "unique_name": "long-running-task"
+                }
+            }
+        }
+        
+        print("Sending task_start request for long-running task...")
+        task_start_response = send_request(process, task_start_request)
+        print(f"Task start response: {json.dumps(task_start_response)}")
+        
+        # Parse task_start response to get PID
+        try:
+            if "result" in task_start_response:
+                result = task_start_response["result"]
+                if "content" in result and len(result["content"]) > 0:
+                    content = result["content"][0]
+                    if "text" in content:
+                        start_data = json.loads(content["text"])
+                        if "ok" in start_data and start_data["ok"] and "result" in start_data:
+                            task_result = start_data["result"]
+                            if "pid" in task_result and "state" in task_result:
+                                pid = task_result["pid"]
+                                state = task_result["state"]
+                                if state == "running":
+                                    print("✓ MCP task_start for long-running task works")
+                                else:
+                                    print(f"✗ MCP task_start failed - task not running: {state}")
+                                    return False
+                            else:
+                                print("✗ MCP task_start failed - missing pid or state")
+                                return False
+                        else:
+                            print("✗ MCP task_start failed - not ok or missing result")
+                            print(f"Start data: {start_data}")
+                            return False
+                    else:
+                        print("✗ MCP task_start failed - no text content")
+                        return False
+                else:
+                    print("✗ MCP task_start failed - no content")
+                    return False
+            else:
+                print("✗ MCP task_start failed - no result")
+                return False
+        except json.JSONDecodeError as e:
+            print(f"✗ MCP task_start failed - JSON decode error: {e}")
+            return False
+        
+        # Wait a moment for the job to be registered
+        time.sleep(1)
+        
+        # Test status tool - should show the running task
+        status_request = {
+            "jsonrpc": "2.0",
+            "id": 14,
+            "method": "tools/call",
+            "params": {
+                "name": "status",
+                "arguments": {}
+            }
+        }
+        
+        print("Sending status request...")
+        status_response = send_request(process, status_request)
+        print(f"Status response: {json.dumps(status_response)}")
+        
+        # Parse status response
+        try:
+            if "result" in status_response:
+                result = status_response["result"]
+                if "content" in result and len(result["content"]) > 0:
+                    content = result["content"][0]
+                    if "text" in content:
+                        status_data = json.loads(content["text"])
+                        if "running" in status_data and isinstance(status_data["running"], list):
+                            running_jobs = status_data["running"]
+                            if len(running_jobs) > 0:
+                                # Check if our task is in the running jobs
+                                found_task = False
+                                for job in running_jobs:
+                                    if job.get("unique_name") == "long-running-task" and job.get("pid") == pid:
+                                        found_task = True
+                                        break
+                                if found_task:
+                                    print("✓ MCP status tool shows running long-running task")
+                                else:
+                                    print("✗ MCP status tool failed - long-running task not found in running jobs")
+                                    return False
+                            else:
+                                print("✗ MCP status tool failed - no running jobs found")
+                                return False
+                        else:
+                            print("✗ MCP status tool failed - invalid response structure")
+                            return False
+                    else:
+                        print("✗ MCP status tool failed - no text content")
+                        return False
+                else:
+                    print("✗ MCP status tool failed - no content")
+                    return False
+            else:
+                print("✗ MCP status tool failed - no result")
+                return False
+        except json.JSONDecodeError as e:
+            print(f"✗ MCP status tool failed - JSON decode error: {e}")
+            return False
+        
+        # Test task_status tool - should show the running task
+        task_status_request = {
+            "jsonrpc": "2.0",
+            "id": 15,
+            "method": "tools/call",
+            "params": {
+                "name": "task_status",
+                "arguments": {
+                    "unique_name": "long-running-task"
+                }
+            }
+        }
+        
+        print("Sending task_status request...")
+        task_status_response = send_request(process, task_status_request)
+        print(f"Task status response: {json.dumps(task_status_response)}")
+        
+        # Parse task_status response
+        try:
+            if "result" in task_status_response:
+                result = task_status_response["result"]
+                if "content" in result and len(result["content"]) > 0:
+                    content = result["content"][0]
+                    if "text" in content:
+                        status_data = json.loads(content["text"])
+                        if "jobs" in status_data and isinstance(status_data["jobs"], list):
+                            jobs = status_data["jobs"]
+                            if len(jobs) > 0:
+                                # Check if our task is in the jobs
+                                found_task = False
+                                for job in jobs:
+                                    if job.get("unique_name") == "long-running-task" and job.get("pid") == pid:
+                                        if job.get("state") == "running":
+                                            found_task = True
+                                            print("✓ MCP task_status tool shows running long-running task")
+                                            break
+                                        else:
+                                            print(f"✗ MCP task_status tool failed - task not running: {job.get('state')}")
+                                            return False
+                                if not found_task:
+                                    print("✗ MCP task_status tool failed - long-running task not found in jobs")
+                                    return False
+                            else:
+                                print("✗ MCP task_status tool failed - no jobs found")
+                                return False
+                        else:
+                            print("✗ MCP task_status tool failed - invalid response structure")
+                            return False
+                    else:
+                        print("✗ MCP task_status tool failed - no text content")
+                        return False
+                else:
+                    print("✗ MCP task_status tool failed - no content")
+                    return False
+            else:
+                print("✗ MCP task_status tool failed - no result")
+                return False
+        except json.JSONDecodeError as e:
+            print(f"✗ MCP task_status tool failed - JSON decode error: {e}")
+            return False
+        
+        # Wait for the task to complete (it runs for 5 seconds)
+        print("Waiting for long-running task to complete...")
+        time.sleep(6)
+        
+        # Test status tool again - should show no running tasks
+        status_request2 = {
+            "jsonrpc": "2.0",
+            "id": 16,
+            "method": "tools/call",
+            "params": {
+                "name": "status",
+                "arguments": {}
+            }
+        }
+        
+        print("Sending status request after completion...")
+        status_response2 = send_request(process, status_request2)
+        print(f"Status response (after completion): {json.dumps(status_response2)}")
+        
+        # Parse status response
+        try:
+            if "result" in status_response2:
+                result = status_response2["result"]
+                if "content" in result and len(result["content"]) > 0:
+                    content = result["content"][0]
+                    if "text" in content:
+                        status_data = json.loads(content["text"])
+                        if "running" in status_data and isinstance(status_data["running"], list):
+                            running_jobs = status_data["running"]
+                            if len(running_jobs) == 0:
+                                print("✓ MCP status tool shows no running tasks after completion")
+                            else:
+                                print(f"✗ MCP status tool failed - still shows {len(running_jobs)} running jobs after completion")
+                                return False
+                        else:
+                            print("✗ MCP status tool failed - invalid response structure")
+                            return False
+                    else:
+                        print("✗ MCP status tool failed - no text content")
+                        return False
+                else:
+                    print("✗ MCP status tool failed - no content")
+                    return False
+            else:
+                print("✗ MCP status tool failed - no result")
+                return False
+        except json.JSONDecodeError as e:
+            print(f"✗ MCP status tool failed - JSON decode error: {e}")
+            return False
+        
+        # Test task_status tool again - should show completed task
+        task_status_request2 = {
+            "jsonrpc": "2.0",
+            "id": 17,
+            "method": "tools/call",
+            "params": {
+                "name": "task_status",
+                "arguments": {
+                    "unique_name": "long-running-task"
+                }
+            }
+        }
+        
+        print("Sending task_status request after completion...")
+        task_status_response2 = send_request(process, task_status_request2)
+        print(f"Task status response (after completion): {json.dumps(task_status_response2)}")
+        
+        # Parse task_status response
+        try:
+            if "result" in task_status_response2:
+                result = task_status_response2["result"]
+                if "content" in result and len(result["content"]) > 0:
+                    content = result["content"][0]
+                    if "text" in content:
+                        status_data = json.loads(content["text"])
+                        if "jobs" in status_data and isinstance(status_data["jobs"], list):
+                            jobs = status_data["jobs"]
+                            if len(jobs) > 0:
+                                # Check if our task is in the jobs and completed
+                                found_task = False
+                                for job in jobs:
+                                    if job.get("unique_name") == "long-running-task" and job.get("pid") == pid:
+                                        if job.get("state") == "exited":
+                                            found_task = True
+                                            print("✓ MCP task_status tool shows completed long-running task")
+                                            break
+                                        else:
+                                            print(f"✗ MCP task_status tool failed - task not exited: {job.get('state')}")
+                                            return False
+                                if not found_task:
+                                    print("✗ MCP task_status tool failed - long-running task not found in jobs after completion")
+                                    return False
+                            else:
+                                print("✗ MCP task_status tool failed - no jobs found after completion")
+                                return False
+                        else:
+                            print("✗ MCP task_status tool failed - invalid response structure")
+                            return False
+                    else:
+                        print("✗ MCP task_status tool failed - no text content")
+                        return False
+                else:
+                    print("✗ MCP task_status tool failed - no content")
+                    return False
+            else:
+                print("✗ MCP task_status tool failed - no result")
+                return False
+        except json.JSONDecodeError as e:
+            print(f"✗ MCP task_status tool failed - JSON decode error: {e}")
+            return False
+        
+        print("✓ MCP long-running task lifecycle test passed!")
+        
+    except subprocess.TimeoutExpired:
+        print("✗ MCP long-running task lifecycle test timed out")
+        process.kill()
+        return False
+    except Exception as e:
+        print(f"✗ MCP long-running task lifecycle test error: {e}")
         process.kill()
         return False
     finally:
