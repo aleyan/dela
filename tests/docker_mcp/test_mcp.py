@@ -185,8 +185,8 @@ def test_mcp_protocol():
         if process.poll() is None:
             process.kill()
     
-    # Test 4: Test MCP status tool
-    print("Test 4: Testing MCP status tool")
+    # Test 4: Test MCP status tool (DTKT-172)
+    print("Test 4: Testing MCP status tool (DTKT-172)")
     
     process = start_mcp_process(cwd)
     
@@ -211,12 +211,42 @@ def test_mcp_protocol():
         # Read response
         stdout, stderr = process.communicate(timeout=5)
         
-        if "running" in stdout and "[]" in stdout:
-            print("✓ MCP status tool works (returns empty array in Phase 10A)")
-        else:
-            print("✗ MCP status tool failed")
+        # Parse JSON response to verify structure
+        try:
+            lines = stdout.strip().split('\n')
+            json_response = None
+            for line in lines:
+                if line.strip().startswith('{') and '"id":4' in line:
+                    json_response = json.loads(line)
+                    break
+            
+            if json_response and "result" in json_response:
+                result = json_response["result"]
+                if "content" in result and len(result["content"]) > 0:
+                    content = result["content"][0]
+                    if "text" in content:
+                        status_data = json.loads(content["text"])
+                        if "running" in status_data and isinstance(status_data["running"], list):
+                            print("✓ MCP status tool works (returns running jobs array)")
+                        else:
+                            print("✗ MCP status tool failed - invalid response structure")
+                            print("STDOUT:", stdout)
+                            return False
+                    else:
+                        print("✗ MCP status tool failed - no text content")
+                        print("STDOUT:", stdout)
+                        return False
+                else:
+                    print("✗ MCP status tool failed - no content")
+                    print("STDOUT:", stdout)
+                    return False
+            else:
+                print("✗ MCP status tool failed - no result")
+                print("STDOUT:", stdout)
+                return False
+        except json.JSONDecodeError as e:
+            print(f"✗ MCP status tool failed - JSON decode error: {e}")
             print("STDOUT:", stdout)
-            print("STDERR:", stderr)
             return False
             
     except subprocess.TimeoutExpired:
@@ -468,6 +498,84 @@ def test_mcp_protocol():
         return False
     except Exception as e:
         print(f"✗ MCP list_tasks enriched fields error: {e}")
+        process.kill()
+        return False
+    finally:
+        if process.poll() is None:
+            process.kill()
+    
+    # Test 10: Test MCP task_status tool (DTKT-173)
+    print("Test 10: Testing MCP task_status tool (DTKT-173)")
+    
+    process = start_mcp_process(cwd)
+    
+    try:
+        # Send task_status request for a non-existent task
+        task_status_request = {
+            "jsonrpc": "2.0",
+            "id": 10,
+            "method": "tools/call",
+            "params": {
+                "name": "task_status",
+                "arguments": {
+                    "unique_name": "nonexistent-task"
+                }
+            }
+        }
+        
+        process.stdin.write(json.dumps(task_status_request) + "\n")
+        process.stdin.flush()
+        
+        # Wait for response
+        time.sleep(2)
+        
+        # Read response
+        stdout, stderr = process.communicate(timeout=5)
+        
+        # Parse JSON response to verify structure
+        try:
+            lines = stdout.strip().split('\n')
+            json_response = None
+            for line in lines:
+                if line.strip().startswith('{') and '"id":10' in line:
+                    json_response = json.loads(line)
+                    break
+            
+            if json_response and "result" in json_response:
+                result = json_response["result"]
+                if "content" in result and len(result["content"]) > 0:
+                    content = result["content"][0]
+                    if "text" in content:
+                        status_data = json.loads(content["text"])
+                        if "jobs" in status_data and isinstance(status_data["jobs"], list):
+                            print("✓ MCP task_status tool works (returns jobs array)")
+                        else:
+                            print("✗ MCP task_status tool failed - invalid response structure")
+                            print("STDOUT:", stdout)
+                            return False
+                    else:
+                        print("✗ MCP task_status tool failed - no text content")
+                        print("STDOUT:", stdout)
+                        return False
+                else:
+                    print("✗ MCP task_status tool failed - no content")
+                    print("STDOUT:", stdout)
+                    return False
+            else:
+                print("✗ MCP task_status tool failed - no result")
+                print("STDOUT:", stdout)
+                return False
+        except json.JSONDecodeError as e:
+            print(f"✗ MCP task_status tool failed - JSON decode error: {e}")
+            print("STDOUT:", stdout)
+            return False
+            
+    except subprocess.TimeoutExpired:
+        print("✗ MCP task_status tool timed out")
+        process.kill()
+        return False
+    except Exception as e:
+        print(f"✗ MCP task_status tool error: {e}")
         process.kill()
         return False
     finally:

@@ -285,7 +285,15 @@ impl DelaMcpServer {
                     file_path: task.file_path.clone(),
                 };
 
-                // Add initial output to the job
+                // Start background job management first
+                self.job_manager.start_job(pid as u32, metadata, child).await.map_err(|e| {
+                    DelaError::internal_error(
+                        format!("Failed to start background job: {}", e),
+                        Some("Job management error".to_string()),
+                    )
+                })?;
+
+                // Add initial output to the job after it's started
                 if !output.is_empty() {
                     self.job_manager.add_job_output(pid as u32, output.clone()).await.map_err(|e| {
                         DelaError::internal_error(
@@ -294,14 +302,6 @@ impl DelaMcpServer {
                         )
                     })?;
                 }
-
-                // Start background job management
-                self.job_manager.start_job(pid as u32, metadata, child).await.map_err(|e| {
-                    DelaError::internal_error(
-                        format!("Failed to start background job: {}", e),
-                        Some("Job management error".to_string()),
-                    )
-                })?;
 
                 // Spawn a task to monitor the job
                 let job_manager = self.job_manager.clone();
@@ -896,10 +896,60 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_status_returns_empty_array() {
+    async fn test_status_returns_running_jobs() {
         // Arrange
         let temp_dir = std::env::temp_dir();
         let server = DelaMcpServer::new(temp_dir);
+
+        // Act - Get status with no running jobs
+        let result = server.status().await.unwrap();
+
+        // Assert - Should return empty array when no jobs are running
+        assert_eq!(result.content.len(), 1);
+        let content = &result.content[0];
+        match &content.raw {
+            RawContent::Text(text_content) => {
+                let json: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
+                let obj = json.as_object().unwrap();
+                assert!(obj.contains_key("running"));
+                let running = obj["running"].as_array().unwrap();
+                assert_eq!(
+                    running.len(),
+                    0,
+                    "Status should return empty array when no jobs are running"
+                );
+            }
+            _ => panic!("Expected text content with JSON"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_status_with_running_jobs() {
+        // Arrange
+        let temp_dir = std::env::temp_dir();
+        let server = DelaMcpServer::new(temp_dir);
+
+        // Create a mock job in the job manager
+        let metadata = JobMetadata {
+            started_at: std::time::Instant::now(),
+            unique_name: "test-task".to_string(),
+            source_name: "test".to_string(),
+            args: Some(vec!["--verbose".to_string()]),
+            env: None,
+            cwd: Some(PathBuf::from("/tmp")),
+            command: "echo test".to_string(),
+            file_path: PathBuf::from("Makefile"),
+        };
+
+        // Start a mock job
+        let mut cmd = tokio::process::Command::new("echo");
+        cmd.arg("test");
+        cmd.stdout(std::process::Stdio::piped());
+        cmd.stderr(std::process::Stdio::piped());
+        let child = cmd.spawn().unwrap();
+        let pid = child.id().unwrap();
+
+        server.job_manager.start_job(pid as u32, metadata, child).await.unwrap();
 
         // Act
         let result = server.status().await.unwrap();
@@ -913,11 +963,177 @@ mod tests {
                 let obj = json.as_object().unwrap();
                 assert!(obj.contains_key("running"));
                 let running = obj["running"].as_array().unwrap();
-                assert_eq!(
-                    running.len(),
-                    0,
-                    "Status should return empty array in Phase 10A"
-                );
+                assert_eq!(running.len(), 1, "Should return one running job");
+                
+                let job = &running[0];
+                assert_eq!(job["pid"], pid);
+                assert_eq!(job["unique_name"], "test-task");
+                assert_eq!(job["source_name"], "test");
+                assert_eq!(job["command"], "echo test");
+                assert!(job["args"].is_array());
+                assert_eq!(job["args"][0], "--verbose");
+            }
+            _ => panic!("Expected text content with JSON"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_task_status_empty() {
+        // Arrange
+        let temp_dir = std::env::temp_dir();
+        let server = DelaMcpServer::new(temp_dir);
+        let args = TaskStatusArgs {
+            unique_name: "nonexistent-task".to_string(),
+        };
+
+        // Act
+        let result = server.task_status(Parameters(args)).await.unwrap();
+
+        // Assert
+        assert_eq!(result.content.len(), 1);
+        let content = &result.content[0];
+        match &content.raw {
+            RawContent::Text(text_content) => {
+                let json: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
+                let obj = json.as_object().unwrap();
+                assert!(obj.contains_key("jobs"));
+                let jobs = obj["jobs"].as_array().unwrap();
+                assert_eq!(jobs.len(), 0, "Should return empty array for nonexistent task");
+            }
+            _ => panic!("Expected text content with JSON"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_task_status_with_jobs() {
+        // Arrange
+        let temp_dir = std::env::temp_dir();
+        let server = DelaMcpServer::new(temp_dir);
+
+        // Create multiple jobs with the same unique_name
+        let metadata1 = JobMetadata {
+            started_at: std::time::Instant::now(),
+            unique_name: "test-task".to_string(),
+            source_name: "test".to_string(),
+            args: Some(vec!["--verbose".to_string()]),
+            env: None,
+            cwd: Some(PathBuf::from("/tmp")),
+            command: "echo test --verbose".to_string(),
+            file_path: PathBuf::from("Makefile"),
+        };
+
+        let metadata2 = JobMetadata {
+            started_at: std::time::Instant::now(),
+            unique_name: "test-task".to_string(),
+            source_name: "test".to_string(),
+            args: Some(vec!["--quiet".to_string()]),
+            env: None,
+            cwd: Some(PathBuf::from("/home")),
+            command: "echo test --quiet".to_string(),
+            file_path: PathBuf::from("Makefile"),
+        };
+
+        // Start mock jobs
+        let mut cmd1 = tokio::process::Command::new("echo");
+        cmd1.arg("test");
+        cmd1.stdout(std::process::Stdio::piped());
+        cmd1.stderr(std::process::Stdio::piped());
+        let child1 = cmd1.spawn().unwrap();
+        let pid1 = child1.id().unwrap();
+
+        let mut cmd2 = tokio::process::Command::new("echo");
+        cmd2.arg("test");
+        cmd2.stdout(std::process::Stdio::piped());
+        cmd2.stderr(std::process::Stdio::piped());
+        let child2 = cmd2.spawn().unwrap();
+        let pid2 = child2.id().unwrap();
+
+        server.job_manager.start_job(pid1 as u32, metadata1, child1).await.unwrap();
+        server.job_manager.start_job(pid2 as u32, metadata2, child2).await.unwrap();
+
+        let args = TaskStatusArgs {
+            unique_name: "test-task".to_string(),
+        };
+
+        // Act
+        let result = server.task_status(Parameters(args)).await.unwrap();
+
+        // Assert
+        assert_eq!(result.content.len(), 1);
+        let content = &result.content[0];
+        match &content.raw {
+            RawContent::Text(text_content) => {
+                let json: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
+                let obj = json.as_object().unwrap();
+                assert!(obj.contains_key("jobs"));
+                let jobs = obj["jobs"].as_array().unwrap();
+                assert_eq!(jobs.len(), 2, "Should return two jobs for the same unique_name");
+                
+                // Check that both jobs have the correct unique_name
+                for job in jobs {
+                    assert_eq!(job["unique_name"], "test-task");
+                    assert_eq!(job["source_name"], "test");
+                    assert!(job["pid"].is_number());
+                    assert!(job["state"].is_string());
+                    assert_eq!(job["state"], "running");
+                }
+            }
+            _ => panic!("Expected text content with JSON"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_task_status_with_different_states() {
+        // Arrange
+        let temp_dir = std::env::temp_dir();
+        let server = DelaMcpServer::new(temp_dir);
+
+        // Create jobs with different states
+        let metadata = JobMetadata {
+            started_at: std::time::Instant::now(),
+            unique_name: "test-task".to_string(),
+            source_name: "test".to_string(),
+            args: None,
+            env: None,
+            cwd: None,
+            command: "echo test".to_string(),
+            file_path: PathBuf::from("Makefile"),
+        };
+
+        // Start a mock job
+        let mut cmd = tokio::process::Command::new("echo");
+        cmd.arg("test");
+        cmd.stdout(std::process::Stdio::piped());
+        cmd.stderr(std::process::Stdio::piped());
+        let child = cmd.spawn().unwrap();
+        let pid = child.id().unwrap();
+
+        server.job_manager.start_job(pid as u32, metadata, child).await.unwrap();
+
+        // Mark job as exited
+        server.job_manager.update_job_state(pid as u32, JobState::Exited(0)).await.unwrap();
+
+        let args = TaskStatusArgs {
+            unique_name: "test-task".to_string(),
+        };
+
+        // Act
+        let result = server.task_status(Parameters(args)).await.unwrap();
+
+        // Assert
+        assert_eq!(result.content.len(), 1);
+        let content = &result.content[0];
+        match &content.raw {
+            RawContent::Text(text_content) => {
+                let json: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
+                let obj = json.as_object().unwrap();
+                assert!(obj.contains_key("jobs"));
+                let jobs = obj["jobs"].as_array().unwrap();
+                assert_eq!(jobs.len(), 1, "Should return one job");
+                
+                let job = &jobs[0];
+                assert_eq!(job["unique_name"], "test-task");
+                assert_eq!(job["state"], "exited");
             }
             _ => panic!("Expected text content with JSON"),
         }

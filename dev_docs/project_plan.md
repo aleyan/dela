@@ -297,8 +297,8 @@ Add PID management, output buffers, and controls.
 - [x] **[DTKT-161]** Implement MCP allowlist **loader** (read-only) and evaluator (MCP namespace)
 - [x] **[DTKT-170]** Introduce in-memory **PID → Job** map with metadata (started_at, unique_name, args) and GC policy
 - [x] **[DTKT-171]** Add **ring buffer** for combined stdout/stderr per PID (bounded, configurable)
-- [ ] **[DTKT-172]** Complete `status` to list **all running PIDs** with minimal info
-- [ ] **[DTKT-173]** Implement `task_status` (filter by unique_name, return many PIDs)
+- [x] **[DTKT-172]** Complete `status` to list **all running PIDs** with minimal info
+- [x] **[DTKT-173]** Implement `task_status` (filter by unique_name, return many PIDs)
 - [ ] **[DTKT-174]** Implement `task_output` **tail last N lines** (default 200); add truncation flag
 - [ ] **[DTKT-175]** Implement `task_stop` with **TERM + grace + KILL**
 - [ ] **[DTKT-176]** Concurrency and safety limits (max concurrent jobs, per-message chunk cap)
