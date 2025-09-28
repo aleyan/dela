@@ -15,7 +15,7 @@ use rmcp::{
     tool,
 };
 use std::path::PathBuf;
-use tokio::io::{stdin, stdout};
+use tokio::io::{stdin, stdout, AsyncReadExt};
 use tokio::process::Command;
 use tokio::time::{Duration, timeout};
 
@@ -238,15 +238,28 @@ impl DelaMcpServer {
             let stdout_handle = child.stdout.take();
             let stderr_handle = child.stderr.take();
 
-            let mut stdout_buf = String::new();
-            let mut stderr_buf = String::new();
 
-            // Read from both stdout and stderr concurrently
+            // Read from both stdout and stderr concurrently with proper timeout handling
             let stdout_task = if let Some(mut stdout) = stdout_handle {
                 tokio::spawn(async move {
-                    let _ =
-                        tokio::io::AsyncReadExt::read_to_string(&mut stdout, &mut stdout_buf).await;
-                    stdout_buf
+                    // Use a timeout for reading stdout to prevent blocking
+                    match timeout(Duration::from_millis(900), async {
+                        let mut buf = [0; 1024];
+                        let mut output = String::new();
+                        loop {
+                            match stdout.read(&mut buf).await {
+                                Ok(0) => break, // EOF
+                                Ok(n) => {
+                                    output.push_str(&String::from_utf8_lossy(&buf[..n]));
+                                }
+                                Err(_) => break, // Error reading
+                            }
+                        }
+                        output
+                    }).await {
+                        Ok(output) => output,
+                        Err(_) => String::new(), // Timeout or error
+                    }
                 })
             } else {
                 tokio::spawn(async { String::new() })
@@ -254,9 +267,24 @@ impl DelaMcpServer {
 
             let stderr_task = if let Some(mut stderr) = stderr_handle {
                 tokio::spawn(async move {
-                    let _ =
-                        tokio::io::AsyncReadExt::read_to_string(&mut stderr, &mut stderr_buf).await;
-                    stderr_buf
+                    // Use a timeout for reading stderr to prevent blocking
+                    match timeout(Duration::from_millis(900), async {
+                        let mut buf = [0; 1024];
+                        let mut output = String::new();
+                        loop {
+                            match stderr.read(&mut buf).await {
+                                Ok(0) => break, // EOF
+                                Ok(n) => {
+                                    output.push_str(&String::from_utf8_lossy(&buf[..n]));
+                                }
+                                Err(_) => break, // Error reading
+                            }
+                        }
+                        output
+                    }).await {
+                        Ok(output) => output,
+                        Err(_) => String::new(), // Timeout or error
+                    }
                 })
             } else {
                 tokio::spawn(async { String::new() })
