@@ -294,9 +294,9 @@ Implement the minimal surface so editors can start using MCP immediately for dis
 ### Phase 10B — **Full Long-Running / Background Tasks**
 Add PID management, output buffers, and controls.
 
-- [ ] **[DTKT-161]** Implement MCP allowlist **loader** (read-only) and evaluator (MCP namespace)
-- [ ] **[DTKT-170]** Introduce in-memory **PID → Job** map with metadata (started_at, unique_name, args) and GC policy
-- [ ] **[DTKT-171]** Add **ring buffer** for combined stdout/stderr per PID (bounded, configurable)
+- [x] **[DTKT-161]** Implement MCP allowlist **loader** (read-only) and evaluator (MCP namespace)
+- [x] **[DTKT-170]** Introduce in-memory **PID → Job** map with metadata (started_at, unique_name, args) and GC policy
+- [x] **[DTKT-171]** Add **ring buffer** for combined stdout/stderr per PID (bounded, configurable)
 - [ ] **[DTKT-172]** Complete `status` to list **all running PIDs** with minimal info
 - [ ] **[DTKT-173]** Implement `task_status` (filter by unique_name, return many PIDs)
 - [ ] **[DTKT-174]** Implement `task_output` **tail last N lines** (default 200); add truncation flag

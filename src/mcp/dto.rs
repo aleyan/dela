@@ -1,4 +1,3 @@
-use crate::allowlist::is_task_allowed;
 use crate::runner::is_runner_available;
 use crate::types::Task;
 use schemars::JsonSchema;
@@ -55,9 +54,7 @@ impl TaskDto {
             runner: task.runner.short_name().to_string(),
             command: task.runner.get_command(task),
             runner_available: is_runner_available(&task.runner),
-            allowlisted: is_task_allowed(task)
-                .map(|(allowed, denied)| allowed && !denied)
-                .unwrap_or(false),
+            allowlisted: false, // Default to false for legacy method
             file_path: task.file_path.to_string_lossy().to_string(),
             description: task.description.clone(),
         }
@@ -65,7 +62,7 @@ impl TaskDto {
 
     /// Convert from internal Task to TaskDto with enriched fields
     /// This method computes all enriched fields including command, runner availability, and allowlist status
-    pub fn from_task_enriched(task: &Task) -> Self {
+    pub fn from_task_enriched(task: &Task, allowlist_evaluator: &crate::mcp::allowlist::McpAllowlistEvaluator) -> Self {
         Self {
             unique_name: task
                 .disambiguated_name
@@ -76,9 +73,7 @@ impl TaskDto {
             runner: task.runner.short_name().to_string(),
             command: task.runner.get_command(task),
             runner_available: is_runner_available(&task.runner),
-            allowlisted: is_task_allowed(task)
-                .map(|(allowed, denied)| allowed && !denied)
-                .unwrap_or(false),
+            allowlisted: allowlist_evaluator.is_task_allowed(task).unwrap_or(false),
             file_path: task.file_path.to_string_lossy().to_string(),
             description: task.description.clone(),
         }
@@ -381,6 +376,8 @@ mod tests {
 
     #[test]
     fn test_taskdto_enriched_fields() {
+        use crate::mcp::allowlist::McpAllowlistEvaluator;
+        
         // Arrange
         let task = Task {
             name: "build".to_string(),
@@ -393,8 +390,13 @@ mod tests {
             disambiguated_name: None,
         };
 
+        // Create a mock allowlist evaluator
+        let allowlist_evaluator = McpAllowlistEvaluator {
+            allowlist: crate::types::Allowlist::default(),
+        };
+
         // Act
-        let dto = TaskDto::from_task_enriched(&task);
+        let dto = TaskDto::from_task_enriched(&task, &allowlist_evaluator);
 
         // Assert - verify all enriched fields are populated
         assert_eq!(dto.unique_name, "build");
@@ -411,6 +413,8 @@ mod tests {
 
     #[test]
     fn test_taskdto_command_generation_various_runners() {
+        use crate::mcp::allowlist::McpAllowlistEvaluator;
+        
         let test_cases = vec![
             (TaskRunner::Make, "build", "make build"),
             (TaskRunner::NodeNpm, "test", "npm run test"),
@@ -431,6 +435,11 @@ mod tests {
             ),
         ];
 
+        // Create a mock allowlist evaluator
+        let allowlist_evaluator = McpAllowlistEvaluator {
+            allowlist: crate::types::Allowlist::default(),
+        };
+
         for (runner, task_name, expected_command) in test_cases {
             // Arrange
             let task = Task {
@@ -445,7 +454,7 @@ mod tests {
             };
 
             // Act
-            let dto = TaskDto::from_task_enriched(&task);
+            let dto = TaskDto::from_task_enriched(&task, &allowlist_evaluator);
 
             // Assert
             assert_eq!(
@@ -458,12 +467,19 @@ mod tests {
 
     #[test]
     fn test_taskdto_docker_compose_special_commands() {
+        use crate::mcp::allowlist::McpAllowlistEvaluator;
+        
         let test_cases = vec![
             ("up", "docker compose up"),
             ("down", "docker compose down"),
             ("build", "docker compose run build"),
             ("logs", "docker compose run logs"),
         ];
+
+        // Create a mock allowlist evaluator
+        let allowlist_evaluator = McpAllowlistEvaluator {
+            allowlist: crate::types::Allowlist::default(),
+        };
 
         for (task_name, expected_command) in test_cases {
             // Arrange
@@ -479,7 +495,7 @@ mod tests {
             };
 
             // Act
-            let dto = TaskDto::from_task_enriched(&task);
+            let dto = TaskDto::from_task_enriched(&task, &allowlist_evaluator);
 
             // Assert
             assert_eq!(
@@ -492,6 +508,8 @@ mod tests {
 
     #[test]
     fn test_taskdto_travis_ci_non_executable() {
+        use crate::mcp::allowlist::McpAllowlistEvaluator;
+        
         // Arrange
         let task = Task {
             name: "test".to_string(),
@@ -504,8 +522,13 @@ mod tests {
             disambiguated_name: None,
         };
 
+        // Create a mock allowlist evaluator
+        let allowlist_evaluator = McpAllowlistEvaluator {
+            allowlist: crate::types::Allowlist::default(),
+        };
+
         // Act
-        let dto = TaskDto::from_task_enriched(&task);
+        let dto = TaskDto::from_task_enriched(&task, &allowlist_evaluator);
 
         // Assert
         assert_eq!(dto.unique_name, "test");
@@ -553,4 +576,29 @@ pub struct StartResultDto {
 
     /// Combined stdout and stderr captured during the first second
     pub initial_output: String,
+}
+
+/// Arguments for the task_status tool
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct TaskStatusArgs {
+    /// The unique name of the task to get status for
+    pub unique_name: String,
+}
+
+/// Arguments for the task_output tool
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct TaskOutputArgs {
+    /// The PID of the job to get output for
+    pub pid: u32,
+
+    /// Number of lines to return (default: 200)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lines: Option<usize>,
+}
+
+/// Arguments for the task_stop tool
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct TaskStopArgs {
+    /// The PID of the job to stop
+    pub pid: u32,
 }
