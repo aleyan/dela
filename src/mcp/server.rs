@@ -1,6 +1,10 @@
-use super::dto::{ListTasksArgs, StartResultDto, TaskDto, TaskStartArgs};
+use super::allowlist::McpAllowlistEvaluator;
+use super::dto::{
+    ListTasksArgs, StartResultDto, TaskDto, TaskOutputArgs, TaskStartArgs, TaskStatusArgs,
+    TaskStopArgs,
+};
 use super::errors::DelaError;
-use crate::allowlist::is_task_allowed;
+use super::job_manager::{JobManager, JobMetadata, JobState};
 use crate::runner::is_runner_available;
 use crate::task_discovery;
 use rmcp::{
@@ -16,15 +20,28 @@ use tokio::process::Command;
 use tokio::time::{Duration, timeout};
 
 /// MCP server for dela that exposes task management capabilities
-#[derive(Clone)]
 pub struct DelaMcpServer {
     root: PathBuf,
+    allowlist_evaluator: McpAllowlistEvaluator,
+    job_manager: JobManager,
 }
 
 impl DelaMcpServer {
     /// Create a new MCP server instance
     pub fn new(root: PathBuf) -> Self {
-        Self { root }
+        let allowlist_evaluator = McpAllowlistEvaluator::new().unwrap_or_else(|_| {
+            // If allowlist loading fails, create an empty evaluator
+            // This allows the server to start even if allowlist is not available
+            McpAllowlistEvaluator {
+                allowlist: crate::types::Allowlist::default(),
+            }
+        });
+        let job_manager = JobManager::new();
+        Self {
+            root,
+            allowlist_evaluator,
+            job_manager,
+        }
     }
 
     /// Get the root path this server operates in
@@ -70,7 +87,10 @@ impl DelaMcpServer {
         }
 
         // Convert to DTOs with enriched fields (command, runner_available, allowlisted)
-        let task_dtos: Vec<TaskDto> = tasks.iter().map(TaskDto::from_task_enriched).collect();
+        let task_dtos: Vec<TaskDto> = tasks
+            .iter()
+            .map(|task| TaskDto::from_task_enriched(task, &self.allowlist_evaluator))
+            .collect();
 
         Ok(CallToolResult::success(vec![
             Content::json(&serde_json::json!({
@@ -82,10 +102,28 @@ impl DelaMcpServer {
 
     #[tool(description = "List all running tasks with PIDs")]
     pub async fn status(&self) -> Result<CallToolResult, ErrorData> {
-        // Stub implementation - Phase 10A returns empty array
+        // Get all running jobs
+        let jobs = self.job_manager.get_all_jobs().await;
+        let running_jobs: Vec<serde_json::Value> = jobs
+            .into_iter()
+            .filter(|job| job.is_running())
+            .map(|job| {
+                serde_json::json!({
+                    "pid": job.pid,
+                    "unique_name": job.metadata.unique_name,
+                    "source_name": job.metadata.source_name,
+                    "command": job.metadata.command,
+                    "file_path": job.metadata.file_path.to_string_lossy(),
+                    "started_at": job.metadata.started_at.elapsed().as_secs(),
+                    "args": job.metadata.args,
+                    "cwd": job.metadata.cwd.map(|p| p.to_string_lossy().to_string())
+                })
+            })
+            .collect();
+
         Ok(CallToolResult::success(vec![
             Content::json(&serde_json::json!({
-            "running": []
+                "running": running_jobs
             }))
             .expect("Failed to serialize JSON"),
         ]))
@@ -109,13 +147,16 @@ impl DelaMcpServer {
             })
             .ok_or_else(|| DelaError::task_not_found(args.unique_name.clone()))?;
 
-        // Check if task is allowlisted
-        let (is_allowed, _) = is_task_allowed(task).map_err(|e| {
-            DelaError::internal_error(
-                format!("Allowlist check failed: {}", e),
-                Some("Check allowlist configuration".to_string()),
-            )
-        })?;
+        // Check if task is allowlisted for MCP execution
+        let is_allowed = self
+            .allowlist_evaluator
+            .is_task_allowed(task)
+            .map_err(|e| {
+                DelaError::internal_error(
+                    format!("MCP allowlist check failed: {}", e),
+                    Some("Check allowlist configuration".to_string()),
+                )
+            })?;
 
         if !is_allowed {
             return Err(DelaError::not_allowlisted(args.unique_name.clone()).into());
@@ -240,8 +281,74 @@ impl DelaMcpServer {
                 // Timeout occurred - process is still running
                 output = captured_output;
 
-                // For Phase 10A, we don't manage background processes
-                // Just return that it's running
+                // Create job metadata
+                let metadata = JobMetadata {
+                    started_at: std::time::Instant::now(),
+                    unique_name: args.unique_name.clone(),
+                    source_name: task.source_name.clone(),
+                    args: args.args.clone(),
+                    env: args.env.clone(),
+                    cwd: args.cwd.as_ref().map(|cwd| PathBuf::from(cwd)),
+                    command: task.runner.get_command(task),
+                    file_path: task.file_path.clone(),
+                };
+
+                // Start background job management first
+                self.job_manager
+                    .start_job(pid as u32, metadata, child)
+                    .await
+                    .map_err(|e| {
+                        DelaError::internal_error(
+                            format!("Failed to start background job: {}", e),
+                            Some("Job management error".to_string()),
+                        )
+                    })?;
+
+                // Add initial output to the job after it's started
+                if !output.is_empty() {
+                    self.job_manager
+                        .add_job_output(pid as u32, output.clone())
+                        .await
+                        .map_err(|e| {
+                            DelaError::internal_error(
+                                format!("Failed to add initial output: {}", e),
+                                Some("Job management error".to_string()),
+                            )
+                        })?;
+                }
+
+                // Spawn a task to monitor the job
+                let job_manager = self.job_manager.clone();
+                tokio::spawn(async move {
+                    // Get the process from the job manager and wait for it
+                    if let Some(mut process) =
+                        job_manager.processes.write().await.remove(&(pid as u32))
+                    {
+                        if let Ok(exit_status) = process.wait().await {
+                            let exit_code = exit_status.code();
+                            if let Err(e) = job_manager
+                                .update_job_state(
+                                    pid as u32,
+                                    JobState::Exited(exit_code.unwrap_or(-1)),
+                                )
+                                .await
+                            {
+                                eprintln!("Failed to update job state: {}", e);
+                            }
+                        } else {
+                            if let Err(e) = job_manager
+                                .update_job_state(
+                                    pid as u32,
+                                    JobState::Failed("Process wait failed".to_string()),
+                                )
+                                .await
+                            {
+                                eprintln!("Failed to update job state: {}", e);
+                            }
+                        }
+                    }
+                });
+
                 let start_result = StartResultDto {
                     state: "running".to_string(),
                     pid: Some(pid),
@@ -287,33 +394,101 @@ impl DelaMcpServer {
     }
 
     #[tool(description = "Status for a single unique_name (may have multiple PIDs)")]
-    pub async fn task_status(&self) -> Result<CallToolResult, ErrorData> {
-        // Stub implementation - will be filled in with Phase 10B
-        Err(ErrorData::new(
-            ErrorCode::INTERNAL_ERROR,
-            "Not implemented",
-            None,
-        ))
+    pub async fn task_status(
+        &self,
+        Parameters(args): Parameters<TaskStatusArgs>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let jobs = self.job_manager.get_jobs_by_name(&args.unique_name).await;
+        let job_statuses: Vec<serde_json::Value> = jobs
+            .into_iter()
+            .map(|job| {
+                let state = match job.state {
+                    JobState::Running => "running",
+                    JobState::Exited(_) => "exited",
+                    JobState::Failed(_) => "failed",
+                };
+
+                serde_json::json!({
+                    "pid": job.pid,
+                    "unique_name": job.metadata.unique_name,
+                    "source_name": job.metadata.source_name,
+                    "state": state,
+                    "started_at": job.metadata.started_at.elapsed().as_secs(),
+                    "command": job.metadata.command,
+                    "file_path": job.metadata.file_path.to_string_lossy(),
+                    "args": job.metadata.args,
+                    "cwd": job.metadata.cwd.map(|p| p.to_string_lossy().to_string())
+                })
+            })
+            .collect();
+
+        Ok(CallToolResult::success(vec![
+            Content::json(&serde_json::json!({
+                "jobs": job_statuses
+            }))
+            .expect("Failed to serialize JSON"),
+        ]))
     }
 
     #[tool(description = "Tail last N lines for a PID")]
-    pub async fn task_output(&self) -> Result<CallToolResult, ErrorData> {
-        // Stub implementation - will be filled in with Phase 10B
-        Err(ErrorData::new(
-            ErrorCode::INTERNAL_ERROR,
-            "Not implemented",
-            None,
-        ))
+    pub async fn task_output(
+        &self,
+        Parameters(args): Parameters<TaskOutputArgs>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let job = self
+            .job_manager
+            .get_job(args.pid)
+            .await
+            .ok_or_else(|| DelaError::task_not_found(format!("Job with PID {}", args.pid)))?;
+
+        let lines = job.get_output_lines(Some(args.lines.unwrap_or(200)));
+
+        Ok(CallToolResult::success(vec![
+            Content::json(&serde_json::json!({
+                "pid": job.pid,
+                "lines": lines,
+                "total_lines": job.output_buffer.len(),
+                "total_bytes": job.output_buffer.total_bytes()
+            }))
+            .expect("Failed to serialize JSON"),
+        ]))
     }
 
     #[tool(description = "Stop a PID with graceful timeout")]
-    pub async fn task_stop(&self) -> Result<CallToolResult, ErrorData> {
-        // Stub implementation - will be filled in with Phase 10B
-        Err(ErrorData::new(
-            ErrorCode::INTERNAL_ERROR,
-            "Not implemented",
-            None,
-        ))
+    pub async fn task_stop(
+        &self,
+        Parameters(args): Parameters<TaskStopArgs>,
+    ) -> Result<CallToolResult, ErrorData> {
+        // Check if job exists
+        let job = self
+            .job_manager
+            .get_job(args.pid)
+            .await
+            .ok_or_else(|| DelaError::task_not_found(format!("Job with PID {}", args.pid)))?;
+
+        if !job.is_running() {
+            return Err(DelaError::internal_error(
+                format!("Job with PID {} is not running", args.pid),
+                Some("Job is already finished".to_string()),
+            )
+            .into());
+        }
+
+        // Stop the job
+        self.job_manager.stop_job(args.pid).await.map_err(|e| {
+            DelaError::internal_error(
+                format!("Failed to stop job: {}", e),
+                Some("Job management error".to_string()),
+            )
+        })?;
+
+        Ok(CallToolResult::success(vec![
+            Content::json(&serde_json::json!({
+                "pid": args.pid,
+                "status": "stopped"
+            }))
+            .expect("Failed to serialize JSON"),
+        ]))
     }
 }
 
@@ -382,6 +557,42 @@ impl ServerHandler for DelaMcpServer {
                     )
                 })?;
                 self.task_start(Parameters(args)).await
+            }
+            "task_status" => {
+                let args: TaskStatusArgs = serde_json::from_value(serde_json::Value::Object(
+                    request.arguments.unwrap_or_default(),
+                ))
+                .map_err(|e| {
+                    DelaError::internal_error(
+                        format!("Invalid arguments: {}", e),
+                        Some("Check argument format and types".to_string()),
+                    )
+                })?;
+                self.task_status(Parameters(args)).await
+            }
+            "task_output" => {
+                let args: TaskOutputArgs = serde_json::from_value(serde_json::Value::Object(
+                    request.arguments.unwrap_or_default(),
+                ))
+                .map_err(|e| {
+                    DelaError::internal_error(
+                        format!("Invalid arguments: {}", e),
+                        Some("Check argument format and types".to_string()),
+                    )
+                })?;
+                self.task_output(Parameters(args)).await
+            }
+            "task_stop" => {
+                let args: TaskStopArgs = serde_json::from_value(serde_json::Value::Object(
+                    request.arguments.unwrap_or_default(),
+                ))
+                .map_err(|e| {
+                    DelaError::internal_error(
+                        format!("Invalid arguments: {}", e),
+                        Some("Check argument format and types".to_string()),
+                    )
+                })?;
+                self.task_stop(Parameters(args)).await
             }
             _ => Err(DelaError::internal_error(
                 format!("Tool not found: {}", request.name),
@@ -522,6 +733,106 @@ impl ServerHandler for DelaMcpServer {
             serde_json::Value::Object(Map::new()),
         );
 
+        // Schema for task_status
+        let mut task_status_schema = Map::new();
+        task_status_schema.insert(
+            "type".to_string(),
+            serde_json::Value::String("object".to_string()),
+        );
+        let mut task_status_properties = Map::new();
+        let mut task_status_unique_name_prop = Map::new();
+        task_status_unique_name_prop.insert(
+            "type".to_string(),
+            serde_json::Value::String("string".to_string()),
+        );
+        task_status_unique_name_prop.insert(
+            "description".to_string(),
+            serde_json::Value::String("The unique name of the task to get status for".to_string()),
+        );
+        task_status_properties.insert(
+            "unique_name".to_string(),
+            serde_json::Value::Object(task_status_unique_name_prop),
+        );
+        task_status_schema.insert(
+            "properties".to_string(),
+            serde_json::Value::Object(task_status_properties),
+        );
+        task_status_schema.insert(
+            "required".to_string(),
+            serde_json::Value::Array(vec![serde_json::Value::String("unique_name".to_string())]),
+        );
+
+        // Schema for task_output
+        let mut task_output_schema = Map::new();
+        task_output_schema.insert(
+            "type".to_string(),
+            serde_json::Value::String("object".to_string()),
+        );
+        let mut task_output_properties = Map::new();
+        let mut task_output_pid_prop = Map::new();
+        task_output_pid_prop.insert(
+            "type".to_string(),
+            serde_json::Value::String("integer".to_string()),
+        );
+        task_output_pid_prop.insert(
+            "description".to_string(),
+            serde_json::Value::String("The PID of the job to get output for".to_string()),
+        );
+        task_output_properties.insert(
+            "pid".to_string(),
+            serde_json::Value::Object(task_output_pid_prop),
+        );
+        let mut task_output_lines_prop = Map::new();
+        task_output_lines_prop.insert(
+            "type".to_string(),
+            serde_json::Value::String("integer".to_string()),
+        );
+        task_output_lines_prop.insert(
+            "description".to_string(),
+            serde_json::Value::String("Number of lines to return (default: 200)".to_string()),
+        );
+        task_output_properties.insert(
+            "lines".to_string(),
+            serde_json::Value::Object(task_output_lines_prop),
+        );
+        task_output_schema.insert(
+            "properties".to_string(),
+            serde_json::Value::Object(task_output_properties),
+        );
+        task_output_schema.insert(
+            "required".to_string(),
+            serde_json::Value::Array(vec![serde_json::Value::String("pid".to_string())]),
+        );
+
+        // Schema for task_stop
+        let mut task_stop_schema = Map::new();
+        task_stop_schema.insert(
+            "type".to_string(),
+            serde_json::Value::String("object".to_string()),
+        );
+        let mut task_stop_properties = Map::new();
+        let mut task_stop_pid_prop = Map::new();
+        task_stop_pid_prop.insert(
+            "type".to_string(),
+            serde_json::Value::String("integer".to_string()),
+        );
+        task_stop_pid_prop.insert(
+            "description".to_string(),
+            serde_json::Value::String("The PID of the job to stop".to_string()),
+        );
+        task_stop_properties.insert(
+            "pid".to_string(),
+            serde_json::Value::Object(task_stop_pid_prop),
+        );
+        task_stop_schema.insert(
+            "properties".to_string(),
+            serde_json::Value::Object(task_stop_properties),
+        );
+        task_stop_schema.insert(
+            "required".to_string(),
+            serde_json::Value::Array(vec![serde_json::Value::String("pid".to_string())]),
+        );
+
         let tools = vec![
             Tool {
                 name: "list_tasks".into(),
@@ -532,7 +843,7 @@ impl ServerHandler for DelaMcpServer {
             },
             Tool {
                 name: "status".into(),
-                description: Some("List all running tasks with PIDs (Phase 10A: returns empty array - background processes not yet supported)".into()),
+                description: Some("List all running tasks with PIDs".into()),
                 input_schema: Arc::new(status_schema),
                 annotations: None,
                 output_schema: None,
@@ -541,6 +852,29 @@ impl ServerHandler for DelaMcpServer {
                 name: "task_start".into(),
                 description: Some("Start a task (≤1s capture, then background)".into()),
                 input_schema: Arc::new(task_start_schema),
+                annotations: None,
+                output_schema: None,
+            },
+            Tool {
+                name: "task_status".into(),
+                description: Some(
+                    "Status for a single unique_name (may have multiple PIDs)".into(),
+                ),
+                input_schema: Arc::new(task_status_schema),
+                annotations: None,
+                output_schema: None,
+            },
+            Tool {
+                name: "task_output".into(),
+                description: Some("Tail last N lines for a PID".into()),
+                input_schema: Arc::new(task_output_schema),
+                annotations: None,
+                output_schema: None,
+            },
+            Tool {
+                name: "task_stop".into(),
+                description: Some("Stop a PID with graceful timeout".into()),
+                input_schema: Arc::new(task_stop_schema),
                 annotations: None,
                 output_schema: None,
             },
@@ -576,22 +910,85 @@ mod tests {
     async fn test_unimplemented_tools() {
         let server = DelaMcpServer::new(PathBuf::from("."));
 
-        // This test is for unimplemented tools, but task_start is now implemented
-        // So we'll test a different unimplemented tool
-        assert!(server.task_status().await.is_err());
-        assert!(server.task_status().await.is_err());
-        assert!(server.task_output().await.is_err());
-        assert!(server.task_stop().await.is_err());
+        // Test that the new tools work with proper arguments
+        let status_args = TaskStatusArgs {
+            unique_name: "test-task".to_string(),
+        };
+        let output_args = TaskOutputArgs {
+            pid: 12345,
+            lines: Some(10),
+        };
+        let stop_args = TaskStopArgs { pid: 12345 };
+
+        // These should work (even if they return empty results for non-existent jobs)
+        assert!(server.task_status(Parameters(status_args)).await.is_ok());
+        // task_output and task_stop should return errors for non-existent jobs
+        assert!(server.task_output(Parameters(output_args)).await.is_err());
+        assert!(server.task_stop(Parameters(stop_args)).await.is_err());
 
         // Status should work (returns empty array in Phase 10A)
         assert!(server.status().await.is_ok());
     }
 
     #[tokio::test]
-    async fn test_status_returns_empty_array() {
+    async fn test_status_returns_running_jobs() {
         // Arrange
         let temp_dir = std::env::temp_dir();
         let server = DelaMcpServer::new(temp_dir);
+
+        // Act - Get status with no running jobs
+        let result = server.status().await.unwrap();
+
+        // Assert - Should return empty array when no jobs are running
+        assert_eq!(result.content.len(), 1);
+        let content = &result.content[0];
+        match &content.raw {
+            RawContent::Text(text_content) => {
+                let json: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
+                let obj = json.as_object().unwrap();
+                assert!(obj.contains_key("running"));
+                let running = obj["running"].as_array().unwrap();
+                assert_eq!(
+                    running.len(),
+                    0,
+                    "Status should return empty array when no jobs are running"
+                );
+            }
+            _ => panic!("Expected text content with JSON"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_status_with_running_jobs() {
+        // Arrange
+        let temp_dir = std::env::temp_dir();
+        let server = DelaMcpServer::new(temp_dir);
+
+        // Create a mock job in the job manager
+        let metadata = JobMetadata {
+            started_at: std::time::Instant::now(),
+            unique_name: "test-task".to_string(),
+            source_name: "test".to_string(),
+            args: Some(vec!["--verbose".to_string()]),
+            env: None,
+            cwd: Some(PathBuf::from("/tmp")),
+            command: "echo test".to_string(),
+            file_path: PathBuf::from("Makefile"),
+        };
+
+        // Start a mock job
+        let mut cmd = tokio::process::Command::new("echo");
+        cmd.arg("test");
+        cmd.stdout(std::process::Stdio::piped());
+        cmd.stderr(std::process::Stdio::piped());
+        let child = cmd.spawn().unwrap();
+        let pid = child.id().unwrap();
+
+        server
+            .job_manager
+            .start_job(pid as u32, metadata, child)
+            .await
+            .unwrap();
 
         // Act
         let result = server.status().await.unwrap();
@@ -605,11 +1002,201 @@ mod tests {
                 let obj = json.as_object().unwrap();
                 assert!(obj.contains_key("running"));
                 let running = obj["running"].as_array().unwrap();
+                assert_eq!(running.len(), 1, "Should return one running job");
+
+                let job = &running[0];
+                assert_eq!(job["pid"], pid);
+                assert_eq!(job["unique_name"], "test-task");
+                assert_eq!(job["source_name"], "test");
+                assert_eq!(job["command"], "echo test");
+                assert!(job["args"].is_array());
+                assert_eq!(job["args"][0], "--verbose");
+            }
+            _ => panic!("Expected text content with JSON"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_task_status_empty() {
+        // Arrange
+        let temp_dir = std::env::temp_dir();
+        let server = DelaMcpServer::new(temp_dir);
+        let args = TaskStatusArgs {
+            unique_name: "nonexistent-task".to_string(),
+        };
+
+        // Act
+        let result = server.task_status(Parameters(args)).await.unwrap();
+
+        // Assert
+        assert_eq!(result.content.len(), 1);
+        let content = &result.content[0];
+        match &content.raw {
+            RawContent::Text(text_content) => {
+                let json: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
+                let obj = json.as_object().unwrap();
+                assert!(obj.contains_key("jobs"));
+                let jobs = obj["jobs"].as_array().unwrap();
                 assert_eq!(
-                    running.len(),
+                    jobs.len(),
                     0,
-                    "Status should return empty array in Phase 10A"
+                    "Should return empty array for nonexistent task"
                 );
+            }
+            _ => panic!("Expected text content with JSON"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_task_status_with_jobs() {
+        // Arrange
+        let temp_dir = std::env::temp_dir();
+        let server = DelaMcpServer::new(temp_dir);
+
+        // Create multiple jobs with the same unique_name
+        let metadata1 = JobMetadata {
+            started_at: std::time::Instant::now(),
+            unique_name: "test-task".to_string(),
+            source_name: "test".to_string(),
+            args: Some(vec!["--verbose".to_string()]),
+            env: None,
+            cwd: Some(PathBuf::from("/tmp")),
+            command: "echo test --verbose".to_string(),
+            file_path: PathBuf::from("Makefile"),
+        };
+
+        let metadata2 = JobMetadata {
+            started_at: std::time::Instant::now(),
+            unique_name: "test-task".to_string(),
+            source_name: "test".to_string(),
+            args: Some(vec!["--quiet".to_string()]),
+            env: None,
+            cwd: Some(PathBuf::from("/home")),
+            command: "echo test --quiet".to_string(),
+            file_path: PathBuf::from("Makefile"),
+        };
+
+        // Start mock jobs
+        let mut cmd1 = tokio::process::Command::new("echo");
+        cmd1.arg("test");
+        cmd1.stdout(std::process::Stdio::piped());
+        cmd1.stderr(std::process::Stdio::piped());
+        let child1 = cmd1.spawn().unwrap();
+        let pid1 = child1.id().unwrap();
+
+        let mut cmd2 = tokio::process::Command::new("echo");
+        cmd2.arg("test");
+        cmd2.stdout(std::process::Stdio::piped());
+        cmd2.stderr(std::process::Stdio::piped());
+        let child2 = cmd2.spawn().unwrap();
+        let pid2 = child2.id().unwrap();
+
+        server
+            .job_manager
+            .start_job(pid1 as u32, metadata1, child1)
+            .await
+            .unwrap();
+        server
+            .job_manager
+            .start_job(pid2 as u32, metadata2, child2)
+            .await
+            .unwrap();
+
+        let args = TaskStatusArgs {
+            unique_name: "test-task".to_string(),
+        };
+
+        // Act
+        let result = server.task_status(Parameters(args)).await.unwrap();
+
+        // Assert
+        assert_eq!(result.content.len(), 1);
+        let content = &result.content[0];
+        match &content.raw {
+            RawContent::Text(text_content) => {
+                let json: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
+                let obj = json.as_object().unwrap();
+                assert!(obj.contains_key("jobs"));
+                let jobs = obj["jobs"].as_array().unwrap();
+                assert_eq!(
+                    jobs.len(),
+                    2,
+                    "Should return two jobs for the same unique_name"
+                );
+
+                // Check that both jobs have the correct unique_name
+                for job in jobs {
+                    assert_eq!(job["unique_name"], "test-task");
+                    assert_eq!(job["source_name"], "test");
+                    assert!(job["pid"].is_number());
+                    assert!(job["state"].is_string());
+                    assert_eq!(job["state"], "running");
+                }
+            }
+            _ => panic!("Expected text content with JSON"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_task_status_with_different_states() {
+        // Arrange
+        let temp_dir = std::env::temp_dir();
+        let server = DelaMcpServer::new(temp_dir);
+
+        // Create jobs with different states
+        let metadata = JobMetadata {
+            started_at: std::time::Instant::now(),
+            unique_name: "test-task".to_string(),
+            source_name: "test".to_string(),
+            args: None,
+            env: None,
+            cwd: None,
+            command: "echo test".to_string(),
+            file_path: PathBuf::from("Makefile"),
+        };
+
+        // Start a mock job
+        let mut cmd = tokio::process::Command::new("echo");
+        cmd.arg("test");
+        cmd.stdout(std::process::Stdio::piped());
+        cmd.stderr(std::process::Stdio::piped());
+        let child = cmd.spawn().unwrap();
+        let pid = child.id().unwrap();
+
+        server
+            .job_manager
+            .start_job(pid as u32, metadata, child)
+            .await
+            .unwrap();
+
+        // Mark job as exited
+        server
+            .job_manager
+            .update_job_state(pid as u32, JobState::Exited(0))
+            .await
+            .unwrap();
+
+        let args = TaskStatusArgs {
+            unique_name: "test-task".to_string(),
+        };
+
+        // Act
+        let result = server.task_status(Parameters(args)).await.unwrap();
+
+        // Assert
+        assert_eq!(result.content.len(), 1);
+        let content = &result.content[0];
+        match &content.raw {
+            RawContent::Text(text_content) => {
+                let json: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
+                let obj = json.as_object().unwrap();
+                assert!(obj.contains_key("jobs"));
+                let jobs = obj["jobs"].as_array().unwrap();
+                assert_eq!(jobs.len(), 1, "Should return one job");
+
+                let job = &jobs[0];
+                assert_eq!(job["unique_name"], "test-task");
+                assert_eq!(job["state"], "exited");
             }
             _ => panic!("Expected text content with JSON"),
         }

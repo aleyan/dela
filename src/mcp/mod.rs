@@ -1,8 +1,12 @@
+mod allowlist;
 mod dto;
 mod errors;
+mod job_manager;
 mod server;
 
-pub use dto::{ListTasksArgs, StartResultDto, TaskStartArgs};
+pub use dto::{
+    ListTasksArgs, StartResultDto, TaskOutputArgs, TaskStartArgs, TaskStatusArgs, TaskStopArgs,
+};
 pub use errors::DelaError;
 pub use server::DelaMcpServer;
 
