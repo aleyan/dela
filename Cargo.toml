@@ -12,7 +12,7 @@ keywords = ["task-runner", "automation", "build", "make"]
 categories = ["command-line-utilities", "development-tools", "development-tools::build-utils"]
 
 [dependencies]
-clap = { version = "4.5.47", features = ["derive"] }
+clap = { version = "4.5.48", features = ["derive"] }
 makefile-lossless = "0.2.1"
 serde = { version = "1.0.225", features = ["derive"] }
 serde_json = "1.0.145"
