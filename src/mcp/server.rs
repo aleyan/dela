@@ -44,6 +44,17 @@ impl DelaMcpServer {
         }
     }
 
+    /// Create a new MCP server instance with a custom allowlist evaluator (for testing)
+    #[cfg(test)]
+    pub fn new_with_allowlist(root: PathBuf, allowlist_evaluator: McpAllowlistEvaluator) -> Self {
+        let job_manager = JobManager::new();
+        Self {
+            root,
+            allowlist_evaluator,
+            job_manager,
+        }
+    }
+
     /// Get the root path this server operates in
     pub fn root(&self) -> &PathBuf {
         &self.root
@@ -2489,6 +2500,152 @@ test:
                 // If it fails due to missing make, that's also acceptable
                 // The important thing is that we're testing the working directory setting path
             }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_long_running_task_lifecycle() {
+        use std::os::unix::fs::PermissionsExt;
+        use tokio::time::{sleep, Duration};
+        
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        
+        // Create a test script that runs for 3 seconds
+        let script_path = temp_dir.path().join("long_task.sh");
+        std::fs::write(&script_path, "#!/bin/bash\necho 'Starting...'\nsleep 3\necho 'Done!'").unwrap();
+        std::fs::set_permissions(&script_path, std::fs::Permissions::from_mode(0o755)).unwrap();
+        
+        // Create a Makefile that calls this script
+        let makefile_path = temp_dir.path().join("Makefile");
+        std::fs::write(&makefile_path, format!("long-test:\n\t{}", script_path.display())).unwrap();
+        
+        // Create a mock allowlist evaluator that allows all tasks
+        let mock_allowlist = crate::types::Allowlist {
+            entries: vec![crate::types::AllowlistEntry {
+                path: makefile_path.clone(),
+                scope: crate::types::AllowScope::File,
+                tasks: None,
+            }],
+        };
+        let allowlist_evaluator = McpAllowlistEvaluator {
+            allowlist: mock_allowlist,
+        };
+        
+        let server = DelaMcpServer::new_with_allowlist(temp_dir.path().to_path_buf(), allowlist_evaluator);
+
+        // Start the long-running task
+        let start_args = TaskStartArgs {
+            unique_name: "long-test".to_string(),
+            args: None,
+            env: None,
+            cwd: None,
+        };
+        
+        let start_result = server.task_start(Parameters(start_args)).await;
+        if let Err(ref e) = start_result {
+            eprintln!("task_start failed with error: {:?}", e);
+        }
+        assert!(start_result.is_ok(), "task_start should succeed");
+        
+        // Parse the result to get the PID
+        let start_response = start_result.unwrap();
+        let content = &start_response.content[0];
+        match &content.raw {
+            RawContent::Text(text_content) => {
+                let json_response: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
+                let pid = json_response["result"]["pid"].as_i64().unwrap() as u32;
+                let state = json_response["result"]["state"].as_str().unwrap();
+                
+                // Should start as running
+                println!("Task started with state: {}, pid: {}", state, pid);
+                assert_eq!(state, "running", "Task should start in running state");
+                
+                // Check status immediately - should show as running
+                let status_result = server.status().await.unwrap();
+                let status_content = &status_result.content[0];
+                match &status_content.raw {
+                    RawContent::Text(text_content) => {
+                        let status_json: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
+                        let running_jobs = status_json["running"].as_array().unwrap();
+                        println!("Status immediately after start: {} running jobs", running_jobs.len());
+                        assert_eq!(running_jobs.len(), 1, "Should have 1 running job");
+                        assert_eq!(running_jobs[0]["pid"].as_i64().unwrap() as u32, pid);
+                    }
+                    _ => panic!("Expected text content"),
+                }
+                
+                // Check task_status immediately - should show as running
+                let task_status_args = TaskStatusArgs {
+                    unique_name: "long-test".to_string(),
+                };
+                let task_status_result = server.task_status(Parameters(task_status_args)).await.unwrap();
+                let task_status_content = &task_status_result.content[0];
+                match &task_status_content.raw {
+                    RawContent::Text(text_content) => {
+                        let task_status_json: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
+                        let jobs = task_status_json["jobs"].as_array().unwrap();
+                        println!("Task status immediately after start: {} jobs, first job state: {}", 
+                                jobs.len(), 
+                                jobs.get(0).map(|j| j["state"].as_str().unwrap_or("unknown")).unwrap_or("none"));
+                        assert_eq!(jobs.len(), 1, "Should have 1 job");
+                        assert_eq!(jobs[0]["state"].as_str().unwrap(), "running");
+                        assert_eq!(jobs[0]["pid"].as_i64().unwrap() as u32, pid);
+                    }
+                    _ => panic!("Expected text content"),
+                }
+                
+                // Wait for 1 second - should still be running
+                sleep(Duration::from_secs(1)).await;
+                
+                let status_result_after_1s = server.status().await.unwrap();
+                let status_content_after_1s = &status_result_after_1s.content[0];
+                match &status_content_after_1s.raw {
+                    RawContent::Text(text_content) => {
+                        let status_json: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
+                        let running_jobs = status_json["running"].as_array().unwrap();
+                        println!("Status after 1 second: {} running jobs", running_jobs.len());
+                        assert_eq!(running_jobs.len(), 1, "Should still have 1 running job after 1s");
+                    }
+                    _ => panic!("Expected text content"),
+                }
+                
+                // Wait for task to complete (3 seconds + buffer)
+                sleep(Duration::from_secs(4)).await;
+                
+                // Check status after completion - should show no running jobs
+                let status_result_final = server.status().await.unwrap();
+                let status_content_final = &status_result_final.content[0];
+                match &status_content_final.raw {
+                    RawContent::Text(text_content) => {
+                        let status_json: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
+                        let running_jobs = status_json["running"].as_array().unwrap();
+                        println!("Status after completion: {} running jobs", running_jobs.len());
+                        assert_eq!(running_jobs.len(), 0, "Should have no running jobs after completion");
+                    }
+                    _ => panic!("Expected text content"),
+                }
+                
+                // Check task_status after completion - should show as exited
+                let task_status_args_final = TaskStatusArgs {
+                    unique_name: "long-test".to_string(),
+                };
+                let task_status_result_final = server.task_status(Parameters(task_status_args_final)).await.unwrap();
+                let task_status_content_final = &task_status_result_final.content[0];
+                match &task_status_content_final.raw {
+                    RawContent::Text(text_content) => {
+                        let task_status_json: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
+                        let jobs = task_status_json["jobs"].as_array().unwrap();
+                        println!("Task status after completion: {} jobs, first job state: {}", 
+                                jobs.len(), 
+                                jobs.get(0).map(|j| j["state"].as_str().unwrap_or("unknown")).unwrap_or("none"));
+                        assert_eq!(jobs.len(), 1, "Should still have 1 job record");
+                        assert_eq!(jobs[0]["state"].as_str().unwrap(), "exited");
+                        assert_eq!(jobs[0]["pid"].as_i64().unwrap() as u32, pid);
+                    }
+                    _ => panic!("Expected text content"),
+                }
+            }
+            _ => panic!("Expected text content"),
         }
     }
 }
