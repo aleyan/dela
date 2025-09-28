@@ -597,6 +597,10 @@ pub struct TaskOutputArgs {
     /// Number of lines to return (default: 200)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub lines: Option<usize>,
+
+    /// Whether the output was truncated due to buffer limits
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub show_truncation: Option<bool>,
 }
 
 /// Arguments for the task_stop tool
@@ -604,4 +608,8 @@ pub struct TaskOutputArgs {
 pub struct TaskStopArgs {
     /// The PID of the job to stop
     pub pid: u32,
+
+    /// Grace period in seconds before sending SIGKILL (default: 5)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub grace_period: Option<u64>,
 }

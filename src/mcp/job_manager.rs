@@ -5,6 +5,17 @@ use std::time::{Duration, Instant};
 use tokio::process::Child;
 use tokio::sync::RwLock;
 
+/// Result of a graceful stop operation
+#[derive(Debug, Clone, PartialEq)]
+pub enum StopResult {
+    /// Process stopped gracefully with exit code
+    Graceful(i32),
+    /// Process was force-killed after grace period
+    Forced,
+    /// Stop operation failed
+    Failed(String),
+}
+
 /// State of a background job
 #[derive(Debug, Clone, PartialEq)]
 pub enum JobState {
@@ -95,6 +106,16 @@ impl RingBuffer {
     /// Check if the buffer is empty
     pub fn is_empty(&self) -> bool {
         self.buffer.is_empty()
+    }
+
+    /// Check if the buffer is full (at line limit)
+    pub fn is_full(&self) -> bool {
+        self.buffer.len() >= self.max_size
+    }
+
+    /// Get the capacity of the buffer (max lines)
+    pub fn capacity(&self) -> usize {
+        self.max_size
     }
 
     /// Get the total bytes stored
@@ -227,6 +248,18 @@ impl JobManager {
         }
     }
 
+    /// Check if we can start a new job (concurrency limit check)
+    pub async fn can_start_job(&self) -> Result<(), String> {
+        let jobs = self.jobs.read().await;
+        if jobs.len() >= self.config.max_concurrent_jobs {
+            return Err(format!(
+                "Maximum concurrent jobs limit reached: {}",
+                self.config.max_concurrent_jobs
+            ));
+        }
+        Ok(())
+    }
+
     /// Start a new job
     pub async fn start_job(
         &self,
@@ -323,6 +356,90 @@ impl JobManager {
                 }
             }
             Ok(())
+        } else {
+            Err(format!("Job with PID {} not found", pid))
+        }
+    }
+
+    /// Gracefully stop a job (SIGTERM + grace period + SIGKILL)
+    pub async fn stop_job_graceful(&self, pid: u32, grace_period_seconds: u64) -> Result<StopResult, String> {
+        use tokio::time::{Duration, timeout};
+
+        // First, try to get the process from our managed processes
+        let mut processes = self.processes.write().await;
+        if let Some(mut process) = processes.remove(&pid) {
+            // Send SIGTERM
+            if let Err(e) = process.kill().await {
+                // Update job state to failed
+                let mut jobs = self.jobs.write().await;
+                if let Some(job) = jobs.get_mut(&pid) {
+                    job.mark_failed(format!("Failed to send SIGTERM: {}", e));
+                }
+                return Ok(StopResult::Failed(format!("Failed to send SIGTERM: {}", e)));
+            }
+
+            // Wait for the process to exit gracefully
+            let grace_duration = Duration::from_secs(grace_period_seconds);
+            let wait_result = timeout(grace_duration, process.wait()).await;
+
+            match wait_result {
+                Ok(Ok(exit_status)) => {
+                    // Process exited gracefully
+                    let exit_code = exit_status.code().unwrap_or(-1);
+                    let mut jobs = self.jobs.write().await;
+                    if let Some(job) = jobs.get_mut(&pid) {
+                        job.mark_exited(exit_code);
+                    }
+                    Ok(StopResult::Graceful(exit_code))
+                }
+                Ok(Err(e)) => {
+                    // Process wait failed
+                    let mut jobs = self.jobs.write().await;
+                    if let Some(job) = jobs.get_mut(&pid) {
+                        job.mark_failed(format!("Process wait failed: {}", e));
+                    }
+                    Ok(StopResult::Failed(format!("Process wait failed: {}", e)))
+                }
+                Err(_) => {
+                    // Grace period expired, send SIGKILL
+                    drop(processes); // Release the lock before trying to kill
+                    
+                    // Try to kill the process using system kill command
+                    let kill_result = tokio::process::Command::new("kill")
+                        .arg("-9")
+                        .arg(pid.to_string())
+                        .output()
+                        .await;
+
+                    match kill_result {
+                        Ok(output) => {
+                            if output.status.success() {
+                                // Update job state to stopped
+                                let mut jobs = self.jobs.write().await;
+                                if let Some(job) = jobs.get_mut(&pid) {
+                                    job.mark_failed("Stopped with SIGKILL after grace period".to_string());
+                                }
+                                Ok(StopResult::Forced)
+                            } else {
+                                // Kill command failed
+                                let mut jobs = self.jobs.write().await;
+                                if let Some(job) = jobs.get_mut(&pid) {
+                                    job.mark_failed("Failed to send SIGKILL".to_string());
+                                }
+                                Ok(StopResult::Failed("Failed to send SIGKILL".to_string()))
+                            }
+                        }
+                        Err(e) => {
+                            // Command execution failed
+                            let mut jobs = self.jobs.write().await;
+                            if let Some(job) = jobs.get_mut(&pid) {
+                                job.mark_failed(format!("Failed to execute kill command: {}", e));
+                            }
+                            Ok(StopResult::Failed(format!("Failed to execute kill command: {}", e)))
+                        }
+                    }
+                }
+            }
         } else {
             Err(format!("Job with PID {} not found", pid))
         }
