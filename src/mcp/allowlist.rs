@@ -3,7 +3,7 @@ use crate::types::{AllowScope, Allowlist, Task};
 use std::path::Path;
 
 /// MCP-specific allowlist evaluator for task permissions
-/// 
+///
 /// This module provides read-only access to the allowlist for MCP operations.
 /// It follows the same precedence rules as the main allowlist but is designed
 /// specifically for MCP server operations without prompting capabilities.
@@ -20,12 +20,12 @@ impl McpAllowlistEvaluator {
     }
 
     /// Check if a task is allowed for MCP execution
-    /// 
+    ///
     /// Returns:
     /// - `Ok(true)` if the task is explicitly allowed
     /// - `Ok(false)` if the task is explicitly denied or not found in allowlist
     /// - `Err(msg)` if there was an error loading the allowlist
-    /// 
+    ///
     /// Precedence order (highest to lowest):
     /// 1. Deny entries (highest precedence)
     /// 2. Directory scope allow entries
@@ -98,8 +98,8 @@ impl McpAllowlistEvaluator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{Allowlist, AllowlistEntry};
     use crate::environment::{TestEnvironment, reset_to_real_environment, set_test_environment};
+    use crate::types::{Allowlist, AllowlistEntry};
     use crate::types::{Task, TaskDefinitionType, TaskRunner};
     use serial_test::serial;
     use std::fs;
@@ -138,11 +138,11 @@ mod tests {
     #[serial]
     fn test_mcp_allowlist_evaluator_new() {
         let (_temp_dir, _task) = setup_test_env();
-        
+
         let evaluator = McpAllowlistEvaluator::new().unwrap();
         assert!(evaluator.is_empty());
         assert_eq!(evaluator.entry_count(), 0);
-        
+
         reset_to_real_environment();
     }
 
@@ -150,12 +150,12 @@ mod tests {
     #[serial]
     fn test_mcp_allowlist_evaluator_empty_deny_by_default() {
         let (_temp_dir, task) = setup_test_env();
-        
+
         let evaluator = McpAllowlistEvaluator::new().unwrap();
-        
+
         // With empty allowlist, task should be denied by default for MCP
         assert_eq!(evaluator.is_task_allowed(&task).unwrap(), false);
-        
+
         reset_to_real_environment();
     }
 
@@ -175,7 +175,7 @@ mod tests {
         crate::allowlist::save_allowlist(&allowlist).unwrap();
 
         let evaluator = McpAllowlistEvaluator::new().unwrap();
-        
+
         // Task should be allowed
         assert_eq!(evaluator.is_task_allowed(&task).unwrap(), true);
 
@@ -199,7 +199,7 @@ mod tests {
         crate::allowlist::save_allowlist(&allowlist).unwrap();
 
         let evaluator = McpAllowlistEvaluator::new().unwrap();
-        
+
         // Task should be allowed
         assert_eq!(evaluator.is_task_allowed(&task).unwrap(), true);
 
@@ -229,7 +229,10 @@ mod tests {
         let evaluator = McpAllowlistEvaluator::new().unwrap();
 
         // Task in subdirectory should be allowed
-        let subdir_task = create_test_task("build", std::path::PathBuf::from("/project/subdir/Makefile"));
+        let subdir_task = create_test_task(
+            "build",
+            std::path::PathBuf::from("/project/subdir/Makefile"),
+        );
         assert_eq!(evaluator.is_task_allowed(&subdir_task).unwrap(), true);
 
         // Task outside directory should be denied
@@ -256,7 +259,7 @@ mod tests {
         crate::allowlist::save_allowlist(&allowlist).unwrap();
 
         let evaluator = McpAllowlistEvaluator::new().unwrap();
-        
+
         // Task should be denied
         assert_eq!(evaluator.is_task_allowed(&task).unwrap(), false);
 
@@ -292,7 +295,7 @@ mod tests {
         crate::allowlist::save_allowlist(&allowlist).unwrap();
 
         let evaluator = McpAllowlistEvaluator::new().unwrap();
-        
+
         // Task should be denied (deny takes precedence)
         assert_eq!(evaluator.is_task_allowed(&task).unwrap(), false);
 
@@ -322,7 +325,7 @@ mod tests {
 
         // Create allowlist with multiple entries
         let mut allowlist = Allowlist::default();
-        
+
         // Add a directory allow entry
         let dir_entry = AllowlistEntry {
             path: std::path::PathBuf::from("/project"),
@@ -342,12 +345,13 @@ mod tests {
         crate::allowlist::save_allowlist(&allowlist).unwrap();
 
         let evaluator = McpAllowlistEvaluator::new().unwrap();
-        
+
         // Task should be denied due to file deny entry (higher precedence than directory allow)
         assert_eq!(evaluator.is_task_allowed(&task).unwrap(), false);
 
         // But a task in a different file in the same directory should be allowed
-        let other_file_task = create_test_task("build", std::path::PathBuf::from("/project/other.mk"));
+        let other_file_task =
+            create_test_task("build", std::path::PathBuf::from("/project/other.mk"));
         assert_eq!(evaluator.is_task_allowed(&other_file_task).unwrap(), true);
 
         drop(temp_dir);

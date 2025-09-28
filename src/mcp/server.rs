@@ -1,5 +1,8 @@
 use super::allowlist::McpAllowlistEvaluator;
-use super::dto::{ListTasksArgs, StartResultDto, TaskDto, TaskStartArgs, TaskStatusArgs, TaskOutputArgs, TaskStopArgs};
+use super::dto::{
+    ListTasksArgs, StartResultDto, TaskDto, TaskOutputArgs, TaskStartArgs, TaskStatusArgs,
+    TaskStopArgs,
+};
 use super::errors::DelaError;
 use super::job_manager::{JobManager, JobMetadata, JobState};
 use crate::runner::is_runner_available;
@@ -26,16 +29,15 @@ pub struct DelaMcpServer {
 impl DelaMcpServer {
     /// Create a new MCP server instance
     pub fn new(root: PathBuf) -> Self {
-        let allowlist_evaluator = McpAllowlistEvaluator::new()
-            .unwrap_or_else(|_| {
-                // If allowlist loading fails, create an empty evaluator
-                // This allows the server to start even if allowlist is not available
-                McpAllowlistEvaluator {
-                    allowlist: crate::types::Allowlist::default(),
-                }
-            });
+        let allowlist_evaluator = McpAllowlistEvaluator::new().unwrap_or_else(|_| {
+            // If allowlist loading fails, create an empty evaluator
+            // This allows the server to start even if allowlist is not available
+            McpAllowlistEvaluator {
+                allowlist: crate::types::Allowlist::default(),
+            }
+        });
         let job_manager = JobManager::new();
-        Self { 
+        Self {
             root,
             allowlist_evaluator,
             job_manager,
@@ -85,7 +87,10 @@ impl DelaMcpServer {
         }
 
         // Convert to DTOs with enriched fields (command, runner_available, allowlisted)
-        let task_dtos: Vec<TaskDto> = tasks.iter().map(|task| TaskDto::from_task_enriched(task, &self.allowlist_evaluator)).collect();
+        let task_dtos: Vec<TaskDto> = tasks
+            .iter()
+            .map(|task| TaskDto::from_task_enriched(task, &self.allowlist_evaluator))
+            .collect();
 
         Ok(CallToolResult::success(vec![
             Content::json(&serde_json::json!({
@@ -143,12 +148,15 @@ impl DelaMcpServer {
             .ok_or_else(|| DelaError::task_not_found(args.unique_name.clone()))?;
 
         // Check if task is allowlisted for MCP execution
-        let is_allowed = self.allowlist_evaluator.is_task_allowed(task).map_err(|e| {
-            DelaError::internal_error(
-                format!("MCP allowlist check failed: {}", e),
-                Some("Check allowlist configuration".to_string()),
-            )
-        })?;
+        let is_allowed = self
+            .allowlist_evaluator
+            .is_task_allowed(task)
+            .map_err(|e| {
+                DelaError::internal_error(
+                    format!("MCP allowlist check failed: {}", e),
+                    Some("Check allowlist configuration".to_string()),
+                )
+            })?;
 
         if !is_allowed {
             return Err(DelaError::not_allowlisted(args.unique_name.clone()).into());
@@ -286,35 +294,55 @@ impl DelaMcpServer {
                 };
 
                 // Start background job management first
-                self.job_manager.start_job(pid as u32, metadata, child).await.map_err(|e| {
-                    DelaError::internal_error(
-                        format!("Failed to start background job: {}", e),
-                        Some("Job management error".to_string()),
-                    )
-                })?;
-
-                // Add initial output to the job after it's started
-                if !output.is_empty() {
-                    self.job_manager.add_job_output(pid as u32, output.clone()).await.map_err(|e| {
+                self.job_manager
+                    .start_job(pid as u32, metadata, child)
+                    .await
+                    .map_err(|e| {
                         DelaError::internal_error(
-                            format!("Failed to add initial output: {}", e),
+                            format!("Failed to start background job: {}", e),
                             Some("Job management error".to_string()),
                         )
                     })?;
+
+                // Add initial output to the job after it's started
+                if !output.is_empty() {
+                    self.job_manager
+                        .add_job_output(pid as u32, output.clone())
+                        .await
+                        .map_err(|e| {
+                            DelaError::internal_error(
+                                format!("Failed to add initial output: {}", e),
+                                Some("Job management error".to_string()),
+                            )
+                        })?;
                 }
 
                 // Spawn a task to monitor the job
                 let job_manager = self.job_manager.clone();
                 tokio::spawn(async move {
                     // Get the process from the job manager and wait for it
-                    if let Some(mut process) = job_manager.processes.write().await.remove(&(pid as u32)) {
+                    if let Some(mut process) =
+                        job_manager.processes.write().await.remove(&(pid as u32))
+                    {
                         if let Ok(exit_status) = process.wait().await {
                             let exit_code = exit_status.code();
-                            if let Err(e) = job_manager.update_job_state(pid as u32, JobState::Exited(exit_code.unwrap_or(-1))).await {
+                            if let Err(e) = job_manager
+                                .update_job_state(
+                                    pid as u32,
+                                    JobState::Exited(exit_code.unwrap_or(-1)),
+                                )
+                                .await
+                            {
                                 eprintln!("Failed to update job state: {}", e);
                             }
                         } else {
-                            if let Err(e) = job_manager.update_job_state(pid as u32, JobState::Failed("Process wait failed".to_string())).await {
+                            if let Err(e) = job_manager
+                                .update_job_state(
+                                    pid as u32,
+                                    JobState::Failed("Process wait failed".to_string()),
+                                )
+                                .await
+                            {
                                 eprintln!("Failed to update job state: {}", e);
                             }
                         }
@@ -379,7 +407,7 @@ impl DelaMcpServer {
                     JobState::Exited(_) => "exited",
                     JobState::Failed(_) => "failed",
                 };
-                
+
                 serde_json::json!({
                     "pid": job.pid,
                     "unique_name": job.metadata.unique_name,
@@ -407,11 +435,14 @@ impl DelaMcpServer {
         &self,
         Parameters(args): Parameters<TaskOutputArgs>,
     ) -> Result<CallToolResult, ErrorData> {
-        let job = self.job_manager.get_job(args.pid).await
+        let job = self
+            .job_manager
+            .get_job(args.pid)
+            .await
             .ok_or_else(|| DelaError::task_not_found(format!("Job with PID {}", args.pid)))?;
 
         let lines = job.get_output_lines(Some(args.lines.unwrap_or(200)));
-        
+
         Ok(CallToolResult::success(vec![
             Content::json(&serde_json::json!({
                 "pid": job.pid,
@@ -429,14 +460,18 @@ impl DelaMcpServer {
         Parameters(args): Parameters<TaskStopArgs>,
     ) -> Result<CallToolResult, ErrorData> {
         // Check if job exists
-        let job = self.job_manager.get_job(args.pid).await
+        let job = self
+            .job_manager
+            .get_job(args.pid)
+            .await
             .ok_or_else(|| DelaError::task_not_found(format!("Job with PID {}", args.pid)))?;
 
         if !job.is_running() {
             return Err(DelaError::internal_error(
                 format!("Job with PID {} is not running", args.pid),
                 Some("Job is already finished".to_string()),
-            ).into());
+            )
+            .into());
         }
 
         // Stop the job
@@ -822,7 +857,9 @@ impl ServerHandler for DelaMcpServer {
             },
             Tool {
                 name: "task_status".into(),
-                description: Some("Status for a single unique_name (may have multiple PIDs)".into()),
+                description: Some(
+                    "Status for a single unique_name (may have multiple PIDs)".into(),
+                ),
                 input_schema: Arc::new(task_status_schema),
                 annotations: None,
                 output_schema: None,
@@ -881,10 +918,8 @@ mod tests {
             pid: 12345,
             lines: Some(10),
         };
-        let stop_args = TaskStopArgs {
-            pid: 12345,
-        };
-        
+        let stop_args = TaskStopArgs { pid: 12345 };
+
         // These should work (even if they return empty results for non-existent jobs)
         assert!(server.task_status(Parameters(status_args)).await.is_ok());
         // task_output and task_stop should return errors for non-existent jobs
@@ -949,7 +984,11 @@ mod tests {
         let child = cmd.spawn().unwrap();
         let pid = child.id().unwrap();
 
-        server.job_manager.start_job(pid as u32, metadata, child).await.unwrap();
+        server
+            .job_manager
+            .start_job(pid as u32, metadata, child)
+            .await
+            .unwrap();
 
         // Act
         let result = server.status().await.unwrap();
@@ -964,7 +1003,7 @@ mod tests {
                 assert!(obj.contains_key("running"));
                 let running = obj["running"].as_array().unwrap();
                 assert_eq!(running.len(), 1, "Should return one running job");
-                
+
                 let job = &running[0];
                 assert_eq!(job["pid"], pid);
                 assert_eq!(job["unique_name"], "test-task");
@@ -998,7 +1037,11 @@ mod tests {
                 let obj = json.as_object().unwrap();
                 assert!(obj.contains_key("jobs"));
                 let jobs = obj["jobs"].as_array().unwrap();
-                assert_eq!(jobs.len(), 0, "Should return empty array for nonexistent task");
+                assert_eq!(
+                    jobs.len(),
+                    0,
+                    "Should return empty array for nonexistent task"
+                );
             }
             _ => panic!("Expected text content with JSON"),
         }
@@ -1048,8 +1091,16 @@ mod tests {
         let child2 = cmd2.spawn().unwrap();
         let pid2 = child2.id().unwrap();
 
-        server.job_manager.start_job(pid1 as u32, metadata1, child1).await.unwrap();
-        server.job_manager.start_job(pid2 as u32, metadata2, child2).await.unwrap();
+        server
+            .job_manager
+            .start_job(pid1 as u32, metadata1, child1)
+            .await
+            .unwrap();
+        server
+            .job_manager
+            .start_job(pid2 as u32, metadata2, child2)
+            .await
+            .unwrap();
 
         let args = TaskStatusArgs {
             unique_name: "test-task".to_string(),
@@ -1067,8 +1118,12 @@ mod tests {
                 let obj = json.as_object().unwrap();
                 assert!(obj.contains_key("jobs"));
                 let jobs = obj["jobs"].as_array().unwrap();
-                assert_eq!(jobs.len(), 2, "Should return two jobs for the same unique_name");
-                
+                assert_eq!(
+                    jobs.len(),
+                    2,
+                    "Should return two jobs for the same unique_name"
+                );
+
                 // Check that both jobs have the correct unique_name
                 for job in jobs {
                     assert_eq!(job["unique_name"], "test-task");
@@ -1108,10 +1163,18 @@ mod tests {
         let child = cmd.spawn().unwrap();
         let pid = child.id().unwrap();
 
-        server.job_manager.start_job(pid as u32, metadata, child).await.unwrap();
+        server
+            .job_manager
+            .start_job(pid as u32, metadata, child)
+            .await
+            .unwrap();
 
         // Mark job as exited
-        server.job_manager.update_job_state(pid as u32, JobState::Exited(0)).await.unwrap();
+        server
+            .job_manager
+            .update_job_state(pid as u32, JobState::Exited(0))
+            .await
+            .unwrap();
 
         let args = TaskStatusArgs {
             unique_name: "test-task".to_string(),
@@ -1130,7 +1193,7 @@ mod tests {
                 assert!(obj.contains_key("jobs"));
                 let jobs = obj["jobs"].as_array().unwrap();
                 assert_eq!(jobs.len(), 1, "Should return one job");
-                
+
                 let job = &jobs[0];
                 assert_eq!(job["unique_name"], "test-task");
                 assert_eq!(job["state"], "exited");

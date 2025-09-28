@@ -4,7 +4,9 @@ mod errors;
 mod job_manager;
 mod server;
 
-pub use dto::{ListTasksArgs, StartResultDto, TaskStartArgs, TaskStatusArgs, TaskOutputArgs, TaskStopArgs};
+pub use dto::{
+    ListTasksArgs, StartResultDto, TaskOutputArgs, TaskStartArgs, TaskStatusArgs, TaskStopArgs,
+};
 pub use errors::DelaError;
 pub use server::DelaMcpServer;
 

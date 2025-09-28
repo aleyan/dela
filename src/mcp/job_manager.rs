@@ -9,7 +9,7 @@ use tokio::sync::RwLock;
 #[derive(Debug, Clone, PartialEq)]
 pub enum JobState {
     Running,
-    Exited(i32), // exit code
+    Exited(i32),    // exit code
     Failed(String), // error message
 }
 
@@ -49,21 +49,21 @@ impl RingBuffer {
     /// Add a line to the buffer, maintaining size limits
     pub fn push_line(&mut self, line: String) {
         let line_bytes = line.len();
-        
+
         // Remove lines from the front if we exceed the line limit
         while self.buffer.len() >= self.max_size {
             if let Some(removed) = self.buffer.pop_front() {
                 self.total_bytes = self.total_bytes.saturating_sub(removed.len());
             }
         }
-        
+
         // Remove lines from the front if we exceed the byte limit
         while self.total_bytes + line_bytes > self.max_bytes && !self.buffer.is_empty() {
             if let Some(removed) = self.buffer.pop_front() {
                 self.total_bytes = self.total_bytes.saturating_sub(removed.len());
             }
         }
-        
+
         // Add the new line if we have space
         if self.total_bytes + line_bytes <= self.max_bytes {
             self.buffer.push_back(line);
@@ -78,11 +78,8 @@ impl RingBuffer {
         } else {
             0
         };
-        
-        self.buffer.iter()
-            .skip(start)
-            .cloned()
-            .collect()
+
+        self.buffer.iter().skip(start).cloned().collect()
     }
 
     /// Get all lines in the buffer
@@ -199,8 +196,8 @@ impl Default for JobManagerConfig {
             max_concurrent_jobs: 50,
             max_output_lines_per_job: 1000,
             max_output_bytes_per_job: 5 * 1024 * 1024, // 5MB
-            job_ttl_seconds: 3600, // 1 hour
-            gc_interval_seconds: 300, // 5 minutes
+            job_ttl_seconds: 3600,                     // 1 hour
+            gc_interval_seconds: 300,                  // 5 minutes
         }
     }
 }
@@ -238,7 +235,7 @@ impl JobManager {
         process: Child,
     ) -> Result<(), String> {
         let mut jobs = self.jobs.write().await;
-        
+
         // Check concurrent job limit
         if jobs.len() >= self.config.max_concurrent_jobs {
             return Err(format!(
@@ -256,11 +253,11 @@ impl JobManager {
         );
 
         jobs.insert(pid, job);
-        
+
         // Store the process separately
         let mut processes = self.processes.write().await;
         processes.insert(pid, process);
-        
+
         Ok(())
     }
 
@@ -335,10 +332,10 @@ impl JobManager {
     pub async fn remove_job(&self, pid: u32) -> Result<(), String> {
         let mut jobs = self.jobs.write().await;
         let mut processes = self.processes.write().await;
-        
+
         let job_removed = jobs.remove(&pid).is_some();
         let process_removed = processes.remove(&pid).is_some();
-        
+
         if job_removed || process_removed {
             Ok(())
         } else {
@@ -349,7 +346,7 @@ impl JobManager {
     /// Run garbage collection to remove old jobs
     pub async fn garbage_collect(&self) {
         let now = Instant::now();
-        
+
         // Check if enough time has passed since last GC
         {
             let last_gc = self.last_gc.read().await;
@@ -361,28 +358,29 @@ impl JobManager {
         let mut jobs = self.jobs.write().await;
         let mut processes = self.processes.write().await;
         let ttl = Duration::from_secs(self.config.job_ttl_seconds);
-        
+
         // Collect PIDs to remove
         let mut pids_to_remove = Vec::new();
-        
+
         for (pid, job) in jobs.iter() {
             let age = job.age();
             let idle = job.idle_time();
-            
+
             // Keep jobs that are still running and not too old
             if job.is_running() && age < ttl {
                 continue;
             }
-            
+
             // Keep finished jobs that haven't been idle too long
-            if !job.is_running() && idle < Duration::from_secs(300) { // 5 minutes
+            if !job.is_running() && idle < Duration::from_secs(300) {
+                // 5 minutes
                 continue;
             }
-            
+
             // Mark this job for removal
             pids_to_remove.push(*pid);
         }
-        
+
         // Remove jobs and processes
         for pid in pids_to_remove {
             jobs.remove(&pid);
@@ -402,7 +400,7 @@ impl JobManager {
         let mut running = 0;
         let mut exited = 0;
         let mut failed = 0;
-        
+
         for job in jobs.values() {
             match job.state {
                 JobState::Running => running += 1,
@@ -437,11 +435,11 @@ mod tests {
     #[test]
     fn test_ring_buffer_basic() {
         let mut buffer = RingBuffer::new(3, 100);
-        
+
         buffer.push_line("line1".to_string());
         buffer.push_line("line2".to_string());
         buffer.push_line("line3".to_string());
-        
+
         assert_eq!(buffer.len(), 3);
         assert_eq!(buffer.get_all_lines(), vec!["line1", "line2", "line3"]);
     }
@@ -449,11 +447,11 @@ mod tests {
     #[test]
     fn test_ring_buffer_overflow() {
         let mut buffer = RingBuffer::new(2, 100);
-        
+
         buffer.push_line("line1".to_string());
         buffer.push_line("line2".to_string());
         buffer.push_line("line3".to_string());
-        
+
         assert_eq!(buffer.len(), 2);
         assert_eq!(buffer.get_all_lines(), vec!["line2", "line3"]);
     }
@@ -461,13 +459,16 @@ mod tests {
     #[test]
     fn test_ring_buffer_last_lines() {
         let mut buffer = RingBuffer::new(5, 100);
-        
+
         for i in 1..=5 {
             buffer.push_line(format!("line{}", i));
         }
-        
+
         assert_eq!(buffer.get_last_lines(2), vec!["line4", "line5"]);
-        assert_eq!(buffer.get_last_lines(10), vec!["line1", "line2", "line3", "line4", "line5"]);
+        assert_eq!(
+            buffer.get_last_lines(10),
+            vec!["line1", "line2", "line3", "line4", "line5"]
+        );
     }
 
     #[test]
@@ -493,7 +494,7 @@ mod tests {
     async fn test_job_manager_creation() {
         let manager = JobManager::new();
         let stats = manager.get_stats().await;
-        
+
         assert_eq!(stats.total_jobs, 0);
         assert_eq!(stats.running_jobs, 0);
     }
@@ -501,16 +502,16 @@ mod tests {
     #[tokio::test]
     async fn test_job_manager_start_job() {
         let manager = JobManager::new();
-        
+
         // Create a simple command
         let mut cmd = Command::new("echo");
         cmd.arg("test");
         cmd.stdout(std::process::Stdio::piped());
         cmd.stderr(std::process::Stdio::piped());
-        
+
         let child = cmd.spawn().unwrap();
         let pid = child.id().unwrap();
-        
+
         let metadata = JobMetadata {
             started_at: Instant::now(),
             unique_name: "test-task".to_string(),
@@ -521,10 +522,10 @@ mod tests {
             command: "echo test".to_string(),
             file_path: PathBuf::from("Makefile"),
         };
-        
+
         let result = manager.start_job(pid, metadata, child).await;
         assert!(result.is_ok());
-        
+
         let stats = manager.get_stats().await;
         assert_eq!(stats.total_jobs, 1);
         assert_eq!(stats.running_jobs, 1);
@@ -533,15 +534,15 @@ mod tests {
     #[tokio::test]
     async fn test_job_manager_get_job() {
         let manager = JobManager::new();
-        
+
         let mut cmd = Command::new("echo");
         cmd.arg("test");
         cmd.stdout(std::process::Stdio::piped());
         cmd.stderr(std::process::Stdio::piped());
-        
+
         let child = cmd.spawn().unwrap();
         let pid = child.id().unwrap();
-        
+
         let metadata = JobMetadata {
             started_at: Instant::now(),
             unique_name: "test-task".to_string(),
@@ -552,9 +553,9 @@ mod tests {
             command: "echo test".to_string(),
             file_path: PathBuf::from("Makefile"),
         };
-        
+
         manager.start_job(pid, metadata, child).await.unwrap();
-        
+
         let job = manager.get_job(pid).await;
         assert!(job.is_some());
         let job = job.unwrap();
@@ -565,15 +566,15 @@ mod tests {
     #[tokio::test]
     async fn test_job_manager_add_output() {
         let manager = JobManager::new();
-        
+
         let mut cmd = Command::new("echo");
         cmd.arg("test");
         cmd.stdout(std::process::Stdio::piped());
         cmd.stderr(std::process::Stdio::piped());
-        
+
         let child = cmd.spawn().unwrap();
         let pid = child.id().unwrap();
-        
+
         let metadata = JobMetadata {
             started_at: Instant::now(),
             unique_name: "test-task".to_string(),
@@ -584,13 +585,19 @@ mod tests {
             command: "echo test".to_string(),
             file_path: PathBuf::from("Makefile"),
         };
-        
+
         manager.start_job(pid, metadata, child).await.unwrap();
-        
+
         // Add some output
-        manager.add_job_output(pid, "Hello, world!".to_string()).await.unwrap();
-        manager.add_job_output(pid, "This is a test".to_string()).await.unwrap();
-        
+        manager
+            .add_job_output(pid, "Hello, world!".to_string())
+            .await
+            .unwrap();
+        manager
+            .add_job_output(pid, "This is a test".to_string())
+            .await
+            .unwrap();
+
         let job = manager.get_job(pid).await.unwrap();
         let output = job.get_output_lines(None);
         assert_eq!(output, vec!["Hello, world!", "This is a test"]);
@@ -602,18 +609,18 @@ mod tests {
             max_concurrent_jobs: 10,
             max_output_lines_per_job: 10,
             max_output_bytes_per_job: 1000,
-            job_ttl_seconds: 0, // Very short TTL for testing
+            job_ttl_seconds: 0,     // Very short TTL for testing
             gc_interval_seconds: 0, // Run GC immediately
         });
-        
+
         let mut cmd = Command::new("echo");
         cmd.arg("test");
         cmd.stdout(std::process::Stdio::piped());
         cmd.stderr(std::process::Stdio::piped());
-        
+
         let child = cmd.spawn().unwrap();
         let pid = child.id().unwrap();
-        
+
         let metadata = JobMetadata {
             started_at: Instant::now(),
             unique_name: "test-task".to_string(),
@@ -624,15 +631,18 @@ mod tests {
             command: "echo test".to_string(),
             file_path: PathBuf::from("Makefile"),
         };
-        
+
         manager.start_job(pid, metadata, child).await.unwrap();
-        
+
         // Mark job as exited
-        manager.update_job_state(pid, JobState::Exited(0)).await.unwrap();
-        
+        manager
+            .update_job_state(pid, JobState::Exited(0))
+            .await
+            .unwrap();
+
         // Manually remove the job to test the remove functionality
         manager.remove_job(pid).await.unwrap();
-        
+
         // Job should be removed
         let stats = manager.get_stats().await;
         assert_eq!(stats.total_jobs, 0);

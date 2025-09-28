@@ -62,7 +62,10 @@ impl TaskDto {
 
     /// Convert from internal Task to TaskDto with enriched fields
     /// This method computes all enriched fields including command, runner availability, and allowlist status
-    pub fn from_task_enriched(task: &Task, allowlist_evaluator: &crate::mcp::allowlist::McpAllowlistEvaluator) -> Self {
+    pub fn from_task_enriched(
+        task: &Task,
+        allowlist_evaluator: &crate::mcp::allowlist::McpAllowlistEvaluator,
+    ) -> Self {
         Self {
             unique_name: task
                 .disambiguated_name
@@ -377,7 +380,7 @@ mod tests {
     #[test]
     fn test_taskdto_enriched_fields() {
         use crate::mcp::allowlist::McpAllowlistEvaluator;
-        
+
         // Arrange
         let task = Task {
             name: "build".to_string(),
@@ -414,7 +417,7 @@ mod tests {
     #[test]
     fn test_taskdto_command_generation_various_runners() {
         use crate::mcp::allowlist::McpAllowlistEvaluator;
-        
+
         let test_cases = vec![
             (TaskRunner::Make, "build", "make build"),
             (TaskRunner::NodeNpm, "test", "npm run test"),
@@ -468,7 +471,7 @@ mod tests {
     #[test]
     fn test_taskdto_docker_compose_special_commands() {
         use crate::mcp::allowlist::McpAllowlistEvaluator;
-        
+
         let test_cases = vec![
             ("up", "docker compose up"),
             ("down", "docker compose down"),
@@ -509,7 +512,7 @@ mod tests {
     #[test]
     fn test_taskdto_travis_ci_non_executable() {
         use crate::mcp::allowlist::McpAllowlistEvaluator;
-        
+
         // Arrange
         let task = Task {
             name: "test".to_string(),
