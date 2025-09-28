@@ -823,6 +823,52 @@ def test_mcp_protocol():
                                 else:
                                     print(f"✗ MCP task_start failed - task not running: {state}")
                                     return False
+                                
+                                # NEW: call task_output to verify initial lines are captured
+                                task_output_request = {
+                                    "jsonrpc": "2.0",
+                                    "id": 13_1,
+                                    "method": "tools/call",
+                                    "params": {
+                                        "name": "task_output",
+                                        "arguments": {
+                                            "pid": pid,
+                                            "lines": 50,
+                                            "show_truncation": True
+                                        }
+                                    }
+                                }
+                                # Give a short moment for output to be stored
+                                time.sleep(0.3)
+                                print("Requesting task_output for long-running task...")
+                                task_output_response = send_request(process, task_output_request)
+                                print(f"Task output response: {json.dumps(task_output_response)}")
+                                if "result" in task_output_response:
+                                    out_res = task_output_response["result"]
+                                    if "content" in out_res and len(out_res["content"]) > 0:
+                                        out_content = out_res["content"][0]
+                                        if "text" in out_content:
+                                            out_json = json.loads(out_content["text"])
+                                            # Basic assertions on structure
+                                            assert out_json.get("pid") == pid
+                                            lines = out_json.get("lines", [])
+                                            assert isinstance(lines, list)
+                                            # We expect at least the first echo to be present
+                                            # Some environments may buffer differently; accept any non-empty
+                                            if not lines:
+                                                print("✗ task_output returned no lines")
+                                                return False
+                                            else:
+                                                print("✓ task_output returned lines (captured initial output)")
+                                        else:
+                                            print("✗ task_output missing text content")
+                                            return False
+                                    else:
+                                        print("✗ task_output missing content")
+                                        return False
+                                else:
+                                    print("✗ task_output missing result")
+                                    return False
                             else:
                                 print("✗ MCP task_start failed - missing pid or state")
                                 return False

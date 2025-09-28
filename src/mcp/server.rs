@@ -252,26 +252,26 @@ impl DelaMcpServer {
             // Read from both stdout and stderr concurrently with proper timeout handling
             let stdout_task = if let Some(mut stdout) = stdout_handle {
                 tokio::spawn(async move {
-                    // Use a timeout for reading stdout to prevent blocking
-                    match timeout(Duration::from_millis(900), async {
-                        let mut buf = [0; 1024];
-                        let mut output = String::new();
-                        loop {
-                            match stdout.read(&mut buf).await {
-                                Ok(0) => break, // EOF
-                                Ok(n) => {
-                                    output.push_str(&String::from_utf8_lossy(&buf[..n]));
-                                }
-                                Err(_) => break, // Error reading
-                            }
+                    // Read up to ~900ms, but keep partial data on timeout
+                    let deadline = std::time::Instant::now() + Duration::from_millis(900);
+                    let mut buf = [0; 1024];
+                    let mut output = String::new();
+                    loop {
+                        let now = std::time::Instant::now();
+                        if now >= deadline {
+                            break;
                         }
-                        output
-                    })
-                    .await
-                    {
-                        Ok(output) => output,
-                        Err(_) => String::new(), // Timeout or error
+                        let remaining = deadline.saturating_duration_since(now);
+                        match timeout(remaining, stdout.read(&mut buf)).await {
+                            Ok(Ok(0)) => break, // EOF
+                            Ok(Ok(n)) => {
+                                output.push_str(&String::from_utf8_lossy(&buf[..n]));
+                            }
+                            Ok(Err(_)) => break, // read error
+                            Err(_) => break,     // timed out this iteration
+                        }
                     }
+                    output
                 })
             } else {
                 tokio::spawn(async { String::new() })
@@ -279,26 +279,26 @@ impl DelaMcpServer {
 
             let stderr_task = if let Some(mut stderr) = stderr_handle {
                 tokio::spawn(async move {
-                    // Use a timeout for reading stderr to prevent blocking
-                    match timeout(Duration::from_millis(900), async {
-                        let mut buf = [0; 1024];
-                        let mut output = String::new();
-                        loop {
-                            match stderr.read(&mut buf).await {
-                                Ok(0) => break, // EOF
-                                Ok(n) => {
-                                    output.push_str(&String::from_utf8_lossy(&buf[..n]));
-                                }
-                                Err(_) => break, // Error reading
-                            }
+                    // Read up to ~900ms, but keep partial data on timeout
+                    let deadline = std::time::Instant::now() + Duration::from_millis(900);
+                    let mut buf = [0; 1024];
+                    let mut output = String::new();
+                    loop {
+                        let now = std::time::Instant::now();
+                        if now >= deadline {
+                            break;
                         }
-                        output
-                    })
-                    .await
-                    {
-                        Ok(output) => output,
-                        Err(_) => String::new(), // Timeout or error
+                        let remaining = deadline.saturating_duration_since(now);
+                        match timeout(remaining, stderr.read(&mut buf)).await {
+                            Ok(Ok(0)) => break, // EOF
+                            Ok(Ok(n)) => {
+                                output.push_str(&String::from_utf8_lossy(&buf[..n]));
+                            }
+                            Ok(Err(_)) => break, // read error
+                            Err(_) => break,     // timed out this iteration
+                        }
                     }
+                    output
                 })
             } else {
                 tokio::spawn(async { String::new() })
@@ -2687,6 +2687,214 @@ test:
                     }
                     _ => panic!("Expected text content"),
                 }
+            }
+            _ => panic!("Expected text content"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_backgrounding_task_exits_immediately() {
+        use std::os::unix::fs::PermissionsExt;
+        use tokio::time::{Duration, sleep};
+
+        let temp_dir = tempfile::TempDir::new().unwrap();
+
+        // Script that backgrounds real work and exits immediately
+        let script_path = temp_dir.path().join("bg_task.sh");
+        std::fs::write(
+            &script_path,
+            "#!/bin/bash\necho 'Spawning background...'\nsleep 3 &\necho 'Parent exiting now'",
+        )
+        .unwrap();
+        std::fs::set_permissions(&script_path, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        // Makefile target that runs the backgrounding script
+        let makefile_path = temp_dir.path().join("Makefile");
+        std::fs::write(
+            &makefile_path,
+            format!("bg-test:\n\t{}", script_path.display()),
+        )
+        .unwrap();
+
+        // Mock allowlist to allow this Makefile
+        let mock_allowlist = crate::types::Allowlist {
+            entries: vec![crate::types::AllowlistEntry {
+                path: makefile_path.clone(),
+                scope: crate::types::AllowScope::File,
+                tasks: None,
+            }],
+        };
+        let allowlist_evaluator = McpAllowlistEvaluator {
+            allowlist: mock_allowlist,
+        };
+        let server =
+            DelaMcpServer::new_with_allowlist(temp_dir.path().to_path_buf(), allowlist_evaluator);
+
+        // Start the backgrounding task
+        let start_args = TaskStartArgs {
+            unique_name: "bg-test".to_string(),
+            args: None,
+            env: None,
+            cwd: None,
+        };
+        let start_response = server.task_start(Parameters(start_args)).await.unwrap();
+
+        // Parse start result
+        let content = &start_response.content[0];
+        let (pid, state) = match &content.raw {
+            RawContent::Text(text_content) => {
+                let json_response: serde_json::Value =
+                    serde_json::from_str(&text_content.text).unwrap();
+                (
+                    json_response["result"]["pid"].as_i64().unwrap() as u32,
+                    json_response["result"]["state"]
+                        .as_str()
+                        .unwrap()
+                        .to_string(),
+                )
+            }
+            _ => panic!("Expected text content"),
+        };
+
+        // It may start as running if shell hasn’t exited within the 1s capture, so wait a moment
+        sleep(Duration::from_millis(300)).await;
+
+        // Immediately after, status should often show 0 running because parent shell exits
+        let status_result = server.status().await.unwrap();
+        let status_content = &status_result.content[0];
+        match &status_content.raw {
+            RawContent::Text(text_content) => {
+                let status_json: serde_json::Value =
+                    serde_json::from_str(&text_content.text).unwrap();
+                let running_jobs = status_json["running"].as_array().unwrap();
+                // Backgrounded recipe: parent exits quickly → typically no running jobs
+                assert!(
+                    running_jobs.is_empty(),
+                    "Backgrounded task parent should exit quickly"
+                );
+            }
+            _ => panic!("Expected text content"),
+        }
+
+        // task_status should record the job as exited quickly
+        let task_status_args = TaskStatusArgs {
+            unique_name: "bg-test".to_string(),
+        };
+        let task_status_result = server
+            .task_status(Parameters(task_status_args))
+            .await
+            .unwrap();
+        let task_status_content = &task_status_result.content[0];
+        match &task_status_content.raw {
+            RawContent::Text(text_content) => {
+                let task_status_json: serde_json::Value =
+                    serde_json::from_str(&text_content.text).unwrap();
+                let jobs = task_status_json["jobs"].as_array().unwrap();
+                assert!(!jobs.is_empty());
+                let job = &jobs[0];
+                assert_eq!(job["pid"].as_i64().unwrap() as u32, pid);
+                assert_eq!(job["state"].as_str().unwrap(), "exited");
+            }
+            _ => panic!("Expected text content"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_task_output_captures_initial_lines() {
+        use std::os::unix::fs::PermissionsExt;
+        use tokio::time::{Duration, sleep};
+
+        let temp_dir = tempfile::TempDir::new().unwrap();
+
+        // Script that prints several lines immediately, then sleeps
+        let script_path = temp_dir.path().join("out_task.sh");
+        std::fs::write(
+            &script_path,
+            "#!/bin/bash\necho 'LINE-ONE'\necho 'LINE-TWO'\necho 'LINE-THREE'\nsleep 2\necho 'AFTER-SLEEP'\n",
+        )
+        .unwrap();
+        std::fs::set_permissions(&script_path, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        // Makefile target invoking the script
+        let makefile_path = temp_dir.path().join("Makefile");
+        std::fs::write(
+            &makefile_path,
+            format!("out-test:\n\t{}", script_path.display()),
+        )
+        .unwrap();
+
+        // Allowlist mock
+        let mock_allowlist = crate::types::Allowlist {
+            entries: vec![crate::types::AllowlistEntry {
+                path: makefile_path.clone(),
+                scope: crate::types::AllowScope::File,
+                tasks: None,
+            }],
+        };
+        let allowlist_evaluator = McpAllowlistEvaluator {
+            allowlist: mock_allowlist,
+        };
+        let server =
+            DelaMcpServer::new_with_allowlist(temp_dir.path().to_path_buf(), allowlist_evaluator);
+
+        // Start task
+        let start_args = TaskStartArgs {
+            unique_name: "out-test".to_string(),
+            args: None,
+            env: None,
+            cwd: None,
+        };
+        let start_response = server.task_start(Parameters(start_args)).await.unwrap();
+
+        // Extract pid
+        let content = &start_response.content[0];
+        let pid = match &content.raw {
+            RawContent::Text(text_content) => {
+                let json_response: serde_json::Value =
+                    serde_json::from_str(&text_content.text).unwrap();
+                json_response["result"]["pid"].as_i64().unwrap() as u32
+            }
+            _ => panic!("Expected text content"),
+        };
+
+        // Give a short moment for initial output capture path to register
+        sleep(Duration::from_millis(200)).await;
+
+        // Call task_output for last lines
+        let out_args = TaskOutputArgs {
+            pid,
+            lines: Some(10),
+            show_truncation: Some(true),
+        };
+        let out_result = server.task_output(Parameters(out_args)).await.unwrap();
+        let out_content = &out_result.content[0];
+        match &out_content.raw {
+            RawContent::Text(text_content) => {
+                let output_json: serde_json::Value =
+                    serde_json::from_str(&text_content.text).unwrap();
+                assert_eq!(output_json["pid"].as_i64().unwrap() as u32, pid);
+                let lines = output_json["lines"].as_array().unwrap();
+                // Expect initial lines present
+                let joined = lines
+                    .iter()
+                    .filter_map(|v| v.as_str())
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                assert!(
+                    joined.contains("LINE-ONE"),
+                    "missing LINE-ONE in output: {}",
+                    joined
+                );
+                assert!(
+                    joined.contains("LINE-TWO"),
+                    "missing LINE-TWO in output: {}",
+                    joined
+                );
+                assert!(
+                    joined.contains("LINE-THREE"),
+                    "missing LINE-THREE in output: {}",
+                    joined
+                );
             }
             _ => panic!("Expected text content"),
         }
