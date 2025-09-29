@@ -86,16 +86,16 @@ impl DelaMcpServer {
     ) -> Result<CallToolResult, ErrorData> {
         // Discover tasks in the current directory
         let mut discovered = task_discovery::discover_tasks(&self.root);
-        
+
         // Process task disambiguation to generate uniqified names
         task_discovery::process_task_disambiguation(&mut discovered);
-        
+
         // Apply runner filtering if specified
         let mut tasks = discovered.tasks;
         if let Some(runner_filter) = &args.runner {
             tasks.retain(|task| task.runner.short_name() == runner_filter);
         }
-        
+
         // Convert to DTOs with enriched fields (command, runner_available, allowlisted)
         let task_dtos: Vec<TaskDto> = tasks
             .iter()
@@ -1063,10 +1063,10 @@ mod tests {
         let temp_dir = std::env::temp_dir();
         let server = DelaMcpServer::new(temp_dir);
         let args = Parameters(ListTasksArgs::default());
-        
+
         // Act
         let result = server.list_tasks(args).await.unwrap();
-        
+
         // Assert
         assert_eq!(result.content.len(), 1);
         // Should return a JSON response with an empty tasks array
@@ -1075,7 +1075,7 @@ mod tests {
     #[tokio::test]
     async fn test_unimplemented_tools() {
         let server = DelaMcpServer::new(PathBuf::from("."));
-        
+
         // Test that the new tools work with proper arguments
         let status_args = TaskStatusArgs {
             unique_name: "test-task".to_string(),
@@ -1935,11 +1935,11 @@ mod tests {
     async fn test_list_tasks_with_actual_files() {
         use std::fs;
         use tempfile::TempDir;
-        
+
         // Arrange
         let temp_dir = TempDir::new().unwrap();
         let temp_path = temp_dir.path();
-        
+
         // Create a simple Makefile
         let makefile_content = r#"# Build target
 build:
@@ -1950,7 +1950,7 @@ test:
 	echo "Testing"
 "#;
         fs::write(temp_path.join("Makefile"), makefile_content).unwrap();
-        
+
         // Create a package.json
         let package_json_content = r#"{
   "name": "test-project",
@@ -1960,13 +1960,13 @@ test:
   }
 }"#;
         fs::write(temp_path.join("package.json"), package_json_content).unwrap();
-        
+
         let server = DelaMcpServer::new(temp_path.to_path_buf());
         let args = Parameters(ListTasksArgs::default());
-        
+
         // Act
         let result = server.list_tasks(args).await.unwrap();
-        
+
         // Assert
         assert_eq!(result.content.len(), 1);
         // The test succeeded, which means TaskDto conversion worked
@@ -1976,11 +1976,11 @@ test:
     async fn test_list_tasks_with_runner_filter() {
         use std::fs;
         use tempfile::TempDir;
-        
+
         // Arrange
         let temp_dir = TempDir::new().unwrap();
         let temp_path = temp_dir.path();
-        
+
         // Create a Makefile with tasks
         let makefile_content = r#"build:
 	echo "Building with make"
@@ -1989,7 +1989,7 @@ test:
 	echo "Testing with make"
 "#;
         fs::write(temp_path.join("Makefile"), makefile_content).unwrap();
-        
+
         // Create a package.json with tasks
         let package_json_content = r#"{
   "name": "test-project",
@@ -2000,23 +2000,23 @@ test:
   }
 }"#;
         fs::write(temp_path.join("package.json"), package_json_content).unwrap();
-        
+
         let server = DelaMcpServer::new(temp_path.to_path_buf());
-        
+
         // Act & Assert - Test filtering by "make"
         let make_args = Parameters(ListTasksArgs {
             runner: Some("make".to_string()),
         });
         let make_result = server.list_tasks(make_args).await.unwrap();
         assert_eq!(make_result.content.len(), 1);
-        
-        // Act & Assert - Test filtering by "npm"  
+
+        // Act & Assert - Test filtering by "npm"
         let npm_args = Parameters(ListTasksArgs {
             runner: Some("npm".to_string()),
         });
         let npm_result = server.list_tasks(npm_args).await.unwrap();
         assert_eq!(npm_result.content.len(), 1);
-        
+
         // Act & Assert - Test filtering by non-existent runner
         let nonexistent_args = Parameters(ListTasksArgs {
             runner: Some("nonexistent".to_string()),
@@ -2024,7 +2024,7 @@ test:
         let nonexistent_result = server.list_tasks(nonexistent_args).await.unwrap();
         assert_eq!(nonexistent_result.content.len(), 1);
         // Should return empty tasks array
-        
+
         // Act & Assert - Test no filter (should return all tasks)
         let all_args = Parameters(ListTasksArgs::default());
         let all_result = server.list_tasks(all_args).await.unwrap();
@@ -2035,26 +2035,26 @@ test:
     async fn test_list_tasks_runner_filter_case_sensitivity() {
         use std::fs;
         use tempfile::TempDir;
-        
+
         // Arrange
         let temp_dir = TempDir::new().unwrap();
         let temp_path = temp_dir.path();
-        
+
         // Create a Makefile
         let makefile_content = r#"build:
 	echo "Building"
 "#;
         fs::write(temp_path.join("Makefile"), makefile_content).unwrap();
-        
+
         let server = DelaMcpServer::new(temp_path.to_path_buf());
-        
+
         // Act & Assert - Test exact match
         let exact_args = Parameters(ListTasksArgs {
             runner: Some("make".to_string()),
         });
         let exact_result = server.list_tasks(exact_args).await.unwrap();
         assert_eq!(exact_result.content.len(), 1);
-        
+
         // Act & Assert - Test case mismatch (should return empty)
         let case_args = Parameters(ListTasksArgs {
             runner: Some("MAKE".to_string()),
@@ -2685,10 +2685,12 @@ test:
     #[tokio::test]
     #[serial_test::serial]
     async fn test_backgrounding_task_exits_immediately() {
+        use crate::environment::{
+            TestEnvironment, reset_to_real_environment, set_test_environment,
+        };
+        use crate::task_shadowing::{enable_mock, mock_executable, reset_mock};
         use std::os::unix::fs::PermissionsExt;
         use tokio::time::{Duration, sleep};
-        use crate::environment::{TestEnvironment, reset_to_real_environment, set_test_environment};
-        use crate::task_shadowing::{enable_mock, mock_executable, reset_mock};
 
         // Set up test environment and mock make
         reset_mock();

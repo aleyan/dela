@@ -413,7 +413,7 @@ impl JobManager {
                     {
                         use nix::sys::signal::{self, Signal};
                         use nix::unistd::Pid;
-                        
+
                         let result = signal::kill(Pid::from_raw(pid as i32), Signal::SIGKILL);
                         match result {
                             Ok(()) => {
@@ -434,10 +434,10 @@ impl JobManager {
                                 }
                                 Ok(StopResult::Graceful(0)) // Treat as graceful exit
                             }
-                        Err(e) => {
+                            Err(e) => {
                                 // Other signal errors
-                            let mut jobs = self.jobs.write().await;
-                            if let Some(job) = jobs.get_mut(&pid) {
+                                let mut jobs = self.jobs.write().await;
+                                if let Some(job) = jobs.get_mut(&pid) {
                                     job.mark_failed(format!("Failed to send SIGKILL: {}", e));
                                 }
                                 Ok(StopResult::Failed(format!("Failed to send SIGKILL: {}", e)))
@@ -451,7 +451,9 @@ impl JobManager {
                         if let Some(job) = jobs.get_mut(&pid) {
                             job.mark_failed("SIGKILL not supported on this platform".to_string());
                         }
-                        Ok(StopResult::Failed("SIGKILL not supported on this platform".to_string()))
+                        Ok(StopResult::Failed(
+                            "SIGKILL not supported on this platform".to_string(),
+                        ))
                     }
                 }
             }
@@ -461,17 +463,17 @@ impl JobManager {
             {
                 use nix::sys::signal::{self, Signal};
                 use nix::unistd::Pid;
-                
-            // Send SIGTERM best-effort
+
+                // Send SIGTERM best-effort
                 let _ = signal::kill(Pid::from_raw(pid as i32), Signal::SIGTERM);
 
-            // Wait for grace period
-            tokio::time::sleep(Duration::from_secs(grace_period_seconds)).await;
+                // Wait for grace period
+                tokio::time::sleep(Duration::from_secs(grace_period_seconds)).await;
 
-            // Send SIGKILL if still present
+                // Send SIGKILL if still present
                 let kill_result = signal::kill(Pid::from_raw(pid as i32), Signal::SIGKILL);
 
-            match kill_result {
+                match kill_result {
                     Ok(()) => {
                         // Mark job as forced stop
                         let mut jobs = self.jobs.write().await;
@@ -488,9 +490,9 @@ impl JobManager {
                         }
                         Ok(StopResult::Graceful(0)) // Treat as graceful exit
                     }
-                Err(e) => {
-                    let mut jobs = self.jobs.write().await;
-                    if let Some(job) = jobs.get_mut(&pid) {
+                    Err(e) => {
+                        let mut jobs = self.jobs.write().await;
+                        if let Some(job) = jobs.get_mut(&pid) {
                             job.mark_failed(format!("Failed to send SIGKILL (fallback): {}", e));
                         }
                         Ok(StopResult::Failed(format!("Failed to send SIGKILL: {}", e)))
@@ -504,7 +506,9 @@ impl JobManager {
                 if let Some(job) = jobs.get_mut(&pid) {
                     job.mark_failed("Signal handling not supported on this platform".to_string());
                 }
-                Ok(StopResult::Failed("Signal handling not supported on this platform".to_string()))
+                Ok(StopResult::Failed(
+                    "Signal handling not supported on this platform".to_string(),
+                ))
             }
         }
     }
