@@ -869,6 +869,38 @@ def test_mcp_protocol():
                                 else:
                                     print("✗ task_output missing result")
                                     return False
+
+                                # NEW: stop while running
+                                task_stop_request = {
+                                    "jsonrpc": "2.0",
+                                    "id": 1312,
+                                    "method": "tools/call",
+                                    "params": {
+                                        "name": "task_stop",
+                                        "arguments": {"pid": pid, "grace_period": 2}
+                                    }
+                                }
+                                print("Sending task_stop request for long-running task (while running)...")
+                                task_stop_response = send_request(process, task_stop_request)
+                                print(f"Task stop response: {json.dumps(task_stop_response)}")
+                                if "result" in task_stop_response:
+                                    stop_res = task_stop_response["result"]
+                                    if "content" in stop_res and len(stop_res["content"]) > 0:
+                                        stop_content = stop_res["content"][0]
+                                        if "text" in stop_content:
+                                            stop_json = json.loads(stop_content["text"])
+                                            assert stop_json.get("pid") == pid
+                                            assert stop_json.get("status") in ("graceful", "killed", "failed")
+                                            print("✓ MCP task_stop returned valid structure (stopped while running)")
+                                        else:
+                                            print("✗ task_stop missing text content")
+                                            return False
+                                    else:
+                                        print("✗ task_stop missing content")
+                                        return False
+                                else:
+                                    print("✗ task_stop missing result")
+                                    return False
                             else:
                                 print("✗ MCP task_start failed - missing pid or state")
                                 return False
@@ -917,21 +949,21 @@ def test_mcp_protocol():
                         status_data = json.loads(content["text"])
                         if "running" in status_data and isinstance(status_data["running"], list):
                             running_jobs = status_data["running"]
-                            if len(running_jobs) > 0:
-                                # Check if our task is in the running jobs
+                            # After stopping the task, there should be no running jobs
+                            if len(running_jobs) == 0:
+                                print("✓ MCP status tool shows no running jobs (task was stopped)")
+                            else:
+                                # Check if our stopped task is still in the running jobs (it shouldn't be)
                                 found_task = False
                                 for job in running_jobs:
                                     if job.get("unique_name") == "long-running-task" and job.get("pid") == pid:
                                         found_task = True
                                         break
                                 if found_task:
-                                    print("✓ MCP status tool shows running long-running task")
-                                else:
-                                    print("✗ MCP status tool failed - long-running task not found in running jobs")
+                                    print("✗ MCP status tool failed - stopped task still shows as running")
                                     return False
-                            else:
-                                print("✗ MCP status tool failed - no running jobs found")
-                                return False
+                                else:
+                                    print("✓ MCP status tool shows running jobs but not the stopped task")
                         else:
                             print("✗ MCP status tool failed - invalid response structure")
                             return False
@@ -980,12 +1012,13 @@ def test_mcp_protocol():
                                 found_task = False
                                 for job in jobs:
                                     if job.get("unique_name") == "long-running-task" and job.get("pid") == pid:
-                                        if job.get("state") == "running":
+                                        # After stopping the task, it should be in a stopped state (not running)
+                                        if job.get("state") in ("failed", "exited", "stopped", "killed"):
                                             found_task = True
-                                            print("✓ MCP task_status tool shows running long-running task")
+                                            print(f"✓ MCP task_status tool shows stopped task with state: {job.get('state')}")
                                             break
                                         else:
-                                            print(f"✗ MCP task_status tool failed - task not running: {job.get('state')}")
+                                            print(f"✗ MCP task_status tool failed - unexpected task state: {job.get('state')}")
                                             return False
                                 if not found_task:
                                     print("✗ MCP task_status tool failed - long-running task not found in jobs")
@@ -1120,6 +1153,69 @@ def test_mcp_protocol():
             print(f"✗ MCP task_status tool failed - JSON decode error: {e}")
             return False
         
+        # Stop the running task via task_stop and validate
+        task_stop_request = {
+            "jsonrpc": "2.0",
+            "id": 18,
+            "method": "tools/call",
+            "params": {
+                "name": "task_stop",
+                "arguments": {
+                    "pid": pid,
+                    "grace_period": 2
+                }
+            }
+        }
+        print("Sending task_stop request for long-running task...")
+        task_stop_response = send_request(process, task_stop_request)
+        print(f"Task stop response: {json.dumps(task_stop_response)}")
+
+        if "result" in task_stop_response:
+            stop_res = task_stop_response["result"]
+            if "content" in stop_res and len(stop_res["content"]) > 0:
+                stop_content = stop_res["content"][0]
+                if "text" in stop_content:
+                    stop_json = json.loads(stop_content["text"])
+                    assert stop_json.get("pid") == pid
+                    assert stop_json.get("status") in ("graceful", "killed", "failed")
+                    print("✓ MCP task_stop returned valid structure")
+                else:
+                    print("✗ task_stop missing text content")
+                    return False
+            else:
+                print("✗ task_stop missing content")
+                return False
+        elif "error" in task_stop_response:
+            # Expected: trying to stop an already completed task should return an error
+            error = task_stop_response["error"]
+            if "message" in error and "not running" in error["message"]:
+                print("✓ MCP task_stop correctly returned error for already completed task")
+            else:
+                print(f"✗ MCP task_stop returned unexpected error: {error}")
+                return False
+        else:
+            print("✗ task_stop missing result and error")
+            return False
+
+        # After stopping, status should show no running jobs for that pid
+        status_after_stop = send_request(process, status_request)
+        print(f"Status after stop: {json.dumps(status_after_stop)}")
+        if "result" in status_after_stop:
+            res = status_after_stop["result"]
+            content = res.get("content", [])
+            if content:
+                text = json.loads(content[0].get("text", "{}"))
+                running = text.get("running", [])
+                still_running = any(j.get("pid") == pid for j in running)
+                if still_running:
+                    print("✗ task still running after task_stop")
+                    return False
+                else:
+                    print("✓ task_stop removed task from running list")
+            else:
+                print("✗ status after stop missing content")
+                return False
+
         print("✓ MCP long-running task lifecycle test passed!")
         
     except subprocess.TimeoutExpired:

@@ -408,16 +408,15 @@ impl JobManager {
                     // Grace period expired, send SIGKILL
                     drop(processes); // Release the lock before trying to kill
 
-                    // Try to kill the process using system kill command
-                    let kill_result = tokio::process::Command::new("kill")
-                        .arg("-9")
-                        .arg(pid.to_string())
-                        .output()
-                        .await;
-
-                    match kill_result {
-                        Ok(output) => {
-                            if output.status.success() {
+                    // Try to kill the process using native Rust signal handling
+                    #[cfg(unix)]
+                    {
+                        use nix::sys::signal::{self, Signal};
+                        use nix::unistd::Pid;
+                        
+                        let result = signal::kill(Pid::from_raw(pid as i32), Signal::SIGKILL);
+                        match result {
+                            Ok(()) => {
                                 // Update job state to stopped
                                 let mut jobs = self.jobs.write().await;
                                 if let Some(job) = jobs.get_mut(&pid) {
@@ -426,31 +425,87 @@ impl JobManager {
                                     );
                                 }
                                 Ok(StopResult::Forced)
-                            } else {
-                                // Kill command failed
+                            }
+                            Err(nix::errno::Errno::ESRCH) => {
+                                // Process already exited - this is actually success
                                 let mut jobs = self.jobs.write().await;
                                 if let Some(job) = jobs.get_mut(&pid) {
-                                    job.mark_failed("Failed to send SIGKILL".to_string());
+                                    job.mark_exited(0); // Process already exited gracefully
                                 }
-                                Ok(StopResult::Failed("Failed to send SIGKILL".to_string()))
+                                Ok(StopResult::Graceful(0)) // Treat as graceful exit
                             }
-                        }
                         Err(e) => {
-                            // Command execution failed
+                                // Other signal errors
                             let mut jobs = self.jobs.write().await;
                             if let Some(job) = jobs.get_mut(&pid) {
-                                job.mark_failed(format!("Failed to execute kill command: {}", e));
+                                    job.mark_failed(format!("Failed to send SIGKILL: {}", e));
+                                }
+                                Ok(StopResult::Failed(format!("Failed to send SIGKILL: {}", e)))
                             }
-                            Ok(StopResult::Failed(format!(
-                                "Failed to execute kill command: {}",
-                                e
-                            )))
                         }
+                    }
+                    #[cfg(not(unix))]
+                    {
+                        // On non-Unix systems, we can't send signals, so just mark as failed
+                        let mut jobs = self.jobs.write().await;
+                        if let Some(job) = jobs.get_mut(&pid) {
+                            job.mark_failed("SIGKILL not supported on this platform".to_string());
+                        }
+                        Ok(StopResult::Failed("SIGKILL not supported on this platform".to_string()))
                     }
                 }
             }
         } else {
-            Err(format!("Job with PID {} not found", pid))
+            // Fallback: no Child handle (likely already moved to monitor). Use PID signals.
+            #[cfg(unix)]
+            {
+                use nix::sys::signal::{self, Signal};
+                use nix::unistd::Pid;
+                
+            // Send SIGTERM best-effort
+                let _ = signal::kill(Pid::from_raw(pid as i32), Signal::SIGTERM);
+
+            // Wait for grace period
+            tokio::time::sleep(Duration::from_secs(grace_period_seconds)).await;
+
+            // Send SIGKILL if still present
+                let kill_result = signal::kill(Pid::from_raw(pid as i32), Signal::SIGKILL);
+
+            match kill_result {
+                    Ok(()) => {
+                        // Mark job as forced stop
+                        let mut jobs = self.jobs.write().await;
+                        if let Some(job) = jobs.get_mut(&pid) {
+                            job.mark_failed("Stopped with SIGKILL (fallback)".to_string());
+                        }
+                        Ok(StopResult::Forced)
+                    }
+                    Err(nix::errno::Errno::ESRCH) => {
+                        // Process already exited - this is actually success
+                        let mut jobs = self.jobs.write().await;
+                        if let Some(job) = jobs.get_mut(&pid) {
+                            job.mark_exited(0); // Process already exited gracefully
+                        }
+                        Ok(StopResult::Graceful(0)) // Treat as graceful exit
+                    }
+                Err(e) => {
+                    let mut jobs = self.jobs.write().await;
+                    if let Some(job) = jobs.get_mut(&pid) {
+                            job.mark_failed(format!("Failed to send SIGKILL (fallback): {}", e));
+                        }
+                        Ok(StopResult::Failed(format!("Failed to send SIGKILL: {}", e)))
+                    }
+                }
+            }
+            #[cfg(not(unix))]
+            {
+                // On non-Unix systems, we can't send signals, so just mark as failed
+                let mut jobs = self.jobs.write().await;
+                if let Some(job) = jobs.get_mut(&pid) {
+                    job.mark_failed("Signal handling not supported on this platform".to_string());
+                }
+                Ok(StopResult::Failed("Signal handling not supported on this platform".to_string()))
+            }
         }
     }
 
