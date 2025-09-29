@@ -71,3 +71,9 @@ publish: tests tests_integration
 
 format:
 	cargo fmt --all
+
+# Long-running test task for MCP testing
+test_long:
+	@echo "Starting long-running test task..."
+	@sleep 30
+	@echo "Long-running test task completed!"

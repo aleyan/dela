@@ -299,9 +299,9 @@ Add PID management, output buffers, and controls.
 - [x] **[DTKT-171]** Add **ring buffer** for combined stdout/stderr per PID (bounded, configurable)
 - [x] **[DTKT-172]** Complete `status` to list **all running PIDs** with minimal info
 - [x] **[DTKT-173]** Implement `task_status` (filter by unique_name, return many PIDs)
-- [ ] **[DTKT-174]** Implement `task_output` **tail last N lines** (default 200); add truncation flag
-- [ ] **[DTKT-175]** Implement `task_stop` with **TERM + grace + KILL**
-- [ ] **[DTKT-176]** Concurrency and safety limits (max concurrent jobs, per-message chunk cap)
+- [x] **[DTKT-174]** Implement `task_output` **tail last N lines** (default 200); add truncation flag
+- [x] **[DTKT-175]** Implement `task_stop` with **TERM + grace + KILL**
+- [x] **[DTKT-176]** Concurrency and safety limits (max concurrent jobs, per-message chunk cap)
 - [ ] **[DTKT-177]** Optional MCP **logging notifications** while running (tracing + subscriber)
 - [ ] **[DTKT-178]** (Optional) Resources `job://<pid>`, `joblog://<pid>?from=…`
 - [ ] **[DTKT-179]** Integration tests for long-running jobs: start → status → output → stop
