@@ -24,7 +24,7 @@ regex = "1.11.2"
 colored = "3.0.0"
 ratatui = "0.29.0"
 crossterm = "0.29.0"
-rmcp = { version = "0.6.3", features = ["server", "transport-io"] }
+rmcp = { version = "0.8.3", features = ["server", "transport-io"] }
 tokio = { version = "1.47.1", features = ["full"] }
 schemars = "1.0.4"
 tracing = "0.1.41"
