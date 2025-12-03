@@ -314,7 +314,7 @@ Add PID management, output buffers, and controls.
 Advanced MCP features for better editor integration and real-time feedback.
 
 **High Priority:**
-- [ ] **[DTKT-177]** MCP **logging notifications** for real-time output streaming (tracing + subscriber)
+- [x] **[DTKT-177]** MCP **logging notifications** for real-time output streaming (tracing + subscriber)
 - [ ] **[DTKT-186]** **Editor config generation** - auto-generate `.cursor/mcp.json` or similar config files
 
 **Medium Priority:**

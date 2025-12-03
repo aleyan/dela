@@ -47,7 +47,7 @@ This redesign narrows each tool to a single, clear responsibility and aligns wit
 Library & Transport
 	•	Library: rmcp (stdio transport)
 	•	Runtime: tokio multi-thread
-	•	Capabilities: tools (+ logging later for streaming notifications)
+	•	Capabilities: tools + logging (for real-time task output streaming)
 
 Add (dev):
 
@@ -61,8 +61,8 @@ Libraries and their roles:
 	•	tokio - Async runtime for Rust. Powers our job management with async process spawning, ring buffers, and graceful shutdown. The 'full' feature gives us process management and IO utilities.
 	•	serde/serde_json - Serialization framework for Rust. Handles all JSON encoding/decoding of our DTOs and tool parameters. The 'derive' feature lets us auto-generate serializers.
 	•	schemars - JSON Schema generation. Used with #[derive(JsonSchema)] to document our DTOs and tool parameters. Helps IDEs understand our protocol.
-	•	tracing - Modern instrumentation framework. (Phase 2) Used to emit structured job output events that rmcp can surface as logging notifications.
-	•	tracing-subscriber - (Phase 2) Formats events into rmcp-compatible notifications and handles log routing.
+	•	tracing - Modern instrumentation framework. Used to emit structured job output events that rmcp can surface as logging notifications.
+	•	tracing-subscriber - Formats events into rmcp-compatible notifications and handles log routing.
 
 ## Permissioning (Allowlist)
 - MCP server uses the **same allowlist** as the human CLI: `~/.dela/allowlist.toml`
@@ -80,8 +80,9 @@ Libraries and their roles:
 - **First-second capture**: `task_start` collects stdout/stderr for up to **1 second** (configurable later).
   - If the child exits in ≤1s → return `{ state: "exited", exit_code, output }`.
   - If still running after 1s → background it and return `{ state: "running", pid, initial_output }`.
-- **Output ring buffer (Phase 2)**: Per-PID bounded buffer (e.g., 1–5 MB). `task_output` returns last N lines. Future paging via `from` byte cursor.
-- **Lifecycle**: `task_stop` sends SIGTERM, waits grace (default 5s), then SIGKILL. Background jobs are GC'd after a TTL (configurable; Phase 2).
+- **Output ring buffer**: Per-PID bounded buffer (default 1000 lines, 5 MB). `task_output` returns last N lines. Future paging via `from` byte cursor.
+- **Lifecycle**: `task_stop` sends SIGTERM, waits grace (default 5s), then SIGKILL. Background jobs are GC'd after a TTL (configurable).
+- **Real-time streaming**: Task output is streamed via MCP logging notifications. Clients can subscribe to `notifications/message` to receive output as it happens.
 
 ⸻
 
