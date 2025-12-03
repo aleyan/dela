@@ -313,14 +313,19 @@ Add PID management, output buffers, and controls.
 ### Phase 10C — **MCP Enhancements & Streaming** (Future)
 Advanced MCP features for better editor integration and real-time feedback.
 
+**High Priority:**
 - [ ] **[DTKT-177]** MCP **logging notifications** for real-time output streaming (tracing + subscriber)
-- [ ] **[DTKT-178]** MCP **Resources** `job://<pid>` for job state snapshots, `joblog://<pid>?from=…` for log paging
-- [ ] **[DTKT-181]** Task **stdin support** - allow sending input to running tasks via MCP
+- [ ] **[DTKT-186]** **Editor config generation** - auto-generate `.cursor/mcp.json` or similar config files
+
+**Medium Priority:**
 - [ ] **[DTKT-182]** **Environment introspection** - expose detected task runners and their versions
 - [ ] **[DTKT-183]** **Task metadata caching** - cache discovered tasks to speed up repeated `list_tasks` calls
+
+**Lower Priority:**
+- [ ] **[DTKT-178]** MCP **Resources** `job://<pid>` for job state snapshots, `joblog://<pid>?from=…` for log paging
+- [ ] **[DTKT-181]** Task **stdin support** - allow sending input to running tasks via MCP
 - [ ] **[DTKT-184]** **Prompts** - implement MCP prompts for common workflows (e.g., "run tests", "build project")
 - [ ] **[DTKT-185]** **Sampling** - support MCP sampling for AI-assisted task selection
-- [ ] **[DTKT-186]** **Editor config generation** - auto-generate `.cursor/mcp.json` or similar config files
 
 **Deliverable (10C):** Enhanced MCP experience with real-time streaming, resource access, and editor-specific integrations.
 
