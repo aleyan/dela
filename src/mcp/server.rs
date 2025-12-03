@@ -1012,6 +1012,7 @@ impl ServerHandler for DelaMcpServer {
                 output_schema: None,
                 title: None,
                 icons: None,
+                meta: None,
             },
             Tool {
                 name: "status".into(),
@@ -1021,6 +1022,7 @@ impl ServerHandler for DelaMcpServer {
                 output_schema: None,
                 title: None,
                 icons: None,
+                meta: None,
             },
             Tool {
                 name: "task_start".into(),
@@ -1030,6 +1032,7 @@ impl ServerHandler for DelaMcpServer {
                 output_schema: None,
                 title: None,
                 icons: None,
+                meta: None,
             },
             Tool {
                 name: "task_status".into(),
@@ -1041,6 +1044,7 @@ impl ServerHandler for DelaMcpServer {
                 output_schema: None,
                 title: None,
                 icons: None,
+                meta: None,
             },
             Tool {
                 name: "task_output".into(),
@@ -1050,6 +1054,7 @@ impl ServerHandler for DelaMcpServer {
                 output_schema: None,
                 title: None,
                 icons: None,
+                meta: None,
             },
             Tool {
                 name: "task_stop".into(),
@@ -1059,6 +1064,7 @@ impl ServerHandler for DelaMcpServer {
                 output_schema: None,
                 title: None,
                 icons: None,
+                meta: None,
             },
         ];
 
