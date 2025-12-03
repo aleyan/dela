@@ -85,11 +85,13 @@ impl McpAllowlistEvaluator {
     }
 
     /// Get the number of entries in the allowlist
+    #[allow(dead_code)]
     pub fn entry_count(&self) -> usize {
         self.allowlist.entries.len()
     }
 
     /// Check if the allowlist is empty
+    #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
         self.allowlist.entries.is_empty()
     }

@@ -795,8 +795,15 @@ fn discover_shell_script_tasks(dir: &Path, discovered: &mut DiscoveredTasks) {
             if path.is_file() {
                 if let Some(extension) = path.extension() {
                     if extension == "sh" {
+                        // Use file stem (without extension) for task name and disambiguation
                         let name = path
                             .file_stem()
+                            .unwrap_or_default()
+                            .to_string_lossy()
+                            .to_string();
+                        // Use full filename (with extension) for source_name since we execute ./script.sh
+                        let source_name = path
+                            .file_name()
                             .unwrap_or_default()
                             .to_string_lossy()
                             .to_string();
@@ -805,7 +812,7 @@ fn discover_shell_script_tasks(dir: &Path, discovered: &mut DiscoveredTasks) {
                             file_path: path,
                             definition_type: TaskDefinitionType::ShellScript,
                             runner: TaskRunner::ShellScript,
-                            source_name: name.clone(),
+                            source_name,
                             description: None,
                             shadowed_by: check_shadowing(&name),
                             disambiguated_name: None,

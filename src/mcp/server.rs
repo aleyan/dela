@@ -56,6 +56,7 @@ impl DelaMcpServer {
     }
 
     /// Get the root path this server operates in
+    #[allow(dead_code)]
     pub fn root(&self) -> &PathBuf {
         &self.root
     }
@@ -640,6 +641,9 @@ impl ServerHandler for DelaMcpServer {
             server_info: Implementation {
                 name: "dela-mcp".into(),
                 version: env!("CARGO_PKG_VERSION").into(),
+                title: None,
+                icons: None,
+                website_url: None,
             },
             instructions: Some(
                 "List tasks, start them (≤1s capture then background), and manage running tasks via PID; all execution gated by an MCP allowlist."
@@ -1006,6 +1010,8 @@ impl ServerHandler for DelaMcpServer {
                 input_schema: Arc::new(list_tasks_schema),
                 annotations: None,
                 output_schema: None,
+                title: None,
+                icons: None,
             },
             Tool {
                 name: "status".into(),
@@ -1013,6 +1019,8 @@ impl ServerHandler for DelaMcpServer {
                 input_schema: Arc::new(status_schema),
                 annotations: None,
                 output_schema: None,
+                title: None,
+                icons: None,
             },
             Tool {
                 name: "task_start".into(),
@@ -1020,6 +1028,8 @@ impl ServerHandler for DelaMcpServer {
                 input_schema: Arc::new(task_start_schema),
                 annotations: None,
                 output_schema: None,
+                title: None,
+                icons: None,
             },
             Tool {
                 name: "task_status".into(),
@@ -1029,6 +1039,8 @@ impl ServerHandler for DelaMcpServer {
                 input_schema: Arc::new(task_status_schema),
                 annotations: None,
                 output_schema: None,
+                title: None,
+                icons: None,
             },
             Tool {
                 name: "task_output".into(),
@@ -1036,6 +1048,8 @@ impl ServerHandler for DelaMcpServer {
                 input_schema: Arc::new(task_output_schema),
                 annotations: None,
                 output_schema: None,
+                title: None,
+                icons: None,
             },
             Tool {
                 name: "task_stop".into(),
@@ -1043,6 +1057,8 @@ impl ServerHandler for DelaMcpServer {
                 input_schema: Arc::new(task_stop_schema),
                 annotations: None,
                 output_schema: None,
+                title: None,
+                icons: None,
             },
         ];
 
@@ -1780,7 +1796,7 @@ mod tests {
     async fn test_concurrency_limit_enforcement() {
         // Arrange
         let temp_dir = std::env::temp_dir();
-        let server = DelaMcpServer::new(temp_dir);
+        let _server = DelaMcpServer::new(temp_dir);
 
         // Create a job manager with very low concurrency limit for testing
         let config = crate::mcp::job_manager::JobManagerConfig {
@@ -2503,7 +2519,9 @@ test:
 
         let temp_dir = tempfile::TempDir::new().unwrap();
 
-        // Create a test script that runs for 3 seconds
+        // Create a shell script that runs for 3 seconds
+        // Shell scripts are discovered directly by task_discovery when they have .sh extension
+        // This avoids depending on 'make' being installed on the system
         let script_path = temp_dir.path().join("long_task.sh");
         std::fs::write(
             &script_path,
@@ -2512,18 +2530,10 @@ test:
         .unwrap();
         std::fs::set_permissions(&script_path, std::fs::Permissions::from_mode(0o755)).unwrap();
 
-        // Create a Makefile that calls this script
-        let makefile_path = temp_dir.path().join("Makefile");
-        std::fs::write(
-            &makefile_path,
-            format!("long-test:\n\t{}", script_path.display()),
-        )
-        .unwrap();
-
-        // Create a mock allowlist evaluator that allows all tasks
+        // Create a mock allowlist evaluator that allows the shell script
         let mock_allowlist = crate::types::Allowlist {
             entries: vec![crate::types::AllowlistEntry {
-                path: makefile_path.clone(),
+                path: script_path.clone(),
                 scope: crate::types::AllowScope::File,
                 tasks: None,
             }],
@@ -2535,9 +2545,9 @@ test:
         let server =
             DelaMcpServer::new_with_allowlist(temp_dir.path().to_path_buf(), allowlist_evaluator);
 
-        // Start the long-running task
+        // Start the long-running task (shell script name without .sh extension)
         let start_args = TaskStartArgs {
-            unique_name: "long-test".to_string(),
+            unique_name: "long_task".to_string(),
             args: None,
             env: None,
             cwd: None,
@@ -2580,7 +2590,7 @@ test:
 
                 // Check task_status immediately - should show as running
                 let task_status_args = TaskStatusArgs {
-                    unique_name: "long-test".to_string(),
+                    unique_name: "long_task".to_string(),
                 };
                 let task_status_result = server
                     .task_status(Parameters(task_status_args))
@@ -2652,7 +2662,7 @@ test:
 
                 // Check task_status after completion - should show as exited
                 let task_status_args_final = TaskStatusArgs {
-                    unique_name: "long-test".to_string(),
+                    unique_name: "long_task".to_string(),
                 };
                 let task_status_result_final = server
                     .task_status(Parameters(task_status_args_final))
@@ -2743,7 +2753,7 @@ test:
 
         // Parse start result
         let content = &start_response.content[0];
-        let (pid, state) = match &content.raw {
+        let (pid, _state) = match &content.raw {
             RawContent::Text(text_content) => {
                 let json_response: serde_json::Value =
                     serde_json::from_str(&text_content.text).unwrap();
@@ -2813,6 +2823,8 @@ test:
         let temp_dir = tempfile::TempDir::new().unwrap();
 
         // Script that prints several lines immediately, then sleeps
+        // Shell scripts are discovered directly by task_discovery when they have .sh extension
+        // This avoids depending on 'make' being installed on the system
         let script_path = temp_dir.path().join("out_task.sh");
         std::fs::write(
             &script_path,
@@ -2821,18 +2833,10 @@ test:
         .unwrap();
         std::fs::set_permissions(&script_path, std::fs::Permissions::from_mode(0o755)).unwrap();
 
-        // Makefile target invoking the script
-        let makefile_path = temp_dir.path().join("Makefile");
-        std::fs::write(
-            &makefile_path,
-            format!("out-test:\n\t{}", script_path.display()),
-        )
-        .unwrap();
-
-        // Allowlist mock
+        // Allowlist mock to allow the shell script
         let mock_allowlist = crate::types::Allowlist {
             entries: vec![crate::types::AllowlistEntry {
-                path: makefile_path.clone(),
+                path: script_path.clone(),
                 scope: crate::types::AllowScope::File,
                 tasks: None,
             }],
@@ -2843,9 +2847,9 @@ test:
         let server =
             DelaMcpServer::new_with_allowlist(temp_dir.path().to_path_buf(), allowlist_evaluator);
 
-        // Start task
+        // Start task (shell script name without .sh extension)
         let start_args = TaskStartArgs {
-            unique_name: "out-test".to_string(),
+            unique_name: "out_task".to_string(),
             args: None,
             env: None,
             cwd: None,
