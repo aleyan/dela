@@ -302,18 +302,32 @@ Add PID management, output buffers, and controls.
 - [x] **[DTKT-174]** Implement `task_output` **tail last N lines** (default 200); add truncation flag
 - [x] **[DTKT-175]** Implement `task_stop` with **TERM + grace + KILL**
 - [x] **[DTKT-176]** Concurrency and safety limits (max concurrent jobs, per-message chunk cap)
-- [ ] **[DTKT-177]** Optional MCP **logging notifications** while running (tracing + subscriber)
-- [ ] **[DTKT-178]** (Optional) Resources `job://<pid>`, `joblog://<pid>?from=…`
-- [ ] **[DTKT-179]** Integration tests for long-running jobs: start → status → output → stop
-- [ ] **[DTKT-180]** Documentation: full background control, limits, examples
-- [ ] **[DTKT-169]** README: quick MCP usage snippet, Inspector command in the development section
+- [x] **[DTKT-179]** Integration tests for long-running jobs: start → status → output → stop
+- [x] **[DTKT-180]** Documentation: full background control, limits, examples
+- [x] **[DTKT-169]** README: quick MCP usage snippet, Inspector command in the development section
 
 **Deliverable (10B):** Robust PID-based background task management compatible with editors, with log tailing and stop.
+
+---
+
+### Phase 10C — **MCP Enhancements & Streaming** (Future)
+Advanced MCP features for better editor integration and real-time feedback.
+
+- [ ] **[DTKT-177]** MCP **logging notifications** for real-time output streaming (tracing + subscriber)
+- [ ] **[DTKT-178]** MCP **Resources** `job://<pid>` for job state snapshots, `joblog://<pid>?from=…` for log paging
+- [ ] **[DTKT-181]** Task **stdin support** - allow sending input to running tasks via MCP
+- [ ] **[DTKT-182]** **Environment introspection** - expose detected task runners and their versions
+- [ ] **[DTKT-183]** **Task metadata caching** - cache discovered tasks to speed up repeated `list_tasks` calls
+- [ ] **[DTKT-184]** **Prompts** - implement MCP prompts for common workflows (e.g., "run tests", "build project")
+- [ ] **[DTKT-185]** **Sampling** - support MCP sampling for AI-assisted task selection
+- [ ] **[DTKT-186]** **Editor config generation** - auto-generate `.cursor/mcp.json` or similar config files
+
+**Deliverable (10C):** Enhanced MCP experience with real-time streaming, resource access, and editor-specific integrations.
 
 ## Icebox and Future Enhancements (Post-Launch)
 
 - [ ] **Desirable**
-  - [ ] [DTKT-131] Become an MCP server for the tasks
+  - [x] [DTKT-131] Become an MCP server for the tasks (completed in Phase 10)
   - [ ] [DTKT-132] Shell completions
 
 - [ ] **Task Runner Expansions**
