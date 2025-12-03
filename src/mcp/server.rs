@@ -293,8 +293,8 @@ impl DelaMcpServer {
         let pid = child.id().unwrap_or(0) as i32;
 
         // Take stdout/stderr handles for streaming
-            let stdout_handle = child.stdout.take();
-            let stderr_handle = child.stderr.take();
+        let stdout_handle = child.stdout.take();
+        let stderr_handle = child.stderr.take();
 
         // Send task started event
         self.send_task_event(
@@ -322,7 +322,7 @@ impl DelaMcpServer {
             Some(tokio::spawn(async move {
                 let mut reader = BufReader::new(stdout);
                 let mut line = String::new();
-                    loop {
+                loop {
                     line.clear();
                     match reader.read_line(&mut line).await {
                         Ok(0) => break, // EOF
@@ -355,7 +355,7 @@ impl DelaMcpServer {
                     }
                 }
             }))
-            } else {
+        } else {
             drop(stderr_tx);
             None
         };
@@ -370,10 +370,10 @@ impl DelaMcpServer {
             let mut stdout_done = false;
             let mut stderr_done = false;
 
-                    loop {
+            loop {
                 if std::time::Instant::now() >= deadline {
-                            break;
-                        }
+                    break;
+                }
 
                 tokio::select! {
                     Some(line) = stdout_rx.recv(), if !stdout_done => {
@@ -439,7 +439,11 @@ impl DelaMcpServer {
         });
 
         // Wait for initial capture with timeout
-        let capture_result = timeout(capture_duration + Duration::from_millis(100), initial_capture).await;
+        let capture_result = timeout(
+            capture_duration + Duration::from_millis(100),
+            initial_capture,
+        )
+        .await;
 
         // Check if process exited during initial capture
         let process_exited = child.try_wait().map_or(false, |status| status.is_some());
@@ -478,17 +482,15 @@ impl DelaMcpServer {
 
             // Create a dummy child process for the job manager
             // We'll immediately mark it as exited
-            let dummy_child = Command::new("true")
-                .spawn()
-                .map_err(|e| {
-                    DelaError::internal_error(
-                        format!("Failed to create job record: {}", e),
-                        None,
-                    )
-                })?;
+            let dummy_child = Command::new("true").spawn().map_err(|e| {
+                DelaError::internal_error(format!("Failed to create job record: {}", e), None)
+            })?;
 
             // Start and immediately mark as exited
-            let _ = self.job_manager.start_job(pid as u32, metadata, dummy_child).await;
+            let _ = self
+                .job_manager
+                .start_job(pid as u32, metadata, dummy_child)
+                .await;
             let _ = self
                 .job_manager
                 .update_job_state(pid as u32, JobState::Exited(exit_code.unwrap_or(-1)))
@@ -496,7 +498,10 @@ impl DelaMcpServer {
 
             // Add output to the job record
             if !output.is_empty() {
-                let _ = self.job_manager.add_job_output(pid as u32, output.clone()).await;
+                let _ = self
+                    .job_manager
+                    .add_job_output(pid as u32, output.clone())
+                    .await;
             }
 
             // Send task completed event
@@ -508,7 +513,7 @@ impl DelaMcpServer {
                     "task": args.unique_name
                 }),
             )
-        .await;
+            .await;
 
             let start_result = StartResultDto {
                 state: "exited".to_string(),
@@ -529,52 +534,53 @@ impl DelaMcpServer {
         // Process is still running - set up background monitoring
         let output = initial_output.lock().await.clone();
 
-                // Create job metadata
-                let metadata = JobMetadata {
-                    started_at: std::time::Instant::now(),
-                    unique_name: args.unique_name.clone(),
-                    source_name: task.source_name.clone(),
-                    args: args.args.clone(),
-                    env: args.env.clone(),
+        // Create job metadata
+        let metadata = JobMetadata {
+            started_at: std::time::Instant::now(),
+            unique_name: args.unique_name.clone(),
+            source_name: task.source_name.clone(),
+            args: args.args.clone(),
+            env: args.env.clone(),
             cwd: args.cwd.as_ref().map(PathBuf::from),
-                    command: task.runner.get_command(task),
-                    file_path: task.file_path.clone(),
-                };
+            command: task.runner.get_command(task),
+            file_path: task.file_path.clone(),
+        };
 
         // Start background job management
-                self.job_manager
-                    .start_job(pid as u32, metadata, child)
-                    .await
-                    .map_err(|e| {
-                        DelaError::internal_error(
-                            format!("Failed to start background job: {}", e),
-                            Some("Job management error".to_string()),
-                        )
-                    })?;
+        self.job_manager
+            .start_job(pid as u32, metadata, child)
+            .await
+            .map_err(|e| {
+                DelaError::internal_error(
+                    format!("Failed to start background job: {}", e),
+                    Some("Job management error".to_string()),
+                )
+            })?;
 
         // Add initial output to the job
-                if !output.is_empty() {
-                    self.job_manager
-                        .add_job_output(pid as u32, output.clone())
-                        .await
-                        .map_err(|e| {
-                            DelaError::internal_error(
-                                format!("Failed to add initial output: {}", e),
-                                Some("Job management error".to_string()),
-                            )
-                        })?;
-                }
+        if !output.is_empty() {
+            self.job_manager
+                .add_job_output(pid as u32, output.clone())
+                .await
+                .map_err(|e| {
+                    DelaError::internal_error(
+                        format!("Failed to add initial output: {}", e),
+                        Some("Job management error".to_string()),
+                    )
+                })?;
+        }
 
         // Spawn background monitoring task with continued output streaming
-                let job_manager = self.job_manager.clone();
+        let job_manager = self.job_manager.clone();
         let peer_for_monitor = peer_clone;
         let task_name = args.unique_name.clone();
 
-                tokio::spawn(async move {
+        tokio::spawn(async move {
             // Get the receivers from initial capture (if available)
-            let (mut stdout_rx_opt, mut stderr_rx_opt) = if let Ok(Ok((rx1, rx2))) = capture_result {
+            let (mut stdout_rx_opt, mut stderr_rx_opt) = if let Ok(Ok((rx1, rx2))) = capture_result
+            {
                 (Some(rx1), Some(rx2))
-                        } else {
+            } else {
                 (None, None)
             };
 
@@ -643,41 +649,46 @@ impl DelaMcpServer {
                         let code = status.code().unwrap_or(-1);
                         (JobState::Exited(code), Some(code))
                     }
-                    Err(e) => (JobState::Failed(format!("Process wait failed: {}", e)), None),
+                    Err(e) => (
+                        JobState::Failed(format!("Process wait failed: {}", e)),
+                        None,
+                    ),
                 };
 
                 let _ = job_manager.update_job_state(pid_u32, state).await;
 
                 // Send task completed event
                 if let Some(peer) = peer_for_monitor.get() {
-                    let _ = peer.notify_logging_message(LoggingMessageNotificationParam {
-                        level: LoggingLevel::Notice,
-                        logger: Some(format!("task:{}", pid_u32)),
-                        data: serde_json::json!({
-                            "event": "exited",
-                            "pid": pid_u32,
-                            "exit_code": exit_code,
-                            "task": task_name
-                        }),
-                    }).await;
+                    let _ = peer
+                        .notify_logging_message(LoggingMessageNotificationParam {
+                            level: LoggingLevel::Notice,
+                            logger: Some(format!("task:{}", pid_u32)),
+                            data: serde_json::json!({
+                                "event": "exited",
+                                "pid": pid_u32,
+                                "exit_code": exit_code,
+                                "task": task_name
+                            }),
+                        })
+                        .await;
                 }
             }
         });
 
-                let start_result = StartResultDto {
+        let start_result = StartResultDto {
             state: "running".to_string(),
-                    pid: Some(pid),
+            pid: Some(pid),
             exit_code: None,
-                    initial_output: output,
-                };
+            initial_output: output,
+        };
 
-                Ok(CallToolResult::success(vec![
-                    Content::json(&serde_json::json!({
-                        "ok": true,
-                        "result": start_result
-                    }))
-                    .expect("Failed to serialize JSON"),
-                ]))
+        Ok(CallToolResult::success(vec![
+            Content::json(&serde_json::json!({
+                "ok": true,
+                "result": start_result
+            }))
+            .expect("Failed to serialize JSON"),
+        ]))
     }
 
     #[tool(description = "Status for a single unique_name (may have multiple PIDs)")]

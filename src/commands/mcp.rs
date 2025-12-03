@@ -93,34 +93,43 @@ fn generate_config(editor: Editor, cwd: &PathBuf) -> Result<(), String> {
     // Create parent directory if it doesn't exist
     if let Some(parent) = config_path.parent() {
         if !parent.exists() {
-            fs::create_dir_all(parent).map_err(|e| {
-                format!("Failed to create {} directory: {}", editor.name(), e)
-            })?;
+            fs::create_dir_all(parent)
+                .map_err(|e| format!("Failed to create {} directory: {}", editor.name(), e))?;
         }
     }
 
     // Check if config already exists
     if config_path.exists() {
-        let existing = fs::read_to_string(&config_path).map_err(|e| {
-            format!("Failed to read existing config: {}", e)
-        })?;
+        let existing = fs::read_to_string(&config_path)
+            .map_err(|e| format!("Failed to read existing config: {}", e))?;
 
         if existing.contains(editor.dela_marker()) {
-            eprintln!("✓ {} config already has dela at {}", editor.name(), config_path.display());
+            eprintln!(
+                "✓ {} config already has dela at {}",
+                editor.name(),
+                config_path.display()
+            );
             return Ok(());
         } else {
-            eprintln!("⚠ {} config exists at {}", editor.name(), config_path.display());
+            eprintln!(
+                "⚠ {} config exists at {}",
+                editor.name(),
+                config_path.display()
+            );
             eprintln!("  Please manually add dela to the config.");
             return Ok(());
         }
     }
 
     // Write the config file
-    fs::write(&config_path, editor.template()).map_err(|e| {
-        format!("Failed to write config file: {}", e)
-    })?;
+    fs::write(&config_path, editor.template())
+        .map_err(|e| format!("Failed to write config file: {}", e))?;
 
-    eprintln!("✓ Created {} config at {}", editor.name(), config_path.display());
+    eprintln!(
+        "✓ Created {} config at {}",
+        editor.name(),
+        config_path.display()
+    );
 
     Ok(())
 }
@@ -211,7 +220,11 @@ mod tests {
         fs::create_dir_all(&cursor_dir).unwrap();
 
         let config_path = cursor_dir.join("mcp.json");
-        fs::write(&config_path, r#"{"mcpServers": {"dela": {"command": "dela"}}}"#).unwrap();
+        fs::write(
+            &config_path,
+            r#"{"mcpServers": {"dela": {"command": "dela"}}}"#,
+        )
+        .unwrap();
 
         let result = generate_config(Editor::Cursor, &temp_dir.path().to_path_buf());
         assert!(result.is_ok());
@@ -220,7 +233,13 @@ mod tests {
     #[test]
     fn test_editor_config_paths() {
         let cwd = PathBuf::from("/test");
-        assert_eq!(Editor::Cursor.config_path(&cwd), PathBuf::from("/test/.cursor/mcp.json"));
-        assert_eq!(Editor::Vscode.config_path(&cwd), PathBuf::from("/test/.vscode/mcp.json"));
+        assert_eq!(
+            Editor::Cursor.config_path(&cwd),
+            PathBuf::from("/test/.cursor/mcp.json")
+        );
+        assert_eq!(
+            Editor::Vscode.config_path(&cwd),
+            PathBuf::from("/test/.vscode/mcp.json")
+        );
     }
 }

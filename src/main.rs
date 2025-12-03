@@ -163,8 +163,15 @@ async fn main() {
             init_gemini,
             init_claude_code,
         } => {
-            commands::mcp::execute(cwd, init_cursor, init_vscode, init_codex, init_gemini, init_claude_code)
-                .await
+            commands::mcp::execute(
+                cwd,
+                init_cursor,
+                init_vscode,
+                init_codex,
+                init_gemini,
+                init_claude_code,
+            )
+            .await
         }
         Commands::Init => commands::init::execute(),
         Commands::ConfigureShell => commands::configure_shell::execute(),
