@@ -43,6 +43,7 @@ pub struct TaskDto {
 impl TaskDto {
     /// Convert from internal Task to TaskDto (legacy method for backward compatibility)
     /// This method provides basic fields without enrichment
+    #[allow(dead_code)]
     pub fn from_task(task: &Task) -> Self {
         Self {
             unique_name: task

@@ -4,9 +4,12 @@ mod errors;
 mod job_manager;
 mod server;
 
+// Re-export DTO types for public API consumers
+#[allow(unused_imports)]
 pub use dto::{
     ListTasksArgs, StartResultDto, TaskOutputArgs, TaskStartArgs, TaskStatusArgs, TaskStopArgs,
 };
+#[allow(unused_imports)]
 pub use errors::DelaError;
 pub use server::DelaMcpServer;
 

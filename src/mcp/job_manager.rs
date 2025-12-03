@@ -31,6 +31,7 @@ pub struct JobMetadata {
     pub unique_name: String,
     pub source_name: String,
     pub args: Option<Vec<String>>,
+    #[allow(dead_code)]
     pub env: Option<std::collections::HashMap<String, String>>,
     pub cwd: Option<PathBuf>,
     pub command: String,
@@ -104,6 +105,7 @@ impl RingBuffer {
     }
 
     /// Check if the buffer is empty
+    #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
         self.buffer.is_empty()
     }
@@ -191,11 +193,13 @@ impl Job {
     }
 
     /// Get the job's age
+    #[allow(dead_code)]
     pub fn age(&self) -> Duration {
         self.metadata.started_at.elapsed()
     }
 
     /// Get the time since last activity
+    #[allow(dead_code)]
     pub fn idle_time(&self) -> Duration {
         self.last_activity.elapsed()
     }
@@ -207,7 +211,9 @@ pub struct JobManagerConfig {
     pub max_concurrent_jobs: usize,
     pub max_output_lines_per_job: usize,
     pub max_output_bytes_per_job: usize,
+    #[allow(dead_code)]
     pub job_ttl_seconds: u64,
+    #[allow(dead_code)]
     pub gc_interval_seconds: u64,
 }
 
@@ -229,6 +235,7 @@ pub struct JobManager {
     jobs: Arc<RwLock<HashMap<u32, Job>>>,
     pub processes: Arc<RwLock<HashMap<u32, Child>>>,
     config: JobManagerConfig,
+    #[allow(dead_code)]
     last_gc: Arc<RwLock<Instant>>,
 }
 
@@ -339,6 +346,7 @@ impl JobManager {
     }
 
     /// Stop a job (send SIGTERM)
+    #[allow(dead_code)]
     pub async fn stop_job(&self, pid: u32) -> Result<(), String> {
         let mut processes = self.processes.write().await;
         if let Some(mut process) = processes.remove(&pid) {
@@ -514,6 +522,7 @@ impl JobManager {
     }
 
     /// Remove a job
+    #[allow(dead_code)]
     pub async fn remove_job(&self, pid: u32) -> Result<(), String> {
         let mut jobs = self.jobs.write().await;
         let mut processes = self.processes.write().await;
@@ -529,6 +538,7 @@ impl JobManager {
     }
 
     /// Run garbage collection to remove old jobs
+    #[allow(dead_code)]
     pub async fn garbage_collect(&self) {
         let now = Instant::now();
 
@@ -580,6 +590,7 @@ impl JobManager {
     }
 
     /// Get job statistics
+    #[allow(dead_code)]
     pub async fn get_stats(&self) -> JobStats {
         let jobs = self.jobs.read().await;
         let mut running = 0;
@@ -605,6 +616,7 @@ impl JobManager {
 
 /// Statistics about jobs
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct JobStats {
     pub total_jobs: usize,
     pub running_jobs: usize,
