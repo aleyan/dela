@@ -315,7 +315,7 @@ Advanced MCP features for better editor integration and real-time feedback.
 
 **High Priority:**
 - [x] **[DTKT-177]** MCP **logging notifications** for real-time output streaming (tracing + subscriber)
-- [ ] **[DTKT-186]** **Editor config generation** - auto-generate `.cursor/mcp.json` or similar config files
+- [x] **[DTKT-186]** **Editor config generation** - generate `.cursor/mcp.json` or similar config files via `dela mcp --init-cursor`
 
 **Medium Priority:**
 - [ ] **[DTKT-182]** **Environment introspection** - expose detected task runners and their versions
