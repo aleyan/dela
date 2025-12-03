@@ -1,6 +1,6 @@
 # Test Makefile for dela Docker tests
 
-.PHONY: test-task another-task help cd custom-exe print-args test
+.PHONY: test-task another-task help cd custom-exe print-args test long-running-task
 
 test-task: ## Test task for basic functionality
 	@echo "Test task executed successfully"
@@ -10,6 +10,11 @@ test: ## Test task that will conflict with other test tasks
 
 another-task: ## Another test task
 	@echo "Another task executed successfully"
+
+long-running-task: ## Long running task for testing background execution
+	@echo "Starting long-running task..."
+	@sleep 5
+	@echo "Long-running task completed successfully"
 
 print-arg-task: ## Test task for basic functionality with args
 	@echo "Argument is: $(ARG)"

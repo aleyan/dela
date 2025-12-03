@@ -2,6 +2,10 @@
 
 Note for humans. You can start the dev MCP server with Inspector like this (recommended: run the built binary directly to avoid `cargo run` arg parsing issues):
 ```sh
+# oen shot
+MCPI_NO_COLOR=1 npx @modelcontextprotocol/inspector -- cargo -q run -- mcp
+
+
 # Debug build (recommended while iterating)
 cargo build --quiet
 MCPI_NO_COLOR=1 RUST_LOG=warn npx @modelcontextprotocol/inspector ./target/debug/dela mcp

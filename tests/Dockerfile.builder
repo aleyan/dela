@@ -8,7 +8,8 @@ RUN apk add --no-cache \
     gcc \
     make \
     openssl-dev \
-    pkgconfig
+    pkgconfig \
+    procps
 
 # Set the working directory inside the container
 WORKDIR /app

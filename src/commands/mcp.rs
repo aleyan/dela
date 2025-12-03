@@ -7,8 +7,7 @@ pub async fn execute(cwd: String) -> Result<(), String> {
     let root_path = if cwd == "." {
         match std::env::current_dir() {
             Ok(path) => path,
-            Err(e) => {
-                eprintln!("Error: Failed to get current directory: {}", e);
+            Err(_) => {
                 std::process::exit(1);
             }
         }

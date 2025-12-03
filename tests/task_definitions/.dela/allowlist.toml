@@ -1,0 +1,40 @@
+# Allowlist for MCP testing
+[[entries]]
+path = "/home/testuser/test_project/Makefile"
+scope = "File"
+
+[[entries]]
+path = "/home/testuser/test_project/package.json"
+scope = "File"
+
+[[entries]]
+path = "/home/testuser/test_project/pyproject.toml"
+scope = "File"
+
+[[entries]]
+path = "/home/testuser/test_project/Taskfile.yml"
+scope = "File"
+
+[[entries]]
+path = "/home/testuser/test_project/Justfile"
+scope = "File"
+
+[[entries]]
+path = "/home/testuser/test_project/CMakeLists.txt"
+scope = "File"
+
+[[entries]]
+path = "/home/testuser/test_project/build.gradle"
+scope = "File"
+
+[[entries]]
+path = "/home/testuser/test_project/pom.xml"
+scope = "File"
+
+[[entries]]
+path = "/home/testuser/test_project/compose.yml"
+scope = "File"
+
+[[entries]]
+path = "/home/testuser/test_project/docker-compose.yml"
+scope = "File"
