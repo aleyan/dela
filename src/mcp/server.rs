@@ -641,6 +641,9 @@ impl ServerHandler for DelaMcpServer {
             server_info: Implementation {
                 name: "dela-mcp".into(),
                 version: env!("CARGO_PKG_VERSION").into(),
+                title: None,
+                icons: None,
+                website_url: None,
             },
             instructions: Some(
                 "List tasks, start them (≤1s capture then background), and manage running tasks via PID; all execution gated by an MCP allowlist."
@@ -1007,6 +1010,8 @@ impl ServerHandler for DelaMcpServer {
                 input_schema: Arc::new(list_tasks_schema),
                 annotations: None,
                 output_schema: None,
+                title: None,
+                icons: None,
             },
             Tool {
                 name: "status".into(),
@@ -1014,6 +1019,8 @@ impl ServerHandler for DelaMcpServer {
                 input_schema: Arc::new(status_schema),
                 annotations: None,
                 output_schema: None,
+                title: None,
+                icons: None,
             },
             Tool {
                 name: "task_start".into(),
@@ -1021,6 +1028,8 @@ impl ServerHandler for DelaMcpServer {
                 input_schema: Arc::new(task_start_schema),
                 annotations: None,
                 output_schema: None,
+                title: None,
+                icons: None,
             },
             Tool {
                 name: "task_status".into(),
@@ -1030,6 +1039,8 @@ impl ServerHandler for DelaMcpServer {
                 input_schema: Arc::new(task_status_schema),
                 annotations: None,
                 output_schema: None,
+                title: None,
+                icons: None,
             },
             Tool {
                 name: "task_output".into(),
@@ -1037,6 +1048,8 @@ impl ServerHandler for DelaMcpServer {
                 input_schema: Arc::new(task_output_schema),
                 annotations: None,
                 output_schema: None,
+                title: None,
+                icons: None,
             },
             Tool {
                 name: "task_stop".into(),
@@ -1044,6 +1057,8 @@ impl ServerHandler for DelaMcpServer {
                 input_schema: Arc::new(task_stop_schema),
                 annotations: None,
                 output_schema: None,
+                title: None,
+                icons: None,
             },
         ];
 
