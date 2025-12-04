@@ -35,6 +35,7 @@ impl Environment for RealEnvironment {
 
 /// Test environment implementation
 #[derive(Default, Clone)]
+#[allow(dead_code)]
 pub struct TestEnvironment {
     shell: Option<String>,
     executables: HashSet<String>,

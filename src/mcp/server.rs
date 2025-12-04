@@ -11,12 +11,14 @@ use rmcp::{
     ServerHandler, ServiceExt,
     handler::server::wrapper::Parameters,
     model::*,
-    service::{RequestContext, RoleServer},
+    service::{Peer, RequestContext, RoleServer},
     tool,
 };
 use std::path::PathBuf;
-use tokio::io::{AsyncReadExt, stdin, stdout};
+use std::sync::Arc;
+use tokio::io::{AsyncBufReadExt, BufReader, stdin, stdout};
 use tokio::process::Command;
+use tokio::sync::OnceCell;
 use tokio::time::{Duration, timeout};
 
 /// MCP server for dela that exposes task management capabilities
@@ -24,6 +26,8 @@ pub struct DelaMcpServer {
     root: PathBuf,
     allowlist_evaluator: McpAllowlistEvaluator,
     job_manager: JobManager,
+    /// Peer connection for sending notifications (set during initialize)
+    peer: Arc<OnceCell<Peer<RoleServer>>>,
 }
 
 impl DelaMcpServer {
@@ -41,6 +45,7 @@ impl DelaMcpServer {
             root,
             allowlist_evaluator,
             job_manager,
+            peer: Arc::new(OnceCell::new()),
         }
     }
 
@@ -52,7 +57,54 @@ impl DelaMcpServer {
             root,
             allowlist_evaluator,
             job_manager,
+            peer: Arc::new(OnceCell::new()),
         }
+    }
+
+    /// Send a logging notification to the client (if connected)
+    async fn send_log(&self, level: LoggingLevel, logger: &str, data: serde_json::Value) {
+        if let Some(peer) = self.peer.get() {
+            let _ = peer
+                .notify_logging_message(LoggingMessageNotificationParam {
+                    level,
+                    logger: Some(logger.to_string()),
+                    data,
+                })
+                .await;
+        }
+    }
+
+    /// Send task output as a logging notification
+    #[allow(dead_code)]
+    async fn send_task_output(&self, pid: u32, output_type: &str, content: &str) {
+        self.send_log(
+            if output_type == "stderr" {
+                LoggingLevel::Warning
+            } else {
+                LoggingLevel::Info
+            },
+            &format!("task:{}", pid),
+            serde_json::json!({
+                "type": output_type,
+                "pid": pid,
+                "content": content
+            }),
+        )
+        .await;
+    }
+
+    /// Send task lifecycle notification
+    async fn send_task_event(&self, pid: u32, event: &str, details: serde_json::Value) {
+        self.send_log(
+            LoggingLevel::Notice,
+            &format!("task:{}", pid),
+            serde_json::json!({
+                "event": event,
+                "pid": pid,
+                "details": details
+            }),
+        )
+        .await;
     }
 
     /// Get the root path this server operates in
@@ -240,201 +292,403 @@ impl DelaMcpServer {
 
         let pid = child.id().unwrap_or(0) as i32;
 
-        // Capture output for up to 1 second
-        let capture_duration = Duration::from_secs(1);
-        let mut output = String::new();
+        // Take stdout/stderr handles for streaming
+        let stdout_handle = child.stdout.take();
+        let stderr_handle = child.stderr.take();
 
-        // Use a timeout to capture output for exactly 1 second
-        let result = timeout(capture_duration, async {
-            let stdout_handle = child.stdout.take();
-            let stderr_handle = child.stderr.take();
-
-            // Read from both stdout and stderr concurrently with proper timeout handling
-            let stdout_task = if let Some(mut stdout) = stdout_handle {
-                tokio::spawn(async move {
-                    // Read up to ~900ms, but keep partial data on timeout
-                    let deadline = std::time::Instant::now() + Duration::from_millis(900);
-                    let mut buf = [0; 1024];
-                    let mut output = String::new();
-                    loop {
-                        let now = std::time::Instant::now();
-                        if now >= deadline {
-                            break;
-                        }
-                        let remaining = deadline.saturating_duration_since(now);
-                        match timeout(remaining, stdout.read(&mut buf)).await {
-                            Ok(Ok(0)) => break, // EOF
-                            Ok(Ok(n)) => {
-                                output.push_str(&String::from_utf8_lossy(&buf[..n]));
-                            }
-                            Ok(Err(_)) => break, // read error
-                            Err(_) => break,     // timed out this iteration
-                        }
-                    }
-                    output
-                })
-            } else {
-                tokio::spawn(async { String::new() })
-            };
-
-            let stderr_task = if let Some(mut stderr) = stderr_handle {
-                tokio::spawn(async move {
-                    // Read up to ~900ms, but keep partial data on timeout
-                    let deadline = std::time::Instant::now() + Duration::from_millis(900);
-                    let mut buf = [0; 1024];
-                    let mut output = String::new();
-                    loop {
-                        let now = std::time::Instant::now();
-                        if now >= deadline {
-                            break;
-                        }
-                        let remaining = deadline.saturating_duration_since(now);
-                        match timeout(remaining, stderr.read(&mut buf)).await {
-                            Ok(Ok(0)) => break, // EOF
-                            Ok(Ok(n)) => {
-                                output.push_str(&String::from_utf8_lossy(&buf[..n]));
-                            }
-                            Ok(Err(_)) => break, // read error
-                            Err(_) => break,     // timed out this iteration
-                        }
-                    }
-                    output
-                })
-            } else {
-                tokio::spawn(async { String::new() })
-            };
-
-            let (stdout_result, stderr_result) = tokio::join!(stdout_task, stderr_task);
-            let stdout_output = stdout_result.unwrap_or_default();
-            let stderr_output = stderr_result.unwrap_or_default();
-
-            // Combine stdout and stderr
-            let mut combined = String::new();
-            if !stdout_output.is_empty() {
-                combined.push_str("STDOUT:\n");
-                combined.push_str(&stdout_output);
-            }
-            if !stderr_output.is_empty() {
-                if !combined.is_empty() {
-                    combined.push_str("\n");
-                }
-                combined.push_str("STDERR:\n");
-                combined.push_str(&stderr_output);
-            }
-
-            combined
-        })
+        // Send task started event
+        self.send_task_event(
+            pid as u32,
+            "started",
+            serde_json::json!({
+                "task": args.unique_name,
+                "command": full_command
+            }),
+        )
         .await;
 
-        match result {
-            Ok(captured_output) => {
-                // Timeout occurred - process is still running
-                output = captured_output;
+        // Capture initial output for up to 1 second while streaming via logging
+        let capture_duration = Duration::from_secs(1);
+        let initial_output = Arc::new(tokio::sync::Mutex::new(String::new()));
+        let peer_clone = self.peer.clone();
 
-                // Create job metadata
-                let metadata = JobMetadata {
-                    started_at: std::time::Instant::now(),
-                    unique_name: args.unique_name.clone(),
-                    source_name: task.source_name.clone(),
-                    args: args.args.clone(),
-                    env: args.env.clone(),
-                    cwd: args.cwd.as_ref().map(|cwd| PathBuf::from(cwd)),
-                    command: task.runner.get_command(task),
-                    file_path: task.file_path.clone(),
-                };
+        // Create channels for output streaming
+        let (stdout_tx, mut stdout_rx) = tokio::sync::mpsc::channel::<String>(100);
+        let (stderr_tx, mut stderr_rx) = tokio::sync::mpsc::channel::<String>(100);
 
-                // Start background job management first
-                self.job_manager
-                    .start_job(pid as u32, metadata, child)
-                    .await
-                    .map_err(|e| {
-                        DelaError::internal_error(
-                            format!("Failed to start background job: {}", e),
-                            Some("Job management error".to_string()),
-                        )
-                    })?;
+        // Spawn stdout reader task
+        let stdout_task = if let Some(stdout) = stdout_handle {
+            let tx = stdout_tx;
+            Some(tokio::spawn(async move {
+                let mut reader = BufReader::new(stdout);
+                let mut line = String::new();
+                loop {
+                    line.clear();
+                    match reader.read_line(&mut line).await {
+                        Ok(0) => break, // EOF
+                        Ok(_) => {
+                            let _ = tx.send(line.clone()).await;
+                        }
+                        Err(_) => break,
+                    }
+                }
+            }))
+        } else {
+            drop(stdout_tx);
+            None
+        };
 
-                // Add initial output to the job after it's started
-                if !output.is_empty() {
-                    self.job_manager
-                        .add_job_output(pid as u32, output.clone())
-                        .await
-                        .map_err(|e| {
-                            DelaError::internal_error(
-                                format!("Failed to add initial output: {}", e),
-                                Some("Job management error".to_string()),
-                            )
-                        })?;
+        // Spawn stderr reader task
+        let stderr_task = if let Some(stderr) = stderr_handle {
+            let tx = stderr_tx;
+            Some(tokio::spawn(async move {
+                let mut reader = BufReader::new(stderr);
+                let mut line = String::new();
+                loop {
+                    line.clear();
+                    match reader.read_line(&mut line).await {
+                        Ok(0) => break, // EOF
+                        Ok(_) => {
+                            let _ = tx.send(line.clone()).await;
+                        }
+                        Err(_) => break,
+                    }
+                }
+            }))
+        } else {
+            drop(stderr_tx);
+            None
+        };
+
+        // Collect initial output for ~1 second while also streaming to logging
+        let initial_output_clone = initial_output.clone();
+        let peer_for_initial = peer_clone.clone();
+        let pid_u32 = pid as u32;
+
+        let initial_capture = tokio::spawn(async move {
+            let deadline = std::time::Instant::now() + capture_duration;
+            let mut stdout_done = false;
+            let mut stderr_done = false;
+
+            loop {
+                if std::time::Instant::now() >= deadline {
+                    break;
                 }
 
-                // Spawn a task to monitor the job
-                let job_manager = self.job_manager.clone();
-                tokio::spawn(async move {
-                    // Get the process from the job manager and wait for it
-                    if let Some(mut process) =
-                        job_manager.processes.write().await.remove(&(pid as u32))
-                    {
-                        if let Ok(exit_status) = process.wait().await {
-                            let exit_code = exit_status.code();
-                            let _ = job_manager
-                                .update_job_state(
-                                    pid as u32,
-                                    JobState::Exited(exit_code.unwrap_or(-1)),
-                                )
-                                .await;
-                        } else {
-                            let _ = job_manager
-                                .update_job_state(
-                                    pid as u32,
-                                    JobState::Failed("Process wait failed".to_string()),
-                                )
-                                .await;
+                tokio::select! {
+                    Some(line) = stdout_rx.recv(), if !stdout_done => {
+                        // Add to initial output
+                        {
+                            let mut output = initial_output_clone.lock().await;
+                            if output.is_empty() {
+                                output.push_str("STDOUT:\n");
+                            }
+                            output.push_str(&line);
+                        }
+                        // Stream via logging notification
+                        if let Some(peer) = peer_for_initial.get() {
+                            let _ = peer.notify_logging_message(LoggingMessageNotificationParam {
+                                level: LoggingLevel::Info,
+                                logger: Some(format!("task:{}", pid_u32)),
+                                data: serde_json::json!({
+                                    "type": "stdout",
+                                    "pid": pid_u32,
+                                    "line": line.trim_end()
+                                }),
+                            }).await;
                         }
                     }
-                });
+                    Some(line) = stderr_rx.recv(), if !stderr_done => {
+                        // Add to initial output
+                        {
+                            let mut output = initial_output_clone.lock().await;
+                            if !output.contains("STDERR:") {
+                                if !output.is_empty() {
+                                    output.push('\n');
+                                }
+                                output.push_str("STDERR:\n");
+                            }
+                            output.push_str(&line);
+                        }
+                        // Stream via logging notification
+                        if let Some(peer) = peer_for_initial.get() {
+                            let _ = peer.notify_logging_message(LoggingMessageNotificationParam {
+                                level: LoggingLevel::Warning,
+                                logger: Some(format!("task:{}", pid_u32)),
+                                data: serde_json::json!({
+                                    "type": "stderr",
+                                    "pid": pid_u32,
+                                    "line": line.trim_end()
+                                }),
+                            }).await;
+                        }
+                    }
+                    else => {
+                        stdout_done = true;
+                        stderr_done = true;
+                    }
+                }
 
-                let start_result = StartResultDto {
-                    state: "running".to_string(),
-                    pid: Some(pid),
-                    exit_code: None,
-                    initial_output: output,
-                };
-
-                Ok(CallToolResult::success(vec![
-                    Content::json(&serde_json::json!({
-                        "ok": true,
-                        "result": start_result
-                    }))
-                    .expect("Failed to serialize JSON"),
-                ]))
+                if stdout_done && stderr_done {
+                    break;
+                }
             }
-            Err(_) => {
-                // Process completed within 1 second
-                let exit_status = child.wait().await.map_err(|e| {
+
+            // Return the receivers for continued streaming
+            (stdout_rx, stderr_rx)
+        });
+
+        // Wait for initial capture with timeout
+        let capture_result = timeout(
+            capture_duration + Duration::from_millis(100),
+            initial_capture,
+        )
+        .await;
+
+        // Check if process exited during initial capture
+        let process_exited = child.try_wait().map_or(false, |status| status.is_some());
+
+        if process_exited {
+            // Process completed within 1 second
+            let exit_status = child.wait().await.map_err(|e| {
+                DelaError::internal_error(
+                    format!("Failed to wait for process: {}", e),
+                    Some("Process may have terminated unexpectedly".to_string()),
+                )
+            })?;
+
+            let exit_code = exit_status.code();
+            let output = initial_output.lock().await.clone();
+
+            // Wait for reader tasks to finish
+            if let Some(task) = stdout_task {
+                let _ = task.await;
+            }
+            if let Some(task) = stderr_task {
+                let _ = task.await;
+            }
+
+            // Create job metadata and store it so task_status can query it
+            let metadata = JobMetadata {
+                started_at: std::time::Instant::now(),
+                unique_name: args.unique_name.clone(),
+                source_name: task.source_name.clone(),
+                args: args.args.clone(),
+                env: args.env.clone(),
+                cwd: args.cwd.as_ref().map(PathBuf::from),
+                command: task.runner.get_command(task),
+                file_path: task.file_path.clone(),
+            };
+
+            // Create a dummy child process for the job manager
+            // We'll immediately mark it as exited
+            let dummy_child = Command::new("true").spawn().map_err(|e| {
+                DelaError::internal_error(format!("Failed to create job record: {}", e), None)
+            })?;
+
+            // Start and immediately mark as exited
+            let _ = self
+                .job_manager
+                .start_job(pid as u32, metadata, dummy_child)
+                .await;
+            let _ = self
+                .job_manager
+                .update_job_state(pid as u32, JobState::Exited(exit_code.unwrap_or(-1)))
+                .await;
+
+            // Add output to the job record
+            if !output.is_empty() {
+                let _ = self
+                    .job_manager
+                    .add_job_output(pid as u32, output.clone())
+                    .await;
+            }
+
+            // Send task completed event
+            self.send_task_event(
+                pid as u32,
+                "exited",
+                serde_json::json!({
+                    "exit_code": exit_code,
+                    "task": args.unique_name
+                }),
+            )
+            .await;
+
+            let start_result = StartResultDto {
+                state: "exited".to_string(),
+                pid: Some(pid),
+                exit_code,
+                initial_output: output,
+            };
+
+            return Ok(CallToolResult::success(vec![
+                Content::json(&serde_json::json!({
+                    "ok": true,
+                    "result": start_result
+                }))
+                .expect("Failed to serialize JSON"),
+            ]));
+        }
+
+        // Process is still running - set up background monitoring
+        let output = initial_output.lock().await.clone();
+
+        // Create job metadata
+        let metadata = JobMetadata {
+            started_at: std::time::Instant::now(),
+            unique_name: args.unique_name.clone(),
+            source_name: task.source_name.clone(),
+            args: args.args.clone(),
+            env: args.env.clone(),
+            cwd: args.cwd.as_ref().map(PathBuf::from),
+            command: task.runner.get_command(task),
+            file_path: task.file_path.clone(),
+        };
+
+        // Start background job management
+        self.job_manager
+            .start_job(pid as u32, metadata, child)
+            .await
+            .map_err(|e| {
+                DelaError::internal_error(
+                    format!("Failed to start background job: {}", e),
+                    Some("Job management error".to_string()),
+                )
+            })?;
+
+        // Add initial output to the job
+        if !output.is_empty() {
+            self.job_manager
+                .add_job_output(pid as u32, output.clone())
+                .await
+                .map_err(|e| {
                     DelaError::internal_error(
-                        format!("Failed to wait for process: {}", e),
-                        Some("Process may have terminated unexpectedly".to_string()),
+                        format!("Failed to add initial output: {}", e),
+                        Some("Job management error".to_string()),
                     )
                 })?;
+        }
 
-                let exit_code = exit_status.code();
+        // Spawn background monitoring task with continued output streaming
+        let job_manager = self.job_manager.clone();
+        let peer_for_monitor = peer_clone;
+        let task_name = args.unique_name.clone();
 
-                let start_result = StartResultDto {
-                    state: "exited".to_string(),
-                    pid: Some(pid),
-                    exit_code,
-                    initial_output: output,
+        tokio::spawn(async move {
+            // Get the receivers from initial capture (if available)
+            let (mut stdout_rx_opt, mut stderr_rx_opt) = if let Ok(Ok((rx1, rx2))) = capture_result
+            {
+                (Some(rx1), Some(rx2))
+            } else {
+                (None, None)
+            };
+
+            // Continue reading output and streaming
+            loop {
+                let stdout_done = stdout_rx_opt.is_none();
+                let stderr_done = stderr_rx_opt.is_none();
+
+                tokio::select! {
+                    Some(line) = async {
+                        if let Some(ref mut rx) = stdout_rx_opt {
+                            rx.recv().await
+                        } else {
+                            std::future::pending::<Option<String>>().await
+                        }
+                    }, if !stdout_done => {
+                        // Add to ring buffer
+                        let _ = job_manager.add_job_output(pid_u32, line.clone()).await;
+                        // Stream via logging
+                        if let Some(peer) = peer_for_monitor.get() {
+                            let _ = peer.notify_logging_message(LoggingMessageNotificationParam {
+                                level: LoggingLevel::Info,
+                                logger: Some(format!("task:{}", pid_u32)),
+                                data: serde_json::json!({
+                                    "type": "stdout",
+                                    "pid": pid_u32,
+                                    "line": line.trim_end()
+                                }),
+                            }).await;
+                        }
+                    }
+                    Some(line) = async {
+                        if let Some(ref mut rx) = stderr_rx_opt {
+                            rx.recv().await
+                        } else {
+                            std::future::pending::<Option<String>>().await
+                        }
+                    }, if !stderr_done => {
+                        // Add to ring buffer
+                        let _ = job_manager.add_job_output(pid_u32, line.clone()).await;
+                        // Stream via logging
+                        if let Some(peer) = peer_for_monitor.get() {
+                            let _ = peer.notify_logging_message(LoggingMessageNotificationParam {
+                                level: LoggingLevel::Warning,
+                                logger: Some(format!("task:{}", pid_u32)),
+                                data: serde_json::json!({
+                                    "type": "stderr",
+                                    "pid": pid_u32,
+                                    "line": line.trim_end()
+                                }),
+                            }).await;
+                        }
+                    }
+                    else => {
+                        // Both channels closed
+                        break;
+                    }
+                }
+            }
+
+            // Wait for process to exit
+            if let Some(mut process) = job_manager.processes.write().await.remove(&pid_u32) {
+                let exit_result = process.wait().await;
+                let (state, exit_code) = match exit_result {
+                    Ok(status) => {
+                        let code = status.code().unwrap_or(-1);
+                        (JobState::Exited(code), Some(code))
+                    }
+                    Err(e) => (
+                        JobState::Failed(format!("Process wait failed: {}", e)),
+                        None,
+                    ),
                 };
 
-                Ok(CallToolResult::success(vec![
-                    Content::json(&serde_json::json!({
-                        "ok": true,
-                        "result": start_result
-                    }))
-                    .expect("Failed to serialize JSON"),
-                ]))
+                let _ = job_manager.update_job_state(pid_u32, state).await;
+
+                // Send task completed event
+                if let Some(peer) = peer_for_monitor.get() {
+                    let _ = peer
+                        .notify_logging_message(LoggingMessageNotificationParam {
+                            level: LoggingLevel::Notice,
+                            logger: Some(format!("task:{}", pid_u32)),
+                            data: serde_json::json!({
+                                "event": "exited",
+                                "pid": pid_u32,
+                                "exit_code": exit_code,
+                                "task": task_name
+                            }),
+                        })
+                        .await;
+                }
             }
-        }
+        });
+
+        let start_result = StartResultDto {
+            state: "running".to_string(),
+            pid: Some(pid),
+            exit_code: None,
+            initial_output: output,
+        };
+
+        Ok(CallToolResult::success(vec![
+            Content::json(&serde_json::json!({
+                "ok": true,
+                "result": start_result
+            }))
+            .expect("Failed to serialize JSON"),
+        ]))
     }
 
     #[tool(description = "Status for a single unique_name (may have multiple PIDs)")]
@@ -635,8 +889,7 @@ impl ServerHandler for DelaMcpServer {
             protocol_version: ProtocolVersion::V_2024_11_05,
             capabilities: ServerCapabilities::builder()
                 .enable_tools()
-                // Disable logging for now since we don't need it for Phase 10A
-                // .enable_logging()
+                .enable_logging()
                 .build(),
             server_info: Implementation {
                 name: "dela-mcp".into(),
@@ -646,7 +899,7 @@ impl ServerHandler for DelaMcpServer {
                 website_url: None,
             },
             instructions: Some(
-                "List tasks, start them (≤1s capture then background), and manage running tasks via PID; all execution gated by an MCP allowlist."
+                "List tasks, start them (≤1s capture then background), and manage running tasks via PID; all execution gated by an MCP allowlist. Subscribe to logging notifications for real-time task output streaming."
                     .into(),
             ),
         }
@@ -660,6 +913,8 @@ impl ServerHandler for DelaMcpServer {
         if context.peer.peer_info().is_none() {
             context.peer.set_peer_info(request);
         }
+        // Store the peer for sending logging notifications
+        let _ = self.peer.set(context.peer.clone());
         Ok(self.get_info())
     }
 
@@ -1012,6 +1267,7 @@ impl ServerHandler for DelaMcpServer {
                 output_schema: None,
                 title: None,
                 icons: None,
+                meta: None,
             },
             Tool {
                 name: "status".into(),
@@ -1021,6 +1277,7 @@ impl ServerHandler for DelaMcpServer {
                 output_schema: None,
                 title: None,
                 icons: None,
+                meta: None,
             },
             Tool {
                 name: "task_start".into(),
@@ -1030,6 +1287,7 @@ impl ServerHandler for DelaMcpServer {
                 output_schema: None,
                 title: None,
                 icons: None,
+                meta: None,
             },
             Tool {
                 name: "task_status".into(),
@@ -1041,6 +1299,7 @@ impl ServerHandler for DelaMcpServer {
                 output_schema: None,
                 title: None,
                 icons: None,
+                meta: None,
             },
             Tool {
                 name: "task_output".into(),
@@ -1050,6 +1309,7 @@ impl ServerHandler for DelaMcpServer {
                 output_schema: None,
                 title: None,
                 icons: None,
+                meta: None,
             },
             Tool {
                 name: "task_stop".into(),
@@ -1059,6 +1319,7 @@ impl ServerHandler for DelaMcpServer {
                 output_schema: None,
                 title: None,
                 icons: None,
+                meta: None,
             },
         ];
 
@@ -1066,6 +1327,30 @@ impl ServerHandler for DelaMcpServer {
             tools,
             next_cursor: None,
         })
+    }
+
+    // Implement set_level to satisfy logging capability requirement
+    fn set_level(
+        &self,
+        request: SetLevelRequestParam,
+        _context: RequestContext<RoleServer>,
+    ) -> impl std::future::Future<Output = Result<(), ErrorData>> + Send + '_ {
+        std::future::ready(self.set_level_impl(request))
+    }
+}
+
+impl DelaMcpServer {
+    /// Internal implementation of set_level for testing
+    #[cfg(test)]
+    pub fn set_level_impl(&self, _request: SetLevelRequestParam) -> Result<(), ErrorData> {
+        // Accept any log level - we'll send all notifications regardless
+        Ok(())
+    }
+
+    #[cfg(not(test))]
+    fn set_level_impl(&self, _request: SetLevelRequestParam) -> Result<(), ErrorData> {
+        // Accept any log level - we'll send all notifications regardless
+        Ok(())
     }
 }
 
@@ -2907,6 +3192,67 @@ test:
                 );
             }
             _ => panic!("Expected text content"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_logging_capability_enabled() {
+        use rmcp::ServerHandler;
+        use std::path::PathBuf;
+
+        let server = DelaMcpServer::new(PathBuf::from("."));
+        let info = server.get_info();
+
+        // Verify logging capability is enabled for DTKT-177
+        assert!(
+            info.capabilities.logging.is_some(),
+            "Logging capability should be enabled for real-time task output streaming"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_peer_storage_for_notifications() {
+        use std::path::PathBuf;
+
+        let server = DelaMcpServer::new(PathBuf::from("."));
+
+        // Before initialization, peer should not be set
+        assert!(
+            server.peer.get().is_none(),
+            "Peer should not be set before initialization"
+        );
+
+        // Note: Full peer storage testing requires a mock client connection
+        // which is complex to set up. The basic verification that the peer
+        // field exists and is properly initialized is sufficient here.
+    }
+
+    #[tokio::test]
+    async fn test_set_level_handler_exists() {
+        use rmcp::model::{LoggingLevel, SetLevelRequestParam};
+        use std::path::PathBuf;
+
+        let server = DelaMcpServer::new(PathBuf::from("."));
+
+        // Test that set_level can be called with various log levels
+        // This verifies the handler exists and doesn't error
+        let levels = [
+            LoggingLevel::Debug,
+            LoggingLevel::Info,
+            LoggingLevel::Warning,
+            LoggingLevel::Error,
+        ];
+
+        for level in levels {
+            let request = SetLevelRequestParam { level };
+            // Test the internal implementation directly since we can't easily
+            // create a RequestContext without a real connection
+            let result = server.set_level_impl(request);
+            assert!(
+                result.is_ok(),
+                "set_level should succeed for level {:?}",
+                level
+            );
         }
     }
 }

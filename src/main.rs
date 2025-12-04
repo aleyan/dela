@@ -68,11 +68,31 @@ enum Commands {
     /// via a structured protocol. This is meant for IDE integration.
     ///
     /// Example: dela mcp
-    /// Example: dela mcp --cwd /path/to/project
+    /// Example: dela mcp --init-cursor
     Mcp {
         /// Working directory for the MCP server
         #[arg(long, default_value = ".")]
         cwd: String,
+
+        /// Generate .cursor/mcp.json for Cursor IDE
+        #[arg(long)]
+        init_cursor: bool,
+
+        /// Generate .vscode/mcp.json for VSCode
+        #[arg(long)]
+        init_vscode: bool,
+
+        /// Generate ~/.codex/config.toml for OpenAI Codex
+        #[arg(long)]
+        init_codex: bool,
+
+        /// Generate ~/.gemini/settings.json for Gemini CLI
+        #[arg(long)]
+        init_gemini: bool,
+
+        /// Generate ~/.claude-code/settings.json for Claude Code
+        #[arg(long)]
+        init_claude_code: bool,
     },
 
     /// Initialize dela and configure shell integration
@@ -135,7 +155,24 @@ async fn main() {
     let cli = Cli::parse();
 
     let result = match cli.command {
-        Commands::Mcp { cwd } => commands::mcp::execute(cwd).await,
+        Commands::Mcp {
+            cwd,
+            init_cursor,
+            init_vscode,
+            init_codex,
+            init_gemini,
+            init_claude_code,
+        } => {
+            commands::mcp::execute(
+                cwd,
+                init_cursor,
+                init_vscode,
+                init_codex,
+                init_gemini,
+                init_claude_code,
+            )
+            .await
+        }
         Commands::Init => commands::init::execute(),
         Commands::ConfigureShell => commands::configure_shell::execute(),
         Commands::List { verbose } => commands::list::execute(verbose),

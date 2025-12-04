@@ -61,6 +61,43 @@ Or use `dela run` for subshell execution:
 $ dela run build
 ```
 
+## MCP Server
+
+Dela includes an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that allows AI assistants and editors to discover and execute tasks programmatically.
+
+### Setting Up MCP in Your Editor
+
+```sh
+$ dela mcp --init-cursor       # Cursor: .cursor/mcp.json
+$ dela mcp --init-vscode       # VSCode: .vscode/mcp.json
+$ dela mcp --init-codex        # OpenAI Codex: ~/.codex/config.toml
+$ dela mcp --init-gemini       # Gemini CLI: ~/.gemini/settings.json
+$ dela mcp --init-claude-code  # Claude Code: ~/.claude-code/settings.json
+```
+
+### Starting the MCP Server Manually
+
+```sh
+$ dela mcp [--cwd <directory>]
+```
+
+The server communicates over stdio using JSON-RPC 2.0 and streams task output via logging notifications.
+
+### Available Tools
+
+| Tool | Description |
+|------|-------------|
+| `list_tasks` | List all available tasks with metadata (runner, availability, allowlist status) |
+| `status` | List all currently running background tasks |
+| `task_start` | Start a task by unique name with optional args/env/cwd |
+| `task_status` | Get status for running instances of a specific task |
+| `task_output` | Get the last N lines of output for a running task (by PID) |
+| `task_stop` | Stop a running task by PID (SIGTERM + grace period + SIGKILL) |
+
+### Security
+
+The MCP server uses the same allowlist as the CLI (`~/.dela/allowlist.toml`). Tasks must be explicitly allowlisted to be executed via MCP. Use the regular `dela` CLI commands to manage allowlists.
+
 ## Frequently Asked Questions
 
 ### How does dela work?
@@ -113,6 +150,16 @@ For local development:
 ```sh
 $ cargo install --path .
 $ source resources/zsh.sh  # or equivalent for your shell
+```
+
+### Testing MCP with Inspector
+
+To test the MCP server interactively with the [MCP Inspector](https://github.com/modelcontextprotocol/inspector):
+
+```sh
+# Build and run with Inspector
+$ cargo build --quiet
+$ RUST_LOG=warn npx @modelcontextprotocol/inspector ./target/debug/dela mcp
 ```
 
 ## Testing

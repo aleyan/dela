@@ -32,9 +32,9 @@ mod tests {
 
         assert_eq!(info.server_info.name, "dela-mcp");
         assert!(info.capabilities.tools.is_some());
-        // Logging disabled in Phase 10A
-        assert!(info.capabilities.logging.is_none());
-        // Resources disabled in Phase 10A
+        // Logging enabled in Phase 10C for real-time task output streaming
+        assert!(info.capabilities.logging.is_some());
+        // Resources disabled until Phase 10C
         assert!(info.capabilities.resources.is_none());
     }
 

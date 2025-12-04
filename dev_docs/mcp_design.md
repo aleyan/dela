@@ -47,7 +47,7 @@ This redesign narrows each tool to a single, clear responsibility and aligns wit
 Library & Transport
 	•	Library: rmcp (stdio transport)
 	•	Runtime: tokio multi-thread
-	•	Capabilities: tools (+ logging later for streaming notifications)
+	•	Capabilities: tools + logging (for real-time task output streaming)
 
 Add (dev):
 
@@ -61,8 +61,8 @@ Libraries and their roles:
 	•	tokio - Async runtime for Rust. Powers our job management with async process spawning, ring buffers, and graceful shutdown. The 'full' feature gives us process management and IO utilities.
 	•	serde/serde_json - Serialization framework for Rust. Handles all JSON encoding/decoding of our DTOs and tool parameters. The 'derive' feature lets us auto-generate serializers.
 	•	schemars - JSON Schema generation. Used with #[derive(JsonSchema)] to document our DTOs and tool parameters. Helps IDEs understand our protocol.
-	•	tracing - Modern instrumentation framework. (Phase 2) Used to emit structured job output events that rmcp can surface as logging notifications.
-	•	tracing-subscriber - (Phase 2) Formats events into rmcp-compatible notifications and handles log routing.
+	•	tracing - Modern instrumentation framework. Used to emit structured job output events that rmcp can surface as logging notifications.
+	•	tracing-subscriber - Formats events into rmcp-compatible notifications and handles log routing.
 
 ## Permissioning (Allowlist)
 - MCP server uses the **same allowlist** as the human CLI: `~/.dela/allowlist.toml`
@@ -80,8 +80,9 @@ Libraries and their roles:
 - **First-second capture**: `task_start` collects stdout/stderr for up to **1 second** (configurable later).
   - If the child exits in ≤1s → return `{ state: "exited", exit_code, output }`.
   - If still running after 1s → background it and return `{ state: "running", pid, initial_output }`.
-- **Output ring buffer (Phase 2)**: Per-PID bounded buffer (e.g., 1–5 MB). `task_output` returns last N lines. Future paging via `from` byte cursor.
-- **Lifecycle**: `task_stop` sends SIGTERM, waits grace (default 5s), then SIGKILL. Background jobs are GC'd after a TTL (configurable; Phase 2).
+- **Output ring buffer**: Per-PID bounded buffer (default 1000 lines, 5 MB). `task_output` returns last N lines. Future paging via `from` byte cursor.
+- **Lifecycle**: `task_stop` sends SIGTERM, waits grace (default 5s), then SIGKILL. Background jobs are GC'd after a TTL (configurable).
+- **Real-time streaming**: Task output is streamed via MCP logging notifications. Clients can subscribe to `notifications/message` to receive output as it happens.
 
 ⸻
 
@@ -298,14 +299,60 @@ All errors follow the JSON-RPC 2.0 error format:
 }
 ```
 
-### Phase 2 Tools (Not Yet Implemented)
-- **task_status** - Return status for running instances of a given unique_name
-- **task_output** - Return the last N lines of output for a PID
-- **task_stop** - Stop a running task by PID
+### 4) task_status
+**Args**
+```json
+{ "unique_name": "build-m" }
+```
+**Result**
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "{\"jobs\": [{\"pid\": 12345, \"unique_name\": \"build-m\", \"state\": \"running\", \"started_at\": 120}]}"
+    }
+  ]
+}
+```
+
+### 5) task_output
+**Args**
+```json
+{ "pid": 12345, "lines": 100, "show_truncation": true }
+```
+**Result**
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "{\"pid\": 12345, \"lines\": [\"Building...\", \"Compiling...\"], \"total_lines\": 2, \"total_bytes\": 25, \"truncated\": false, \"buffer_full\": false}"
+    }
+  ]
+}
+```
+
+### 6) task_stop
+**Args**
+```json
+{ "pid": 12345, "grace_period": 5 }
+```
+**Result**
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "{\"pid\": 12345, \"status\": \"graceful\", \"message\": \"Process stopped gracefully with exit code 0\", \"grace_period_used\": 5}"
+    }
+  ]
+}
+```
 
 ⸻
 
-## Resources (Phase 2 / Optional)
+## Resources (Optional / Future)
 - We can keep a conservative tool-only design. If needed for streaming or snapshots later:
   - `job://<pid>` → JSON status snapshot
   - `joblog://<pid>?from=<u64>` → chunked logs paging
@@ -339,16 +386,16 @@ impl ServerHandler for DelaMcpServer {
 }
 ```
 
-### Implemented Tools (Phase 10A)
+### Implemented Tools
 
 **list_tasks** - Lists all available tasks with enriched metadata
 - Filters by runner type if specified
 - Returns `TaskDto` objects with command, runner availability, and allowlist status
 - Handles task disambiguation (e.g., "test-m", "test-n")
 
-**status** - Returns running tasks (Phase 10A: empty array)
-- Currently returns empty array as background process management is not yet implemented
-- Will be enhanced in Phase 2 with actual running task tracking
+**status** - Returns all currently running background tasks
+- Returns list of running jobs with PIDs, unique names, and metadata
+- Updated in real-time as jobs start and complete
 
 **task_start** - Starts a task with optional arguments, environment, and working directory
 - Validates task exists and is allowlisted
@@ -356,30 +403,46 @@ impl ServerHandler for DelaMcpServer {
 - Captures output for first second, then backgrounds if still running
 - Returns `StartResultDto` with state, PID, exit code, and initial output
 
+**task_status** - Returns status for running instances of a specific task
+- Filters jobs by unique_name
+- Returns all PIDs associated with that task name
+- Includes state (running/exited/failed), started_at, command, and args
+
+**task_output** - Returns the last N lines of output for a running task
+- Default 200 lines, configurable via `lines` parameter
+- Supports `show_truncation` flag to indicate if output was truncated
+- Per-PID ring buffer (1000 lines, 5MB max)
+
+**task_stop** - Stops a running task by PID
+- Sends SIGTERM with configurable grace period (default 5s)
+- Falls back to SIGKILL if process doesn't exit gracefully
+- Returns stop status (graceful/killed/failed)
+
 ### Error Handling
 - Uses structured error taxonomy with specific error codes
 - Provides helpful error messages and resolution hints
 - Follows JSON-RPC 2.0 error format
 
-### Phase 2 Tools (Not Yet Implemented)
-- **task_status** - Status for running instances of a specific task
-- **task_output** - Tail output for a running task by PID
-- **task_stop** - Stop a running task by PID
-
-## Job runner internals
-- Spawn via `tokio::process::Command` with stdin closed; capture stdout/stderr.
-- First-second capture using `tokio::time::timeout` around a pump loop.
-- Maintain per-PID ring buffer (VecDeque) (Phase 2) and minimal metadata (started_at, command, unique_name, args).
-- Update state on child exit via join handle; GC old entries (Phase 2).
+## Job Runner Internals
+- Spawn via `tokio::process::Command` with stdin closed; capture stdout/stderr
+- First-second capture using `tokio::time::timeout` around a pump loop
+- Per-PID ring buffer (VecDeque) with configurable limits:
+  - Max 1000 lines per job
+  - Max 5MB output per job
+- Job metadata includes: started_at, command, unique_name, source_name, args, cwd, file_path
+- Background monitoring task updates job state on child exit
+- Jobs transition through states: Running → Exited(exit_code) or Failed(reason)
 
 ⸻
 
 ## Security & Limits
-- Deny by default if not explicitly allowlisted in the MCP file.
-- Respect `.dela` path only under real user `$HOME`.
-- Output limits: ring buffer size cap; per-message chunk max (e.g., 8 KB). (Phase 2)
-- Concurrency: cap max running PIDs (config), reject beyond limit. (Phase 2)
-- Path policy: Tasks execute with `cwd` under server root (no upward traversal).
+- **Deny by default**: Tasks not explicitly allowlisted are rejected with `NotAllowlisted` error
+- **Allowlist path**: Reads from `~/.dela/allowlist.toml` (same as CLI)
+- **Output limits**:
+  - Ring buffer: 1000 lines, 5MB max per job
+  - Per-message chunk: 8KB max
+- **Concurrency**: Max 50 concurrent jobs (configurable), rejects beyond limit
+- **Path policy**: Tasks execute with `cwd` under server root (no upward traversal)
 
 ⸻
 
