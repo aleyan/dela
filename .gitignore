@@ -5,3 +5,4 @@
 **/__pycache__
 .env
 tests/task_definitions/build/*
+.cursor
