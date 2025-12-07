@@ -5,6 +5,19 @@ use crate::types::TaskRunner;
 #[cfg(test)]
 use serial_test::serial;
 
+/// Parse a shell-style command string into executable + args preserving quoting.
+/// Returns an error when the command cannot be parsed or is empty.
+pub fn split_command_words(command: &str) -> Result<Vec<String>, String> {
+    let parts = shell_words::split(command)
+        .map_err(|e| format!("Failed to parse command '{}': {}", command, e))?;
+
+    if parts.is_empty() {
+        return Err("Empty command generated".to_string());
+    }
+
+    Ok(parts)
+}
+
 pub fn is_runner_available(runner: &TaskRunner) -> bool {
     match runner {
         TaskRunner::Make => check_path_executable("make").is_some(),
@@ -34,6 +47,29 @@ pub fn is_runner_available(runner: &TaskRunner) -> bool {
 mod tests {
     use super::*;
     use crate::task_shadowing::{enable_mock, mock_executable, reset_mock};
+
+    #[test]
+    fn test_split_command_words_preserves_spaces() {
+        let parts = split_command_words("make print-args ARGS='value with spaces'").unwrap();
+        assert_eq!(
+            parts,
+            vec![
+                "make".to_string(),
+                "print-args".to_string(),
+                "ARGS=value with spaces".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn test_split_command_words_errors_on_empty() {
+        let err = split_command_words("   ").unwrap_err();
+        assert!(
+            err.contains("Empty command"),
+            "unexpected error message: {}",
+            err
+        );
+    }
 
     #[test]
     #[serial]

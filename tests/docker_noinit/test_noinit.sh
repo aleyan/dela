@@ -353,6 +353,18 @@ fi
 # Clean up
 unset -f temp_dr
 
+# Test 22b: Verify dela run preserves quoted arguments with spaces
+echo "\nTest 22b: Testing dela run with quoted arguments containing spaces"
+run_output=$(dela run "print-args ARGS='value with spaces'" 2>&1)
+if echo "$run_output" | grep -q "Arguments passed to print-args: value with spaces"; then
+    echo "${GREEN}✓ dela run preserves quoted arguments with spaces${NC}"
+else
+    echo "${RED}✗ dela run did not preserve quoted arguments${NC}"
+    echo "Output was:"
+    echo "$run_output"
+    exit 1
+fi
+
 cd /home/testuser/test_project
 
 # Test 23: Verify ambiguous task detection in dela list

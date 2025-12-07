@@ -5,7 +5,7 @@ use super::dto::{
 };
 use super::errors::DelaError;
 use super::job_manager::{JobManager, JobMetadata, JobState};
-use crate::runner::is_runner_available;
+use crate::runner::{is_runner_available, split_command_words};
 use crate::task_discovery;
 use rmcp::{
     ServerHandler, ServiceExt,
@@ -244,17 +244,25 @@ impl DelaMcpServer {
 
         // Build the command
         let full_command = task.runner.get_command(task);
-        let mut parts: Vec<&str> = full_command.split_whitespace().collect();
-
-        if parts.is_empty() {
-            return Err(DelaError::internal_error(
-                "Empty command generated".to_string(),
+        let command_parts = split_command_words(&full_command).map_err(|e| {
+            DelaError::internal_error(
+                format!("Failed to parse command '{}': {}", full_command, e),
                 Some("Check task definition and runner configuration".to_string()),
             )
-            .into());
-        }
+        })?;
 
-        let executable = parts.remove(0);
+        let mut command_iter = command_parts.iter();
+        let executable = command_iter
+            .next()
+            .ok_or_else(|| {
+                DelaError::internal_error(
+                    "Empty command generated".to_string(),
+                    Some("Check task definition and runner configuration".to_string()),
+                )
+            })?
+            .clone();
+        let base_args: Vec<&String> = command_iter.collect();
+
         let mut cmd = Command::new(executable);
         cmd.current_dir(self.root.clone());
 
@@ -263,7 +271,7 @@ impl DelaMcpServer {
         cmd.stderr(std::process::Stdio::piped());
 
         // Add the task name as the first argument
-        cmd.args(&parts);
+        cmd.args(base_args);
 
         // Add task-specific arguments
         if let Some(task_args) = &args.args {

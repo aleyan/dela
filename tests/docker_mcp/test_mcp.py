@@ -72,11 +72,21 @@ def start_mcp_process(cwd):
     return process
 
 def send_request(process, request):
-    """Send a request and return the response"""
+    """Send a request and return the response matching the request id (skip log lines)."""
     process.stdin.write(json.dumps(request) + "\n")
     process.stdin.flush()
-    response_line = process.stdout.readline()
-    return json.loads(response_line)
+    target_id = request.get("id")
+    while True:
+        line = process.stdout.readline()
+        if not line:
+            return {"error": "no response"}
+        try:
+            payload = json.loads(line)
+        except json.JSONDecodeError:
+            # Skip non-JSON lines
+            continue
+        if target_id is None or payload.get("id") == target_id:
+            return payload
 
 def test_mcp_protocol():
     """Test MCP protocol communication"""
@@ -329,7 +339,7 @@ def test_mcp_protocol():
     finally:
         if process.poll() is None:
             process.kill()
-    
+
     # Test 6: Test MCP task_start with arguments
     print("Test 6: Testing MCP task_start with arguments")
     
@@ -381,7 +391,63 @@ def test_mcp_protocol():
     finally:
         if process.poll() is None:
             process.kill()
-    
+
+    # Test 6b: Test MCP task_start with arguments that include spaces
+    print("Test 6b: Testing MCP task_start with space-containing arguments")
+
+    process = start_mcp_process(cwd)
+    if process is None:
+        print("✗ MCP task_start with spaced args failed - could not start process")
+        return False
+
+    try:
+        spaced_args_request = {
+            "jsonrpc": "2.0",
+            "id": 65,
+            "method": "tools/call",
+            "params": {
+                "name": "task_start",
+                "arguments": {
+                    "unique_name": "print-args",
+                    "args": ["ARGS=value with spaces"]
+                }
+            }
+        }
+
+        response = send_request(process, spaced_args_request)
+
+        if "result" in response:
+            content = response["result"].get("content", [])
+            if content and "text" in content[0]:
+                try:
+                    payload = json.loads(content[0]["text"])
+                    if payload.get("ok") and "result" in payload:
+                        initial_output = payload["result"].get("initial_output", "")
+                        if "value with spaces" in initial_output:
+                            print("✓ MCP task_start preserves arguments with spaces")
+                        else:
+                            print("✗ MCP task_start did not preserve spaced argument")
+                            print(f"Initial output: {initial_output}")
+                            return False
+                    else:
+                        print("✗ MCP task_start spaced args response missing ok/result")
+                        return False
+                except json.JSONDecodeError as e:
+                    print(f"✗ MCP task_start spaced args response not JSON: {e}")
+                    return False
+            else:
+                print("✗ MCP task_start spaced args missing text content")
+                return False
+        else:
+            print("✗ MCP task_start spaced args missing result")
+            return False
+    except Exception as e:
+        print(f"✗ MCP task_start with spaced args error: {e}")
+        return False
+    finally:
+        if process.poll() is None:
+            process.kill()
+
     # Test 7: Test MCP error taxonomy - TaskNotFound
     print("Test 7: Testing MCP error taxonomy - TaskNotFound")
     
