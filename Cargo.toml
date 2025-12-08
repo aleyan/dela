@@ -35,4 +35,4 @@ dirs = "6.0.0"
 [dev-dependencies]
 tempfile = "3.23.0"
 serial_test = "3.2.0"
-libc = "0.2.177"
+libc = "0.2.178"
