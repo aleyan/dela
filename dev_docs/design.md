@@ -230,6 +230,14 @@ When multiple task runners define tasks with the same name, the following disamb
    - When a user executes an ambiguous task without a suffix, a TUI selection prompt will appear
    - The TUI will allow selection between all matching tasks, similar to the permission prompt interface
 
+## CLI Argument Handling
+
+- **Parsing strategy**: All user-entered task invocations are parsed with `shell-words` rather than `split_whitespace`, so quoted segments (e.g. `"arg with spaces"`) remain intact while unquoted tokens still split on whitespace.
+- **Command construction**: Runners produce a base command string (e.g. `make build`, `npm run test`). We re-parse that string with `shell-words`, then append any additional user args as discrete tokens before spawning the process. This avoids `sh -c` and keeps arguments structured.
+- **Logging**: When echoing the final command for the user, we re-join tokens with `shell_words::join` to show a safe, reproducible representation.
+- **MCP parity**: The MCP `task_start` path uses the same parsing and joining helpers, so CLI and MCP execute tasks identically with respect to quoting and spacing.
+- **Guideline**: Never hand-roll whitespace splitting or use `Command::new("sh").arg("-c" ...)` for task execution; always rely on the shared helper that keeps quoted and unquoted arguments faithful.
+
 ## Testing
 
 The project has comprehensive test coverage through unit tests and integration tests.

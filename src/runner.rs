@@ -49,6 +49,23 @@ mod tests {
     use crate::task_shadowing::{enable_mock, mock_executable, reset_mock};
 
     #[test]
+    fn test_split_command_words_unquoted_args() {
+        let parts =
+            split_command_words("npm run test --flag --opt=value positional").unwrap();
+        assert_eq!(
+            parts,
+            vec![
+                "npm".to_string(),
+                "run".to_string(),
+                "test".to_string(),
+                "--flag".to_string(),
+                "--opt=value".to_string(),
+                "positional".to_string()
+            ]
+        );
+    }
+
+    #[test]
     fn test_split_command_words_preserves_spaces() {
         let parts = split_command_words("make print-args ARGS='value with spaces'").unwrap();
         assert_eq!(
