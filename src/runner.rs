@@ -50,8 +50,7 @@ mod tests {
 
     #[test]
     fn test_split_command_words_unquoted_args() {
-        let parts =
-            split_command_words("npm run test --flag --opt=value positional").unwrap();
+        let parts = split_command_words("npm run test --flag --opt=value positional").unwrap();
         assert_eq!(
             parts,
             vec![
