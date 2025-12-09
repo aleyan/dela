@@ -1,21 +1,24 @@
 use crate::runner::is_runner_available;
+use crate::runner::split_command_words;
 use crate::task_discovery;
 use std::env;
 use std::process::{Command, Stdio};
 
 pub fn execute(task_with_args: &str) -> Result<(), String> {
-    let mut parts = task_with_args.split_whitespace();
-    let task_name = parts
-        .next()
-        .ok_or_else(|| "No task name provided".to_string())?;
-    let args: Vec<&str> = parts.collect();
+    let mut invocation_parts =
+        shell_words::split(task_with_args).map_err(|e| format!("Failed to parse args: {}", e))?;
+    let task_name = invocation_parts
+        .first()
+        .ok_or_else(|| "No task name provided".to_string())?
+        .to_string();
+    let task_args: Vec<String> = invocation_parts.drain(1..).collect();
 
     let current_dir =
         env::current_dir().map_err(|e| format!("Failed to get current directory: {}", e))?;
     let discovered = task_discovery::discover_tasks(&current_dir);
 
     // Find all tasks with the given name (both original and disambiguated)
-    let matching_tasks = task_discovery::get_matching_tasks(&discovered, task_name);
+    let matching_tasks = task_discovery::get_matching_tasks(&discovered, task_name.as_str());
 
     // Check if there are no matching tasks
     if matching_tasks.is_empty() {
@@ -24,7 +27,8 @@ pub fn execute(task_with_args: &str) -> Result<(), String> {
 
     // Check if there are multiple matching tasks
     if matching_tasks.len() > 1 {
-        let error_msg = task_discovery::format_ambiguous_task_error(task_name, &matching_tasks);
+        let error_msg =
+            task_discovery::format_ambiguous_task_error(task_name.as_str(), &matching_tasks);
         println!("{}", error_msg);
         return Err(format!("Ambiguous task name: '{}'", task_name));
     }
@@ -36,18 +40,21 @@ pub fn execute(task_with_args: &str) -> Result<(), String> {
     }
 
     // Get the command to run
-    let mut command_str = task.runner.get_command(task);
-    if !args.is_empty() {
-        command_str.push(' ');
-        command_str.push_str(&args.join(" "));
-    }
+    let base_command = task.runner.get_command(task);
+    let mut command_parts = split_command_words(&base_command)?;
+    command_parts.extend(task_args.clone());
 
-    println!("Running: {}", command_str);
+    let mut parts_iter = command_parts.iter();
+    let executable = parts_iter
+        .next()
+        .ok_or_else(|| "Empty command generated".to_string())?;
+    let remaining_args: Vec<&String> = parts_iter.collect();
+
+    println!("Running: {}", shell_words::join(command_parts.clone()));
 
     // Execute the command
-    let status = Command::new("sh")
-        .arg("-c")
-        .arg(&command_str)
+    let status = Command::new(executable)
+        .args(remaining_args)
         .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
