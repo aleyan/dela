@@ -34,6 +34,6 @@ dirs = "6.0.0"
 shell-words = "1.1.1"
 
 [dev-dependencies]
-tempfile = "3.23.0"
+tempfile = "3.24.0"
 serial_test = "3.2.0"
 libc = "0.2.178"
