@@ -1334,6 +1334,7 @@ impl ServerHandler for DelaMcpServer {
         Ok(ListToolsResult {
             tools,
             next_cursor: None,
+            meta: None,
         })
     }
 
