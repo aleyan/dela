@@ -85,6 +85,8 @@ The server communicates over stdio using JSON-RPC 2.0 and streams task output vi
 
 ### Available Tools
 
+Tool names are stable, and `list_tasks` exposes a stable wire format (including `unique_name` with suffixes like `test-m`).
+
 | Tool | Description |
 |------|-------------|
 | `list_tasks` | List all available tasks with metadata (runner, availability, allowlist status) |
@@ -106,11 +108,11 @@ The MCP server uses the same allowlist as the CLI (`~/.dela/allowlist.toml`). Ta
 
 ### What happens if a task shares the same name with a command?
 
-Then the bare command will be executed instead of the task. To execute the task, you can use `dr <task_name>` to bypass the shadowed command but still make use of `dela`'s task runner disambiguation.
+Then the bare command will be executed instead of the task. Tasks shadowed by shell builtins and conflicting with other tasks get a unique suffixed name (for example `test` from a Makefile becomes `test-m`), so you can run the task via its suffixed name; `dr <task_name>` also works.
 
 ### How do I add a new task?
 
-You can add a new task by adding a new task definition file. The task definition file can be a Makefile, a pyproject.toml, or a package.json.
+You add tasks to your existing task definition files (like `Makefile`, `package.json`, or `pyproject.toml`), and `dela` will discover them automatically.
 
 ### What shell environment are tasks executed in?
 
@@ -122,18 +124,15 @@ Currently, `dela` supports zsh, bash, fish, and PowerShell.
 
 ### Which task runners are supported?
 
-Currently, `dela` supports make, npm, pnpm, uv, poetry, Maven, Gradle, GitHub Actions, Docker Compose, CMake, Travis CI, just and task.
+Currently, `dela` supports make, npm, yarn, pnpm, bun, uv, poetry, poe (poethepoet), Maven, Gradle, GitHub Actions, Docker Compose, CMake, Travis CI, just and task.
 
 ### Which platforms are supported?
 
-Currently, `dela` supports macOS and Linux.
+Currently, `dela` supports macOS and Linux. There is no Windows support, powershell is for Linux only.
 
 ### What is the purpose of allowlists?
 
-Allowlist are a typo protection feature, and not for security. Since dela relies on
-method missing functionality in your shell, typing a previously invalid command could
-turn into executing something unintended, which is what allowlists mean to prevent.
-When you download a repo from the internet and execute a task in it you need to be cognizant of its providence, just like you would with make or npm.
+Allowlists are a safety feature to prevent accidental execution (especially in untrusted directories). They’re not a sandbox, so treat tasks from downloaded repos with the same caution you would with `make` or `npm`.
 
 ### Is dela production ready?
 
@@ -141,7 +140,7 @@ When you download a repo from the internet and execute a task in it you need to 
 
 ### What are the alternatives to dela?
 
-Other task runners that handle multiple runners are [task-keeper](https://github.com/linux-china/task-keeper) and [ds](https://github.com/metaist/ds).
+Other task runners that handle multiple runners are [task-keeper](https://github.com/linux-china/task-keeper), [ds](https://github.com/metaist/ds), and [rt](https://github.com/unvalley/rt).
 
 ## Development
 
