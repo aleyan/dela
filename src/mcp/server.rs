@@ -915,7 +915,7 @@ impl ServerHandler for DelaMcpServer {
 
     async fn initialize(
         &self,
-        request: InitializeRequestParam,
+        request: InitializeRequestParams,
         context: RequestContext<RoleServer>,
     ) -> Result<InitializeResult, ErrorData> {
         if context.peer.peer_info().is_none() {
@@ -929,7 +929,7 @@ impl ServerHandler for DelaMcpServer {
     // Manually implement ServerHandler trait methods since #[tool_router] macro is not working
     async fn call_tool(
         &self,
-        request: CallToolRequestParam,
+        request: CallToolRequestParams,
         _context: RequestContext<RoleServer>,
     ) -> Result<CallToolResult, ErrorData> {
         match request.name.as_ref() {
@@ -1007,7 +1007,7 @@ impl ServerHandler for DelaMcpServer {
 
     async fn list_tools(
         &self,
-        _request: Option<PaginatedRequestParam>,
+        _request: Option<PaginatedRequestParams>,
         _context: RequestContext<RoleServer>,
     ) -> Result<ListToolsResult, ErrorData> {
         use serde_json::Map;
@@ -1341,7 +1341,7 @@ impl ServerHandler for DelaMcpServer {
     // Implement set_level to satisfy logging capability requirement
     fn set_level(
         &self,
-        request: SetLevelRequestParam,
+        request: SetLevelRequestParams,
         _context: RequestContext<RoleServer>,
     ) -> impl std::future::Future<Output = Result<(), ErrorData>> + Send + '_ {
         std::future::ready(self.set_level_impl(request))
@@ -1351,13 +1351,13 @@ impl ServerHandler for DelaMcpServer {
 impl DelaMcpServer {
     /// Internal implementation of set_level for testing
     #[cfg(test)]
-    pub fn set_level_impl(&self, _request: SetLevelRequestParam) -> Result<(), ErrorData> {
+    pub fn set_level_impl(&self, _request: SetLevelRequestParams) -> Result<(), ErrorData> {
         // Accept any log level - we'll send all notifications regardless
         Ok(())
     }
 
     #[cfg(not(test))]
-    fn set_level_impl(&self, _request: SetLevelRequestParam) -> Result<(), ErrorData> {
+    fn set_level_impl(&self, _request: SetLevelRequestParams) -> Result<(), ErrorData> {
         // Accept any log level - we'll send all notifications regardless
         Ok(())
     }
@@ -3238,7 +3238,7 @@ test:
 
     #[tokio::test]
     async fn test_set_level_handler_exists() {
-        use rmcp::model::{LoggingLevel, SetLevelRequestParam};
+        use rmcp::model::{LoggingLevel, SetLevelRequestParams};
         use std::path::PathBuf;
 
         let server = DelaMcpServer::new(PathBuf::from("."));
@@ -3253,7 +3253,7 @@ test:
         ];
 
         for level in levels {
-            let request = SetLevelRequestParam { level };
+            let request = SetLevelRequestParams { level, meta: None };
             // Test the internal implementation directly since we can't easily
             // create a RequestContext without a real connection
             let result = server.set_level_impl(request);
