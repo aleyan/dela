@@ -141,7 +141,7 @@ When you download a repo from the internet and execute a task in it you need to 
 
 ### What are the alternatives to dela?
 
-Other task runners that handle multiple runners are [task-keeper](https://github.com/linux-china/task-keeper) and [ds](https://github.com/metaist/ds).
+Other task runners that handle multiple runners are [task-keeper](https://github.com/linux-china/task-keeper), [ds](https://github.com/metaist/ds), and [rt](https://github.com/unvalley/rt).
 
 ## Development
 
