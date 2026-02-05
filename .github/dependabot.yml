@@ -8,13 +8,15 @@ updates:
       interval: "monthly"
     rebase-strategy: "disabled"
     groups:
-      safe-minor-patch:
+      all-dependencies:
         patterns:
           - "*"
-        update-types:
-          - "minor"
-          - "patch"
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: quarterly
+      interval: "quarterly"
+    rebase-strategy: "disabled"
+    groups:
+      all-actions:
+        patterns:
+          - "*"
