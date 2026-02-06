@@ -137,8 +137,8 @@ fn merge_dela_into_json(editor: Editor, existing: &str) -> Result<String, String
 
 /// Merge dela into an existing TOML config file (Codex)
 fn merge_dela_into_toml(existing: &str) -> Result<String, String> {
-    let mut table: toml::Table = toml::from_str(existing)
-        .map_err(|e| format!("Failed to parse config as TOML: {}", e))?;
+    let mut table: toml::Table =
+        toml::from_str(existing).map_err(|e| format!("Failed to parse config as TOML: {}", e))?;
 
     if !table.contains_key("mcp_servers") {
         table.insert(
@@ -461,18 +461,9 @@ mod tests {
     #[test]
     fn test_editor_config_paths_use_home_dir() {
         let home = dirs::home_dir().unwrap();
-        assert_eq!(
-            Editor::Cursor.config_path(),
-            home.join(".cursor/mcp.json")
-        );
-        assert_eq!(
-            Editor::Vscode.config_path(),
-            home.join(".vscode/mcp.json")
-        );
-        assert_eq!(
-            Editor::Codex.config_path(),
-            home.join(".codex/config.toml")
-        );
+        assert_eq!(Editor::Cursor.config_path(), home.join(".cursor/mcp.json"));
+        assert_eq!(Editor::Vscode.config_path(), home.join(".vscode/mcp.json"));
+        assert_eq!(Editor::Codex.config_path(), home.join(".codex/config.toml"));
         assert_eq!(
             Editor::Gemini.config_path(),
             home.join(".gemini/settings.json")
