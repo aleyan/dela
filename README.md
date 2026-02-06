@@ -68,8 +68,8 @@ Dela includes an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/
 ### Setting Up MCP in Your Editor
 
 ```sh
-$ dela mcp --init-cursor       # Cursor: .cursor/mcp.json
-$ dela mcp --init-vscode       # VSCode: .vscode/mcp.json
+$ dela mcp --init-cursor       # Cursor: ~/.cursor/mcp.json
+$ dela mcp --init-vscode       # VSCode: ~/.vscode/mcp.json
 $ dela mcp --init-codex        # OpenAI Codex: ~/.codex/config.toml
 $ dela mcp --init-gemini       # Gemini CLI: ~/.gemini/settings.json
 $ dela mcp --init-claude-code  # Claude Code: ~/.claude-code/settings.json
