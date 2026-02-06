@@ -52,19 +52,14 @@ impl Editor {
         }
     }
 
-    fn config_path(&self, cwd: &PathBuf) -> PathBuf {
+    fn config_path(&self) -> PathBuf {
+        let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("~"));
         match self {
-            Editor::Cursor => cwd.join(".cursor/mcp.json"),
-            Editor::Vscode => cwd.join(".vscode/mcp.json"),
-            Editor::Codex => dirs::home_dir()
-                .unwrap_or_else(|| PathBuf::from("~"))
-                .join(".codex/config.toml"),
-            Editor::Gemini => dirs::home_dir()
-                .unwrap_or_else(|| PathBuf::from("~"))
-                .join(".gemini/settings.json"),
-            Editor::ClaudeCode => dirs::home_dir()
-                .unwrap_or_else(|| PathBuf::from("~"))
-                .join(".claude-code/settings.json"),
+            Editor::Cursor => home.join(".cursor/mcp.json"),
+            Editor::Vscode => home.join(".vscode/mcp.json"),
+            Editor::Codex => home.join(".codex/config.toml"),
+            Editor::Gemini => home.join(".gemini/settings.json"),
+            Editor::ClaudeCode => home.join(".claude-code/settings.json"),
         }
     }
 
@@ -86,10 +81,8 @@ impl Editor {
     }
 }
 
-/// Generate MCP config file for an editor
-fn generate_config(editor: Editor, cwd: &PathBuf) -> Result<(), String> {
-    let config_path = editor.config_path(cwd);
-
+/// Generate MCP config file for an editor at a specific path
+fn generate_config_at(editor: Editor, config_path: &PathBuf) -> Result<(), String> {
     // Create parent directory if it doesn't exist
     if let Some(parent) = config_path.parent() {
         if !parent.exists() {
@@ -100,7 +93,7 @@ fn generate_config(editor: Editor, cwd: &PathBuf) -> Result<(), String> {
 
     // Check if config already exists
     if config_path.exists() {
-        let existing = fs::read_to_string(&config_path)
+        let existing = fs::read_to_string(config_path)
             .map_err(|e| format!("Failed to read existing config: {}", e))?;
 
         if existing.contains(editor.dela_marker()) {
@@ -122,7 +115,7 @@ fn generate_config(editor: Editor, cwd: &PathBuf) -> Result<(), String> {
     }
 
     // Write the config file
-    fs::write(&config_path, editor.template())
+    fs::write(config_path, editor.template())
         .map_err(|e| format!("Failed to write config file: {}", e))?;
 
     eprintln!(
@@ -132,6 +125,12 @@ fn generate_config(editor: Editor, cwd: &PathBuf) -> Result<(), String> {
     );
 
     Ok(())
+}
+
+/// Generate MCP config file for an editor at its default global path
+fn generate_config(editor: Editor) -> Result<(), String> {
+    let config_path = editor.config_path();
+    generate_config_at(editor, &config_path)
 }
 
 /// Execute the MCP command
@@ -155,19 +154,19 @@ pub async fn execute(
 
     if has_init_flag {
         if init_cursor {
-            generate_config(Editor::Cursor, &root_path)?;
+            generate_config(Editor::Cursor)?;
         }
         if init_vscode {
-            generate_config(Editor::Vscode, &root_path)?;
+            generate_config(Editor::Vscode)?;
         }
         if init_codex {
-            generate_config(Editor::Codex, &root_path)?;
+            generate_config(Editor::Codex)?;
         }
         if init_gemini {
-            generate_config(Editor::Gemini, &root_path)?;
+            generate_config(Editor::Gemini)?;
         }
         if init_claude_code {
-            generate_config(Editor::ClaudeCode, &root_path)?;
+            generate_config(Editor::ClaudeCode)?;
         }
         return Ok(());
     }
@@ -186,11 +185,10 @@ mod tests {
     #[test]
     fn test_generate_cursor_config_new() {
         let temp_dir = TempDir::new().unwrap();
-        let result = generate_config(Editor::Cursor, &temp_dir.path().to_path_buf());
+        let config_path = temp_dir.path().join(".cursor/mcp.json");
+        let result = generate_config_at(Editor::Cursor, &config_path);
 
         assert!(result.is_ok());
-
-        let config_path = temp_dir.path().join(".cursor/mcp.json");
         assert!(config_path.exists());
 
         let content = fs::read_to_string(&config_path).unwrap();
@@ -201,11 +199,10 @@ mod tests {
     #[test]
     fn test_generate_vscode_config_new() {
         let temp_dir = TempDir::new().unwrap();
-        let result = generate_config(Editor::Vscode, &temp_dir.path().to_path_buf());
+        let config_path = temp_dir.path().join(".vscode/mcp.json");
+        let result = generate_config_at(Editor::Vscode, &config_path);
 
         assert!(result.is_ok());
-
-        let config_path = temp_dir.path().join(".vscode/mcp.json");
         assert!(config_path.exists());
 
         let content = fs::read_to_string(&config_path).unwrap();
@@ -216,30 +213,41 @@ mod tests {
     #[test]
     fn test_generate_config_already_exists_with_dela() {
         let temp_dir = TempDir::new().unwrap();
-        let cursor_dir = temp_dir.path().join(".cursor");
-        fs::create_dir_all(&cursor_dir).unwrap();
+        let config_path = temp_dir.path().join(".cursor/mcp.json");
+        fs::create_dir_all(config_path.parent().unwrap()).unwrap();
 
-        let config_path = cursor_dir.join("mcp.json");
         fs::write(
             &config_path,
             r#"{"mcpServers": {"dela": {"command": "dela"}}}"#,
         )
         .unwrap();
 
-        let result = generate_config(Editor::Cursor, &temp_dir.path().to_path_buf());
+        let result = generate_config_at(Editor::Cursor, &config_path);
         assert!(result.is_ok());
     }
 
     #[test]
-    fn test_editor_config_paths() {
-        let cwd = PathBuf::from("/test");
+    fn test_editor_config_paths_use_home_dir() {
+        let home = dirs::home_dir().unwrap();
         assert_eq!(
-            Editor::Cursor.config_path(&cwd),
-            PathBuf::from("/test/.cursor/mcp.json")
+            Editor::Cursor.config_path(),
+            home.join(".cursor/mcp.json")
         );
         assert_eq!(
-            Editor::Vscode.config_path(&cwd),
-            PathBuf::from("/test/.vscode/mcp.json")
+            Editor::Vscode.config_path(),
+            home.join(".vscode/mcp.json")
+        );
+        assert_eq!(
+            Editor::Codex.config_path(),
+            home.join(".codex/config.toml")
+        );
+        assert_eq!(
+            Editor::Gemini.config_path(),
+            home.join(".gemini/settings.json")
+        );
+        assert_eq!(
+            Editor::ClaudeCode.config_path(),
+            home.join(".claude-code/settings.json")
         );
     }
 }
