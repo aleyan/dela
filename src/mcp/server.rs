@@ -894,7 +894,7 @@ impl DelaMcpServer {
 impl ServerHandler for DelaMcpServer {
     fn get_info(&self) -> ServerInfo {
         ServerInfo {
-            protocol_version: ProtocolVersion::V_2024_11_05,
+            protocol_version: ProtocolVersion::LATEST,
             capabilities: ServerCapabilities::builder()
                 .enable_tools()
                 .enable_logging()
@@ -902,7 +902,11 @@ impl ServerHandler for DelaMcpServer {
             server_info: Implementation {
                 name: "dela-mcp".into(),
                 version: env!("CARGO_PKG_VERSION").into(),
-                title: None,
+                title: Some("Dela MCP Server".into()),
+                description: Some(
+                    "Dela MCP Server for list and executing tasks from definition files like package.json, pyproject.toml, taskfile.yml, etc."
+                        .into(),
+                ),
                 icons: None,
                 website_url: None,
             },
@@ -1273,6 +1277,7 @@ impl ServerHandler for DelaMcpServer {
                 input_schema: Arc::new(list_tasks_schema),
                 annotations: None,
                 output_schema: None,
+                execution: None,
                 title: None,
                 icons: None,
                 meta: None,
@@ -1283,6 +1288,7 @@ impl ServerHandler for DelaMcpServer {
                 input_schema: Arc::new(status_schema),
                 annotations: None,
                 output_schema: None,
+                execution: None,
                 title: None,
                 icons: None,
                 meta: None,
@@ -1293,6 +1299,7 @@ impl ServerHandler for DelaMcpServer {
                 input_schema: Arc::new(task_start_schema),
                 annotations: None,
                 output_schema: None,
+                execution: None,
                 title: None,
                 icons: None,
                 meta: None,
@@ -1305,6 +1312,7 @@ impl ServerHandler for DelaMcpServer {
                 input_schema: Arc::new(task_status_schema),
                 annotations: None,
                 output_schema: None,
+                execution: None,
                 title: None,
                 icons: None,
                 meta: None,
@@ -1315,6 +1323,7 @@ impl ServerHandler for DelaMcpServer {
                 input_schema: Arc::new(task_output_schema),
                 annotations: None,
                 output_schema: None,
+                execution: None,
                 title: None,
                 icons: None,
                 meta: None,
@@ -1325,6 +1334,7 @@ impl ServerHandler for DelaMcpServer {
                 input_schema: Arc::new(task_stop_schema),
                 annotations: None,
                 output_schema: None,
+                execution: None,
                 title: None,
                 icons: None,
                 meta: None,
