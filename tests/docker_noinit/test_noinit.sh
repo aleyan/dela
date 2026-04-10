@@ -354,6 +354,8 @@ else
     exit 1
 fi
 
+cd /home/testuser/test_project
+
 # Test 22: Simulate dr command to verify argument passing
 echo "\nTest 22: Testing argument passing with dr function simulation"
 
