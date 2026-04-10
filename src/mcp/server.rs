@@ -1264,11 +1264,7 @@ impl ServerHandler for DelaMcpServer {
         );
 
         let tools = vec![
-            Tool::new_with_raw(
-                "list_tasks",
-                Some("List tasks".into()),
-                list_tasks_schema,
-            ),
+            Tool::new_with_raw("list_tasks", Some("List tasks".into()), list_tasks_schema),
             Tool::new_with_raw(
                 "status",
                 Some("List all running tasks with PIDs".into()),
