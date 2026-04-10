@@ -338,7 +338,7 @@ Advanced MCP features for better editor integration and real-time feedback.
 - [ ] **Task Runner Expansions**
   - [ ] [DTKT-127] Implement cargo build
   - [ ] [DTKT-133] Improve Gradle task disambiguation strategy (duplicates in same file)
-  - [ ] [DTKT-136] Implement Turborepo support
+  - [x] [DTKT-136] Implement Turborepo support
   - [ ] [DTKT-136] Implement Rake support
   - [x] [DTKT-137] Implement Justfile parser and task discovery
   - [ ] [DTKT-122] Add Starlark parsing for Bazel

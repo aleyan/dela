@@ -23,6 +23,8 @@ pub enum TaskDefinitionType {
     ShellScript,
     /// Taskfile.yml
     Taskfile,
+    /// turbo.json
+    TurboJson,
     /// Maven pom.xml
     MavenPom,
     /// Gradle build files (build.gradle, build.gradle.kts)
@@ -74,6 +76,9 @@ pub enum TaskRunner {
     /// Task runner for Taskfile.yml
     /// Used when Taskfile.yml is present
     Task,
+    /// Turborepo tasks from turbo.json
+    /// Used when turbo.json is present at the repository root
+    Turbo,
     /// Maven tasks runner
     /// Used when pom.xml is present
     Maven,
@@ -136,6 +141,8 @@ pub struct DiscoveredTaskDefinitions {
     pub pyproject_toml: Option<TaskDefinitionFile>,
     /// Taskfile.yml if found
     pub taskfile: Option<TaskDefinitionFile>,
+    /// turbo.json if found
+    pub turbo_json: Option<TaskDefinitionFile>,
     /// Maven pom.xml if found
     pub maven_pom: Option<TaskDefinitionFile>,
     /// Gradle build files (build.gradle, build.gradle.kts) if found
@@ -183,6 +190,7 @@ impl TaskRunner {
             TaskRunner::PythonPoe => format!("poe {}", task.source_name),
             TaskRunner::ShellScript => format!("./{}", task.source_name),
             TaskRunner::Task => format!("task {} --", task.source_name),
+            TaskRunner::Turbo => format!("turbo run {}", task.source_name),
             TaskRunner::Maven => format!("mvn {}", task.source_name),
             TaskRunner::Gradle => format!("gradle {}", task.source_name),
             TaskRunner::Act => format!("act -W {}", task.file_path.display()),
@@ -225,6 +233,7 @@ impl TaskRunner {
             TaskRunner::PythonPoe => "poe",
             TaskRunner::ShellScript => "sh",
             TaskRunner::Task => "task",
+            TaskRunner::Turbo => "turbo",
             TaskRunner::Maven => "mvn",
             TaskRunner::Gradle => "gradle",
             TaskRunner::Act => "act",

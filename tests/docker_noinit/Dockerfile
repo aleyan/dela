@@ -22,6 +22,8 @@ RUN apk add --no-cache \
 # symlink go-task to task
 RUN ln -s /usr/bin/go-task /usr/local/bin/task
 
+RUN npm install -g turbo
+
 
 # Install act (GitHub Actions runner)
 # TODO: Get act from the package manager, once it is in a non-edge alpine release.
@@ -69,7 +71,9 @@ COPY tests/task_definitions/github_actions/.github /home/testuser/test_project/.
 # Copy Docker Compose files
 COPY tests/task_definitions/docker-compose.yml /home/testuser/test_project/
 COPY tests/task_definitions/compose.yml /home/testuser/test_project/
+COPY tests/task_definitions/turbo_repo /home/testuser/turbo_repo
 RUN chown -R testuser:testuser /home/testuser/test_project
+RUN chown -R testuser:testuser /home/testuser/turbo_repo
 
 # Copy the compiled binary from the builder stage
 COPY --from=builder /app/target/debug/dela /usr/local/bin/

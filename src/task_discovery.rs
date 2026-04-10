@@ -1,8 +1,9 @@
 use crate::parsers::{
     parse_cmake, parse_docker_compose, parse_github_actions, parse_gradle, parse_justfile,
     parse_makefile, parse_package_json, parse_pom_xml, parse_pyproject_toml, parse_taskfile,
-    parse_travis_ci,
+    parse_travis_ci, parse_turbo_json,
 };
+use crate::repo_root::find_git_repo_root;
 use crate::task_shadowing::check_shadowing;
 use crate::types::{Task, TaskDefinitionFile, TaskDefinitionType, TaskFileStatus, TaskRunner};
 use std::collections::HashMap;
@@ -17,6 +18,7 @@ pub struct DiscoveredTaskDefinitions {
     pub package_json: Option<TaskDefinitionFile>,
     pub pyproject_toml: Option<TaskDefinitionFile>,
     pub taskfile: Option<TaskDefinitionFile>,
+    pub turbo_json: Option<TaskDefinitionFile>,
     pub maven_pom: Option<TaskDefinitionFile>,
     pub gradle: Option<TaskDefinitionFile>,
     pub github_actions: Option<TaskDefinitionFile>,
@@ -66,6 +68,7 @@ pub fn discover_tasks(dir: &Path) -> DiscoveredTasks {
     let _ = discover_npm_tasks(dir, &mut discovered);
     let _ = discover_python_tasks(dir, &mut discovered);
     let _ = discover_taskfile_tasks(dir, &mut discovered);
+    let _ = discover_turbo_tasks(dir, &mut discovered);
     let _ = discover_maven_tasks(dir, &mut discovered);
     let _ = discover_gradle_tasks(dir, &mut discovered);
     let _ = discover_github_actions_tasks(dir, &mut discovered);
@@ -240,6 +243,7 @@ fn set_definition(discovered: &mut DiscoveredTasks, definition: TaskDefinitionFi
             discovered.definitions.pyproject_toml = Some(definition)
         }
         TaskDefinitionType::Taskfile => discovered.definitions.taskfile = Some(definition),
+        TaskDefinitionType::TurboJson => discovered.definitions.turbo_json = Some(definition),
         TaskDefinitionType::MavenPom => discovered.definitions.maven_pom = Some(definition),
         TaskDefinitionType::Gradle => discovered.definitions.gradle = Some(definition),
         TaskDefinitionType::GitHubActions => {
@@ -442,6 +446,31 @@ fn discover_taskfile_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Resu
             definition_type: TaskDefinitionType::Taskfile,
             status: TaskFileStatus::NotFound,
         });
+    }
+
+    Ok(())
+}
+
+fn discover_turbo_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<(), String> {
+    let repo_root = find_git_repo_root(dir).unwrap_or_else(|| dir.to_path_buf());
+    let turbo_json = repo_root.join("turbo.json");
+
+    if !turbo_json.exists() {
+        discovered.definitions.turbo_json = Some(TaskDefinitionFile {
+            path: turbo_json,
+            definition_type: TaskDefinitionType::TurboJson,
+            status: TaskFileStatus::NotFound,
+        });
+        return Ok(());
+    }
+
+    match parse_turbo_json::parse(&turbo_json) {
+        Ok(tasks) => {
+            handle_discovery_success(tasks, turbo_json, TaskDefinitionType::TurboJson, discovered);
+        }
+        Err(e) => {
+            handle_discovery_error(e, turbo_json, TaskDefinitionType::TurboJson, discovered);
+        }
     }
 
     Ok(())
@@ -941,6 +970,11 @@ mod tests {
             discovered.definitions.pyproject_toml.unwrap().status,
             TaskFileStatus::NotFound
         ));
+
+        assert!(matches!(
+            discovered.definitions.turbo_json.unwrap().status,
+            TaskFileStatus::NotFound
+        ));
     }
 
     #[test]
@@ -979,6 +1013,42 @@ test:
         let test_task = discovered.tasks.iter().find(|t| t.name == "test").unwrap();
         assert_eq!(test_task.runner, TaskRunner::Make);
         assert_eq!(test_task.description, Some("Running tests".to_string()));
+    }
+
+    #[test]
+    fn test_discover_tasks_finds_turbo_json_at_git_repo_root() {
+        let temp_dir = TempDir::new().unwrap();
+        std::fs::create_dir_all(temp_dir.path().join(".git")).unwrap();
+        std::fs::create_dir_all(temp_dir.path().join("apps").join("web")).unwrap();
+
+        std::fs::write(
+            temp_dir.path().join("turbo.json"),
+            r#"{
+  "$schema": "https://turborepo.dev/schema.json",
+  "tasks": {
+    "build": {},
+    "test": {
+      "dependsOn": ["build"]
+    }
+  }
+}"#,
+        )
+        .unwrap();
+
+        let discovered = discover_tasks(&temp_dir.path().join("apps").join("web"));
+
+        let build_task = discovered.tasks.iter().find(|t| t.name == "build").unwrap();
+        assert_eq!(build_task.runner, TaskRunner::Turbo);
+        assert_eq!(build_task.file_path, temp_dir.path().join("turbo.json"));
+
+        let test_task = discovered.tasks.iter().find(|t| t.name == "test").unwrap();
+        assert_eq!(test_task.runner, TaskRunner::Turbo);
+        assert_eq!(test_task.file_path, temp_dir.path().join("turbo.json"));
+
+        assert_eq!(
+            discovered.definitions.turbo_json.unwrap().status,
+            TaskFileStatus::Parsed
+        );
     }
 
     #[test]

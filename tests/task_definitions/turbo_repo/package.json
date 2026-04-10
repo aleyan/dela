@@ -1,0 +1,11 @@
+{
+  "name": "turbo-repo",
+  "private": true,
+  "packageManager": "npm@10.9.3",
+  "workspaces": [
+    "apps/*"
+  ],
+  "devDependencies": {
+    "turbo": "^2.5.0"
+  }
+}
