@@ -893,28 +893,22 @@ impl DelaMcpServer {
 
 impl ServerHandler for DelaMcpServer {
     fn get_info(&self) -> ServerInfo {
-        ServerInfo {
-            protocol_version: ProtocolVersion::LATEST,
-            capabilities: ServerCapabilities::builder()
+        ServerInfo::new(
+            ServerCapabilities::builder()
                 .enable_tools()
                 .enable_logging()
-                .build(),
-            server_info: Implementation {
-                name: "dela-mcp".into(),
-                version: env!("CARGO_PKG_VERSION").into(),
-                title: Some("Dela MCP Server".into()),
-                description: Some(
+                .build()
+        )
+        .with_server_info(
+            Implementation::new("dela-mcp", env!("CARGO_PKG_VERSION"))
+                .with_title("Dela MCP Server")
+                .with_description(
                     "Dela MCP Server for list and executing tasks from definition files like package.json, pyproject.toml, taskfile.yml, etc."
-                        .into(),
-                ),
-                icons: None,
-                website_url: None,
-            },
-            instructions: Some(
-                "List tasks, start them (≤1s capture then background), and manage running tasks via PID; all execution gated by an MCP allowlist. Subscribe to logging notifications for real-time task output streaming."
-                    .into(),
-            ),
-        }
+                )
+        )
+        .with_instructions(
+            "List tasks, start them (≤1s capture then background), and manage running tasks via PID; all execution gated by an MCP allowlist. Subscribe to logging notifications for real-time task output streaming."
+        )
     }
 
     async fn initialize(
@@ -1015,7 +1009,6 @@ impl ServerHandler for DelaMcpServer {
         _context: RequestContext<RoleServer>,
     ) -> Result<ListToolsResult, ErrorData> {
         use serde_json::Map;
-        use std::sync::Arc;
 
         // Schema for list_tasks
         let mut list_tasks_schema = Map::new();
@@ -1271,74 +1264,32 @@ impl ServerHandler for DelaMcpServer {
         );
 
         let tools = vec![
-            Tool {
-                name: "list_tasks".into(),
-                description: Some("List tasks".into()),
-                input_schema: Arc::new(list_tasks_schema),
-                annotations: None,
-                output_schema: None,
-                execution: None,
-                title: None,
-                icons: None,
-                meta: None,
-            },
-            Tool {
-                name: "status".into(),
-                description: Some("List all running tasks with PIDs".into()),
-                input_schema: Arc::new(status_schema),
-                annotations: None,
-                output_schema: None,
-                execution: None,
-                title: None,
-                icons: None,
-                meta: None,
-            },
-            Tool {
-                name: "task_start".into(),
-                description: Some("Start a task (≤1s capture, then background)".into()),
-                input_schema: Arc::new(task_start_schema),
-                annotations: None,
-                output_schema: None,
-                execution: None,
-                title: None,
-                icons: None,
-                meta: None,
-            },
-            Tool {
-                name: "task_status".into(),
-                description: Some(
-                    "Status for a single unique_name (may have multiple PIDs)".into(),
-                ),
-                input_schema: Arc::new(task_status_schema),
-                annotations: None,
-                output_schema: None,
-                execution: None,
-                title: None,
-                icons: None,
-                meta: None,
-            },
-            Tool {
-                name: "task_output".into(),
-                description: Some("Tail last N lines for a PID".into()),
-                input_schema: Arc::new(task_output_schema),
-                annotations: None,
-                output_schema: None,
-                execution: None,
-                title: None,
-                icons: None,
-                meta: None,
-            },
-            Tool {
-                name: "task_stop".into(),
-                description: Some("Stop a PID with graceful timeout".into()),
-                input_schema: Arc::new(task_stop_schema),
-                annotations: None,
-                output_schema: None,
-                execution: None,
-                title: None,
-                icons: None,
-                meta: None,
-            },
+            Tool::new_with_raw("list_tasks", Some("List tasks".into()), list_tasks_schema),
+            Tool::new_with_raw(
+                "status",
+                Some("List all running tasks with PIDs".into()),
+                status_schema,
+            ),
+            Tool::new_with_raw(
+                "task_start",
+                Some("Start a task (≤1s capture, then background)".into()),
+                task_start_schema,
+            ),
+            Tool::new_with_raw(
+                "task_status",
+                Some("Status for a single unique_name (may have multiple PIDs)".into()),
+                task_status_schema,
+            ),
+            Tool::new_with_raw(
+                "task_output",
+                Some("Tail last N lines for a PID".into()),
+                task_output_schema,
+            ),
+            Tool::new_with_raw(
+                "task_stop",
+                Some("Stop a PID with graceful timeout".into()),
+                task_stop_schema,
+            ),
         ];
 
         Ok(ListToolsResult {
@@ -3263,7 +3214,7 @@ test:
         ];
 
         for level in levels {
-            let request = SetLevelRequestParams { level, meta: None };
+            let request = SetLevelRequestParams::new(level);
             // Test the internal implementation directly since we can't easily
             // create a RequestContext without a real connection
             let result = server.set_level_impl(request);
