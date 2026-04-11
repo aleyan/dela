@@ -22,7 +22,7 @@ RUN apk add --no-cache \
 # symlink go-task to task
 RUN ln -s /usr/bin/go-task /usr/local/bin/task
 
-RUN npm install -g turbo
+RUN npm install -g turbo@2.9.6
 
 
 # Install act (GitHub Actions runner)
