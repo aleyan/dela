@@ -102,4 +102,14 @@ mod tests {
         let tasks = parse(&turbo_json_path).unwrap();
         assert!(tasks.is_empty());
     }
+
+    #[test]
+    fn test_parse_turbo_json_malformed_json() {
+        let temp_dir = TempDir::new().unwrap();
+        let turbo_json_path = temp_dir.path().join("turbo.json");
+        std::fs::write(&turbo_json_path, r#"{"tasks":{"build":{}}"#).unwrap();
+
+        let err = parse(&turbo_json_path).unwrap_err();
+        assert!(err.contains("Failed to parse turbo.json"));
+    }
 }
