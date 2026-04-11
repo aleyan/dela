@@ -8,6 +8,7 @@ pub mod environment;
 pub mod mcp;
 pub mod parsers;
 pub mod prompt;
+pub mod repo_root;
 pub mod runner;
 pub mod runners;
 pub mod task_discovery;

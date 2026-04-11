@@ -330,6 +330,32 @@ fi
 
 echo "${GREEN}✓ All get-command argument passing tests passed successfully${NC}"
 
+# Test 21b: Discover turbo tasks from a nested package using the git repo root
+echo "\nTest 21b: Testing Turborepo discovery from a nested package"
+cd /home/testuser/turbo_repo
+git init >/dev/null 2>&1
+cd /home/testuser/turbo_repo/apps/web
+
+dela list 2>/dev/null > turbo_list_output.txt
+if grep -q "build-t" turbo_list_output.txt && grep -q "test-t" turbo_list_output.txt; then
+    echo "${GREEN}✓ dela list shows turbo tasks from repo root when run in a nested package${NC}"
+else
+    echo "${RED}✗ dela list failed to show turbo tasks from repo root${NC}"
+    cat turbo_list_output.txt
+    exit 1
+fi
+
+output=$(dela get-command build-t 2>&1)
+if echo "$output" | grep -q "turbo run build"; then
+    echo "${GREEN}✓ get-command returns the turbo command for a nested package task${NC}"
+else
+    echo "${RED}✗ get-command failed for turbo task${NC}"
+    echo "Full output: $output"
+    exit 1
+fi
+
+cd /home/testuser/test_project
+
 # Test 22: Simulate dr command to verify argument passing
 echo "\nTest 22: Testing argument passing with dr function simulation"
 

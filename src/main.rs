@@ -7,6 +7,7 @@ mod environment;
 mod mcp;
 mod parsers;
 mod prompt;
+mod repo_root;
 mod runner;
 mod runners {
     pub mod runners_package_json;
@@ -28,6 +29,7 @@ mod types;
 • Node.js: npm, yarn, pnpm, bun (package.json)
 • Python: uv, poetry, poethepoet (pyproject.toml)
 • Task (Taskfile.yml)
+• Turborepo (turbo.json)
 • Maven (pom.xml)
 • Gradle (build.gradle, build.gradle.kts)
 • GitHub Actions (act)

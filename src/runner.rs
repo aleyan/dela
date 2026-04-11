@@ -30,6 +30,7 @@ pub fn is_runner_available(runner: &TaskRunner) -> bool {
         TaskRunner::PythonPoe => check_path_executable("poe").is_some(),
         TaskRunner::ShellScript => true, // Shell scripts don't need a runner
         TaskRunner::Task => check_path_executable("task").is_some(),
+        TaskRunner::Turbo => check_path_executable("turbo").is_some(),
         TaskRunner::Maven => check_path_executable("mvn").is_some(),
         TaskRunner::Gradle => {
             check_path_executable("gradle").is_some()
@@ -121,6 +122,24 @@ mod tests {
         assert!(is_runner_available(&TaskRunner::NodeBun));
         reset_mock();
 
+        reset_to_real_environment();
+    }
+
+    #[test]
+    #[serial]
+    fn test_turbo_runner() {
+        reset_mock();
+        enable_mock();
+
+        let env = TestEnvironment::new().with_executable("turbo");
+        set_test_environment(env);
+        assert!(is_runner_available(&TaskRunner::Turbo));
+
+        let env = TestEnvironment::new();
+        set_test_environment(env);
+        assert!(!is_runner_available(&TaskRunner::Turbo));
+
+        reset_mock();
         reset_to_real_environment();
     }
 

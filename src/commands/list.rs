@@ -90,6 +90,28 @@ pub fn execute(verbose: bool) -> Result<(), String> {
                 }
             }
         }
+        if let Some(turbo_json) = &discovered.definitions.turbo_json {
+            match &turbo_json.status {
+                TaskFileStatus::Parsed => {
+                    test_println!("  {} turbo.json: Found and parsed", "✓".green());
+                }
+                TaskFileStatus::NotImplemented => {
+                    test_println!(
+                        "  {} turbo.json: Found but parsing not yet implemented",
+                        "!".yellow()
+                    );
+                }
+                TaskFileStatus::ParseError(_e) => {
+                    test_println!("  {} turbo.json: Error parsing: {}", "✗".red(), _e);
+                }
+                TaskFileStatus::NotReadable(_e) => {
+                    test_println!("  {} turbo.json: Not readable: {}", "✗".red(), _e);
+                }
+                TaskFileStatus::NotFound => {
+                    test_println!("  {} turbo.json: Not found", "-".dimmed());
+                }
+            }
+        }
         if let Some(maven_pom) = &discovered.definitions.maven_pom {
             match &maven_pom.status {
                 TaskFileStatus::Parsed => {
@@ -481,6 +503,7 @@ mod tests {
                 }
                 TaskRunner::ShellScript => TaskDefinitionType::ShellScript,
                 TaskRunner::Task => TaskDefinitionType::Taskfile,
+                TaskRunner::Turbo => TaskDefinitionType::TurboJson,
                 TaskRunner::Maven => TaskDefinitionType::MavenPom,
                 TaskRunner::Gradle => TaskDefinitionType::Gradle,
                 TaskRunner::Act => TaskDefinitionType::GitHubActions,

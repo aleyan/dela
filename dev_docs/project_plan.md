@@ -31,7 +31,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [x] [DTKT-8] Associate discovered tasks with appropriate runner.
 
 - [ ] **CLI Implementation for `list`**
-  - [x] [DTKT-9] Ensure `dela list` shows tasks from recognized files.
+  - [x] [DTKT-187] Ensure `dela list` shows tasks from recognized files.
   - [x] [DTKT-10] Print tasks with references to the source file.
   - [x] [DTKT-92] List which task runner will be used for each task.
   - [x] [DTKT-113] Indicate which commands have duplicate names.
@@ -332,14 +332,14 @@ Advanced MCP features for better editor integration and real-time feedback.
 ## Icebox and Future Enhancements (Post-Launch)
 
 - [ ] **Desirable**
-  - [x] [DTKT-131] Become an MCP server for the tasks (completed in Phase 10)
-  - [ ] [DTKT-132] Shell completions
+  - [x] [DTKT-188] Become an MCP server for the tasks (completed in Phase 10)
+  - [ ] [DTKT-189] Shell completions
 
 - [ ] **Task Runner Expansions**
   - [ ] [DTKT-127] Implement cargo build
   - [ ] [DTKT-133] Improve Gradle task disambiguation strategy (duplicates in same file)
-  - [ ] [DTKT-136] Implement Turborepo support
-  - [ ] [DTKT-136] Implement Rake support
+  - [x] [DTKT-136] Implement Turborepo support
+  - [ ] [DTKT-190] Implement Rake support
   - [x] [DTKT-137] Implement Justfile parser and task discovery
   - [ ] [DTKT-122] Add Starlark parsing for Bazel
   - [ ] [DTKT-123] Implement Bazel task running.
