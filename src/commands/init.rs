@@ -1,4 +1,7 @@
-use crate::config::{dela_config_dir, legacy_dela_config_dir};
+use crate::config::{
+    legacy_dela_config_dir, preferred_allowlist_path, preferred_allowlist_path_for,
+    preferred_config_dir_path, preferred_config_dir_path_for,
+};
 use crate::environment::{get_current_home, get_current_shell as env_get_current_shell};
 use crate::types::Allowlist;
 use std::env;
@@ -108,7 +111,7 @@ pub fn execute() -> Result<(), String> {
     );
 
     get_current_home().ok_or("HOME environment variable not set".to_string())?;
-    let dela_dir = dela_config_dir()?;
+    let dela_dir = preferred_config_dir_path()?;
     let legacy_dela_dir = legacy_dela_config_dir()?;
 
     if !dela_dir.exists() && legacy_dela_dir.exists() {
@@ -145,7 +148,7 @@ pub fn execute() -> Result<(), String> {
     }
 
     // Create empty allowlist.toml if it doesn't exist
-    let allowlist_path = dela_dir.join("allowlist.toml");
+    let allowlist_path = preferred_allowlist_path()?;
     if !allowlist_path.exists() {
         println!("Creating empty allowlist at {}", allowlist_path.display());
         let empty_allowlist = Allowlist::default();
@@ -245,7 +248,7 @@ mod tests {
         assert!(result.is_ok());
 
         // Verify ~/.config/dela was created
-        let dela_dir = home.join(".config").join("dela");
+        let dela_dir = preferred_config_dir_path_for(&home);
         assert!(dela_dir.exists());
         assert!(dela_dir.is_dir());
 
@@ -327,7 +330,7 @@ mod tests {
         assert!(result.is_ok());
 
         // Verify allowlist.toml was created
-        let allowlist_path = home.join(".config").join("dela").join("allowlist.toml");
+        let allowlist_path = preferred_allowlist_path_for(&home);
         assert!(allowlist_path.exists());
         assert!(allowlist_path.is_file());
 
@@ -357,12 +360,7 @@ mod tests {
         assert!(result.is_ok());
 
         assert!(!legacy_dir.exists());
-        assert!(
-            home.join(".config")
-                .join("dela")
-                .join("allowlist.toml")
-                .exists()
-        );
+        assert!(preferred_allowlist_path_for(&home).exists());
 
         reset_to_real_environment();
     }

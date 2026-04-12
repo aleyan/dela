@@ -1,5 +1,7 @@
 use crate::allowlist;
-use crate::config::preferred_allowlist_path;
+use crate::config::{
+    preferred_allowlist_path, preferred_allowlist_path_for, preferred_config_dir_path_for,
+};
 use crate::task_discovery;
 use crate::types::AllowScope;
 use std::env;
@@ -141,7 +143,7 @@ test: ## Running tests
         set_test_environment(test_env);
 
         // Create ~/.config/dela directory
-        fs::create_dir_all(home_dir.path().join(".config").join("dela"))
+        fs::create_dir_all(preferred_config_dir_path_for(home_dir.path()))
             .expect("Failed to create dela config directory");
 
         (project_dir, home_dir)
@@ -191,12 +193,7 @@ test: ## Running tests
                 result.unwrap_err(),
                 format!(
                     "Dela task 'test' was denied by the {}",
-                    home_dir
-                        .path()
-                        .join(".config")
-                        .join("dela")
-                        .join("allowlist.toml")
-                        .display()
+                    preferred_allowlist_path_for(home_dir.path()).display()
                 )
             );
         });
@@ -249,12 +246,7 @@ test: ## Running tests
             result.unwrap_err(),
             format!(
                 "Dela task 'test' was denied by the {}",
-                home_dir
-                    .path()
-                    .join(".config")
-                    .join("dela")
-                    .join("allowlist.toml")
-                    .display()
+                preferred_allowlist_path_for(home_dir.path()).display()
             )
         );
 
@@ -315,7 +307,7 @@ test: ## Running tests
 
         // Verify the dela config directory wasn't created
         assert!(
-            !home_dir.path().join(".config").join("dela").exists(),
+            !preferred_config_dir_path_for(home_dir.path()).exists(),
             "dela config directory should not be created"
         );
 
@@ -341,12 +333,7 @@ test: ## Running tests
             result.unwrap_err(),
             format!(
                 "Dela task 'test' was denied by the {}",
-                home_dir
-                    .path()
-                    .join(".config")
-                    .join("dela")
-                    .join("allowlist.toml")
-                    .display()
+                preferred_allowlist_path_for(home_dir.path()).display()
             )
         );
 

@@ -71,6 +71,7 @@ pub fn execute(task_with_args: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::preferred_config_dir_path_for;
     use crate::environment::{TestEnvironment, reset_to_real_environment, set_test_environment};
     #[cfg(test)]
     use crate::task_shadowing::{enable_mock, reset_mock};
@@ -107,7 +108,7 @@ test: ## Running tests
         set_test_environment(test_env);
 
         // Create ~/.config/dela directory
-        fs::create_dir_all(home_dir.path().join(".config").join("dela"))
+        fs::create_dir_all(preferred_config_dir_path_for(home_dir.path()))
             .expect("Failed to create dela config directory");
 
         (project_dir, home_dir)

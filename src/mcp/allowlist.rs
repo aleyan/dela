@@ -100,6 +100,7 @@ impl McpAllowlistEvaluator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::preferred_config_dir_path_for;
     use crate::environment::{TestEnvironment, reset_to_real_environment, set_test_environment};
     use crate::types::{Allowlist, AllowlistEntry};
     use crate::types::{Task, TaskDefinitionType, TaskRunner};
@@ -128,7 +129,7 @@ mod tests {
         set_test_environment(test_env);
 
         // Create ~/.config/dela directory
-        fs::create_dir_all(temp_dir.path().join(".config").join("dela"))
+        fs::create_dir_all(preferred_config_dir_path_for(temp_dir.path()))
             .expect("Failed to create dela config directory");
 
         let task = create_test_task("test-task", std::path::PathBuf::from("Makefile"));

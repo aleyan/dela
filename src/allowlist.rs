@@ -1,4 +1,7 @@
-use crate::config::{active_allowlist_path, active_dela_config_dir, preferred_allowlist_path};
+use crate::config::{
+    active_allowlist_path, active_dela_config_dir, preferred_allowlist_path,
+    preferred_config_dir_path_for,
+};
 use crate::prompt::{self, AllowDecision};
 use crate::types::{AllowScope, Allowlist, AllowlistEntry, Task};
 use std::fs;
@@ -221,7 +224,7 @@ mod tests {
         set_test_environment(test_env);
 
         // Create ~/.config/dela directory
-        fs::create_dir_all(temp_dir.path().join(".config").join("dela"))
+        fs::create_dir_all(preferred_config_dir_path_for(temp_dir.path()))
             .expect("Failed to create dela config directory");
 
         let task = create_test_task("test-task", PathBuf::from("Makefile"));
