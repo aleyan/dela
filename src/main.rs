@@ -3,6 +3,7 @@ use clap::{Parser, Subcommand};
 mod allowlist;
 mod builtins;
 mod commands;
+mod config;
 mod environment;
 mod mcp;
 mod parsers;
@@ -100,7 +101,7 @@ enum Commands {
     /// Initialize dela and configure shell integration
     ///
     /// This command will:
-    /// 1. Create ~/.dela directory for configuration
+    /// 1. Create ~/.config/dela directory for configuration
     /// 2. Create an initial allowlist.toml
     /// 3. Add shell integration to your shell's config file
     ///

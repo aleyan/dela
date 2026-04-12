@@ -19,7 +19,7 @@ $ dela init
 
 The `dela init` command will:
 - Add shell integration to handle "command not found" events
-- Create a `~/.dela` directory for configuration
+- Create a `~/.config/dela` directory for configuration
 
 ## Usage
 
@@ -98,7 +98,7 @@ Tool names are stable, and `list_tasks` exposes a stable wire format (including 
 
 ### Security
 
-The MCP server uses the same allowlist as the CLI (`~/.dela/allowlist.toml`). Tasks must be explicitly allowlisted to be executed via MCP. Use the regular `dela` CLI commands to manage allowlists.
+The MCP server uses the same allowlist as the CLI (`~/.config/dela/allowlist.toml`). Tasks must be explicitly allowlisted to be executed via MCP. Use the regular `dela` CLI commands to manage allowlists.
 
 ## Frequently Asked Questions
 

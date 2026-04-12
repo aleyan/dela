@@ -49,7 +49,7 @@ log "2. Testing dela initialization..."
 
 # Initialize dela and verify directory creation
 dela init
-test -d ~/.dela || (error "~/.dela directory not created" && exit 1)
+test -d ~/.config/dela || (error "~/.config/dela directory not created" && exit 1)
 
 # Verify shell integration was added
 grep -q "eval \"\$(dela configure-shell)\"" ~/.bashrc || {
@@ -332,4 +332,4 @@ fi
 
 log "All tests passed!"
 
-log "=== All tests passed successfully! ===" 
+log "=== All tests passed successfully! ==="

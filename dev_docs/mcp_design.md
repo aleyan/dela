@@ -65,7 +65,7 @@ Libraries and their roles:
 	•	tracing-subscriber - Formats events into rmcp-compatible notifications and handles log routing.
 
 ## Permissioning (Allowlist)
-- MCP server uses the **same allowlist** as the human CLI: `~/.dela/allowlist.toml`
+- MCP server uses the **same allowlist** as the human CLI: `~/.config/dela/allowlist.toml`
 - All execution tools (notably **task_start**) evaluate the allowlist with precedence:
   - **Deny > Directory > File > Task**
   - If no hit → **deny** with `NotAllowlisted` error
@@ -98,7 +98,7 @@ pub struct TaskDto {
   pub runner: String,           // short_name() - "make", "npm", "gradle", etc.
   pub command: String,          // fully-expanded shell command
   pub runner_available: bool,   // is the runner usable on this system
-  pub allowlisted: bool,        // allowlist decision (based on ~/.dela/allowlist.toml)
+  pub allowlisted: bool,        // allowlist decision (based on ~/.config/dela/allowlist.toml)
   pub file_path: String,        // absolute or repo-root relative string
   pub description: Option<String>, // task description if available
 }
@@ -437,7 +437,7 @@ impl ServerHandler for DelaMcpServer {
 
 ## Security & Limits
 - **Deny by default**: Tasks not explicitly allowlisted are rejected with `NotAllowlisted` error
-- **Allowlist path**: Reads from `~/.dela/allowlist.toml` (same as CLI)
+- **Allowlist path**: Reads from `~/.config/dela/allowlist.toml` (same as CLI)
 - **Output limits**:
   - Ring buffer: 1000 lines, 5MB max per job
   - Per-message chunk: 8KB max

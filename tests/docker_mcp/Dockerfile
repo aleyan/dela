@@ -25,17 +25,17 @@ RUN npm install -g pnpm@9
 RUN useradd -m -s /bin/bash testuser
 
 # Create test directories
-RUN mkdir -p /home/testuser/test_project /home/testuser/.dela && \
+RUN mkdir -p /home/testuser/test_project /home/testuser/.config/dela && \
     chown -R testuser:testuser /home/testuser && \
-    chmod -R 755 /home/testuser/.dela
+    chmod -R 755 /home/testuser/.config/dela
 
 # Create allowlist with MCP-allowlisted tasks
-RUN echo 'entries = [' > /home/testuser/.dela/allowlist.toml && \
-    echo '  { path = "/home/testuser/test_project/package.json", scope = "Task", tasks = ["npm-test", "npm-start"] },' >> /home/testuser/.dela/allowlist.toml && \
-    echo '  { path = "/home/testuser/test_project/Makefile", scope = "Task", tasks = ["make-build", "make-test", "test-task", "another-task", "print-args", "long-running-task"] }' >> /home/testuser/.dela/allowlist.toml && \
-    echo ']' >> /home/testuser/.dela/allowlist.toml && \
-    chown testuser:testuser /home/testuser/.dela/allowlist.toml && \
-    chmod 644 /home/testuser/.dela/allowlist.toml
+RUN echo 'entries = [' > /home/testuser/.config/dela/allowlist.toml && \
+    echo '  { path = "/home/testuser/test_project/package.json", scope = "Task", tasks = ["npm-test", "npm-start"] },' >> /home/testuser/.config/dela/allowlist.toml && \
+    echo '  { path = "/home/testuser/test_project/Makefile", scope = "Task", tasks = ["make-build", "make-test", "test-task", "another-task", "print-args", "long-running-task"] }' >> /home/testuser/.config/dela/allowlist.toml && \
+    echo ']' >> /home/testuser/.config/dela/allowlist.toml && \
+    chown testuser:testuser /home/testuser/.config/dela/allowlist.toml && \
+    chmod 644 /home/testuser/.config/dela/allowlist.toml
 
 # Copy the compiled binary from the builder stage
 COPY --from=builder /app/target/debug/dela /usr/local/bin/

@@ -79,9 +79,9 @@ test: ## Running tests
         let test_env = TestEnvironment::new().with_home(home_dir.path().to_string_lossy());
         set_test_environment(test_env);
 
-        // Create ~/.dela directory
-        fs::create_dir_all(home_dir.path().join(".dela"))
-            .expect("Failed to create .dela directory");
+        // Create ~/.config/dela directory
+        fs::create_dir_all(home_dir.path().join(".config").join("dela"))
+            .expect("Failed to create dela config directory");
 
         (project_dir, home_dir)
     }

@@ -1,4 +1,5 @@
 use crate::allowlist;
+use crate::config::preferred_allowlist_path;
 use crate::task_discovery;
 use crate::types::AllowScope;
 use std::env;
@@ -40,8 +41,9 @@ pub fn execute(task_with_args: &str, allow: Option<u8>) -> Result<(), String> {
                     5 => {
                         eprintln!("Task '{}' was denied by the allowlist.", task.name);
                         Err(format!(
-                            "Dela task '{}' was denied by the ~/.dela/allowlist.toml",
-                            task.name
+                            "Dela task '{}' was denied by the {}",
+                            task.name,
+                            preferred_allowlist_path()?.display()
                         ))
                     }
                     _ => Err(format!(
@@ -54,8 +56,9 @@ pub fn execute(task_with_args: &str, allow: Option<u8>) -> Result<(), String> {
                 if !allowlist::check_task_allowed(task)? {
                     eprintln!("Task '{}' was denied by the allowlist.", task.name);
                     return Err(format!(
-                        "Dela task '{}' was denied by the ~/.dela/allowlist.toml",
-                        task.name
+                        "Dela task '{}' was denied by the {}",
+                        task.name,
+                        preferred_allowlist_path()?.display()
                     ));
                 }
                 Ok(())
@@ -137,9 +140,9 @@ test: ## Running tests
         let test_env = TestEnvironment::new().with_home(home_dir.path().to_string_lossy());
         set_test_environment(test_env);
 
-        // Create ~/.dela directory
-        fs::create_dir_all(home_dir.path().join(".dela"))
-            .expect("Failed to create .dela directory");
+        // Create ~/.config/dela directory
+        fs::create_dir_all(home_dir.path().join(".config").join("dela"))
+            .expect("Failed to create dela config directory");
 
         (project_dir, home_dir)
     }
@@ -177,7 +180,7 @@ test: ## Running tests
     #[test]
     #[serial]
     fn test_allow_command_denied_task() {
-        let (project_dir, _home_dir) = setup_test_env();
+        let (project_dir, home_dir) = setup_test_env();
         env::set_current_dir(&project_dir).expect("Failed to change directory");
 
         // Simulate user denying the task
@@ -186,7 +189,15 @@ test: ## Running tests
             assert!(result.is_err(), "Should fail when task is denied");
             assert_eq!(
                 result.unwrap_err(),
-                "Dela task 'test' was denied by the ~/.dela/allowlist.toml"
+                format!(
+                    "Dela task 'test' was denied by the {}",
+                    home_dir
+                        .path()
+                        .join(".config")
+                        .join("dela")
+                        .join("allowlist.toml")
+                        .display()
+                )
             );
         });
 
@@ -214,7 +225,7 @@ test: ## Running tests
     #[test]
     #[serial]
     fn test_allow_command_with_allow_option() {
-        let (project_dir, _home_dir) = setup_test_env();
+        let (project_dir, home_dir) = setup_test_env();
         env::set_current_dir(&project_dir).expect("Failed to change directory");
 
         // Test with valid allow options
@@ -236,7 +247,15 @@ test: ## Running tests
         assert!(result.is_err(), "Should fail with allow=5");
         assert_eq!(
             result.unwrap_err(),
-            "Dela task 'test' was denied by the ~/.dela/allowlist.toml"
+            format!(
+                "Dela task 'test' was denied by the {}",
+                home_dir
+                    .path()
+                    .join(".config")
+                    .join("dela")
+                    .join("allowlist.toml")
+                    .display()
+            )
         );
 
         // Test with invalid allow option
@@ -261,7 +280,7 @@ test: ## Running tests
     #[test]
     #[serial]
     fn test_allow_command_uninitialized() {
-        // Create a temp dir for HOME but don't create .dela directory
+        // Create a temp dir for HOME but don't create the dela config directory
         let home_dir = TempDir::new().expect("Failed to create temp HOME directory");
 
         // Set up test environment with the temp directory as HOME
@@ -283,21 +302,21 @@ test: ## Running tests
             .write_all(makefile_content.as_bytes())
             .expect("Failed to write Makefile");
 
-        // Try to allow a task without .dela directory
+        // Try to allow a task without the dela config directory
         let result = execute("test", None);
         assert!(
             result.is_err(),
-            "Should fail when .dela directory doesn't exist"
+            "Should fail when the dela config directory doesn't exist"
         );
         assert_eq!(
             result.unwrap_err(),
             "Dela is not initialized. Please run 'dela init' first."
         );
 
-        // Verify .dela directory wasn't created
+        // Verify the dela config directory wasn't created
         assert!(
-            !home_dir.path().join(".dela").exists(),
-            ".dela directory should not be created"
+            !home_dir.path().join(".config").join("dela").exists(),
+            "dela config directory should not be created"
         );
 
         reset_to_real_environment();
@@ -306,7 +325,7 @@ test: ## Running tests
     #[test]
     #[serial]
     fn test_allow_command_with_allow_option_and_args() {
-        let (project_dir, _home_dir) = setup_test_env();
+        let (project_dir, home_dir) = setup_test_env();
         env::set_current_dir(&project_dir).expect("Failed to change directory");
 
         // Test with valid allow option and task arguments
@@ -320,7 +339,15 @@ test: ## Running tests
         assert!(result.is_err(), "Should fail with allow=5 and arguments");
         assert_eq!(
             result.unwrap_err(),
-            "Dela task 'test' was denied by the ~/.dela/allowlist.toml"
+            format!(
+                "Dela task 'test' was denied by the {}",
+                home_dir
+                    .path()
+                    .join(".config")
+                    .join("dela")
+                    .join("allowlist.toml")
+                    .display()
+            )
         );
 
         reset_to_real_environment();

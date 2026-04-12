@@ -27,8 +27,8 @@ COPY --chown=testuser:testuser tests/docker_pwsh/Microsoft.PowerShell_profile.ps
 RUN chmod 644 /home/testuser/.config/powershell/Microsoft.PowerShell_profile.ps1
 
 # Create dela directory with proper permissions
-RUN mkdir -p /home/testuser/.dela && \
-    chown -R testuser:testuser /home/testuser/.dela
+RUN mkdir -p /home/testuser/.config/dela && \
+    chown -R testuser:testuser /home/testuser/.config/dela
 
 # Copy test files
 COPY tests/task_definitions /home/testuser/
