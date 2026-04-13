@@ -9,6 +9,10 @@ pub fn preferred_allowlist_path_for(home: impl AsRef<Path>) -> PathBuf {
     preferred_config_dir_path_for(home).join("allowlist.toml")
 }
 
+pub fn legacy_allowlist_path_for(home: impl AsRef<Path>) -> PathBuf {
+    home.as_ref().join(".dela").join("allowlist.toml")
+}
+
 pub fn preferred_config_dir_path() -> Result<PathBuf, String> {
     let home = get_current_home().ok_or("HOME environment variable not set".to_string())?;
     Ok(preferred_config_dir_path_for(PathBuf::from(home)))
@@ -17,6 +21,11 @@ pub fn preferred_config_dir_path() -> Result<PathBuf, String> {
 pub fn legacy_dela_config_dir() -> Result<PathBuf, String> {
     let home = get_current_home().ok_or("HOME environment variable not set".to_string())?;
     Ok(PathBuf::from(home).join(".dela"))
+}
+
+pub fn legacy_allowlist_path() -> Result<PathBuf, String> {
+    let home = get_current_home().ok_or("HOME environment variable not set".to_string())?;
+    Ok(legacy_allowlist_path_for(PathBuf::from(home)))
 }
 
 pub fn active_dela_config_dir() -> Result<PathBuf, String> {
@@ -38,5 +47,15 @@ pub fn preferred_allowlist_path() -> Result<PathBuf, String> {
 }
 
 pub fn active_allowlist_path() -> Result<PathBuf, String> {
-    Ok(active_dela_config_dir()?.join("allowlist.toml"))
+    let preferred_path = preferred_allowlist_path()?;
+    if preferred_path.exists() {
+        return Ok(preferred_path);
+    }
+
+    let legacy_path = legacy_allowlist_path()?;
+    if legacy_path.exists() {
+        return Ok(legacy_path);
+    }
+
+    Ok(preferred_path)
 }

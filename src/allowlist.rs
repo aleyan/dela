@@ -279,6 +279,31 @@ mod tests {
 
     #[test]
     #[serial]
+    fn test_load_allowlist_prefers_existing_legacy_file_over_empty_new_dir() {
+        let (temp_dir, _task) = setup_test_env();
+        let legacy_dir = temp_dir.path().join(".dela");
+        fs::create_dir_all(&legacy_dir).expect("Failed to create legacy dela directory");
+
+        let legacy_allowlist = Allowlist {
+            entries: vec![AllowlistEntry {
+                path: PathBuf::from("Makefile"),
+                scope: AllowScope::File,
+                tasks: None,
+            }],
+        };
+        let toml = toml::to_string_pretty(&legacy_allowlist).unwrap();
+        fs::write(legacy_dir.join("allowlist.toml"), toml).unwrap();
+
+        let loaded = load_allowlist().unwrap();
+        assert_eq!(loaded.entries.len(), 1);
+        assert_eq!(loaded.entries[0].path, PathBuf::from("Makefile"));
+
+        drop(temp_dir);
+        reset_to_real_environment();
+    }
+
+    #[test]
+    #[serial]
     fn test_path_matches() {
         let base = PathBuf::from("/home/user/project");
         let file = base.join("Makefile");
