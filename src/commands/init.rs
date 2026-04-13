@@ -1,3 +1,4 @@
+use crate::config::{legacy_dela_config_dir, preferred_allowlist_path, preferred_config_dir_path};
 use crate::environment::{get_current_home, get_current_shell as env_get_current_shell};
 use crate::types::Allowlist;
 use std::env;
@@ -106,9 +107,28 @@ pub fn execute() -> Result<(), String> {
         config_path.display()
     );
 
-    // Create ~/.dela directory if it doesn't exist
-    let home = get_current_home().ok_or("HOME environment variable not set".to_string())?;
-    let dela_dir = PathBuf::from(&home).join(".dela");
+    get_current_home().ok_or("HOME environment variable not set".to_string())?;
+    let dela_dir = preferred_config_dir_path()?;
+    let legacy_dela_dir = legacy_dela_config_dir()?;
+
+    if !dela_dir.exists() && legacy_dela_dir.exists() {
+        println!(
+            "Migrating dela configuration from {} to {}",
+            legacy_dela_dir.display(),
+            dela_dir.display()
+        );
+        if let Some(parent) = dela_dir.parent() {
+            fs::create_dir_all(parent)
+                .map_err(|e| format!("Failed to create dela config parent directory: {}", e))?;
+        }
+        fs::rename(&legacy_dela_dir, &dela_dir).map_err(|e| {
+            format!(
+                "Failed to migrate dela configuration to {}: {}",
+                dela_dir.display(),
+                e
+            )
+        })?;
+    }
 
     if !dela_dir.exists() {
         println!(
@@ -116,7 +136,7 @@ pub fn execute() -> Result<(), String> {
             dela_dir.display()
         );
         fs::create_dir_all(&dela_dir)
-            .map_err(|e| format!("Failed to create ~/.dela directory: {}", e))?;
+            .map_err(|e| format!("Failed to create dela config directory: {}", e))?;
     } else {
         println!(
             "Using existing dela configuration directory at {}",
@@ -125,7 +145,7 @@ pub fn execute() -> Result<(), String> {
     }
 
     // Create empty allowlist.toml if it doesn't exist
-    let allowlist_path = dela_dir.join("allowlist.toml");
+    let allowlist_path = preferred_allowlist_path()?;
     if !allowlist_path.exists() {
         println!("Creating empty allowlist at {}", allowlist_path.display());
         let empty_allowlist = Allowlist::default();
@@ -149,6 +169,7 @@ pub fn execute() -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::{preferred_allowlist_path_for, preferred_config_dir_path_for};
     use crate::environment::{TestEnvironment, reset_to_real_environment, set_test_environment};
     use serial_test::serial;
     use tempfile::TempDir;
@@ -224,8 +245,8 @@ mod tests {
         let result = execute();
         assert!(result.is_ok());
 
-        // Verify ~/.dela was created
-        let dela_dir = home.join(".dela");
+        // Verify ~/.config/dela was created
+        let dela_dir = preferred_config_dir_path_for(&home);
         assert!(dela_dir.exists());
         assert!(dela_dir.is_dir());
 
@@ -307,7 +328,7 @@ mod tests {
         assert!(result.is_ok());
 
         // Verify allowlist.toml was created
-        let allowlist_path = home.join(".dela").join("allowlist.toml");
+        let allowlist_path = preferred_allowlist_path_for(&home);
         assert!(allowlist_path.exists());
         assert!(allowlist_path.is_file());
 
@@ -315,6 +336,29 @@ mod tests {
         let content = fs::read_to_string(&allowlist_path).unwrap();
         let allowlist: Allowlist = toml::from_str(&content).unwrap();
         assert!(allowlist.entries.is_empty());
+
+        reset_to_real_environment();
+    }
+
+    #[test]
+    #[serial]
+    fn test_init_migrates_legacy_config_dir() {
+        let temp_dir = TempDir::new().unwrap();
+        let home = temp_dir.path().to_path_buf();
+        setup_test_env("/bin/zsh", &home).unwrap();
+
+        let zshrc = home.join(".zshrc");
+        fs::write(&zshrc, "# existing zsh config\n").unwrap();
+
+        let legacy_dir = home.join(".dela");
+        fs::create_dir_all(&legacy_dir).unwrap();
+        fs::write(legacy_dir.join("allowlist.toml"), "entries = []\n").unwrap();
+
+        let result = execute();
+        assert!(result.is_ok());
+
+        assert!(!legacy_dir.exists());
+        assert!(preferred_allowlist_path_for(&home).exists());
 
         reset_to_real_environment();
     }

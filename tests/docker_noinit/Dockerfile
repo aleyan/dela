@@ -40,16 +40,16 @@ RUN apk add --no-cache curl git bash && \
 RUN adduser -D -s /bin/zsh testuser
 
 # Create test directories and dela config
-RUN mkdir -p /home/testuser/test_project /home/testuser/.dela && \
+RUN mkdir -p /home/testuser/test_project /home/testuser/.config/dela && \
     chown -R testuser:testuser /home/testuser && \
-    chmod -R 755 /home/testuser/.dela
+    chmod -R 755 /home/testuser/.config/dela
 
 # Create initial allowlist with only npm-test
-RUN echo 'entries = [' > /home/testuser/.dela/allowlist.toml && \
-    echo '  { path = "/home/testuser/test_project/package.json", scope = "Task", tasks = ["npm-test"] }' >> /home/testuser/.dela/allowlist.toml && \
-    echo ']' >> /home/testuser/.dela/allowlist.toml && \
-    chown testuser:testuser /home/testuser/.dela/allowlist.toml && \
-    chmod 644 /home/testuser/.dela/allowlist.toml
+RUN echo 'entries = [' > /home/testuser/.config/dela/allowlist.toml && \
+    echo '  { path = "/home/testuser/test_project/package.json", scope = "Task", tasks = ["npm-test"] }' >> /home/testuser/.config/dela/allowlist.toml && \
+    echo ']' >> /home/testuser/.config/dela/allowlist.toml && \
+    chown testuser:testuser /home/testuser/.config/dela/allowlist.toml && \
+    chmod 644 /home/testuser/.config/dela/allowlist.toml
 
 # Create task definitions file
 RUN echo "tasks:" > /home/testuser/test_project/task_definitions.yml && \

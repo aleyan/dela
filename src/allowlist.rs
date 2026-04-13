@@ -1,27 +1,26 @@
-use crate::environment::get_current_home;
+use crate::config::{active_allowlist_path, active_dela_config_dir, preferred_allowlist_path};
 use crate::prompt::{self, AllowDecision};
 use crate::types::{AllowScope, Allowlist, AllowlistEntry, Task};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// Returns the path to ~/.dela/allowlist.toml
+/// Returns the path to the active allowlist.toml.
 fn allowlist_path() -> Result<PathBuf, String> {
-    let home = get_current_home().ok_or("HOME environment variable not set".to_string())?;
-    Ok(PathBuf::from(home).join(".dela").join("allowlist.toml"))
+    active_allowlist_path()
 }
 
-/// Load the allowlist from ~/.dela/allowlist.toml.
+/// Load the allowlist from the active allowlist path.
 /// If the file does not exist, return an empty allowlist.
 pub fn load_allowlist() -> Result<Allowlist, String> {
     let path = allowlist_path()?;
-    let dela_dir = path.parent().ok_or("Invalid allowlist path")?;
+    let dela_dir = active_dela_config_dir()?;
 
-    // Check if ~/.dela exists
+    // Check if the dela config directory exists
     if !dela_dir.exists() {
         return Err("Dela is not initialized. Please run 'dela init' first.".to_string());
     }
 
-    // If allowlist file doesn't exist but ~/.dela does, return empty allowlist
+    // If allowlist file doesn't exist but the config directory does, return empty allowlist
     if !path.exists() {
         return Ok(Allowlist::default());
     }
@@ -35,14 +34,14 @@ pub fn load_allowlist() -> Result<Allowlist, String> {
     }
 }
 
-/// Save the allowlist to ~/.dela/allowlist.toml
+/// Save the allowlist to ~/.config/dela/allowlist.toml.
 pub fn save_allowlist(allowlist: &Allowlist) -> Result<(), String> {
-    let path = allowlist_path()?;
+    let path = preferred_allowlist_path()?;
 
-    // Create .dela directory if it doesn't exist
+    // Create the config directory if it doesn't exist
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)
-            .map_err(|e| format!("Failed to create .dela directory: {}", e))?;
+            .map_err(|e| format!("Failed to create dela config directory: {}", e))?;
     }
 
     let toml = toml::to_string_pretty(&allowlist)
@@ -195,6 +194,7 @@ pub fn check_task_allowed_with_scope(task: &Task, scope: AllowScope) -> Result<b
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::preferred_config_dir_path_for;
     use crate::environment::{TestEnvironment, reset_to_real_environment, set_test_environment};
     use crate::types::{Task, TaskDefinitionType, TaskRunner};
     use serial_test::serial;
@@ -221,9 +221,9 @@ mod tests {
         let test_env = TestEnvironment::new().with_home(temp_dir.path().to_string_lossy());
         set_test_environment(test_env);
 
-        // Create ~/.dela directory
-        fs::create_dir_all(temp_dir.path().join(".dela"))
-            .expect("Failed to create .dela directory");
+        // Create ~/.config/dela directory
+        fs::create_dir_all(preferred_config_dir_path_for(temp_dir.path()))
+            .expect("Failed to create dela config directory");
 
         let task = create_test_task("test-task", PathBuf::from("Makefile"));
 
@@ -271,6 +271,31 @@ mod tests {
         assert_eq!(loaded.entries[0].scope, AllowScope::File);
 
         // Keep temp_dir around until the end of the test
+        drop(temp_dir);
+        reset_to_real_environment();
+    }
+
+    #[test]
+    #[serial]
+    fn test_load_allowlist_prefers_existing_legacy_file_over_empty_new_dir() {
+        let (temp_dir, _task) = setup_test_env();
+        let legacy_dir = temp_dir.path().join(".dela");
+        fs::create_dir_all(&legacy_dir).expect("Failed to create legacy dela directory");
+
+        let legacy_allowlist = Allowlist {
+            entries: vec![AllowlistEntry {
+                path: PathBuf::from("Makefile"),
+                scope: AllowScope::File,
+                tasks: None,
+            }],
+        };
+        let toml = toml::to_string_pretty(&legacy_allowlist).unwrap();
+        fs::write(legacy_dir.join("allowlist.toml"), toml).unwrap();
+
+        let loaded = load_allowlist().unwrap();
+        assert_eq!(loaded.entries.len(), 1);
+        assert_eq!(loaded.entries[0].path, PathBuf::from("Makefile"));
+
         drop(temp_dir);
         reset_to_real_environment();
     }
@@ -436,7 +461,7 @@ mod tests {
     #[test]
     #[serial]
     fn test_is_task_allowed_uninitialized() {
-        // Set up environment without .dela directory
+        // Set up environment without the dela config directory
         let temp_dir = TempDir::new().unwrap();
         let test_env = TestEnvironment::new().with_home(temp_dir.path().to_string_lossy());
         set_test_environment(test_env);

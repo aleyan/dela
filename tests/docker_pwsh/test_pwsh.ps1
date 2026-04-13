@@ -54,8 +54,8 @@ Write-Log "2. Testing dela initialization..."
 
 # Initialize dela and verify directory creation
 dela init
-if (-not (Test-Path ~/.dela)) {
-    Write-Error "~/.dela directory not created"
+if (-not (Test-Path ~/.config/dela)) {
+    Write-Error "~/.config/dela directory not created"
 }
 
 # Verify shell integration was added
@@ -298,4 +298,4 @@ if (-not ($output -match "Arguments:.*--arg1.*value1.*--arg2=value2")) {
     Write-Error "Arguments are not passed through dr function for python task.`nExpected output to contain arguments: --arg1 value1 --arg2=value2`nGot: $output"
 }
 
-Write-Log "=== All tests passed successfully! ===" 
+Write-Log "=== All tests passed successfully! ==="

@@ -26,8 +26,8 @@ RUN chown testuser:testuser /home/testuser/.zshrc && \
     chmod 644 /home/testuser/.zshrc
 
 # Create dela directory with proper permissions
-RUN mkdir -p /home/testuser/.dela && \
-    chown -R testuser:testuser /home/testuser/.dela
+RUN mkdir -p /home/testuser/.config/dela && \
+    chown -R testuser:testuser /home/testuser/.config/dela
 
 # Copy test files
 COPY tests/task_definitions /home/testuser/

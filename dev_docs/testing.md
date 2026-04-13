@@ -48,7 +48,7 @@ Each shell type (bash, fish, zsh, pwsh) has its own Dockerfile in the `tests/doc
 3. **User Setup**: Create a test user with appropriate shell configuration:
    - Shell-specific config files (`.bashrc`, `config.fish`, `.zshrc`, etc.)
    - Proper permissions and environment variables
-   - Dela configuration directory (`~/.dela`)
+   - Dela configuration directory (`~/.config/dela`)
 
 4. **Test Files**: Mount test definitions and scripts for verification:
    - Task definitions from various build systems

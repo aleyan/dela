@@ -54,8 +54,8 @@ log "2. Testing dela initialization..."
 
 # Initialize dela and verify directory creation
 dela init
-test -d ~/.dela; or begin
-    error "~/.dela directory not created"
+test -d ~/.config/dela; or begin
+    error "~/.config/dela directory not created"
     exit 1
 end
 
@@ -344,4 +344,4 @@ end
 rm -f ~/task_list_output.txt ~/dela_list_output.txt ~/shadow_list_output.txt
 
 log "=== All tests passed successfully! ==="
-exit 0 
+exit 0

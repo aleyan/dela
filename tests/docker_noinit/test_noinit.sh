@@ -42,17 +42,17 @@ fi
 # Test 3: Test allow-command interactive functionality for npm
 echo "\nTest 3: Testing allow-command interactive functionality for npm"
 echo "Initial allowlist contents:"
-cat /home/testuser/.dela/allowlist.toml
+cat /home/testuser/.config/dela/allowlist.toml
 
 # Test interactive allow-command with option 2 (Allow this task)
 echo "\nTesting interactive allow-command with 'Allow this task' option:"
 echo "2" | dela allow-command npm-build >/dev/null 2>&1
 
 echo "\nAllowlist contents after allow-command:"
-cat /home/testuser/.dela/allowlist.toml
+cat /home/testuser/.config/dela/allowlist.toml
 
 # Verify the allowlist was updated with the specific task
-if grep -q "npm-build" /home/testuser/.dela/allowlist.toml; then
+if grep -q "npm-build" /home/testuser/.config/dela/allowlist.toml; then
     echo "${GREEN}✓ npm-build task was added to allowlist via interactive mode${NC}"
 else
     echo "${RED}✗ npm-build task was not added to allowlist via interactive mode${NC}"
@@ -82,7 +82,7 @@ fi
 # Test 6: Test allow-command interactive functionality for Taskfile
 echo "\nTest 6: Testing allow-command interactive functionality for Taskfile"
 echo "Initial allowlist contents:"
-cat /home/testuser/.dela/allowlist.toml
+cat /home/testuser/.config/dela/allowlist.toml
 
 # Test interactive allow-command with option 2 (Allow this task)
 echo "\nTesting interactive allow-command with 'Allow this task' option:"
@@ -92,10 +92,10 @@ echo "2" | dela allow-command task-build >/dev/null 2>&1 || {
 }
 
 echo "\nAllowlist contents after allow-command:"
-cat /home/testuser/.dela/allowlist.toml
+cat /home/testuser/.config/dela/allowlist.toml
 
 # Verify the allowlist was updated with the specific task
-if grep -q "task-build" /home/testuser/.dela/allowlist.toml; then
+if grep -q "task-build" /home/testuser/.config/dela/allowlist.toml; then
     echo "${GREEN}✓ task-build task was added to allowlist via interactive mode${NC}"
 else
     echo "${RED}✗ task-build task was not added to allowlist via interactive mode${NC}"
@@ -103,7 +103,7 @@ else
 fi
 
 # Verify the task was added with Task scope (not File or Directory)
-if grep -q "scope = \"Task\"" /home/testuser/.dela/allowlist.toml; then
+if grep -q "scope = \"Task\"" /home/testuser/.config/dela/allowlist.toml; then
     echo "${GREEN}✓ Task scope was correctly set via interactive mode${NC}"
 else
     echo "${RED}✗ Task scope was not correctly set via interactive mode${NC}"
@@ -142,7 +142,7 @@ fi
 # Test 10: Test allow-command interactive functionality for Maven
 echo "\nTest 10: Testing allow-command interactive functionality for Maven"
 echo "Initial allowlist contents:"
-cat /home/testuser/.dela/allowlist.toml
+cat /home/testuser/.config/dela/allowlist.toml
 
 # Test interactive allow-command with option 2 (Allow this task)
 echo "\nTesting interactive allow-command with 'Allow this task' option:"
@@ -157,10 +157,10 @@ if [ $RESULT -ne 0 ]; then
 fi
 
 echo "\nAllowlist contents after allow-command:"
-cat /home/testuser/.dela/allowlist.toml
+cat /home/testuser/.config/dela/allowlist.toml
 
 # Verify the allowlist was updated with the specific task
-if grep -q "profile:dev" /home/testuser/.dela/allowlist.toml; then
+if grep -q "profile:dev" /home/testuser/.config/dela/allowlist.toml; then
     echo "${GREEN}✓ Maven profile:dev task was added to allowlist via interactive mode${NC}"
 else
     echo "${RED}✗ Maven profile:dev task was not added to allowlist via interactive mode${NC}"
@@ -215,17 +215,17 @@ fi
 # Test 15: Test allow-command interactive functionality for Gradle
 echo "\nTest 15: Testing allow-command interactive functionality for Gradle"
 echo "Initial allowlist contents:"
-cat /home/testuser/.dela/allowlist.toml
+cat /home/testuser/.config/dela/allowlist.toml
 
 # Test interactive allow-command with option 2 (Allow this task)
 echo "\nTesting interactive allow-command with 'Allow this task' option:"
 echo "2" | dela allow-command gradleBuild >/dev/null 2>&1
 
 echo "\nAllowlist contents after allow-command:"
-cat /home/testuser/.dela/allowlist.toml
+cat /home/testuser/.config/dela/allowlist.toml
 
 # Verify the allowlist was updated with the specific task
-if grep -q "gradleBuild" /home/testuser/.dela/allowlist.toml; then
+if grep -q "gradleBuild" /home/testuser/.config/dela/allowlist.toml; then
     echo "${GREEN}✓ gradleBuild task was added to allowlist via interactive mode${NC}"
 else
     echo "${RED}✗ gradleBuild task was not added to allowlist via interactive mode${NC}"
@@ -543,12 +543,12 @@ if [ ${#TASK_SUFFIXES[@]} -gt 0 ]; then
     }
     
     # Verify the allowlist was updated in some way
-    if grep -q "path.*\|task.*" /home/testuser/.dela/allowlist.toml; then
+    if grep -q "path.*\|task.*" /home/testuser/.config/dela/allowlist.toml; then
         echo "${GREEN}✓ Allowlist was updated${NC}"
     else
         echo "${YELLOW}⚠ Couldn't verify allowlist update${NC}"
         echo "Allowlist contents:"
-        cat /home/testuser/.dela/allowlist.toml
+        cat /home/testuser/.config/dela/allowlist.toml
     fi
 else
     echo "${YELLOW}⚠ No task suffix found, skipping allow-command test${NC}"
@@ -587,17 +587,17 @@ fi
 # Test 29: Test allow-command interactive functionality for Docker Compose
 echo "\nTest 29: Testing allow-command interactive functionality for Docker Compose"
 echo "Initial allowlist contents:"
-cat /home/testuser/.dela/allowlist.toml
+cat /home/testuser/.config/dela/allowlist.toml
 
 # Test interactive allow-command with option 2 (Allow this task)
 echo "\nTesting interactive allow-command with 'Allow this task' option:"
 echo "2" | dela allow-command app >/dev/null 2>&1
 
 echo "\nAllowlist contents after allow-command:"
-cat /home/testuser/.dela/allowlist.toml
+cat /home/testuser/.config/dela/allowlist.toml
 
 # Verify the allowlist was updated with the specific task
-if grep -q "app" /home/testuser/.dela/allowlist.toml; then
+if grep -q "app" /home/testuser/.config/dela/allowlist.toml; then
     echo "${GREEN}✓ app service was added to allowlist via interactive mode${NC}"
 else
     echo "${RED}✗ app service was not added to allowlist via interactive mode${NC}"

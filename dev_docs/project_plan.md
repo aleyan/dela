@@ -49,7 +49,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [x] [DTKT-11] Modify `.zshrc` to invoke `dela` manually.
   - [x] [DTKT-12] Append/update `command_not_found_handle` manually.
   - [x] [DTKT-13] Implement `dela configure-shell` command to return the command_not_found_handle.
-  - [x] [DTKT-14] Implement `dela init` command to automate creation of `~/.dela` and `~/.dela/allowlist.toml`.
+  - [x] [DTKT-14] Implement `dela init` command to automate creation of `~/.config/dela` and `~/.config/dela/allowlist.toml`.
   - [x] [DTKT-15] Modify `dela init` command add eval of `dela configure_shell`.
   - [ ] [DTKT-93] Have `dela init` take options options (eg no method missing)
   - [ ] [DTKT-105] Update `dela init` to cleanup the output.
@@ -121,7 +121,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
 ## Phase 4: Security & Allowlist Management
 
 - [x] **Allowlist Data Structures**
-  - [x] [DTKT-28] Implement `allowlist.rs` to read/write `~/.dela/allowlist.toml`.
+  - [x] [DTKT-28] Implement `allowlist.rs` to read/write `~/.config/dela/allowlist.toml`.
   - [x] [DTKT-29] Define `AllowlistEntry` with `file`/`directory` scopes.
 
 - [x] **User Prompts**
@@ -347,7 +347,7 @@ Advanced MCP features for better editor integration and real-time feedback.
 - [ ] **Unlikely to Happen, deprioretized**
   - [ ] [DTKT-52] Provide a standardized interface for community-built task parsers.
   - [ ] [DTKT-53] Support containers or remote servers for distributed workloads.
-  - [ ] [DTKT-54] Introduce optional `~/.dela/config.toml` for global settings.
+  - [ ] [DTKT-54] Introduce optional `~/.config/dela/config.toml` for global settings.
   - [ ] [DTKT-55] Add more flexible user preferences.
 
 

@@ -37,7 +37,7 @@ src/
 │   ├── runners_package_json.rs // Runners for npm/yarn/etc.
 │   ├── runners_pyproject_toml.rs // Runners for Python tools
 │   └── mod.rs                  // Module exports
-├── allowlist.rs                // Handling of allowlists, reading/writing from .dela/allowlist.toml
+├── allowlist.rs                // Handling of allowlists, reading/writing from ~/.config/dela/allowlist.toml
 ├── builtins.rs                 // Handling of shell builtin commands
 ├── prompt.rs                   // User interaction prompts
 ├── runner.rs                   // Core logic for running tasks
@@ -69,7 +69,7 @@ src/
 - Handles the specific details of executing tasks with different tools (npm, yarn, Python, etc.).
 
 ### `allowlist.rs`
-- Responsible for reading and writing user approval decisions to `~/.dela/allowlists`.
+- Responsible for reading and writing user approval decisions to `~/.config/dela/allowlist.toml`.
 - Exposes APIs for checking and modifying task approvals.
 
 ### `task_discovery.rs`
@@ -162,7 +162,7 @@ These types provide a comprehensive representation of tasks, their sources, and 
 The following commands are planned for dela:
 1) dela init
 - Updates the user's shell configuration to set up dela as the fallback for "command not found".
-- Creates ~/.dela directory (if missing) and an initial allowlist.toml.
+- Creates ~/.config/dela directory (if missing) and an initial allowlist.toml.
 2) dela list
 - Prints out all discovered tasks in the current directory.
 - Each task might be listed with its origin file.
@@ -190,7 +190,7 @@ start (npm)
 ### Typical Workflow
 1) User runs cargo install dela.
 2) User calls dela init, which:
-- Creates ~/.dela if necessary.
+- Creates ~/.config/dela if necessary.
 - Writes or updates lines in .zshrc (or other shell config).
 - Installs a minimal function for command_not_found_handle that delegates to dela.
 3) User opens or reloads their shell session.
@@ -202,7 +202,7 @@ start (npm)
 
 ### Security & Allowlist Management
 - Prompt: On the first run of any new command from a file or directory, dela asks if the user wants to allow just one-time execution, allow that specific task, allow all tasks from that file, allow all tasks in the directory, or deny.
-- Storage: The user choice is written into a TOML-based allowlist in ~/.dela/allowlist.toml.
+- Storage: The user choice is written into a TOML-based allowlist in ~/.config/dela/allowlist.toml.
 - Checks: Each time a task is run, dela consults the allowlist to ensure permission.
 - Example: If the user chooses to allow a single run, the entry is ephemeral and not stored permanently. If the user chooses to "Allow any command from ~/Projects/dela/Makefile," a matching entry is created in the allowlist.
 

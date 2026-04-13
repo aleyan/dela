@@ -16,7 +16,7 @@ At a high level, `dela` operates by intercepting commands in your shell that wou
    -  The shell configuration will `eval(dela configure_shell)` to configure the shell. This is done so that new versions of dela can be installed without having to re-run the init command.
 
 2. **User Home Directory**
-   - When `dela init` is first run, it creates a `~/.dela` directory to store configuration details, including the allowlists.
+   - When `dela init` is first run, it creates a `~/.config/dela` directory to store configuration details, including the allowlists.
 
 3. **Cross-Shell Compatibility**
    - While `.zshrc` is our primary target, the installation logic may be extended to handle `~/.bashrc`, `~/.config/fish/config.fish`, or other shell init files if detected or requested.
@@ -72,7 +72,7 @@ At a high level, `dela` operates by intercepting commands in your shell that wou
 ## Allowlist Management & Security
 
 1. **Allowlists**
-   - `dela` tracks user-approved tasks or task definition files in `~/.dela/allowlists`. This ensures that tasks cannot execute code from an untrusted directory or file without explicit permission when a user typos a command.
+   - `dela` tracks user-approved tasks or task definition files in `~/.config/dela/allowlist.toml`. This ensures that tasks cannot execute code from an untrusted directory or file without explicit permission when a user typos a command.
 
 2. **Prompting**
    - When a task is run for the first time from a new directory or new file, the user is prompted to allow or deny that command. This approach helps prevent accidental or malicious commands from executing automatically.
@@ -88,7 +88,7 @@ At a high level, `dela` operates by intercepting commands in your shell that wou
    - `dela` is written in Rust to maximize portability and performance. It uses libraries for command-line argument parsing and for orchestrating shell calls (e.g. `std::process::Command`).
 
 2. **Storage & Configuration**
-   - All user-specific data (allowlists, configuration, logs, etc.) are stored in the `~/.dela` folder by default.
+   - All user-specific data (allowlists, configuration, logs, etc.) are stored in the `~/.config/dela` folder by default.
    - A minimal in-memory store is built at runtime from these local files so that repeated tasks in the same session don’t require repeated file access.
 
 3. **Error Handling & Logging**
