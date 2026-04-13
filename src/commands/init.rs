@@ -1,7 +1,4 @@
-use crate::config::{
-    legacy_dela_config_dir, preferred_allowlist_path, preferred_allowlist_path_for,
-    preferred_config_dir_path, preferred_config_dir_path_for,
-};
+use crate::config::{legacy_dela_config_dir, preferred_allowlist_path, preferred_config_dir_path};
 use crate::environment::{get_current_home, get_current_shell as env_get_current_shell};
 use crate::types::Allowlist;
 use std::env;
@@ -172,6 +169,7 @@ pub fn execute() -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::{preferred_allowlist_path_for, preferred_config_dir_path_for};
     use crate::environment::{TestEnvironment, reset_to_real_environment, set_test_environment};
     use serial_test::serial;
     use tempfile::TempDir;

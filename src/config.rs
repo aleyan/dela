@@ -5,6 +5,7 @@ pub fn preferred_config_dir_path_for(home: impl AsRef<Path>) -> PathBuf {
     home.as_ref().join(".config").join("dela")
 }
 
+#[cfg(test)]
 pub fn preferred_allowlist_path_for(home: impl AsRef<Path>) -> PathBuf {
     preferred_config_dir_path_for(home).join("allowlist.toml")
 }

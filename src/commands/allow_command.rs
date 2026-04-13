@@ -1,7 +1,5 @@
 use crate::allowlist;
-use crate::config::{
-    preferred_allowlist_path, preferred_allowlist_path_for, preferred_config_dir_path_for,
-};
+use crate::config::preferred_allowlist_path;
 use crate::task_discovery;
 use crate::types::AllowScope;
 use std::env;
@@ -78,6 +76,7 @@ pub fn execute(task_with_args: &str, allow: Option<u8>) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::{preferred_allowlist_path_for, preferred_config_dir_path_for};
     use crate::environment::{TestEnvironment, reset_to_real_environment, set_test_environment};
     use serial_test::serial;
     use std::env;

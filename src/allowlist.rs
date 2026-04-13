@@ -1,7 +1,4 @@
-use crate::config::{
-    active_allowlist_path, active_dela_config_dir, preferred_allowlist_path,
-    preferred_config_dir_path_for,
-};
+use crate::config::{active_allowlist_path, active_dela_config_dir, preferred_allowlist_path};
 use crate::prompt::{self, AllowDecision};
 use crate::types::{AllowScope, Allowlist, AllowlistEntry, Task};
 use std::fs;
@@ -197,6 +194,7 @@ pub fn check_task_allowed_with_scope(task: &Task, scope: AllowScope) -> Result<b
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::preferred_config_dir_path_for;
     use crate::environment::{TestEnvironment, reset_to_real_environment, set_test_environment};
     use crate::types::{Task, TaskDefinitionType, TaskRunner};
     use serial_test::serial;
