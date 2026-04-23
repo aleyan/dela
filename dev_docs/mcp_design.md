@@ -18,6 +18,11 @@ MCPI_NO_COLOR=1 RUST_LOG=warn npx @modelcontextprotocol/inspector ./target/relea
 **Protocol hygiene:** never print to **stdout** before/while serving MCP over stdio.
 All human/debug output must go to **stderr**. The server should enter
 `DelaMcpServer::serve_stdio()` and block until shutdown so the Inspector can establish the SSE session.
+
+**Transport note:** with the current `rmcp` stdio transport, dela speaks newline-delimited
+JSON-RPC messages over stdio, not `Content-Length` framed messages. Any local debugging
+client or smoke-test utility should write one JSON-RPC message per line and read one line
+per response/notification.
 ⸻
 
 # Dela MCP — Revised Design (First-Principles)
@@ -38,7 +43,7 @@ This redesign narrows each tool to a single, clear responsibility and aligns wit
   - description (optional)
 - **status** → Return a list of **all running tasks** (across all names) with PIDs and minimal status.
 - **task_start** → Start a task by **unique_name** with optional args/env/cwd. If it **finishes within 1s**, return its full output and exit status. If it **does not finish in 1s**, background it, return `running` with PID and any output captured during that first second.
-- **task_status** → Return status for **running instances of a given unique_name**. There may be multiple PIDs if the same task was started with different arguments.
+- **task_status** → Return status for instances of a given **unique_name**. There may be multiple PIDs if the same task was started with different arguments. Current wire format emphasizes state and elapsed time; future revisions should also expose completion metadata such as `exit_code` and `completed_at`.
 - **task_output** → Return the **last N lines** of output for a **PID** (with a default N). Supports simple paging via an optional `from` byte cursor (future).
 - **task_stop** → Stop a running task by **PID** (TERM with grace, then KILL on timeout).
 - 
@@ -57,7 +62,7 @@ cargo add schemars
 cargo add tracing tracing-subscriber
 
 Libraries and their roles:
-	•	rmcp - The core MCP protocol library. Handles stdio transport, tool routing, and logging notifications. We use it to define and expose our five tools via #[tool] attributes.
+	•	rmcp - The core MCP protocol library. Handles stdio transport, tool routing, and logging notifications. In our current stdio mode this means newline-delimited JSON-RPC messages over stdin/stdout. We use it to define and expose our five tools via #[tool] attributes.
 	•	tokio - Async runtime for Rust. Powers our job management with async process spawning, ring buffers, and graceful shutdown. The 'full' feature gives us process management and IO utilities.
 	•	serde/serde_json - Serialization framework for Rust. Handles all JSON encoding/decoding of our DTOs and tool parameters. The 'derive' feature lets us auto-generate serializers.
 	•	schemars - JSON Schema generation. Used with #[derive(JsonSchema)] to document our DTOs and tool parameters. Helps IDEs understand our protocol.
@@ -80,6 +85,10 @@ Libraries and their roles:
 - **First-second capture**: `task_start` collects stdout/stderr for up to **1 second** (configurable later).
   - If the child exits in ≤1s → return `{ state: "exited", exit_code, output }`.
   - If still running after 1s → background it and return `{ state: "running", pid, initial_output }`.
+- **Waited execution (planned)**: common agent workflows such as "run tests" benefit from a
+  bounded wait option. A future revision should allow `task_start(wait_for_exit_seconds=N)` or a
+  dedicated convenience tool that waits for short/medium tasks to finish and returns final status
+  plus an output tail in one round trip.
 - **Output ring buffer**: Per-PID bounded buffer (default 1000 lines, 5 MB). `task_output` returns last N lines. Future paging via `from` byte cursor.
 - **Lifecycle**: `task_stop` sends SIGTERM, waits grace (default 5s), then SIGKILL. Background jobs are GC'd after a TTL (configurable).
 - **Real-time streaming**: Task output is streamed via MCP logging notifications. Clients can subscribe to `notifications/message` to receive output as it happens.
@@ -114,6 +123,7 @@ pub struct TaskStartArgs {
   pub args: Option<Vec<String>>, // optional arguments to pass to the task
   pub env: Option<HashMap<String, String>>, // optional environment variables
   pub cwd: Option<String>,      // optional working directory
+  pub wait_for_exit_seconds: Option<u64>, // future: wait for completion before backgrounding
 }
 
 #[derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
@@ -126,6 +136,26 @@ pub struct StartResultDto {
 
 // Note: RunningTaskDto, TaskStatusArgs, TaskOutputArgs, TaskStopArgs are Phase 2
 // and not yet implemented in the current version.
+```
+
+Planned DTO enrichments for client ergonomics:
+
+```rust
+pub struct TaskStatusJobDto {
+  pub pid: i32,
+  pub unique_name: String,
+  pub state: String,               // "running"|"exited"|"failed"
+  pub elapsed_seconds: u64,
+  pub exit_code: Option<i32>,      // future
+  pub completed_at: Option<String> // future RFC3339 timestamp
+}
+
+pub struct TaskOutputArgs {
+  pub pid: u32,
+  pub lines: Option<usize>,
+  pub show_truncation: Option<bool>,
+  pub from: Option<u64>,           // future cursor for incremental paging
+}
 ```
 
 
@@ -200,6 +230,14 @@ pub struct StartResultDto {
   ]
 }
 ```
+**Future convenience option**
+```json
+{
+  "unique_name": "tests-m",
+  "wait_for_exit_seconds": 15
+}
+```
+This mode is intended for common agent flows where an extra `task_status` poll cycle is pure overhead.
 **Error (NotAllowlisted)**
 ```json
 {
@@ -310,11 +348,13 @@ All errors follow the JSON-RPC 2.0 error format:
   "content": [
     {
       "type": "text",
-      "text": "{\"jobs\": [{\"pid\": 12345, \"unique_name\": \"build-m\", \"state\": \"running\", \"elapsed_seconds\": 120}]}"
+      "text": "{\"jobs\": [{\"pid\": 12345, \"unique_name\": \"build-m\", \"state\": \"running\", \"elapsed_seconds\": 120, \"exit_code\": null, \"completed_at\": null}]}"
     }
   ]
 }
 ```
+`exit_code` and `completed_at` are planned enrichments that make polling clients simpler and remove
+the need to infer success/failure from logging notifications alone.
 
 ### 5) task_output
 **Args**
@@ -332,6 +372,11 @@ All errors follow the JSON-RPC 2.0 error format:
   ]
 }
 ```
+**Planned paging form**
+```json
+{ "pid": 12345, "from": 4096, "lines": 100 }
+```
+Cursor-based paging lets clients fetch only new output instead of repeatedly re-reading a tail and diffing it client-side.
 
 ### 6) task_stop
 **Args**
@@ -356,6 +401,20 @@ All errors follow the JSON-RPC 2.0 error format:
 - We can keep a conservative tool-only design. If needed for streaming or snapshots later:
   - `job://<pid>` → JSON status snapshot
   - `joblog://<pid>?from=<u64>` → chunked logs paging
+
+## Client Ergonomics Roadmap
+
+These are not required for the minimal MCP surface, but they materially improve agent/editor UX:
+
+- **Bounded wait on start**: avoid poll loops for common commands like tests and builds.
+- **Completion metadata in `task_status`**: include `exit_code` and `completed_at` for closed jobs.
+- **Incremental log paging**: add `from` cursors to `task_output` or `joblog://` resources.
+- **Discovery caching**: cache task discovery for hot paths such as repeated `list_tasks` calls.
+- **Workspace-aware editor config generation**: allow generated MCP configs to pre-bind `cwd`,
+  prefer absolute `dela` binary paths when useful, and reduce post-generation manual edits.
+- **Built-in MCP smoke test**: provide a small CLI workflow such as `dela mcp --self-test` or
+  `dela mcp --inspect-task <task>` for verifying transport, initialization, and task execution
+  without hand-crafting JSON-RPC.
 
 ⸻
 
@@ -402,16 +461,19 @@ impl ServerHandler for DelaMcpServer {
 - Checks runner availability
 - Captures output for first second, then backgrounds if still running
 - Returns `StartResultDto` with state, PID, exit code, and initial output
+- Future ergonomic extension: support bounded waiting for completion in the same call
 
 **task_status** - Returns status for running instances of a specific task
 - Filters jobs by unique_name
 - Returns all PIDs associated with that task name
 - Includes state (running/exited/failed), elapsed_seconds, command, and args
+- Planned enrichment: include `exit_code` and `completed_at` for completed jobs
 
 **task_output** - Returns the last N lines of output for a running task
 - Default 200 lines, configurable via `lines` parameter
 - Supports `show_truncation` flag to indicate if output was truncated
 - Per-PID ring buffer (1000 lines, 5MB max)
+- Planned enrichment: support cursor-based paging via `from`
 
 **task_stop** - Stops a running task by PID
 - Sends SIGTERM with configurable grace period (default 5s)
@@ -459,6 +521,11 @@ impl ServerHandler for DelaMcpServer {
 dela mcp [--cwd <dir>]
 ```
 Starts stdio server in `<dir>` (default `.`).
+
+Planned convenience entry points:
+- `dela mcp --self-test`
+- `dela mcp --inspect-task <unique_name>`
+- `dela mcp --init-<editor> --cwd <workspace>` for workspace-aware config generation
 
 ⸻
 

@@ -319,9 +319,13 @@ Advanced MCP features for better editor integration and real-time feedback.
 
 **Medium Priority:**
 - [ ] **[DTKT-182]** **Environment introspection** - expose detected task runners and their versions
-- [ ] **[DTKT-183]** **Task metadata caching** - cache discovered tasks to speed up repeated `list_tasks` calls
+- [ ] **[DTKT-183]** **Task metadata caching** - cache discovered tasks to speed up repeated `list_tasks` calls and other hot-path MCP discovery calls
 - [ ] **[DTKT-191]** **Structured MCP task execution plans** - stop relying on shell-fragment command strings for MCP execution so compound runners like CMake can execute safely without `sh -c`
-- [ ] **[DTKT-192]** **Robust editor config generation** - support JSONC-aware merges and optionally write absolute `dela` binary paths for GUI editor MCP configs
+- [ ] **[DTKT-192]** **Robust editor config generation** - support JSONC-aware merges, optionally write absolute `dela` binary paths for GUI editor MCP configs, and add workspace-aware `cwd` generation modes
+- [ ] **[DTKT-193]** **Bounded wait execution** - add `task_start(wait_for_exit_seconds=...)` or equivalent convenience flow for short/medium tasks like tests and builds
+- [ ] **[DTKT-194]** **Completion metadata in task_status** - include `exit_code` and `completed_at` for completed jobs so clients do not need to infer outcomes from notifications
+- [ ] **[DTKT-195]** **Cursor-based log paging** - support `task_output(from=...)` or equivalent incremental log fetches
+- [ ] **[DTKT-196]** **MCP smoke test CLI** - provide `dela mcp --self-test` and/or `dela mcp --inspect-task <task>` for local MCP debugging without hand-written JSON-RPC
 
 **Lower Priority:**
 - [ ] **[DTKT-178]** MCP **Resources** `job://<pid>` for job state snapshots, `joblog://<pid>?from=…` for log paging
