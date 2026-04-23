@@ -310,7 +310,7 @@ All errors follow the JSON-RPC 2.0 error format:
   "content": [
     {
       "type": "text",
-      "text": "{\"jobs\": [{\"pid\": 12345, \"unique_name\": \"build-m\", \"state\": \"running\", \"started_at\": 120}]}"
+      "text": "{\"jobs\": [{\"pid\": 12345, \"unique_name\": \"build-m\", \"state\": \"running\", \"elapsed_seconds\": 120}]}"
     }
   ]
 }
@@ -406,7 +406,7 @@ impl ServerHandler for DelaMcpServer {
 **task_status** - Returns status for running instances of a specific task
 - Filters jobs by unique_name
 - Returns all PIDs associated with that task name
-- Includes state (running/exited/failed), started_at, command, and args
+- Includes state (running/exited/failed), elapsed_seconds, command, and args
 
 **task_output** - Returns the last N lines of output for a running task
 - Default 200 lines, configurable via `lines` parameter
@@ -429,7 +429,7 @@ impl ServerHandler for DelaMcpServer {
 - Per-PID ring buffer (VecDeque) with configurable limits:
   - Max 1000 lines per job
   - Max 5MB output per job
-- Job metadata includes: started_at, command, unique_name, source_name, args, cwd, file_path
+- Job metadata includes: started_at (internal), elapsed_seconds (wire), command, unique_name, source_name, args, cwd, file_path
 - Background monitoring task updates job state on child exit
 - Jobs transition through states: Running → Exited(exit_code) or Failed(reason)
 

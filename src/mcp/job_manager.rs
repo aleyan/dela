@@ -257,8 +257,10 @@ impl JobManager {
 
     /// Check if we can start a new job (concurrency limit check)
     pub async fn can_start_job(&self) -> Result<(), String> {
+        self.garbage_collect().await;
         let jobs = self.jobs.read().await;
-        if jobs.len() >= self.config.max_concurrent_jobs {
+        let running_jobs = jobs.values().filter(|job| job.is_running()).count();
+        if running_jobs >= self.config.max_concurrent_jobs {
             return Err(format!(
                 "Maximum concurrent jobs limit reached: {}",
                 self.config.max_concurrent_jobs
@@ -298,6 +300,30 @@ impl JobManager {
         let mut processes = self.processes.write().await;
         processes.insert(pid, process);
 
+        Ok(())
+    }
+
+    /// Record a completed job without retaining a process handle
+    pub async fn record_completed_job(
+        &self,
+        pid: u32,
+        metadata: JobMetadata,
+        state: JobState,
+    ) -> Result<(), String> {
+        let mut jobs = self.jobs.write().await;
+        jobs.insert(
+            pid,
+            Job {
+                pid,
+                metadata,
+                state,
+                output_buffer: RingBuffer::new(
+                    self.config.max_output_lines_per_job,
+                    self.config.max_output_bytes_per_job,
+                ),
+                last_activity: Instant::now(),
+            },
+        );
         Ok(())
     }
 
@@ -380,14 +406,42 @@ impl JobManager {
         // First, try to get the process from our managed processes
         let mut processes = self.processes.write().await;
         if let Some(mut process) = processes.remove(&pid) {
-            // Send SIGTERM
-            if let Err(e) = process.kill().await {
-                // Update job state to failed
-                let mut jobs = self.jobs.write().await;
-                if let Some(job) = jobs.get_mut(&pid) {
-                    job.mark_failed(format!("Failed to send SIGTERM: {}", e));
+            #[cfg(unix)]
+            {
+                use nix::sys::signal::{self, Signal};
+                use nix::unistd::Pid;
+
+                match signal::kill(Pid::from_raw(pid as i32), Signal::SIGTERM) {
+                    Ok(()) => {}
+                    Err(nix::errno::Errno::ESRCH) => {
+                        let exit_status = process.wait().await.map_err(|e| {
+                            format!("Process already exited but wait failed: {}", e)
+                        })?;
+                        let exit_code = exit_status.code().unwrap_or(0);
+                        let mut jobs = self.jobs.write().await;
+                        if let Some(job) = jobs.get_mut(&pid) {
+                            job.mark_exited(exit_code);
+                        }
+                        return Ok(StopResult::Graceful(exit_code));
+                    }
+                    Err(e) => {
+                        let mut jobs = self.jobs.write().await;
+                        if let Some(job) = jobs.get_mut(&pid) {
+                            job.mark_failed(format!("Failed to send SIGTERM: {}", e));
+                        }
+                        return Ok(StopResult::Failed(format!("Failed to send SIGTERM: {}", e)));
+                    }
                 }
-                return Ok(StopResult::Failed(format!("Failed to send SIGTERM: {}", e)));
+            }
+            #[cfg(not(unix))]
+            {
+                if let Err(e) = process.kill().await {
+                    let mut jobs = self.jobs.write().await;
+                    if let Some(job) = jobs.get_mut(&pid) {
+                        job.mark_failed(format!("Failed to stop process: {}", e));
+                    }
+                    return Ok(StopResult::Failed(format!("Failed to stop process: {}", e)));
+                }
             }
 
             // Wait for the process to exit gracefully
@@ -414,9 +468,6 @@ impl JobManager {
                 }
                 Err(_) => {
                     // Grace period expired, send SIGKILL
-                    drop(processes); // Release the lock before trying to kill
-
-                    // Try to kill the process using native Rust signal handling
                     #[cfg(unix)]
                     {
                         use nix::sys::signal::{self, Signal};

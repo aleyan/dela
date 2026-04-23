@@ -34,8 +34,6 @@ impl DelaMcpServer {
     /// Create a new MCP server instance
     pub fn new(root: PathBuf) -> Self {
         let allowlist_evaluator = McpAllowlistEvaluator::new().unwrap_or_else(|_| {
-            // If allowlist loading fails, create an empty evaluator
-            // This allows the server to start even if allowlist is not available
             McpAllowlistEvaluator {
                 allowlist: crate::types::Allowlist::default(),
             }
@@ -177,7 +175,7 @@ impl DelaMcpServer {
                     "source_name": job.metadata.source_name,
                     "command": job.metadata.command,
                     "file_path": job.metadata.file_path.to_string_lossy(),
-                    "started_at": job.metadata.started_at.elapsed().as_secs(),
+                    "elapsed_seconds": job.metadata.started_at.elapsed().as_secs(),
                     "args": job.metadata.args,
                     "cwd": job.metadata.cwd.map(|p| p.to_string_lossy().to_string())
                 })
@@ -476,7 +474,7 @@ impl DelaMcpServer {
                 let _ = task.await;
             }
 
-            // Create job metadata and store it so task_status can query it
+            // Create job metadata and store it so task_status/task_output can query it
             let metadata = JobMetadata {
                 started_at: std::time::Instant::now(),
                 unique_name: args.unique_name.clone(),
@@ -488,20 +486,10 @@ impl DelaMcpServer {
                 file_path: task.file_path.clone(),
             };
 
-            // Create a dummy child process for the job manager
-            // We'll immediately mark it as exited
-            let dummy_child = Command::new("true").spawn().map_err(|e| {
-                DelaError::internal_error(format!("Failed to create job record: {}", e), None)
-            })?;
-
-            // Start and immediately mark as exited
+            let exit_state = JobState::Exited(exit_code.unwrap_or(-1));
             let _ = self
                 .job_manager
-                .start_job(pid as u32, metadata, dummy_child)
-                .await;
-            let _ = self
-                .job_manager
-                .update_job_state(pid as u32, JobState::Exited(exit_code.unwrap_or(-1)))
+                .record_completed_job(pid as u32, metadata, exit_state)
                 .await;
 
             // Add output to the job record
@@ -525,17 +513,13 @@ impl DelaMcpServer {
 
             let start_result = StartResultDto {
                 state: "exited".to_string(),
-                pid: Some(pid),
+                pid: None,
                 exit_code,
                 initial_output: output,
             };
 
             return Ok(CallToolResult::success(vec![
-                Content::json(&serde_json::json!({
-                    "ok": true,
-                    "result": start_result
-                }))
-                .expect("Failed to serialize JSON"),
+                Content::json(&start_result).expect("Failed to serialize JSON"),
             ]));
         }
 
@@ -691,11 +675,7 @@ impl DelaMcpServer {
         };
 
         Ok(CallToolResult::success(vec![
-            Content::json(&serde_json::json!({
-                "ok": true,
-                "result": start_result
-            }))
-            .expect("Failed to serialize JSON"),
+            Content::json(&start_result).expect("Failed to serialize JSON"),
         ]))
     }
 
@@ -719,7 +699,7 @@ impl DelaMcpServer {
                     "unique_name": job.metadata.unique_name,
                     "source_name": job.metadata.source_name,
                     "state": state,
-                    "started_at": job.metadata.started_at.elapsed().as_secs(),
+                    "elapsed_seconds": job.metadata.started_at.elapsed().as_secs(),
                     "command": job.metadata.command,
                     "file_path": job.metadata.file_path.to_string_lossy(),
                     "args": job.metadata.args,
@@ -2628,13 +2608,9 @@ test:
                         let json: serde_json::Value =
                             serde_json::from_str(&text_content.text).unwrap();
                         let obj = json.as_object().unwrap();
-                        assert!(obj.contains_key("ok"));
-                        assert!(obj.contains_key("result"));
-
-                        let result_obj = obj["result"].as_object().unwrap();
-                        assert!(result_obj.contains_key("state"));
+                        assert!(obj.contains_key("state"));
                         // Should be either "exited" (quick completion) or "running" (backgrounded)
-                        let state = result_obj["state"].as_str().unwrap();
+                        let state = obj["state"].as_str().unwrap();
                         assert!(state == "exited" || state == "running");
                     }
                     _ => panic!("Expected text content"),
@@ -2818,8 +2794,8 @@ test:
             RawContent::Text(text_content) => {
                 let json_response: serde_json::Value =
                     serde_json::from_str(&text_content.text).unwrap();
-                let pid = json_response["result"]["pid"].as_i64().unwrap() as u32;
-                let state = json_response["result"]["state"].as_str().unwrap();
+                let pid = json_response["pid"].as_i64().unwrap() as u32;
+                let state = json_response["state"].as_str().unwrap();
 
                 // Should start as running
                 println!("Task started with state: {}, pid: {}", state, pid);
@@ -3008,17 +2984,11 @@ test:
 
         // Parse start result
         let content = &start_response.content[0];
-        let (pid, _state) = match &content.raw {
+        let start_state = match &content.raw {
             RawContent::Text(text_content) => {
                 let json_response: serde_json::Value =
                     serde_json::from_str(&text_content.text).unwrap();
-                (
-                    json_response["result"]["pid"].as_i64().unwrap() as u32,
-                    json_response["result"]["state"]
-                        .as_str()
-                        .unwrap()
-                        .to_string(),
-                )
+                json_response["state"].as_str().unwrap().to_string()
             }
             _ => panic!("Expected text content"),
         };
@@ -3059,8 +3029,10 @@ test:
                 let jobs = task_status_json["jobs"].as_array().unwrap();
                 assert!(!jobs.is_empty());
                 let job = &jobs[0];
-                assert_eq!(job["pid"].as_i64().unwrap() as u32, pid);
                 assert_eq!(job["state"].as_str().unwrap(), "exited");
+                if start_state == "running" {
+                    assert!(job["pid"].is_number());
+                }
             }
             _ => panic!("Expected text content"),
         }
@@ -3117,7 +3089,7 @@ test:
             RawContent::Text(text_content) => {
                 let json_response: serde_json::Value =
                     serde_json::from_str(&text_content.text).unwrap();
-                json_response["result"]["pid"].as_i64().unwrap() as u32
+                json_response["pid"].as_i64().unwrap() as u32
             }
             _ => panic!("Expected text content"),
         };

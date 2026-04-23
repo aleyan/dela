@@ -320,6 +320,8 @@ Advanced MCP features for better editor integration and real-time feedback.
 **Medium Priority:**
 - [ ] **[DTKT-182]** **Environment introspection** - expose detected task runners and their versions
 - [ ] **[DTKT-183]** **Task metadata caching** - cache discovered tasks to speed up repeated `list_tasks` calls
+- [ ] **[DTKT-191]** **Structured MCP task execution plans** - stop relying on shell-fragment command strings for MCP execution so compound runners like CMake can execute safely without `sh -c`
+- [ ] **[DTKT-192]** **Robust editor config generation** - support JSONC-aware merges and optionally write absolute `dela` binary paths for GUI editor MCP configs
 
 **Lower Priority:**
 - [ ] **[DTKT-178]** MCP **Resources** `job://<pid>` for job state snapshots, `joblog://<pid>?from=…` for log paging

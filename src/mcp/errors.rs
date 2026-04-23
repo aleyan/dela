@@ -20,6 +20,7 @@ impl DelaErrorCode {
     pub const NOT_ALLOWLISTED: Self = Self(-32010);
     pub const RUNNER_UNAVAILABLE: Self = Self(-32011);
     pub const TASK_NOT_FOUND: Self = Self(-32012);
+    pub const MCP_NOT_READY: Self = Self(-32013);
 }
 
 impl From<DelaErrorCode> for ErrorCode {
@@ -49,6 +50,11 @@ pub enum DelaError {
     },
     /// Generic internal error
     InternalError {
+        message: String,
+        hint: Option<String>,
+    },
+    /// MCP cannot start because local dela configuration is unavailable
+    McpNotReady {
         message: String,
         hint: Option<String>,
     },
@@ -85,6 +91,11 @@ impl DelaError {
             },
             DelaError::InternalError { message, hint } => ErrorData {
                 code: DelaErrorCode::INTERNAL_ERROR.into(),
+                message: Cow::Owned(message.clone()),
+                data: hint.as_ref().map(|h| Value::String(h.clone())),
+            },
+            DelaError::McpNotReady { message, hint } => ErrorData {
+                code: DelaErrorCode::MCP_NOT_READY.into(),
                 message: Cow::Owned(message.clone()),
                 data: hint.as_ref().map(|h| Value::String(h.clone())),
             },
@@ -135,6 +146,17 @@ impl DelaError {
     /// Create an InternalError with a helpful hint
     pub fn internal_error(message: String, hint: Option<String>) -> Self {
         DelaError::InternalError { message, hint }
+    }
+
+    /// Create an MCP-not-ready error with a helpful hint
+    pub fn mcp_not_ready(message: String) -> Self {
+        DelaError::McpNotReady {
+            message,
+            hint: Some(
+                "Run 'dela init' to create ~/.config/dela before starting the MCP server"
+                    .to_string(),
+            ),
+        }
     }
 }
 
@@ -202,7 +224,25 @@ mod tests {
                 .unwrap()
                 .as_str()
                 .unwrap()
-                .contains("list_tasks")
+            .contains("list_tasks")
+        );
+    }
+
+    #[test]
+    fn test_mcp_not_ready_error() {
+        let error = DelaError::mcp_not_ready("Dela is not initialized".to_string());
+        let error_data = error.to_error_data();
+
+        assert_eq!(error_data.code.0, -32013);
+        assert!(error_data.message.contains("not initialized"));
+        assert!(
+            error_data
+                .data
+                .as_ref()
+                .unwrap()
+                .as_str()
+                .unwrap()
+                .contains("dela init")
         );
     }
 }
