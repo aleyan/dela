@@ -16,16 +16,27 @@ use rmcp::{
 };
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Instant;
 use tokio::io::{AsyncBufReadExt, BufReader, stdin, stdout};
 use tokio::process::Command;
-use tokio::sync::OnceCell;
+use tokio::sync::{OnceCell, RwLock};
 use tokio::time::{Duration, timeout};
+
+const TASK_DISCOVERY_CACHE_TTL: Duration = Duration::from_secs(60);
+
+#[derive(Debug, Clone)]
+struct CachedDiscoveredTasks {
+    discovered: task_discovery::DiscoveredTasks,
+    cached_at: Instant,
+}
 
 /// MCP server for dela that exposes task management capabilities
 pub struct DelaMcpServer {
     root: PathBuf,
     allowlist_evaluator: McpAllowlistEvaluator,
     job_manager: JobManager,
+    task_cache: Arc<RwLock<Option<CachedDiscoveredTasks>>>,
+    task_cache_ttl: Duration,
     /// Peer connection for sending notifications (set during initialize)
     peer: Arc<OnceCell<Peer<RoleServer>>>,
 }
@@ -38,11 +49,21 @@ impl DelaMcpServer {
                 allowlist: crate::types::Allowlist::default(),
             }
         });
+        Self::new_inner(root, allowlist_evaluator, TASK_DISCOVERY_CACHE_TTL)
+    }
+
+    fn new_inner(
+        root: PathBuf,
+        allowlist_evaluator: McpAllowlistEvaluator,
+        task_cache_ttl: Duration,
+    ) -> Self {
         let job_manager = JobManager::new();
         Self {
             root,
             allowlist_evaluator,
             job_manager,
+            task_cache: Arc::new(RwLock::new(None)),
+            task_cache_ttl,
             peer: Arc::new(OnceCell::new()),
         }
     }
@@ -50,13 +71,16 @@ impl DelaMcpServer {
     /// Create a new MCP server instance with a custom allowlist evaluator (for testing)
     #[cfg(test)]
     pub fn new_with_allowlist(root: PathBuf, allowlist_evaluator: McpAllowlistEvaluator) -> Self {
-        let job_manager = JobManager::new();
-        Self {
-            root,
-            allowlist_evaluator,
-            job_manager,
-            peer: Arc::new(OnceCell::new()),
-        }
+        Self::new_inner(root, allowlist_evaluator, TASK_DISCOVERY_CACHE_TTL)
+    }
+
+    #[cfg(test)]
+    pub fn new_with_allowlist_and_cache_ttl(
+        root: PathBuf,
+        allowlist_evaluator: McpAllowlistEvaluator,
+        task_cache_ttl: Duration,
+    ) -> Self {
+        Self::new_inner(root, allowlist_evaluator, task_cache_ttl)
     }
 
     /// Send a logging notification to the client (if connected)
@@ -111,6 +135,25 @@ impl DelaMcpServer {
         &self.root
     }
 
+    async fn get_discovered_tasks(&self) -> task_discovery::DiscoveredTasks {
+        {
+            let cache = self.task_cache.read().await;
+            if let Some(entry) = cache.as_ref() {
+                if entry.cached_at.elapsed() < self.task_cache_ttl {
+                    return entry.discovered.clone();
+                }
+            }
+        }
+
+        let discovered = task_discovery::discover_tasks(&self.root);
+        let mut cache = self.task_cache.write().await;
+        *cache = Some(CachedDiscoveredTasks {
+            discovered: discovered.clone(),
+            cached_at: Instant::now(),
+        });
+        discovered
+    }
+
     /// Start an MCP stdio server and block until shutdown.
     /// IMPORTANT: Do not print to stdout; MCP JSON-RPC uses stdout.
     pub async fn serve_stdio(self) -> Result<(), ErrorData> {
@@ -135,11 +178,7 @@ impl DelaMcpServer {
         &self,
         Parameters(args): Parameters<ListTasksArgs>,
     ) -> Result<CallToolResult, ErrorData> {
-        // Discover tasks in the current directory
-        let mut discovered = task_discovery::discover_tasks(&self.root);
-
-        // Process task disambiguation to generate uniqified names
-        task_discovery::process_task_disambiguation(&mut discovered);
+        let discovered = self.get_discovered_tasks().await;
 
         // Apply runner filtering if specified
         let mut tasks = discovered.tasks;
@@ -195,9 +234,7 @@ impl DelaMcpServer {
         &self,
         Parameters(args): Parameters<TaskStartArgs>,
     ) -> Result<CallToolResult, ErrorData> {
-        // Find the task by unique name
-        let mut discovered = task_discovery::discover_tasks(&self.root);
-        task_discovery::process_task_disambiguation(&mut discovered);
+        let discovered = self.get_discovered_tasks().await;
 
         let task = discovered
             .tasks
@@ -2221,6 +2258,97 @@ test:
         // Assert
         assert_eq!(result.content.len(), 1);
         // The test succeeded, which means TaskDto conversion worked
+    }
+
+    #[tokio::test]
+    async fn test_list_tasks_uses_cached_discovery_within_ttl() {
+        use std::fs;
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let temp_path = temp_dir.path();
+
+        fs::write(temp_path.join("Makefile"), "build:\n\techo \"Building\"\n").unwrap();
+
+        let allowlist_evaluator = McpAllowlistEvaluator {
+            allowlist: crate::types::Allowlist::default(),
+        };
+        let server = DelaMcpServer::new_with_allowlist_and_cache_ttl(
+            temp_path.to_path_buf(),
+            allowlist_evaluator,
+            Duration::from_secs(60),
+        );
+
+        let first_result = server
+            .list_tasks(Parameters(ListTasksArgs::default()))
+            .await
+            .unwrap();
+
+        fs::write(temp_path.join("Makefile"), "test:\n\techo \"Testing\"\n").unwrap();
+
+        let second_result = server
+            .list_tasks(Parameters(ListTasksArgs::default()))
+            .await
+            .unwrap();
+
+        let first_json = match &first_result.content[0].raw {
+            RawContent::Text(text_content) => {
+                serde_json::from_str::<serde_json::Value>(&text_content.text).unwrap()
+            }
+            _ => panic!("Expected text content with JSON"),
+        };
+        let second_json = match &second_result.content[0].raw {
+            RawContent::Text(text_content) => {
+                serde_json::from_str::<serde_json::Value>(&text_content.text).unwrap()
+            }
+            _ => panic!("Expected text content with JSON"),
+        };
+
+        assert_eq!(first_json["tasks"][0]["source_name"], "build");
+        assert_eq!(second_json["tasks"][0]["source_name"], "build");
+    }
+
+    #[tokio::test]
+    async fn test_list_tasks_refreshes_after_cache_ttl_expires() {
+        use std::fs;
+        use tempfile::TempDir;
+        use tokio::time::sleep;
+
+        let temp_dir = TempDir::new().unwrap();
+        let temp_path = temp_dir.path();
+
+        fs::write(temp_path.join("Makefile"), "build:\n\techo \"Building\"\n").unwrap();
+
+        let allowlist_evaluator = McpAllowlistEvaluator {
+            allowlist: crate::types::Allowlist::default(),
+        };
+        let server = DelaMcpServer::new_with_allowlist_and_cache_ttl(
+            temp_path.to_path_buf(),
+            allowlist_evaluator,
+            Duration::from_millis(50),
+        );
+
+        let _ = server
+            .list_tasks(Parameters(ListTasksArgs::default()))
+            .await
+            .unwrap();
+
+        fs::write(temp_path.join("Makefile"), "test:\n\techo \"Testing\"\n").unwrap();
+        sleep(Duration::from_millis(75)).await;
+
+        let refreshed_result = server
+            .list_tasks(Parameters(ListTasksArgs::default()))
+            .await
+            .unwrap();
+
+        let refreshed_json = match &refreshed_result.content[0].raw {
+            RawContent::Text(text_content) => {
+                serde_json::from_str::<serde_json::Value>(&text_content.text).unwrap()
+            }
+            _ => panic!("Expected text content with JSON"),
+        };
+
+        assert_eq!(refreshed_json["tasks"][0]["source_name"], "test");
     }
 
     #[tokio::test]

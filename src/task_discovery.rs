@@ -12,7 +12,7 @@ use std::path::Path;
 use std::path::PathBuf;
 
 // Define the DiscoveredTaskDefinitions type directly here
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct DiscoveredTaskDefinitions {
     pub makefile: Option<TaskDefinitionFile>,
     pub package_json: Option<TaskDefinitionFile>,
@@ -29,7 +29,7 @@ pub struct DiscoveredTaskDefinitions {
 }
 
 /// Result of task discovery
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct DiscoveredTasks {
     /// Task definition files found
     pub definitions: DiscoveredTaskDefinitions,
