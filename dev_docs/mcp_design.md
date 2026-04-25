@@ -82,13 +82,13 @@ Libraries and their roles:
 ## Process & Output Model
 
 - **PID-centric**: Each started task is a real OS child process with a PID.
-- **First-second capture**: `task_start` collects stdout/stderr for up to **1 second** (configurable later).
+- **Default capture window**: `task_start` collects stdout/stderr for up to **1 second** by default.
   - If the child exits in ≤1s → return `{ state: "exited", exit_code, output }`.
   - If still running after 1s → background it and return `{ state: "running", pid, initial_output }`.
-- **Waited execution (planned)**: common agent workflows such as "run tests" benefit from a
-  bounded wait option. A future revision should allow `task_start(wait_for_exit_seconds=N)` or a
-  dedicated convenience tool that waits for short/medium tasks to finish and returns final status
-  plus an output tail in one round trip.
+- **Bounded wait execution**: callers can pass `task_start(wait_for_exit_seconds=N)` to extend
+  that wait window for short/medium tasks like tests and builds. If the task exits within the
+  requested window, `task_start` returns final status and captured output in one round trip. If it
+  is still running when the window expires, MCP backgrounds it and returns `running` with the PID.
 - **Output ring buffer**: Per-PID bounded buffer (default 1000 lines, 5 MB). `task_output` returns last N lines. Future paging via `from` byte cursor.
 - **Lifecycle**: `task_stop` sends SIGTERM, waits grace (default 5s), then SIGKILL. Background jobs are GC'd after a TTL (configurable).
 - **Real-time streaming**: Task output is streamed via MCP logging notifications. Clients can subscribe to `notifications/message` to receive output as it happens.
@@ -123,7 +123,7 @@ pub struct TaskStartArgs {
   pub args: Option<Vec<String>>, // optional arguments to pass to the task
   pub env: Option<HashMap<String, String>>, // optional environment variables
   pub cwd: Option<String>,      // optional working directory
-  pub wait_for_exit_seconds: Option<u64>, // future: wait for completion before backgrounding
+  pub wait_for_exit_seconds: Option<u64>, // optional bounded wait before backgrounding
 }
 
 #[derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
@@ -131,7 +131,7 @@ pub struct StartResultDto {
   pub state: String,            // "exited"|"running"|"failed"
   pub pid: Option<i32>,         // present if running
   pub exit_code: Option<i32>,   // present if exited/failed
-  pub initial_output: String,   // combined stdout+stderr captured during first-second
+  pub initial_output: String,   // combined stdout+stderr captured before returning
 }
 
 // Note: RunningTaskDto, TaskStatusArgs, TaskOutputArgs, TaskStopArgs are Phase 2
@@ -230,7 +230,7 @@ pub struct TaskOutputArgs {
   ]
 }
 ```
-**Future convenience option**
+**Bounded wait option**
 ```json
 {
   "unique_name": "tests-m",
@@ -406,7 +406,7 @@ Cursor-based paging lets clients fetch only new output instead of repeatedly re-
 
 These are not required for the minimal MCP surface, but they materially improve agent/editor UX:
 
-- **Bounded wait on start**: avoid poll loops for common commands like tests and builds.
+- **Bounded wait on start**: implemented via `task_start(wait_for_exit_seconds=...)` to avoid poll loops for common commands like tests and builds.
 - **Completion metadata in `task_status`**: include `exit_code` and `completed_at` for closed jobs.
 - **Incremental log paging**: add `from` cursors to `task_output` or `joblog://` resources.
 - **Discovery caching**: cache task discovery for hot paths such as repeated `list_tasks` calls.

@@ -23,6 +23,7 @@ use tokio::sync::{OnceCell, RwLock};
 use tokio::time::{Duration, timeout};
 
 const TASK_DISCOVERY_CACHE_TTL: Duration = Duration::from_secs(60);
+const DEFAULT_TASK_START_WAIT_SECONDS: u64 = 1;
 
 #[derive(Debug, Clone)]
 struct CachedDiscoveredTasks {
@@ -228,7 +229,9 @@ impl DelaMcpServer {
         ]))
     }
 
-    #[tool(description = "Start a task (≤1s capture, then background)")]
+    #[tool(
+        description = "Start a task (default 1s capture, optional bounded wait, then background)"
+    )]
     pub async fn task_start(
         &self,
         Parameters(args): Parameters<TaskStartArgs>,
@@ -349,8 +352,11 @@ impl DelaMcpServer {
         )
         .await;
 
-        // Capture initial output for up to 1 second while streaming via logging
-        let capture_duration = Duration::from_secs(1);
+        // Capture output until the bounded wait window expires while streaming via logging.
+        let capture_duration = Duration::from_secs(
+            args.wait_for_exit_seconds
+                .unwrap_or(DEFAULT_TASK_START_WAIT_SECONDS),
+        );
         let initial_output = Arc::new(tokio::sync::Mutex::new(String::new()));
         let peer_clone = self.peer.clone();
 
@@ -1129,6 +1135,23 @@ impl ServerHandler for DelaMcpServer {
         );
         task_start_properties.insert("cwd".to_string(), serde_json::Value::Object(cwd_prop));
 
+        // wait_for_exit_seconds (optional)
+        let mut wait_for_exit_seconds_prop = Map::new();
+        wait_for_exit_seconds_prop.insert(
+            "type".to_string(),
+            serde_json::Value::String("integer".to_string()),
+        );
+        wait_for_exit_seconds_prop.insert(
+            "description".to_string(),
+            serde_json::Value::String(
+                "Optional bounded wait in seconds before backgrounding the task".to_string(),
+            ),
+        );
+        task_start_properties.insert(
+            "wait_for_exit_seconds".to_string(),
+            serde_json::Value::Object(wait_for_exit_seconds_prop),
+        );
+
         task_start_schema.insert(
             "properties".to_string(),
             serde_json::Value::Object(task_start_properties),
@@ -1288,7 +1311,10 @@ impl ServerHandler for DelaMcpServer {
             ),
             Tool::new_with_raw(
                 "task_start",
-                Some("Start a task (≤1s capture, then background)".into()),
+                Some(
+                    "Start a task (default 1s capture, optional bounded wait, then background)"
+                        .into(),
+                ),
                 task_start_schema,
             ),
             Tool::new_with_raw(
@@ -2606,6 +2632,7 @@ test:
             args: None,
             env: None,
             cwd: None,
+            wait_for_exit_seconds: None,
         });
 
         // Act
@@ -2654,6 +2681,7 @@ add_custom_target(build-all COMMENT "Build everything")
             args: None,
             env: None,
             cwd: None,
+            wait_for_exit_seconds: None,
         });
 
         let result = server.task_start(args).await;
@@ -2691,6 +2719,7 @@ add_custom_target(build-all COMMENT "Build everything")
             args: None,
             env: None,
             cwd: None,
+            wait_for_exit_seconds: None,
         });
         let result = server.task_start(args).await;
         assert!(result.is_err());
@@ -2766,6 +2795,7 @@ add_custom_target(build-all COMMENT "Build everything")
             args: None,
             env: None,
             cwd: None,
+            wait_for_exit_seconds: None,
         });
 
         // Act
@@ -2820,6 +2850,7 @@ add_custom_target(build-all COMMENT "Build everything")
             args: Some(vec!["--verbose".to_string(), "--debug".to_string()]),
             env: None,
             cwd: None,
+            wait_for_exit_seconds: None,
         });
 
         // Act
@@ -2862,6 +2893,7 @@ add_custom_target(build-all COMMENT "Build everything")
             args: None,
             env: Some(env_vars),
             cwd: None,
+            wait_for_exit_seconds: None,
         });
 
         // Act
@@ -2901,6 +2933,7 @@ add_custom_target(build-all COMMENT "Build everything")
             args: None,
             env: None,
             cwd: Some(temp_path.to_string_lossy().to_string()),
+            wait_for_exit_seconds: None,
         });
 
         // Act
@@ -2917,6 +2950,158 @@ add_custom_target(build-all COMMENT "Build everything")
                 // The important thing is that we're testing the working directory setting path
             }
         }
+    }
+
+    #[tokio::test]
+    async fn test_task_start_wait_for_exit_returns_exited_within_window() {
+        use std::os::unix::fs::PermissionsExt;
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let script_path = temp_dir.path().join("waited_task.sh");
+        std::fs::write(
+            &script_path,
+            "#!/bin/bash\necho 'Starting...'\nsleep 2\necho 'Finished within wait window'\n",
+        )
+        .unwrap();
+        std::fs::set_permissions(&script_path, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        let allowlist_evaluator = McpAllowlistEvaluator {
+            allowlist: crate::types::Allowlist {
+                entries: vec![crate::types::AllowlistEntry {
+                    path: script_path.clone(),
+                    scope: crate::types::AllowScope::File,
+                    tasks: None,
+                }],
+            },
+        };
+        let server =
+            DelaMcpServer::new_with_allowlist(temp_dir.path().to_path_buf(), allowlist_evaluator);
+
+        let args = Parameters(TaskStartArgs {
+            unique_name: "waited_task".to_string(),
+            args: None,
+            env: None,
+            cwd: None,
+            wait_for_exit_seconds: Some(3),
+        });
+
+        let result = server.task_start(args).await.unwrap();
+        let content = &result.content[0];
+        let json = match &content.raw {
+            RawContent::Text(text_content) => {
+                serde_json::from_str::<serde_json::Value>(&text_content.text).unwrap()
+            }
+            _ => panic!("Expected text content"),
+        };
+
+        assert_eq!(json["state"], "exited");
+        assert_eq!(json["exit_code"], 0);
+        assert!(json.get("pid").is_none());
+        assert!(
+            json["initial_output"]
+                .as_str()
+                .unwrap()
+                .contains("Finished within wait window")
+        );
+
+        let status_result = server.status().await.unwrap();
+        let status_json = match &status_result.content[0].raw {
+            RawContent::Text(text_content) => {
+                serde_json::from_str::<serde_json::Value>(&text_content.text).unwrap()
+            }
+            _ => panic!("Expected text content"),
+        };
+        assert_eq!(status_json["running"].as_array().unwrap().len(), 0);
+
+        let task_status_result = server
+            .task_status(Parameters(TaskStatusArgs {
+                unique_name: "waited_task".to_string(),
+            }))
+            .await
+            .unwrap();
+        let task_status_json = match &task_status_result.content[0].raw {
+            RawContent::Text(text_content) => {
+                serde_json::from_str::<serde_json::Value>(&text_content.text).unwrap()
+            }
+            _ => panic!("Expected text content"),
+        };
+        let jobs = task_status_json["jobs"].as_array().unwrap();
+        assert_eq!(jobs.len(), 1);
+        assert_eq!(jobs[0]["state"], "exited");
+    }
+
+    #[tokio::test]
+    async fn test_task_start_wait_for_exit_backgrounds_after_timeout() {
+        use std::os::unix::fs::PermissionsExt;
+        use tempfile::TempDir;
+        use tokio::time::{Duration, sleep};
+
+        let temp_dir = TempDir::new().unwrap();
+        let script_path = temp_dir.path().join("still_running_task.sh");
+        std::fs::write(
+            &script_path,
+            "#!/bin/bash\necho 'Starting...'\nsleep 4\necho 'Finished after timeout'\n",
+        )
+        .unwrap();
+        std::fs::set_permissions(&script_path, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        let allowlist_evaluator = McpAllowlistEvaluator {
+            allowlist: crate::types::Allowlist {
+                entries: vec![crate::types::AllowlistEntry {
+                    path: script_path.clone(),
+                    scope: crate::types::AllowScope::File,
+                    tasks: None,
+                }],
+            },
+        };
+        let server =
+            DelaMcpServer::new_with_allowlist(temp_dir.path().to_path_buf(), allowlist_evaluator);
+
+        let args = Parameters(TaskStartArgs {
+            unique_name: "still_running_task".to_string(),
+            args: None,
+            env: None,
+            cwd: None,
+            wait_for_exit_seconds: Some(2),
+        });
+
+        let result = server.task_start(args).await.unwrap();
+        let content = &result.content[0];
+        let json = match &content.raw {
+            RawContent::Text(text_content) => {
+                serde_json::from_str::<serde_json::Value>(&text_content.text).unwrap()
+            }
+            _ => panic!("Expected text content"),
+        };
+
+        assert_eq!(json["state"], "running");
+        let pid = json["pid"].as_i64().unwrap() as u32;
+        assert!(
+            json["initial_output"]
+                .as_str()
+                .unwrap()
+                .contains("Starting...")
+        );
+
+        let status_result = server.status().await.unwrap();
+        let status_json = match &status_result.content[0].raw {
+            RawContent::Text(text_content) => {
+                serde_json::from_str::<serde_json::Value>(&text_content.text).unwrap()
+            }
+            _ => panic!("Expected text content"),
+        };
+        assert_eq!(status_json["running"].as_array().unwrap().len(), 1);
+
+        let stop_result = server
+            .task_stop(Parameters(TaskStopArgs {
+                pid,
+                grace_period: Some(1),
+            }))
+            .await;
+        assert!(stop_result.is_ok());
+
+        sleep(Duration::from_millis(200)).await;
     }
 
     #[tokio::test]
@@ -2958,6 +3143,7 @@ add_custom_target(build-all COMMENT "Build everything")
             args: None,
             env: None,
             cwd: None,
+            wait_for_exit_seconds: None,
         };
 
         let start_result = server.task_start(Parameters(start_args)).await;
@@ -3155,6 +3341,7 @@ add_custom_target(build-all COMMENT "Build everything")
             args: None,
             env: None,
             cwd: None,
+            wait_for_exit_seconds: None,
         };
         let start_response = server.task_start(Parameters(start_args)).await.unwrap();
 
@@ -3256,6 +3443,7 @@ add_custom_target(build-all COMMENT "Build everything")
             args: None,
             env: None,
             cwd: None,
+            wait_for_exit_seconds: None,
         };
         let start_response = server.task_start(Parameters(start_args)).await.unwrap();
 

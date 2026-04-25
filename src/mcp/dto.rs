@@ -592,6 +592,10 @@ pub struct TaskStartArgs {
     /// Optional working directory (if None, uses server's root directory)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cwd: Option<String>,
+
+    /// Optional bounded wait in seconds before backgrounding the task
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub wait_for_exit_seconds: Option<u64>,
 }
 
 /// Result of starting a task
@@ -608,7 +612,7 @@ pub struct StartResultDto {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub exit_code: Option<i32>,
 
-    /// Combined stdout and stderr captured during the first second
+    /// Combined stdout and stderr captured before returning
     pub initial_output: String,
 }
 
@@ -643,4 +647,40 @@ pub struct TaskStopArgs {
     /// Grace period in seconds before sending SIGKILL (default: 5)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub grace_period: Option<u64>,
+}
+
+#[cfg(test)]
+mod task_start_args_tests {
+    use super::TaskStartArgs;
+
+    #[test]
+    fn test_task_start_args_serialization_with_wait_for_exit_seconds() {
+        let args = TaskStartArgs {
+            unique_name: "tests-m".to_string(),
+            args: None,
+            env: None,
+            cwd: None,
+            wait_for_exit_seconds: Some(15),
+        };
+
+        let json = serde_json::to_value(&args).unwrap();
+
+        assert_eq!(json["unique_name"], "tests-m");
+        assert_eq!(json["wait_for_exit_seconds"], 15);
+    }
+
+    #[test]
+    fn test_task_start_args_serialization_omits_wait_for_exit_seconds_when_absent() {
+        let args = TaskStartArgs {
+            unique_name: "tests-m".to_string(),
+            args: None,
+            env: None,
+            cwd: None,
+            wait_for_exit_seconds: None,
+        };
+
+        let json = serde_json::to_value(&args).unwrap();
+
+        assert!(json.get("wait_for_exit_seconds").is_none());
+    }
 }

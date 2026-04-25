@@ -280,14 +280,13 @@ mod tests {
             .as_str()
             .unwrap()
             .to_string();
-        let poetry_hint =
-            DelaError::runner_unavailable("poetry".to_string(), "test".to_string())
-                .to_error_data()
-                .data
-                .unwrap()
-                .as_str()
-                .unwrap()
-                .to_string();
+        let poetry_hint = DelaError::runner_unavailable("poetry".to_string(), "test".to_string())
+            .to_error_data()
+            .data
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .to_string();
         let poe_hint = DelaError::runner_unavailable("poe".to_string(), "test".to_string())
             .to_error_data()
             .data
