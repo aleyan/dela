@@ -320,7 +320,7 @@ Advanced MCP features for better editor integration and real-time feedback.
 **Medium Priority:**
 - [ ] **[DTKT-182]** **Environment introspection** - expose detected task runners and their versions
 - [x] **[DTKT-183]** **Task metadata caching** - cache discovered tasks to speed up repeated `list_tasks` calls and other hot-path MCP discovery calls
-- [ ] **[DTKT-191]** **Structured MCP task execution plans** - stop relying on shell-fragment command strings for MCP execution so compound runners like CMake can execute safely without `sh -c`
+- [x] **[DTKT-191]** **Disable CMake for MCP execution** - CMake is the known shell-fragment corner case (`cmake -S . -B build && cmake --build build --target <task>`). Rather than adding structured multi-step execution right now, MCP now reports CMake tasks as non-runnable and rejects `task_start` for them with an explicit unsupported-via-MCP hint.
 - [ ] **[DTKT-192]** **Robust editor config generation** - support JSONC-aware merges, optionally write absolute `dela` binary paths for GUI editor MCP configs, and add workspace-aware `cwd` generation modes
 - [ ] **[DTKT-193]** **Bounded wait execution** - add `task_start(wait_for_exit_seconds=...)` or equivalent convenience flow for short/medium tasks like tests and builds
 - [ ] **[DTKT-194]** **Completion metadata in task_status** - include `exit_code` and `completed_at` for completed jobs so clients do not need to infer outcomes from notifications

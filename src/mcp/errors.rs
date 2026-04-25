@@ -113,6 +113,10 @@ impl DelaError {
     /// Create a RunnerUnavailable error with a helpful hint
     pub fn runner_unavailable(runner_name: String, task_name: String) -> Self {
         let hint = match runner_name.as_str() {
+            "cmake" => Some(
+                "CMake tasks are discovered for visibility, but MCP execution is disabled because the current CMake runner expands to a shell fragment. Run this task via the dela CLI instead."
+                    .to_string(),
+            ),
             "make" => Some(
                 "Install make: brew install make (macOS) or apt-get install make (Ubuntu)"
                     .to_string(),
@@ -224,7 +228,7 @@ mod tests {
                 .unwrap()
                 .as_str()
                 .unwrap()
-            .contains("list_tasks")
+                .contains("list_tasks")
         );
     }
 

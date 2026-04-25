@@ -1,4 +1,4 @@
-use crate::runner::is_runner_available;
+use crate::runner::{is_runner_available, is_runner_available_for_mcp};
 use crate::types::Task;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -76,7 +76,7 @@ impl TaskDto {
             source_name: task.source_name.clone(),
             runner: task.runner.short_name().to_string(),
             command: task.runner.get_command(task),
-            runner_available: is_runner_available(&task.runner),
+            runner_available: is_runner_available_for_mcp(&task.runner),
             allowlisted: allowlist_evaluator.is_task_allowed(task).unwrap_or(false),
             file_path: task.file_path.to_string_lossy().to_string(),
             description: task.description.clone(),
@@ -544,6 +544,34 @@ mod tests {
             "# Travis CI task 'test' - not executable locally"
         );
         assert_eq!(dto.runner_available, false); // Travis CI is never available locally
+    }
+
+    #[test]
+    fn test_taskdto_cmake_not_available_for_mcp() {
+        use crate::mcp::allowlist::McpAllowlistEvaluator;
+
+        let task = Task {
+            name: "build-all".to_string(),
+            file_path: PathBuf::from("/project/CMakeLists.txt"),
+            definition_type: TaskDefinitionType::CMake,
+            runner: TaskRunner::CMake,
+            source_name: "build-all".to_string(),
+            description: Some("Build all targets".to_string()),
+            shadowed_by: None,
+            disambiguated_name: None,
+        };
+
+        let allowlist_evaluator = McpAllowlistEvaluator {
+            allowlist: crate::types::Allowlist::default(),
+        };
+
+        let dto = TaskDto::from_task_enriched(&task, &allowlist_evaluator);
+
+        assert_eq!(
+            dto.command,
+            "cmake -S . -B build && cmake --build build --target build-all"
+        );
+        assert!(!dto.runner_available);
     }
 }
 

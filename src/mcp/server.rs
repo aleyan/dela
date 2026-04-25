@@ -5,7 +5,7 @@ use super::dto::{
 };
 use super::errors::DelaError;
 use super::job_manager::{JobManager, JobMetadata, JobState};
-use crate::runner::{is_runner_available, split_command_words};
+use crate::runner::{is_runner_available_for_mcp, split_command_words};
 use crate::task_discovery;
 use rmcp::{
     ServerHandler, ServiceExt,
@@ -44,11 +44,10 @@ pub struct DelaMcpServer {
 impl DelaMcpServer {
     /// Create a new MCP server instance
     pub fn new(root: PathBuf) -> Self {
-        let allowlist_evaluator = McpAllowlistEvaluator::new().unwrap_or_else(|_| {
-            McpAllowlistEvaluator {
+        let allowlist_evaluator =
+            McpAllowlistEvaluator::new().unwrap_or_else(|_| McpAllowlistEvaluator {
                 allowlist: crate::types::Allowlist::default(),
-            }
-        });
+            });
         Self::new_inner(root, allowlist_evaluator, TASK_DISCOVERY_CACHE_TTL)
     }
 
@@ -261,7 +260,7 @@ impl DelaMcpServer {
         }
 
         // Check if runner is available
-        if !is_runner_available(&task.runner) {
+        if !is_runner_available_for_mcp(&task.runner) {
             return Err(DelaError::runner_unavailable(
                 task.runner.short_name().to_string(),
                 args.unique_name.clone(),
@@ -2619,6 +2618,55 @@ test:
         assert!(error.message.contains("nonexistent-task"));
         // Check that it's a TASK_NOT_FOUND error
         assert_eq!(error.code.0, -32012);
+    }
+
+    #[tokio::test]
+    async fn test_task_start_cmake_disabled_for_mcp() {
+        use std::fs;
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let temp_path = temp_dir.path();
+        let cmake_path = temp_path.join("CMakeLists.txt");
+
+        let cmake_content = r#"
+cmake_minimum_required(VERSION 3.10)
+project(TestProject)
+
+add_custom_target(build-all COMMENT "Build everything")
+"#;
+        fs::write(&cmake_path, cmake_content).unwrap();
+
+        let allowlist_evaluator = McpAllowlistEvaluator {
+            allowlist: crate::types::Allowlist {
+                entries: vec![crate::types::AllowlistEntry {
+                    path: cmake_path,
+                    scope: crate::types::AllowScope::File,
+                    tasks: None,
+                }],
+            },
+        };
+
+        let server =
+            DelaMcpServer::new_with_allowlist(temp_path.to_path_buf(), allowlist_evaluator);
+        let args = Parameters(TaskStartArgs {
+            unique_name: "build-all".to_string(),
+            args: None,
+            env: None,
+            cwd: None,
+        });
+
+        let result = server.task_start(args).await;
+
+        assert!(result.is_err());
+        let error = result.unwrap_err();
+        assert_eq!(error.code.0, -32011);
+        assert!(error.message.contains("Runner 'cmake' is not available"));
+        let hint = error
+            .data
+            .and_then(|value| value.as_str().map(str::to_string));
+        assert!(hint.is_some());
+        assert!(hint.unwrap().contains("MCP execution is disabled"));
     }
 
     #[tokio::test]

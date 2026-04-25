@@ -44,6 +44,16 @@ pub fn is_runner_available(runner: &TaskRunner) -> bool {
     }
 }
 
+/// MCP can only execute runners that expand to a single direct process invocation.
+/// CMake currently expands to a shell fragment with `&&`, so we expose it but do not
+/// allow MCP clients to execute it.
+pub fn is_runner_available_for_mcp(runner: &TaskRunner) -> bool {
+    match runner {
+        TaskRunner::CMake => false,
+        _ => is_runner_available(runner),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -270,6 +280,22 @@ mod tests {
 
         // Docker Compose should not be available
         assert!(!is_runner_available(&TaskRunner::DockerCompose));
+
+        reset_mock();
+        reset_to_real_environment();
+    }
+
+    #[test]
+    #[serial]
+    fn test_cmake_runner_disabled_for_mcp() {
+        reset_mock();
+        enable_mock();
+
+        let env = TestEnvironment::new().with_executable("cmake");
+        set_test_environment(env);
+
+        assert!(is_runner_available(&TaskRunner::CMake));
+        assert!(!is_runner_available_for_mcp(&TaskRunner::CMake));
 
         reset_mock();
         reset_to_real_environment();
