@@ -122,13 +122,31 @@ impl DelaError {
                     .to_string(),
             ),
             "npm" => Some("Install Node.js and npm: https://nodejs.org/".to_string()),
+            "yarn" => Some(
+                "Install Node.js, then enable Yarn via Corepack or install Yarn directly: https://yarnpkg.com/getting-started/install"
+                    .to_string(),
+            ),
+            "pnpm" => Some(
+                "Install Node.js, then enable pnpm via Corepack or install pnpm directly: https://pnpm.io/installation"
+                    .to_string(),
+            ),
+            "bun" => Some("Install Bun: https://bun.sh/docs/installation".to_string()),
             "gradle" => Some("Install Gradle: https://gradle.org/install/".to_string()),
-            "maven" => Some("Install Maven: https://maven.apache.org/install.html".to_string()),
-            "python" => Some("Install Python: https://python.org/downloads/".to_string()),
+            "mvn" => Some("Install Maven: https://maven.apache.org/install.html".to_string()),
             "uv" => {
                 Some("Install uv: pip install uv or https://github.com/astral-sh/uv".to_string())
             }
+            "poetry" => Some("Install Poetry: https://python-poetry.org/docs/#installation".to_string()),
+            "poe" => Some(
+                "Install Poe the Poet in this project environment, for example: uv tool install poethepoet or pip install poethepoet"
+                    .to_string(),
+            ),
             "just" => Some("Install just: https://github.com/casey/just#installation".to_string()),
+            "docker compose" => Some(
+                "Install Docker Desktop or Docker Engine with Compose support: https://docs.docker.com/compose/install/"
+                    .to_string(),
+            ),
+            "act" => Some("Install act: https://nektosact.com/installation/".to_string()),
             _ => Some(format!("Install {} to run this task", runner_name)),
         };
 
@@ -212,6 +230,77 @@ mod tests {
                 .unwrap()
                 .contains("brew install make")
         );
+    }
+
+    #[test]
+    fn test_runner_unavailable_node_package_manager_hints() {
+        let npm_hint = DelaError::runner_unavailable("npm".to_string(), "build".to_string())
+            .to_error_data()
+            .data
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .to_string();
+        let yarn_hint = DelaError::runner_unavailable("yarn".to_string(), "build".to_string())
+            .to_error_data()
+            .data
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .to_string();
+        let pnpm_hint = DelaError::runner_unavailable("pnpm".to_string(), "build".to_string())
+            .to_error_data()
+            .data
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .to_string();
+        let bun_hint = DelaError::runner_unavailable("bun".to_string(), "build".to_string())
+            .to_error_data()
+            .data
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .to_string();
+
+        assert!(npm_hint.contains("Node.js and npm"));
+        assert!(yarn_hint.contains("Yarn"));
+        assert!(yarn_hint.contains("Corepack"));
+        assert!(pnpm_hint.contains("pnpm"));
+        assert!(pnpm_hint.contains("Corepack"));
+        assert!(bun_hint.contains("Bun"));
+    }
+
+    #[test]
+    fn test_runner_unavailable_python_tool_hints() {
+        let uv_hint = DelaError::runner_unavailable("uv".to_string(), "test".to_string())
+            .to_error_data()
+            .data
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .to_string();
+        let poetry_hint =
+            DelaError::runner_unavailable("poetry".to_string(), "test".to_string())
+                .to_error_data()
+                .data
+                .unwrap()
+                .as_str()
+                .unwrap()
+                .to_string();
+        let poe_hint = DelaError::runner_unavailable("poe".to_string(), "test".to_string())
+            .to_error_data()
+            .data
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .to_string();
+
+        assert!(uv_hint.contains("Install uv"));
+        assert!(!uv_hint.contains("Install Python"));
+        assert!(poetry_hint.contains("Install Poetry"));
+        assert!(poe_hint.contains("poethepoet"));
+        assert!(!poe_hint.contains("Install Python"));
     }
 
     #[test]
