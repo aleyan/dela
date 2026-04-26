@@ -531,26 +531,36 @@ def test_logging_severity_classification():
             for log in logs
             if log.get("params", {}).get("data", {}).get("type") == "stderr"
         ]
-        levels_by_line = {
-            log.get("params", {}).get("data", {}).get("line"): log.get("params", {}).get("level")
-            for log in stderr_logs
-        }
+        assert_condition(
+            len(stderr_logs) == 1,
+            "stderr fixture should be delivered as one batched notification",
+            stderr_logs,
+        )
+        batch = stderr_logs[0].get("params", {}).get("data", {})
+        lines = batch.get("lines", [])
+        batch_level = stderr_logs[0].get("params", {}).get("level")
 
         assert_condition(
-            levels_by_line.get("plain stderr line") == "info",
-            "plain stderr should log at info",
-            levels_by_line,
+            "plain stderr line" in lines,
+            "plain stderr line missing from batch",
+            batch,
         )
         assert_condition(
-            levels_by_line.get("warning: this is a warning") == "warning",
-            "warning stderr should log at warning",
-            levels_by_line,
+            "warning: this is a warning" in lines,
+            "warning stderr line missing from batch",
+            batch,
         )
         assert_condition(
-            levels_by_line.get("error: this is an error") == "error",
-            "error stderr should log at error",
-            levels_by_line,
+            "error: this is an error" in lines,
+            "error stderr line missing from batch",
+            batch,
         )
+        assert_condition(batch_level == "error", "batch severity should escalate to error", stderr_logs[0])
+        assert_condition("line" not in batch, "batched payload should not include singular line", batch)
+        assert_condition("entries" not in batch, "batched payload should not include per-line entries", batch)
+        assert_condition("chunk" not in batch, "batched payload should not include chunk", batch)
+        assert_condition("byte_count" not in batch, "batched payload should not include byte_count", batch)
+        assert_condition("line_count" not in batch, "batched payload should not include line_count", batch)
         print("✓ stderr notification levels are classified correctly")
         return True
     finally:
