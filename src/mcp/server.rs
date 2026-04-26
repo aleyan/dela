@@ -26,6 +26,31 @@ use tokio::time::{Duration, timeout};
 const TASK_DISCOVERY_CACHE_TTL: Duration = Duration::from_secs(60);
 const DEFAULT_TASK_START_WAIT_SECONDS: u64 = 1;
 
+fn classify_output_log_level(stream: &str, line: &str) -> LoggingLevel {
+    let normalized = line.trim().to_ascii_lowercase();
+
+    let is_error = normalized.starts_with("error")
+        || normalized.starts_with("fatal:")
+        || normalized.contains(" panicked at")
+        || normalized.starts_with("thread '")
+        || normalized.starts_with("failures:");
+    if is_error {
+        return LoggingLevel::Error;
+    }
+
+    let is_warning = normalized.starts_with("warning")
+        || normalized.starts_with("warn:")
+        || normalized.contains(" warning:");
+    if is_warning {
+        return LoggingLevel::Warning;
+    }
+
+    match stream {
+        "stderr" => LoggingLevel::Info,
+        _ => LoggingLevel::Info,
+    }
+}
+
 #[derive(Debug, Clone)]
 struct CachedDiscoveredTasks {
     discovered: task_discovery::DiscoveredTasks,
@@ -437,7 +462,7 @@ impl DelaMcpServer {
                         // Stream via logging notification
                         if let Some(peer) = peer_for_initial.get() {
                             let _ = peer.notify_logging_message(LoggingMessageNotificationParam {
-                                level: LoggingLevel::Info,
+                                level: classify_output_log_level("stdout", &line),
                                 logger: Some(format!("task:{}", pid_u32)),
                                 data: serde_json::json!({
                                     "type": "stdout",
@@ -462,7 +487,7 @@ impl DelaMcpServer {
                         // Stream via logging notification
                         if let Some(peer) = peer_for_initial.get() {
                             let _ = peer.notify_logging_message(LoggingMessageNotificationParam {
-                                level: LoggingLevel::Warning,
+                                level: classify_output_log_level("stderr", &line),
                                 logger: Some(format!("task:{}", pid_u32)),
                                 data: serde_json::json!({
                                     "type": "stderr",
@@ -637,7 +662,7 @@ impl DelaMcpServer {
                         // Stream via logging
                         if let Some(peer) = peer_for_monitor.get() {
                             let _ = peer.notify_logging_message(LoggingMessageNotificationParam {
-                                level: LoggingLevel::Info,
+                                level: classify_output_log_level("stdout", &line),
                                 logger: Some(format!("task:{}", pid_u32)),
                                 data: serde_json::json!({
                                     "type": "stdout",
@@ -659,7 +684,7 @@ impl DelaMcpServer {
                         // Stream via logging
                         if let Some(peer) = peer_for_monitor.get() {
                             let _ = peer.notify_logging_message(LoggingMessageNotificationParam {
-                                level: LoggingLevel::Warning,
+                                level: classify_output_log_level("stderr", &line),
                                 logger: Some(format!("task:{}", pid_u32)),
                                 data: serde_json::json!({
                                     "type": "stderr",
@@ -936,7 +961,7 @@ impl ServerHandler for DelaMcpServer {
                 )
         )
         .with_instructions(
-            "List tasks, start them (≤1s capture then background), and manage running tasks via PID; all execution gated by an MCP allowlist. Subscribe to logging notifications for real-time task output streaming."
+            "List tasks, start them with a default 1-second capture window or an optional wait_for_exit_seconds bounded wait, and manage running tasks via PID; all execution is gated by an MCP allowlist. Subscribe to logging notifications for real-time task output streaming."
         )
     }
 
@@ -3626,5 +3651,35 @@ add_custom_target(build-all COMMENT "Build everything")
                 level
             );
         }
+    }
+
+    #[test]
+    fn test_classify_output_log_level() {
+        assert_eq!(
+            classify_output_log_level("stderr", "   Compiling dela v0.0.6"),
+            LoggingLevel::Info
+        );
+        assert_eq!(
+            classify_output_log_level("stderr", "warning: unused variable"),
+            LoggingLevel::Warning
+        );
+        assert_eq!(
+            classify_output_log_level("stderr", "error: could not compile `dela`"),
+            LoggingLevel::Error
+        );
+        assert_eq!(
+            classify_output_log_level("stdout", "regular test output"),
+            LoggingLevel::Info
+        );
+    }
+
+    #[test]
+    fn test_server_info_instructions_mentions_bounded_wait() {
+        let server = DelaMcpServer::new(PathBuf::from("."));
+        let info = server.get_info();
+        let instructions = info.instructions.expect("instructions should be present");
+
+        assert!(instructions.contains("wait_for_exit_seconds"));
+        assert!(instructions.contains("default 1-second capture window"));
     }
 }
