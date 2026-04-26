@@ -25,6 +25,7 @@ use tokio::time::{Duration, timeout};
 
 const TASK_DISCOVERY_CACHE_TTL: Duration = Duration::from_secs(60);
 const DEFAULT_TASK_START_WAIT_SECONDS: u64 = 1;
+const MAX_TASK_START_WAIT_SECONDS: u64 = 3600;
 
 fn classify_output_log_level(stream: &str, line: &str) -> LoggingLevel {
     let normalized = line.trim().to_ascii_lowercase();
@@ -119,6 +120,24 @@ impl DelaMcpServer {
                     data,
                 })
                 .await;
+        }
+    }
+
+    fn resolve_wait_for_exit_seconds(wait_for_exit_seconds: Option<u64>) -> Result<u64, ErrorData> {
+        match wait_for_exit_seconds {
+            Some(seconds) if seconds <= MAX_TASK_START_WAIT_SECONDS => Ok(seconds),
+            Some(seconds) => Err(ErrorData {
+                code: super::errors::DelaErrorCode::INVALID_PARAMS.into(),
+                message: format!(
+                    "wait_for_exit_seconds must be between 0 and {} seconds, got {}",
+                    MAX_TASK_START_WAIT_SECONDS, seconds
+                )
+                .into(),
+                data: Some(serde_json::Value::String(
+                    "Use a bounded wait between 0 and 3600 seconds, or omit the field to use the 1-second default.".to_string(),
+                )),
+            }),
+            None => Ok(DEFAULT_TASK_START_WAIT_SECONDS),
         }
     }
 
@@ -240,7 +259,7 @@ impl DelaMcpServer {
                     "source_name": job.metadata.source_name,
                     "command": job.metadata.command,
                     "file_path": job.metadata.file_path.to_string_lossy(),
-                    "elapsed_seconds": job.metadata.started_at.elapsed().as_secs(),
+                    "elapsed_seconds": job.age().as_secs(),
                     "args": job.metadata.args,
                     "cwd": job.metadata.cwd.map(|p| p.to_string_lossy().to_string())
                 })
@@ -353,6 +372,8 @@ impl DelaMcpServer {
             cmd.current_dir(cwd);
         }
 
+        let started_at = Instant::now();
+
         // Start the process
         let mut child = cmd.spawn().map_err(|e| {
             DelaError::internal_error(
@@ -379,10 +400,9 @@ impl DelaMcpServer {
         .await;
 
         // Capture output until the bounded wait window expires while streaming via logging.
-        let capture_duration = Duration::from_secs(
-            args.wait_for_exit_seconds
-                .unwrap_or(DEFAULT_TASK_START_WAIT_SECONDS),
-        );
+        let capture_duration = Duration::from_secs(Self::resolve_wait_for_exit_seconds(
+            args.wait_for_exit_seconds,
+        )?);
         let initial_output = Arc::new(tokio::sync::Mutex::new(String::new()));
         let peer_clone = self.peer.clone();
 
@@ -544,7 +564,7 @@ impl DelaMcpServer {
 
             // Create job metadata and store it so task_status/task_output can query it
             let metadata = JobMetadata {
-                started_at: std::time::Instant::now(),
+                started_at,
                 unique_name: args.unique_name.clone(),
                 source_name: task.source_name.clone(),
                 args: args.args.clone(),
@@ -555,10 +575,15 @@ impl DelaMcpServer {
             };
 
             let exit_state = JobState::Exited(exit_code.unwrap_or(-1));
-            let _ = self
-                .job_manager
+            self.job_manager
                 .record_completed_job(pid as u32, metadata, exit_state)
-                .await;
+                .await
+                .map_err(|e| {
+                    DelaError::internal_error(
+                        format!("Failed to record completed job: {}", e),
+                        Some("Job management error".to_string()),
+                    )
+                })?;
 
             // Add output to the job record
             if !output.is_empty() {
@@ -596,7 +621,7 @@ impl DelaMcpServer {
 
         // Create job metadata
         let metadata = JobMetadata {
-            started_at: std::time::Instant::now(),
+            started_at,
             unique_name: args.unique_name.clone(),
             source_name: task.source_name.clone(),
             args: args.args.clone(),
@@ -771,7 +796,7 @@ impl DelaMcpServer {
                     "unique_name": job.metadata.unique_name,
                     "source_name": job.metadata.source_name,
                     "state": state,
-                    "elapsed_seconds": job.metadata.started_at.elapsed().as_secs(),
+                    "elapsed_seconds": job.age().as_secs(),
                     "exit_code": exit_code,
                     "completed_at": completed_at,
                     "command": job.metadata.command,
@@ -1173,10 +1198,20 @@ impl ServerHandler for DelaMcpServer {
             "type".to_string(),
             serde_json::Value::String("integer".to_string()),
         );
+        wait_for_exit_seconds_prop
+            .insert("minimum".to_string(), serde_json::Value::Number(0.into()));
+        wait_for_exit_seconds_prop.insert(
+            "maximum".to_string(),
+            serde_json::Value::Number(MAX_TASK_START_WAIT_SECONDS.into()),
+        );
         wait_for_exit_seconds_prop.insert(
             "description".to_string(),
             serde_json::Value::String(
-                "Optional bounded wait in seconds before backgrounding the task".to_string(),
+                format!(
+                    "Optional bounded wait in seconds before backgrounding the task. Defaults to {} second when omitted; allowed range: 0-{} seconds.",
+                    DEFAULT_TASK_START_WAIT_SECONDS,
+                    MAX_TASK_START_WAIT_SECONDS
+                ),
             ),
         );
         task_start_properties.insert(
@@ -3047,6 +3082,7 @@ add_custom_target(build-all COMMENT "Build everything")
     async fn test_task_start_wait_for_exit_returns_exited_within_window() {
         use std::os::unix::fs::PermissionsExt;
         use tempfile::TempDir;
+        use tokio::time::{Duration, sleep};
 
         let temp_dir = TempDir::new().unwrap();
         let script_path = temp_dir.path().join("waited_task.sh");
@@ -3120,6 +3156,28 @@ add_custom_target(build-all COMMENT "Build everything")
         let jobs = task_status_json["jobs"].as_array().unwrap();
         assert_eq!(jobs.len(), 1);
         assert_eq!(jobs[0]["state"], "exited");
+
+        sleep(Duration::from_secs(2)).await;
+
+        let task_status_result_later = server
+            .task_status(Parameters(TaskStatusArgs {
+                unique_name: "waited_task".to_string(),
+            }))
+            .await
+            .unwrap();
+        let task_status_json_later = match &task_status_result_later.content[0].raw {
+            RawContent::Text(text_content) => {
+                serde_json::from_str::<serde_json::Value>(&text_content.text).unwrap()
+            }
+            _ => panic!("Expected text content"),
+        };
+        let later_job = &task_status_json_later["jobs"].as_array().unwrap()[0];
+        let elapsed_seconds = later_job["elapsed_seconds"].as_u64().unwrap();
+        assert!(
+            (1..=2).contains(&elapsed_seconds),
+            "completed task elapsed_seconds should reflect its actual runtime, got {}",
+            elapsed_seconds
+        );
     }
 
     #[tokio::test]
@@ -3184,6 +3242,25 @@ add_custom_target(build-all COMMENT "Build everything")
         };
         assert_eq!(status_json["running"].as_array().unwrap().len(), 1);
 
+        let task_status_result = server
+            .task_status(Parameters(TaskStatusArgs {
+                unique_name: "still_running_task".to_string(),
+            }))
+            .await
+            .unwrap();
+        let task_status_json = match &task_status_result.content[0].raw {
+            RawContent::Text(text_content) => {
+                serde_json::from_str::<serde_json::Value>(&text_content.text).unwrap()
+            }
+            _ => panic!("Expected text content"),
+        };
+        let running_job = &task_status_json["jobs"].as_array().unwrap()[0];
+        assert_eq!(running_job["state"], "running");
+        assert!(
+            running_job["elapsed_seconds"].as_u64().unwrap() >= 2,
+            "elapsed_seconds should include the initial bounded wait window"
+        );
+
         let stop_result = server
             .task_stop(Parameters(TaskStopArgs {
                 pid,
@@ -3193,6 +3270,44 @@ add_custom_target(build-all COMMENT "Build everything")
         assert!(stop_result.is_ok());
 
         sleep(Duration::from_millis(200)).await;
+    }
+
+    #[tokio::test]
+    async fn test_task_start_wait_for_exit_rejects_values_above_max() {
+        use std::os::unix::fs::PermissionsExt;
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let script_path = temp_dir.path().join("bounded_task.sh");
+        std::fs::write(&script_path, "#!/bin/bash\necho 'hi'\n").unwrap();
+        std::fs::set_permissions(&script_path, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        let allowlist_evaluator = McpAllowlistEvaluator {
+            allowlist: crate::types::Allowlist {
+                entries: vec![crate::types::AllowlistEntry {
+                    path: script_path.clone(),
+                    scope: crate::types::AllowScope::File,
+                    tasks: None,
+                }],
+            },
+        };
+        let server =
+            DelaMcpServer::new_with_allowlist(temp_dir.path().to_path_buf(), allowlist_evaluator);
+
+        let result = server
+            .task_start(Parameters(TaskStartArgs {
+                unique_name: "bounded_task".to_string(),
+                args: None,
+                env: None,
+                cwd: None,
+                wait_for_exit_seconds: Some(MAX_TASK_START_WAIT_SECONDS + 1),
+            }))
+            .await;
+
+        let error = result.unwrap_err();
+        assert_eq!(error.code.0, -32602);
+        assert!(error.message.contains("wait_for_exit_seconds"));
+        assert!(error.message.contains("3600"));
     }
 
     #[tokio::test]

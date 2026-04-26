@@ -593,7 +593,8 @@ pub struct TaskStartArgs {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cwd: Option<String>,
 
-    /// Optional bounded wait in seconds before backgrounding the task
+    /// Optional bounded wait in seconds before backgrounding the task.
+    /// Defaults to 1 second when omitted. Allowed range: 0-3600 seconds.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub wait_for_exit_seconds: Option<u64>,
 }
