@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.4
 # --- Stage 1: Builder ---
-FROM rust:alpine3.21 AS builder
+FROM rust:1.91.1-alpine3.21 AS builder
 
 # Install build dependencies
 RUN apk add --no-cache \
