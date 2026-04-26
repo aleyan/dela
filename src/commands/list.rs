@@ -642,8 +642,10 @@ mod tests {
         runners.sort();
 
         // Mock the task discovery
-        let mut discovered_tasks = task_discovery::DiscoveredTasks::default();
-        discovered_tasks.tasks = tasks;
+        let discovered_tasks = task_discovery::DiscoveredTasks {
+            tasks,
+            ..Default::default()
+        };
 
         // Calculate max task name width across all runners
         let max_task_name_width = discovered_tasks
@@ -656,7 +658,7 @@ mod tests {
 
         // Ensure all task names will be padded to this width
         // Round up to nearest multiple of 5 for better alignment
-        let display_width = (max_task_name_width + 4) / 5 * 5;
+        let display_width = max_task_name_width.div_ceil(5) * 5;
 
         // Process each runner
         for runner in runners {
@@ -898,8 +900,10 @@ mod tests {
         let mut writer = TestWriter::new();
 
         // Mock the task discovery with our GitHub Actions task
-        let mut discovered_tasks = task_discovery::DiscoveredTasks::default();
-        discovered_tasks.tasks = vec![task];
+        let discovered_tasks = task_discovery::DiscoveredTasks {
+            tasks: vec![task],
+            ..Default::default()
+        };
 
         // Group tasks by runner
         let mut tasks_by_runner: HashMap<String, Vec<&Task>> = HashMap::new();
@@ -920,7 +924,7 @@ mod tests {
         write!(writer, "{} — {}", runner.cyan(), display_path.dimmed()).unwrap();
 
         // Write the task
-        let formatted_task = format_task_entry(&act_tasks[0], false, 20);
+        let formatted_task = format_task_entry(act_tasks[0], false, 20);
         writeln!(writer, "\n  {}", formatted_task).unwrap();
 
         // Get the output and verify it shows the full path

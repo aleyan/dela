@@ -138,21 +138,21 @@ fn extract_task_description(content: &str, task_name: &str) -> Option<String> {
     if let Ok(regex) = Regex::new(&format!(
         "{}.+?{}",
         task_pattern, description_single_quote_pattern
-    ))
-        && let Some(caps) = regex.captures(content)
-            && let Some(desc) = caps.get(1) {
-                return Some(desc.as_str().to_string());
-            }
+    )) && let Some(caps) = regex.captures(content)
+        && let Some(desc) = caps.get(1)
+    {
+        return Some(desc.as_str().to_string());
+    }
 
     // Look for task with description using double quotes
     if let Ok(regex) = Regex::new(&format!(
         "{}.+?{}",
         task_pattern, description_double_quote_pattern
-    ))
-        && let Some(caps) = regex.captures(content)
-            && let Some(desc) = caps.get(1) {
-                return Some(desc.as_str().to_string());
-            }
+    )) && let Some(caps) = regex.captures(content)
+        && let Some(desc) = caps.get(1)
+    {
+        return Some(desc.as_str().to_string());
+    }
 
     // For Kotlin DSL, look for description with equals
     let kotlin_pattern = format!(
@@ -161,9 +161,10 @@ fn extract_task_description(content: &str, task_name: &str) -> Option<String> {
     );
     if let Ok(regex) = Regex::new(&kotlin_pattern)
         && let Some(caps) = regex.captures(content)
-            && let Some(desc) = caps.get(1) {
-                return Some(desc.as_str().to_string());
-            }
+        && let Some(desc) = caps.get(1)
+    {
+        return Some(desc.as_str().to_string());
+    }
 
     Some("Custom Gradle task".to_string())
 }

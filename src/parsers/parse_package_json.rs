@@ -21,20 +21,21 @@ pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
     let mut tasks = Vec::new();
 
     if let Some(scripts) = json.get("scripts")
-        && let Some(scripts_obj) = scripts.as_object() {
-            for (name, cmd) in scripts_obj {
-                tasks.push(Task {
-                    name: name.clone(),
-                    file_path: path.clone(),
-                    definition_type: TaskDefinitionType::PackageJson,
-                    runner: runner.clone(),
-                    source_name: name.clone(),
-                    description: cmd.as_str().map(|s| s.to_string()),
-                    shadowed_by: None,
-                    disambiguated_name: None,
-                });
-            }
+        && let Some(scripts_obj) = scripts.as_object()
+    {
+        for (name, cmd) in scripts_obj {
+            tasks.push(Task {
+                name: name.clone(),
+                file_path: path.clone(),
+                definition_type: TaskDefinitionType::PackageJson,
+                runner: runner.clone(),
+                source_name: name.clone(),
+                description: cmd.as_str().map(|s| s.to_string()),
+                shadowed_by: None,
+                disambiguated_name: None,
+            });
         }
+    }
 
     Ok(tasks)
 }

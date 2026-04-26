@@ -93,10 +93,7 @@ pub fn process_task_disambiguation(discovered: &mut DiscoveredTasks) {
     // Count occurrences of each task name
     for (i, task) in discovered.tasks.iter().enumerate() {
         *task_name_counts.entry(task.name.clone()).or_insert(0) += 1;
-        tasks_by_name
-            .entry(task.name.clone())
-            .or_default()
-            .push(i);
+        tasks_by_name.entry(task.name.clone()).or_default().push(i);
     }
 
     // Save task name counts for reference
@@ -609,21 +606,23 @@ fn discover_github_actions_tasks(
     // 3. Check custom directories that might contain workflows
     for custom_dir in &["workflows", "custom/workflows", ".gitlab/workflows"] {
         let custom_path = dir.join(custom_dir);
-        if custom_path.exists() && custom_path.is_dir()
-            && let Ok(entries) = fs::read_dir(&custom_path) {
-                let files: Vec<PathBuf> = entries
-                    .filter_map(Result::ok)
-                    .map(|entry| entry.path())
-                    .filter(|path| {
-                        if let Some(ext) = path.extension() {
-                            ext == "yml" || ext == "yaml"
-                        } else {
-                            false
-                        }
-                    })
-                    .collect();
-                workflow_files.extend(files);
-            }
+        if custom_path.exists()
+            && custom_path.is_dir()
+            && let Ok(entries) = fs::read_dir(&custom_path)
+        {
+            let files: Vec<PathBuf> = entries
+                .filter_map(Result::ok)
+                .map(|entry| entry.path())
+                .filter(|path| {
+                    if let Some(ext) = path.extension() {
+                        ext == "yml" || ext == "yaml"
+                    } else {
+                        false
+                    }
+                })
+                .collect();
+            workflow_files.extend(files);
+        }
     }
 
     if workflow_files.is_empty() {
@@ -822,30 +821,31 @@ fn discover_shell_script_tasks(dir: &Path, discovered: &mut DiscoveredTasks) {
             let path = entry.path();
             if path.is_file()
                 && let Some(extension) = path.extension()
-                    && extension == "sh" {
-                        // Use file stem (without extension) for task name and disambiguation
-                        let name = path
-                            .file_stem()
-                            .unwrap_or_default()
-                            .to_string_lossy()
-                            .to_string();
-                        // Use full filename (with extension) for source_name since we execute ./script.sh
-                        let source_name = path
-                            .file_name()
-                            .unwrap_or_default()
-                            .to_string_lossy()
-                            .to_string();
-                        discovered.tasks.push(Task {
-                            name: name.clone(),
-                            file_path: path,
-                            definition_type: TaskDefinitionType::ShellScript,
-                            runner: TaskRunner::ShellScript,
-                            source_name,
-                            description: None,
-                            shadowed_by: check_shadowing(&name),
-                            disambiguated_name: None,
-                        });
-                    }
+                && extension == "sh"
+            {
+                // Use file stem (without extension) for task name and disambiguation
+                let name = path
+                    .file_stem()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string();
+                // Use full filename (with extension) for source_name since we execute ./script.sh
+                let source_name = path
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string();
+                discovered.tasks.push(Task {
+                    name: name.clone(),
+                    file_path: path,
+                    definition_type: TaskDefinitionType::ShellScript,
+                    runner: TaskRunner::ShellScript,
+                    source_name,
+                    description: None,
+                    shadowed_by: check_shadowing(&name),
+                    disambiguated_name: None,
+                });
+            }
         }
     }
 }
@@ -861,10 +861,12 @@ mod tests {
     use std::io::Write;
     use tempfile::TempDir;
 
+    type ExecuteFn = Box<dyn FnMut(&Task) -> Result<(), String>>;
+
     // Define mocks for command execution tests
     struct MockTaskExecutor {
         // Mock implementation to handle execute() calls in tests
-        execute_fn: Box<dyn FnMut(&Task) -> Result<(), String>>,
+        execute_fn: ExecuteFn,
     }
 
     impl MockTaskExecutor {

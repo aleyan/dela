@@ -56,9 +56,10 @@ fn parse_cmake_string(content: &str, file_path: &Path) -> Result<Vec<Task>, Stri
 
         // Look for COMMENT in this specific target block
         if let Some(comment_captures) = comment_pattern.captures(target_block)
-            && let Some(comment) = comment_captures.get(1) {
-                description = comment.as_str().to_string();
-            }
+            && let Some(comment) = comment_captures.get(1)
+        {
+            description = comment.as_str().to_string();
+        }
 
         let task = Task {
             name: target_name.to_string(),

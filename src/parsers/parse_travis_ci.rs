@@ -185,7 +185,7 @@ jobs:
     stage: build
 "#;
 
-        let file_path = create_test_travis_config(&temp_dir.path(), ".travis.yml", travis_content);
+        let file_path = create_test_travis_config(temp_dir.path(), ".travis.yml", travis_content);
 
         let tasks = parse(&file_path).expect("Failed to parse Travis CI config");
 
@@ -231,7 +231,7 @@ matrix:
       python: "3.10"
 "#;
 
-        let file_path = create_test_travis_config(&temp_dir.path(), ".travis.yml", travis_content);
+        let file_path = create_test_travis_config(temp_dir.path(), ".travis.yml", travis_content);
 
         let tasks = parse(&file_path).expect("Failed to parse Travis CI config");
 
@@ -265,7 +265,7 @@ script:
   - bundle exec rspec
 "#;
 
-        let file_path = create_test_travis_config(&temp_dir.path(), ".travis.yml", travis_content);
+        let file_path = create_test_travis_config(temp_dir.path(), ".travis.yml", travis_content);
 
         let tasks = parse(&file_path).expect("Failed to parse Travis CI config");
 
@@ -301,7 +301,7 @@ jobs:
     invalid: yaml: content
 "#;
 
-        let file_path = create_test_travis_config(&temp_dir.path(), ".travis.yml", invalid_content);
+        let file_path = create_test_travis_config(temp_dir.path(), ".travis.yml", invalid_content);
 
         let result = parse(&file_path);
         assert!(result.is_err(), "Should fail to parse invalid YAML");
@@ -311,7 +311,7 @@ jobs:
     fn test_parse_empty_file() {
         let temp_dir = TempDir::new().expect("Failed to create temp directory");
 
-        let file_path = create_test_travis_config(&temp_dir.path(), ".travis.yml", "");
+        let file_path = create_test_travis_config(temp_dir.path(), ".travis.yml", "");
 
         let tasks = parse(&file_path).expect("Failed to parse empty Travis CI config");
 

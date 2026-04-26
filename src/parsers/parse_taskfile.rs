@@ -202,13 +202,13 @@ tasks:
         assert_eq!(tasks.len(), 3);
 
         // Verify that the internal tasks are not included
-        assert!(tasks.iter().find(|t| t.name == "internal-task").is_none());
-        assert!(tasks.iter().find(|t| t.name == "helper").is_none());
+        assert!(!tasks.iter().any(|t| t.name == "internal-task"));
+        assert!(!tasks.iter().any(|t| t.name == "helper"));
 
         // Verify the normal tasks are included
-        assert!(tasks.iter().find(|t| t.name == "build").is_some());
-        assert!(tasks.iter().find(|t| t.name == "test").is_some());
-        assert!(tasks.iter().find(|t| t.name == "clean").is_some());
+        assert!(tasks.iter().any(|t| t.name == "build"));
+        assert!(tasks.iter().any(|t| t.name == "test"));
+        assert!(tasks.iter().any(|t| t.name == "clean"));
     }
     #[test]
     fn test_parse_taskfile_with_nested_commands() {

@@ -36,9 +36,10 @@ impl McpAllowlistEvaluator {
         // First pass: Check for deny entries (highest precedence)
         for entry in &self.allowlist.entries {
             if let AllowScope::Deny = entry.scope
-                && self.path_matches(&task.file_path, &entry.path, true) {
-                    return Ok(false);
-                }
+                && self.path_matches(&task.file_path, &entry.path, true)
+            {
+                return Ok(false);
+            }
         }
 
         // Second pass: Check for allow entries
@@ -57,9 +58,10 @@ impl McpAllowlistEvaluator {
                 AllowScope::Task => {
                     if self.path_matches(&task.file_path, &entry.path, false)
                         && let Some(ref tasks) = entry.tasks
-                            && tasks.contains(&task.name) {
-                                return Ok(true);
-                            }
+                        && tasks.contains(&task.name)
+                    {
+                        return Ok(true);
+                    }
                 }
                 AllowScope::Deny | AllowScope::Once => {
                     // Already handled deny in first pass, skip Once (not applicable for MCP)
@@ -154,7 +156,7 @@ mod tests {
         let evaluator = McpAllowlistEvaluator::new().unwrap();
 
         // With empty allowlist, task should be denied by default for MCP
-        assert_eq!(evaluator.is_task_allowed(&task).unwrap(), false);
+        assert!(!evaluator.is_task_allowed(&task).unwrap());
 
         reset_to_real_environment();
     }
@@ -177,7 +179,7 @@ mod tests {
         let evaluator = McpAllowlistEvaluator::new().unwrap();
 
         // Task should be allowed
-        assert_eq!(evaluator.is_task_allowed(&task).unwrap(), true);
+        assert!(evaluator.is_task_allowed(&task).unwrap());
 
         drop(temp_dir);
         reset_to_real_environment();
@@ -201,11 +203,11 @@ mod tests {
         let evaluator = McpAllowlistEvaluator::new().unwrap();
 
         // Task should be allowed
-        assert_eq!(evaluator.is_task_allowed(&task).unwrap(), true);
+        assert!(evaluator.is_task_allowed(&task).unwrap());
 
         // Create a different task that should be denied
         let other_task = create_test_task("other-task", std::path::PathBuf::from("Makefile"));
-        assert_eq!(evaluator.is_task_allowed(&other_task).unwrap(), false);
+        assert!(!evaluator.is_task_allowed(&other_task).unwrap());
 
         drop(temp_dir);
         reset_to_real_environment();
@@ -233,11 +235,11 @@ mod tests {
             "build",
             std::path::PathBuf::from("/project/subdir/Makefile"),
         );
-        assert_eq!(evaluator.is_task_allowed(&subdir_task).unwrap(), true);
+        assert!(evaluator.is_task_allowed(&subdir_task).unwrap());
 
         // Task outside directory should be denied
         let outside_task = create_test_task("build", std::path::PathBuf::from("/other/Makefile"));
-        assert_eq!(evaluator.is_task_allowed(&outside_task).unwrap(), false);
+        assert!(!evaluator.is_task_allowed(&outside_task).unwrap());
 
         drop(temp_dir);
         reset_to_real_environment();
@@ -261,7 +263,7 @@ mod tests {
         let evaluator = McpAllowlistEvaluator::new().unwrap();
 
         // Task should be denied
-        assert_eq!(evaluator.is_task_allowed(&task).unwrap(), false);
+        assert!(!evaluator.is_task_allowed(&task).unwrap());
 
         drop(temp_dir);
         reset_to_real_environment();
@@ -297,7 +299,7 @@ mod tests {
         let evaluator = McpAllowlistEvaluator::new().unwrap();
 
         // Task should be denied (deny takes precedence)
-        assert_eq!(evaluator.is_task_allowed(&task).unwrap(), false);
+        assert!(!evaluator.is_task_allowed(&task).unwrap());
 
         drop(temp_dir);
         reset_to_real_environment();
@@ -347,12 +349,12 @@ mod tests {
         let evaluator = McpAllowlistEvaluator::new().unwrap();
 
         // Task should be denied due to file deny entry (higher precedence than directory allow)
-        assert_eq!(evaluator.is_task_allowed(&task).unwrap(), false);
+        assert!(!evaluator.is_task_allowed(&task).unwrap());
 
         // But a task in a different file in the same directory should be allowed
         let other_file_task =
             create_test_task("build", std::path::PathBuf::from("/project/other.mk"));
-        assert_eq!(evaluator.is_task_allowed(&other_file_task).unwrap(), true);
+        assert!(evaluator.is_task_allowed(&other_file_task).unwrap());
 
         drop(temp_dir);
         reset_to_real_environment();

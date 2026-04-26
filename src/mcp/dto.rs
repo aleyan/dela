@@ -85,14 +85,12 @@ impl TaskDto {
 }
 
 /// Parameters for the list_tasks MCP tool
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[derive(Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema, Default)]
 pub struct ListTasksArgs {
     /// Optional runner filter - if provided, only return tasks for this runner
     /// Examples: "make", "npm", "gradle", "poetry"
     pub runner: Option<String>,
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -289,8 +287,7 @@ mod tests {
     #[test]
     fn test_taskdto_from_multiple_tasks_batch() {
         // Arrange - simulate a disambiguation scenario
-        let tasks = vec![
-            Task {
+        let tasks = [Task {
                 name: "test".to_string(),
                 file_path: PathBuf::from("/project/Makefile"),
                 definition_type: TaskDefinitionType::Makefile,
@@ -309,8 +306,7 @@ mod tests {
                 description: Some("Run npm tests".to_string()),
                 shadowed_by: None,
                 disambiguated_name: Some("test-n".to_string()),
-            },
-        ];
+            }];
 
         // Act
         let dtos: Vec<TaskDto> = tasks.iter().map(TaskDto::from_task).collect();
@@ -407,9 +403,7 @@ mod tests {
         assert_eq!(dto.file_path, "/project/Makefile");
         assert_eq!(dto.description, Some("Build the project".to_string()));
 
-        // These fields depend on system state but should be present
-        assert!(dto.runner_available == true || dto.runner_available == false);
-        assert!(dto.allowlisted == true || dto.allowlisted == false);
+
     }
 
     #[test]
@@ -539,7 +533,7 @@ mod tests {
             dto.command,
             "# Travis CI task 'test' - not executable locally"
         );
-        assert_eq!(dto.runner_available, false); // Travis CI is never available locally
+        assert!(!dto.runner_available); // Travis CI is never available locally
     }
 
     #[test]

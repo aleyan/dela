@@ -118,7 +118,7 @@ jobs:
         run: echo "Testing..."
 "#;
 
-        let file_path = create_test_workflow(&temp_dir.path(), "workflow.yml", workflow_content);
+        let file_path = create_test_workflow(temp_dir.path(), "workflow.yml", workflow_content);
 
         let tasks = parse(&file_path).expect("Failed to parse workflow");
 
@@ -196,7 +196,7 @@ jobs:
 "#;
 
         let file_path =
-            create_test_workflow(&temp_dir.path(), "complex-workflow.yml", workflow_content);
+            create_test_workflow(temp_dir.path(), "complex-workflow.yml", workflow_content);
 
         let tasks = parse(&file_path).expect("Failed to parse complex workflow");
 
@@ -284,7 +284,7 @@ jobs:
 "#;
 
         let file_path =
-            create_test_workflow(&temp_dir.path(), "unnamed-workflow.yml", workflow_content);
+            create_test_workflow(temp_dir.path(), "unnamed-workflow.yml", workflow_content);
 
         let tasks = parse(&file_path).expect("Failed to parse workflow without name");
 
@@ -312,7 +312,7 @@ jobs:
 "#;
 
         let file_path =
-            create_test_workflow(&temp_dir.path(), "invalid-workflow.yml", workflow_content);
+            create_test_workflow(temp_dir.path(), "invalid-workflow.yml", workflow_content);
 
         let result = parse(&file_path);
         assert!(result.is_err(), "Should fail with invalid YAML");
@@ -323,7 +323,7 @@ name: No Jobs
 on: [push]
 "#;
 
-        let file_path = create_test_workflow(&temp_dir.path(), "no-jobs.yml", workflow_content);
+        let file_path = create_test_workflow(temp_dir.path(), "no-jobs.yml", workflow_content);
 
         let result = parse(&file_path);
         assert!(result.is_err());

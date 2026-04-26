@@ -304,9 +304,9 @@ test: # Run tests
         assert_eq!(tasks.len(), 2);
 
         // Only the valid tasks should be parsed
-        assert!(tasks.iter().find(|t| t.name == "build").is_some());
-        assert!(tasks.iter().find(|t| t.name == "test").is_some());
-        assert!(tasks.iter().find(|t| t.name == "invalid-task").is_none());
+        assert!(tasks.iter().any(|t| t.name == "build"));
+        assert!(tasks.iter().any(|t| t.name == "test"));
+        assert!(!tasks.iter().any(|t| t.name == "invalid-task"));
     }
 
     #[test]

@@ -170,10 +170,11 @@ fn merge_dela_into_toml(existing: &str) -> Result<String, String> {
 fn generate_config_at(editor: Editor, config_path: &PathBuf) -> Result<(), String> {
     // Create parent directory if it doesn't exist
     if let Some(parent) = config_path.parent()
-        && !parent.exists() {
-            fs::create_dir_all(parent)
-                .map_err(|e| format!("Failed to create {} directory: {}", editor.name(), e))?;
-        }
+        && !parent.exists()
+    {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create {} directory: {}", editor.name(), e))?;
+    }
 
     // Check if config already exists
     if config_path.exists() {
