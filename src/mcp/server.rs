@@ -317,11 +317,10 @@ impl DelaMcpServer {
     async fn get_discovered_tasks(&self) -> task_discovery::DiscoveredTasks {
         {
             let cache = self.task_cache.read().await;
-            if let Some(entry) = cache.as_ref() {
-                if entry.cached_at.elapsed() < self.task_cache_ttl {
+            if let Some(entry) = cache.as_ref()
+                && entry.cached_at.elapsed() < self.task_cache_ttl {
                     return entry.discovered.clone();
                 }
-            }
         }
 
         let discovered = task_discovery::discover_tasks(&self.root);
@@ -372,7 +371,7 @@ impl DelaMcpServer {
             .collect();
 
         Ok(CallToolResult::success(vec![
-            Content::json(&serde_json::json!({
+            Content::json(serde_json::json!({
             "tasks": task_dtos
             }))
             .expect("Failed to serialize JSON"),
@@ -401,7 +400,7 @@ impl DelaMcpServer {
             .collect();
 
         Ok(CallToolResult::success(vec![
-            Content::json(&serde_json::json!({
+            Content::json(serde_json::json!({
                 "running": running_jobs
             }))
             .expect("Failed to serialize JSON"),
@@ -743,7 +742,7 @@ impl DelaMcpServer {
         .await;
 
         // Check if process exited during initial capture
-        let process_exited = child.try_wait().map_or(false, |status| status.is_some());
+        let process_exited = child.try_wait().is_ok_and(|status| status.is_some());
 
         if process_exited {
             // Process completed within 1 second
@@ -1066,7 +1065,7 @@ impl DelaMcpServer {
             .collect();
 
         Ok(CallToolResult::success(vec![
-            Content::json(&serde_json::json!({
+            Content::json(serde_json::json!({
                 "jobs": job_statuses
             }))
             .expect("Failed to serialize JSON"),
@@ -1155,7 +1154,7 @@ impl DelaMcpServer {
             response["lines"] = serde_json::Value::Array(
                 truncated_lines
                     .into_iter()
-                    .map(|line| serde_json::Value::String(line))
+                    .map(serde_json::Value::String)
                     .collect(),
             );
             response["chunk_truncated"] = serde_json::Value::Bool(true);
@@ -1217,7 +1216,7 @@ impl DelaMcpServer {
         };
 
         Ok(CallToolResult::success(vec![
-            Content::json(&serde_json::json!({
+            Content::json(serde_json::json!({
                 "pid": args.pid,
                 "status": status,
                 "message": message,

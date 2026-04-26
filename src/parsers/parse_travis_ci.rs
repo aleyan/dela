@@ -34,7 +34,7 @@ fn parse_travis_string(content: &str, file_path: &Path) -> Result<Vec<Task>, Str
     let mut tasks = Vec::new();
 
     // Extract jobs from the configuration
-    if let Some(Value::Mapping(jobs_map)) = config_map.get(&Value::String("jobs".to_string())) {
+    if let Some(Value::Mapping(jobs_map)) = config_map.get(Value::String("jobs".to_string())) {
         // Parse jobs section
         for (job_key, job_value) in jobs_map {
             if let Value::String(job_name) = job_key {
@@ -57,16 +57,16 @@ fn parse_travis_string(content: &str, file_path: &Path) -> Result<Vec<Task>, Str
     } else {
         // If no jobs section, look for matrix or other job definitions
         if let Some(Value::Mapping(matrix_map)) =
-            config_map.get(&Value::String("matrix".to_string()))
+            config_map.get(Value::String("matrix".to_string()))
         {
             // Handle matrix configuration
             if let Some(Value::Sequence(include_list)) =
-                matrix_map.get(&Value::String("include".to_string()))
+                matrix_map.get(Value::String("include".to_string()))
             {
                 for (i, include_item) in include_list.iter().enumerate() {
                     if let Value::Mapping(include_map) = include_item {
                         if let Some(Value::String(job_name)) =
-                            include_map.get(&Value::String("name".to_string()))
+                            include_map.get(Value::String("name".to_string()))
                         {
                             let description = extract_job_description(include_item);
 
@@ -130,18 +130,18 @@ fn extract_job_description(job_value: &Value) -> Option<String> {
     match job_value {
         Value::Mapping(job_map) => {
             // Try to get name first
-            if let Some(Value::String(name)) = job_map.get(&Value::String("name".to_string())) {
+            if let Some(Value::String(name)) = job_map.get(Value::String("name".to_string())) {
                 return Some(format!("Travis CI job: {}", name));
             }
 
             // Try to get stage
-            if let Some(Value::String(stage)) = job_map.get(&Value::String("stage".to_string())) {
+            if let Some(Value::String(stage)) = job_map.get(Value::String("stage".to_string())) {
                 return Some(format!("Travis CI job in stage: {}", stage));
             }
 
             // Try to get language
             if let Some(Value::String(language)) =
-                job_map.get(&Value::String("language".to_string()))
+                job_map.get(Value::String("language".to_string()))
             {
                 return Some(format!("Travis CI {} job", language));
             }

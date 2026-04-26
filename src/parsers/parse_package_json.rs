@@ -20,8 +20,8 @@ pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
 
     let mut tasks = Vec::new();
 
-    if let Some(scripts) = json.get("scripts") {
-        if let Some(scripts_obj) = scripts.as_object() {
+    if let Some(scripts) = json.get("scripts")
+        && let Some(scripts_obj) = scripts.as_object() {
             for (name, cmd) in scripts_obj {
                 tasks.push(Task {
                     name: name.clone(),
@@ -35,7 +35,6 @@ pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
                 });
             }
         }
-    }
 
     Ok(tasks)
 }

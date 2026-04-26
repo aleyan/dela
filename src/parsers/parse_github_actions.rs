@@ -29,14 +29,14 @@ fn parse_workflow_string(content: &str, file_path: &Path) -> Result<Vec<Task>, S
 
     // Try to get workflow name for description
     let workflow_name = workflow_map
-        .get(&Value::String("name".to_string()))
+        .get(Value::String("name".to_string()))
         .and_then(|v| match v {
             Value::String(s) => Some(s.clone()),
             _ => None,
         });
 
     // Extract jobs to confirm the workflow is valid
-    let jobs = match workflow_map.get(&Value::String("jobs".to_string())) {
+    let jobs = match workflow_map.get(Value::String("jobs".to_string())) {
         Some(Value::Mapping(jobs_map)) => jobs_map,
         _ => return Err("No jobs found in workflow file".to_string()),
     };

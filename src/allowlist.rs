@@ -68,11 +68,10 @@ pub fn is_task_allowed(task: &Task) -> Result<(bool, bool), String> {
 
     // First pass: Check for deny entries (highest precedence)
     for entry in &allowlist.entries {
-        if let AllowScope::Deny = entry.scope {
-            if path_matches(&task.file_path, &entry.path, true) {
+        if let AllowScope::Deny = entry.scope
+            && path_matches(&task.file_path, &entry.path, true) {
                 return Ok((false, true));
             }
-        }
     }
 
     // Second pass: Check for allow entries
@@ -89,13 +88,11 @@ pub fn is_task_allowed(task: &Task) -> Result<(bool, bool), String> {
                 }
             }
             AllowScope::Task => {
-                if path_matches(&task.file_path, &entry.path, false) {
-                    if let Some(ref tasks) = entry.tasks {
-                        if tasks.contains(&task.name) {
+                if path_matches(&task.file_path, &entry.path, false)
+                    && let Some(ref tasks) = entry.tasks
+                        && tasks.contains(&task.name) {
                             return Ok((true, false));
                         }
-                    }
-                }
             }
             AllowScope::Deny | AllowScope::Once => {
                 // Already handled deny in first pass, skip Once

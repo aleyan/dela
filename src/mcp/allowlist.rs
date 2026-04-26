@@ -35,11 +35,10 @@ impl McpAllowlistEvaluator {
     pub fn is_task_allowed(&self, task: &Task) -> Result<bool, String> {
         // First pass: Check for deny entries (highest precedence)
         for entry in &self.allowlist.entries {
-            if let AllowScope::Deny = entry.scope {
-                if self.path_matches(&task.file_path, &entry.path, true) {
+            if let AllowScope::Deny = entry.scope
+                && self.path_matches(&task.file_path, &entry.path, true) {
                     return Ok(false);
                 }
-            }
         }
 
         // Second pass: Check for allow entries
@@ -56,13 +55,11 @@ impl McpAllowlistEvaluator {
                     }
                 }
                 AllowScope::Task => {
-                    if self.path_matches(&task.file_path, &entry.path, false) {
-                        if let Some(ref tasks) = entry.tasks {
-                            if tasks.contains(&task.name) {
+                    if self.path_matches(&task.file_path, &entry.path, false)
+                        && let Some(ref tasks) = entry.tasks
+                            && tasks.contains(&task.name) {
                                 return Ok(true);
                             }
-                        }
-                    }
                 }
                 AllowScope::Deny | AllowScope::Once => {
                     // Already handled deny in first pass, skip Once (not applicable for MCP)

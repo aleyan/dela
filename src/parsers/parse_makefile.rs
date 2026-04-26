@@ -11,7 +11,7 @@ pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
 
     // Special case for the test_discover_tasks_with_invalid_makefile test
     if content.contains("<hello>not a make file</hello>") {
-        return Err(format!("Failed to parse Makefile: Invalid syntax"));
+        return Err("Failed to parse Makefile: Invalid syntax".to_string());
     }
 
     // Special case for testing regex parsing - look for a marker in the content

@@ -59,7 +59,7 @@ pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
                         TaskCommand::String(cmd) => format!("command: {}", cmd),
                         TaskCommand::Map(_map) => {
                             // Just indicate it's a complex command without parsing details
-                            format!("complex command")
+                            "complex command".to_string()
                         }
                     }
                 } else {

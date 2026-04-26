@@ -84,8 +84,8 @@ fn add_profile_tasks(tasks: &mut Vec<Task>, root: Node, file_path: &Path) -> Res
 /// Add tasks from Maven plugins
 fn add_plugin_tasks(tasks: &mut Vec<Task>, root: Node, file_path: &Path) -> Result<(), String> {
     // Find <build> section and then <plugins>
-    if let Some(build_node) = root.children().find(|n| n.has_tag_name("build")) {
-        if let Some(plugins_node) = build_node.children().find(|n| n.has_tag_name("plugins")) {
+    if let Some(build_node) = root.children().find(|n| n.has_tag_name("build"))
+        && let Some(plugins_node) = build_node.children().find(|n| n.has_tag_name("plugins")) {
             // Iterate over each plugin
             for plugin in plugins_node.children().filter(|n| n.has_tag_name("plugin")) {
                 // Get plugin artifact ID
@@ -139,7 +139,6 @@ fn add_plugin_tasks(tasks: &mut Vec<Task>, root: Node, file_path: &Path) -> Resu
                 }
             }
         }
-    }
 
     Ok(())
 }

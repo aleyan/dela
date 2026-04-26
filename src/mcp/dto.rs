@@ -86,17 +86,13 @@ impl TaskDto {
 
 /// Parameters for the list_tasks MCP tool
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Default)]
 pub struct ListTasksArgs {
     /// Optional runner filter - if provided, only return tasks for this runner
     /// Examples: "make", "npm", "gradle", "poetry"
     pub runner: Option<String>,
 }
 
-impl Default for ListTasksArgs {
-    fn default() -> Self {
-        Self { runner: None }
-    }
-}
 
 #[cfg(test)]
 mod tests {
