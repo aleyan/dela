@@ -287,7 +287,8 @@ mod tests {
     #[test]
     fn test_taskdto_from_multiple_tasks_batch() {
         // Arrange - simulate a disambiguation scenario
-        let tasks = [Task {
+        let tasks = [
+            Task {
                 name: "test".to_string(),
                 file_path: PathBuf::from("/project/Makefile"),
                 definition_type: TaskDefinitionType::Makefile,
@@ -306,7 +307,8 @@ mod tests {
                 description: Some("Run npm tests".to_string()),
                 shadowed_by: None,
                 disambiguated_name: Some("test-n".to_string()),
-            }];
+            },
+        ];
 
         // Act
         let dtos: Vec<TaskDto> = tasks.iter().map(TaskDto::from_task).collect();
@@ -402,8 +404,6 @@ mod tests {
         assert_eq!(dto.command, "make build");
         assert_eq!(dto.file_path, "/project/Makefile");
         assert_eq!(dto.description, Some("Build the project".to_string()));
-
-
     }
 
     #[test]

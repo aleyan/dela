@@ -248,7 +248,8 @@ mod tests {
 
     // Test helper function that simulates the TUI logic
     fn test_tui_logic(selected_index: usize) -> Result<AllowDecision, String> {
-        let options = [(
+        let options = [
+            (
                 "Allow once (this time only)",
                 AllowDecision::Allow(AllowScope::Once),
             ),
@@ -264,7 +265,8 @@ mod tests {
                 "Allow directory (remember for all tasks in this directory)",
                 AllowDecision::Allow(AllowScope::Directory),
             ),
-            ("Deny (don't run this task)", AllowDecision::Deny)];
+            ("Deny (don't run this task)", AllowDecision::Deny),
+        ];
 
         if selected_index < options.len() {
             Ok(options[selected_index].1.clone())

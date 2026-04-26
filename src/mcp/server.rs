@@ -2170,10 +2170,7 @@ mod tests {
         // Add some output to the job
         server
             .job_manager
-            .add_job_output(
-                pid,
-                "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n".to_string(),
-            )
+            .add_job_output(pid, "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n".to_string())
             .await
             .unwrap();
 
@@ -2625,7 +2622,6 @@ mod tests {
         // This test would require mocking the job manager or creating a custom server
         // with a low concurrency limit, which is complex. For now, we'll test the
         // can_start_job method directly as shown above.
-
     }
 
     #[tokio::test]

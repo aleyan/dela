@@ -10,6 +10,10 @@ build:
 	@echo "Building dela..."
 	cargo build
 
+lint:
+	cargo fmt --all -- --check
+	cargo clippy --all-targets --all-features -- -D warnings
+
 tests:
 	@echo "Running unit tests."
 	cargo test
