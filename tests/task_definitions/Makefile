@@ -1,6 +1,6 @@
 # Test Makefile for dela Docker tests
 
-.PHONY: test-task another-task help cd custom-exe print-args test long-running-task
+.PHONY: test-task another-task help cd custom-exe print-args test long-running-task stderr-level-task
 
 test-task: ## Test task for basic functionality
 	@echo "Test task executed successfully"
@@ -15,6 +15,11 @@ long-running-task: ## Long running task for testing background execution
 	@echo "Starting long-running task..."
 	@sleep 5
 	@echo "Long-running task completed successfully"
+
+stderr-level-task: ## Emit stderr lines for MCP logging level classification
+	@printf '%s\n' 'plain stderr line' >&2
+	@printf '%s\n' 'warning: this is a warning' >&2
+	@printf '%s\n' 'error: this is an error' >&2
 
 print-arg-task: ## Test task for basic functionality with args
 	@echo "Argument is: $(ARG)"

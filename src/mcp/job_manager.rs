@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -132,6 +133,8 @@ pub struct Job {
     pub pid: u32,
     pub metadata: JobMetadata,
     pub state: JobState,
+    pub completed_at: Option<DateTime<Utc>>,
+    pub elapsed_at_completion: Option<Duration>,
     pub output_buffer: RingBuffer,
     pub last_activity: Instant,
 }
@@ -148,6 +151,8 @@ impl Job {
             pid,
             metadata,
             state: JobState::Running,
+            completed_at: None,
+            elapsed_at_completion: None,
             output_buffer: RingBuffer::new(max_output_lines, max_output_bytes),
             last_activity: Instant::now(),
         }
@@ -160,13 +165,17 @@ impl Job {
 
     /// Mark the job as exited with the given exit code
     pub fn mark_exited(&mut self, exit_code: i32) {
+        self.elapsed_at_completion = Some(self.metadata.started_at.elapsed());
         self.state = JobState::Exited(exit_code);
+        self.completed_at = Some(Utc::now());
         self.touch();
     }
 
     /// Mark the job as failed with the given error message
     pub fn mark_failed(&mut self, error: String) {
+        self.elapsed_at_completion = Some(self.metadata.started_at.elapsed());
         self.state = JobState::Failed(error);
+        self.completed_at = Some(Utc::now());
         self.touch();
     }
 
@@ -195,7 +204,8 @@ impl Job {
     /// Get the job's age
     #[allow(dead_code)]
     pub fn age(&self) -> Duration {
-        self.metadata.started_at.elapsed()
+        self.elapsed_at_completion
+            .unwrap_or_else(|| self.metadata.started_at.elapsed())
     }
 
     /// Get the time since last activity
@@ -257,8 +267,10 @@ impl JobManager {
 
     /// Check if we can start a new job (concurrency limit check)
     pub async fn can_start_job(&self) -> Result<(), String> {
+        self.garbage_collect().await;
         let jobs = self.jobs.read().await;
-        if jobs.len() >= self.config.max_concurrent_jobs {
+        let running_jobs = jobs.values().filter(|job| job.is_running()).count();
+        if running_jobs >= self.config.max_concurrent_jobs {
             return Err(format!(
                 "Maximum concurrent jobs limit reached: {}",
                 self.config.max_concurrent_jobs
@@ -284,6 +296,13 @@ impl JobManager {
             ));
         }
 
+        if matches!(jobs.get(&pid), Some(existing) if existing.is_running()) {
+            return Err(format!(
+                "Refusing to overwrite running job with PID {}",
+                pid
+            ));
+        }
+
         // Create the job
         let job = Job::new(
             pid,
@@ -298,6 +317,45 @@ impl JobManager {
         let mut processes = self.processes.write().await;
         processes.insert(pid, process);
 
+        Ok(())
+    }
+
+    /// Record a completed job without retaining a process handle
+    pub async fn record_completed_job(
+        &self,
+        pid: u32,
+        metadata: JobMetadata,
+        state: JobState,
+    ) -> Result<(), String> {
+        let mut jobs = self.jobs.write().await;
+        if matches!(jobs.get(&pid), Some(existing) if existing.is_running()) {
+            return Err(format!(
+                "Refusing to overwrite running job with PID {}",
+                pid
+            ));
+        }
+        let elapsed_at_completion = match state {
+            JobState::Running => None,
+            JobState::Exited(_) | JobState::Failed(_) => Some(metadata.started_at.elapsed()),
+        };
+        jobs.insert(
+            pid,
+            Job {
+                pid,
+                metadata,
+                completed_at: match state {
+                    JobState::Running => None,
+                    JobState::Exited(_) | JobState::Failed(_) => Some(Utc::now()),
+                },
+                elapsed_at_completion,
+                state,
+                output_buffer: RingBuffer::new(
+                    self.config.max_output_lines_per_job,
+                    self.config.max_output_bytes_per_job,
+                ),
+                last_activity: Instant::now(),
+            },
+        );
         Ok(())
     }
 
@@ -326,8 +384,16 @@ impl JobManager {
     pub async fn update_job_state(&self, pid: u32, state: JobState) -> Result<(), String> {
         let mut jobs = self.jobs.write().await;
         if let Some(job) = jobs.get_mut(&pid) {
-            job.state = state;
-            job.touch();
+            match state {
+                JobState::Running => {
+                    job.state = JobState::Running;
+                    job.completed_at = None;
+                    job.elapsed_at_completion = None;
+                    job.touch();
+                }
+                JobState::Exited(exit_code) => job.mark_exited(exit_code),
+                JobState::Failed(error) => job.mark_failed(error),
+            }
             Ok(())
         } else {
             Err(format!("Job with PID {} not found", pid))
@@ -380,14 +446,42 @@ impl JobManager {
         // First, try to get the process from our managed processes
         let mut processes = self.processes.write().await;
         if let Some(mut process) = processes.remove(&pid) {
-            // Send SIGTERM
-            if let Err(e) = process.kill().await {
-                // Update job state to failed
-                let mut jobs = self.jobs.write().await;
-                if let Some(job) = jobs.get_mut(&pid) {
-                    job.mark_failed(format!("Failed to send SIGTERM: {}", e));
+            #[cfg(unix)]
+            {
+                use nix::sys::signal::{self, Signal};
+                use nix::unistd::Pid;
+
+                match signal::kill(Pid::from_raw(pid as i32), Signal::SIGTERM) {
+                    Ok(()) => {}
+                    Err(nix::errno::Errno::ESRCH) => {
+                        let exit_status = process.wait().await.map_err(|e| {
+                            format!("Process already exited but wait failed: {}", e)
+                        })?;
+                        let exit_code = exit_status.code().unwrap_or(0);
+                        let mut jobs = self.jobs.write().await;
+                        if let Some(job) = jobs.get_mut(&pid) {
+                            job.mark_exited(exit_code);
+                        }
+                        return Ok(StopResult::Graceful(exit_code));
+                    }
+                    Err(e) => {
+                        let mut jobs = self.jobs.write().await;
+                        if let Some(job) = jobs.get_mut(&pid) {
+                            job.mark_failed(format!("Failed to send SIGTERM: {}", e));
+                        }
+                        return Ok(StopResult::Failed(format!("Failed to send SIGTERM: {}", e)));
+                    }
                 }
-                return Ok(StopResult::Failed(format!("Failed to send SIGTERM: {}", e)));
+            }
+            #[cfg(not(unix))]
+            {
+                if let Err(e) = process.kill().await {
+                    let mut jobs = self.jobs.write().await;
+                    if let Some(job) = jobs.get_mut(&pid) {
+                        job.mark_failed(format!("Failed to stop process: {}", e));
+                    }
+                    return Ok(StopResult::Failed(format!("Failed to stop process: {}", e)));
+                }
             }
 
             // Wait for the process to exit gracefully
@@ -414,9 +508,6 @@ impl JobManager {
                 }
                 Err(_) => {
                     // Grace period expired, send SIGKILL
-                    drop(processes); // Release the lock before trying to kill
-
-                    // Try to kill the process using native Rust signal handling
                     #[cfg(unix)]
                     {
                         use nix::sys::signal::{self, Signal};
@@ -758,6 +849,7 @@ mod tests {
         let job = job.unwrap();
         assert_eq!(job.pid, pid);
         assert_eq!(job.metadata.unique_name, "test-task");
+        assert!(job.completed_at.is_none());
     }
 
     #[tokio::test]
@@ -843,5 +935,85 @@ mod tests {
         // Job should be removed
         let stats = manager.get_stats().await;
         assert_eq!(stats.total_jobs, 0);
+    }
+
+    #[tokio::test]
+    async fn test_job_manager_records_completion_metadata() {
+        let manager = JobManager::new();
+
+        let mut cmd = Command::new("echo");
+        cmd.arg("test");
+        cmd.stdout(std::process::Stdio::piped());
+        cmd.stderr(std::process::Stdio::piped());
+
+        let child = cmd.spawn().unwrap();
+        let pid = child.id().unwrap();
+
+        let metadata = JobMetadata {
+            started_at: Instant::now(),
+            unique_name: "test-task".to_string(),
+            source_name: "test".to_string(),
+            args: None,
+            env: None,
+            cwd: None,
+            command: "echo test".to_string(),
+            file_path: PathBuf::from("Makefile"),
+        };
+
+        manager.start_job(pid, metadata, child).await.unwrap();
+        manager
+            .update_job_state(pid, JobState::Exited(0))
+            .await
+            .unwrap();
+
+        let job = manager.get_job(pid).await.unwrap();
+        assert_eq!(job.state, JobState::Exited(0));
+        assert!(job.completed_at.is_some());
+        assert!(job.elapsed_at_completion.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_record_completed_job_rejects_overwriting_running_job() {
+        let manager = JobManager::new();
+
+        let mut cmd = Command::new("sleep");
+        cmd.arg("5");
+        cmd.stdout(std::process::Stdio::piped());
+        cmd.stderr(std::process::Stdio::piped());
+
+        let child = cmd.spawn().unwrap();
+        let pid = child.id().unwrap();
+
+        let metadata = JobMetadata {
+            started_at: Instant::now(),
+            unique_name: "test-task".to_string(),
+            source_name: "test".to_string(),
+            args: None,
+            env: None,
+            cwd: None,
+            command: "sleep 5".to_string(),
+            file_path: PathBuf::from("Makefile"),
+        };
+
+        manager
+            .start_job(pid, metadata.clone(), child)
+            .await
+            .unwrap();
+
+        let result = manager
+            .record_completed_job(pid, metadata, JobState::Exited(0))
+            .await;
+
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .contains("Refusing to overwrite running job")
+        );
+
+        let job = manager.get_job(pid).await.unwrap();
+        assert!(job.is_running());
+
+        let _ = manager.stop_job_graceful(pid, 0).await;
     }
 }

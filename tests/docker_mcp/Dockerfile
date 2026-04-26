@@ -32,7 +32,7 @@ RUN mkdir -p /home/testuser/test_project /home/testuser/.config/dela && \
 # Create allowlist with MCP-allowlisted tasks
 RUN echo 'entries = [' > /home/testuser/.config/dela/allowlist.toml && \
     echo '  { path = "/home/testuser/test_project/package.json", scope = "Task", tasks = ["npm-test", "npm-start"] },' >> /home/testuser/.config/dela/allowlist.toml && \
-    echo '  { path = "/home/testuser/test_project/Makefile", scope = "Task", tasks = ["make-build", "make-test", "test-task", "another-task", "print-args", "long-running-task"] }' >> /home/testuser/.config/dela/allowlist.toml && \
+    echo '  { path = "/home/testuser/test_project/Makefile", scope = "Task", tasks = ["make-build", "make-test", "test-task", "another-task", "print-args", "long-running-task", "stderr-level-task"] }' >> /home/testuser/.config/dela/allowlist.toml && \
     echo ']' >> /home/testuser/.config/dela/allowlist.toml && \
     chown testuser:testuser /home/testuser/.config/dela/allowlist.toml && \
     chmod 644 /home/testuser/.config/dela/allowlist.toml

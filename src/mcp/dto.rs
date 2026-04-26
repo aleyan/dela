@@ -1,4 +1,4 @@
-use crate::runner::is_runner_available;
+use crate::runner::{is_runner_available, is_runner_available_for_mcp};
 use crate::types::Task;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -76,7 +76,7 @@ impl TaskDto {
             source_name: task.source_name.clone(),
             runner: task.runner.short_name().to_string(),
             command: task.runner.get_command(task),
-            runner_available: is_runner_available(&task.runner),
+            runner_available: is_runner_available_for_mcp(&task.runner),
             allowlisted: allowlist_evaluator.is_task_allowed(task).unwrap_or(false),
             file_path: task.file_path.to_string_lossy().to_string(),
             description: task.description.clone(),
@@ -545,6 +545,34 @@ mod tests {
         );
         assert_eq!(dto.runner_available, false); // Travis CI is never available locally
     }
+
+    #[test]
+    fn test_taskdto_cmake_not_available_for_mcp() {
+        use crate::mcp::allowlist::McpAllowlistEvaluator;
+
+        let task = Task {
+            name: "build-all".to_string(),
+            file_path: PathBuf::from("/project/CMakeLists.txt"),
+            definition_type: TaskDefinitionType::CMake,
+            runner: TaskRunner::CMake,
+            source_name: "build-all".to_string(),
+            description: Some("Build all targets".to_string()),
+            shadowed_by: None,
+            disambiguated_name: None,
+        };
+
+        let allowlist_evaluator = McpAllowlistEvaluator {
+            allowlist: crate::types::Allowlist::default(),
+        };
+
+        let dto = TaskDto::from_task_enriched(&task, &allowlist_evaluator);
+
+        assert_eq!(
+            dto.command,
+            "cmake -S . -B build && cmake --build build --target build-all"
+        );
+        assert!(!dto.runner_available);
+    }
 }
 
 /// Arguments for the task_start tool
@@ -564,6 +592,11 @@ pub struct TaskStartArgs {
     /// Optional working directory (if None, uses server's root directory)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cwd: Option<String>,
+
+    /// Optional bounded wait in seconds before backgrounding the task.
+    /// Defaults to 1 second when omitted. Allowed range: 0-3600 seconds.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub wait_for_exit_seconds: Option<u64>,
 }
 
 /// Result of starting a task
@@ -580,7 +613,7 @@ pub struct StartResultDto {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub exit_code: Option<i32>,
 
-    /// Combined stdout and stderr captured during the first second
+    /// Combined stdout and stderr captured before returning
     pub initial_output: String,
 }
 
@@ -615,4 +648,40 @@ pub struct TaskStopArgs {
     /// Grace period in seconds before sending SIGKILL (default: 5)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub grace_period: Option<u64>,
+}
+
+#[cfg(test)]
+mod task_start_args_tests {
+    use super::TaskStartArgs;
+
+    #[test]
+    fn test_task_start_args_serialization_with_wait_for_exit_seconds() {
+        let args = TaskStartArgs {
+            unique_name: "tests-m".to_string(),
+            args: None,
+            env: None,
+            cwd: None,
+            wait_for_exit_seconds: Some(15),
+        };
+
+        let json = serde_json::to_value(&args).unwrap();
+
+        assert_eq!(json["unique_name"], "tests-m");
+        assert_eq!(json["wait_for_exit_seconds"], 15);
+    }
+
+    #[test]
+    fn test_task_start_args_serialization_omits_wait_for_exit_seconds_when_absent() {
+        let args = TaskStartArgs {
+            unique_name: "tests-m".to_string(),
+            args: None,
+            env: None,
+            cwd: None,
+            wait_for_exit_seconds: None,
+        };
+
+        let json = serde_json::to_value(&args).unwrap();
+
+        assert!(json.get("wait_for_exit_seconds").is_none());
+    }
 }

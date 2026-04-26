@@ -20,6 +20,7 @@ impl DelaErrorCode {
     pub const NOT_ALLOWLISTED: Self = Self(-32010);
     pub const RUNNER_UNAVAILABLE: Self = Self(-32011);
     pub const TASK_NOT_FOUND: Self = Self(-32012);
+    pub const MCP_NOT_READY: Self = Self(-32013);
 }
 
 impl From<DelaErrorCode> for ErrorCode {
@@ -49,6 +50,11 @@ pub enum DelaError {
     },
     /// Generic internal error
     InternalError {
+        message: String,
+        hint: Option<String>,
+    },
+    /// MCP cannot start because local dela configuration is unavailable
+    McpNotReady {
         message: String,
         hint: Option<String>,
     },
@@ -88,6 +94,11 @@ impl DelaError {
                 message: Cow::Owned(message.clone()),
                 data: hint.as_ref().map(|h| Value::String(h.clone())),
             },
+            DelaError::McpNotReady { message, hint } => ErrorData {
+                code: DelaErrorCode::MCP_NOT_READY.into(),
+                message: Cow::Owned(message.clone()),
+                data: hint.as_ref().map(|h| Value::String(h.clone())),
+            },
         }
     }
 
@@ -102,18 +113,40 @@ impl DelaError {
     /// Create a RunnerUnavailable error with a helpful hint
     pub fn runner_unavailable(runner_name: String, task_name: String) -> Self {
         let hint = match runner_name.as_str() {
+            "cmake" => Some(
+                "CMake tasks are discovered for visibility, but MCP execution is disabled because the current CMake runner expands to a shell fragment. Run this task via the dela CLI instead."
+                    .to_string(),
+            ),
             "make" => Some(
                 "Install make: brew install make (macOS) or apt-get install make (Ubuntu)"
                     .to_string(),
             ),
             "npm" => Some("Install Node.js and npm: https://nodejs.org/".to_string()),
+            "yarn" => Some(
+                "Install Node.js, then enable Yarn via Corepack or install Yarn directly: https://yarnpkg.com/getting-started/install"
+                    .to_string(),
+            ),
+            "pnpm" => Some(
+                "Install Node.js, then enable pnpm via Corepack or install pnpm directly: https://pnpm.io/installation"
+                    .to_string(),
+            ),
+            "bun" => Some("Install Bun: https://bun.sh/docs/installation".to_string()),
             "gradle" => Some("Install Gradle: https://gradle.org/install/".to_string()),
-            "maven" => Some("Install Maven: https://maven.apache.org/install.html".to_string()),
-            "python" => Some("Install Python: https://python.org/downloads/".to_string()),
+            "mvn" => Some("Install Maven: https://maven.apache.org/install.html".to_string()),
             "uv" => {
                 Some("Install uv: pip install uv or https://github.com/astral-sh/uv".to_string())
             }
+            "poetry" => Some("Install Poetry: https://python-poetry.org/docs/#installation".to_string()),
+            "poe" => Some(
+                "Install Poe the Poet in this project environment, for example: uv tool install poethepoet or pip install poethepoet"
+                    .to_string(),
+            ),
             "just" => Some("Install just: https://github.com/casey/just#installation".to_string()),
+            "docker compose" => Some(
+                "Install Docker Desktop or Docker Engine with Compose support: https://docs.docker.com/compose/install/"
+                    .to_string(),
+            ),
+            "act" => Some("Install act: https://nektosact.com/installation/".to_string()),
             _ => Some(format!("Install {} to run this task", runner_name)),
         };
 
@@ -135,6 +168,17 @@ impl DelaError {
     /// Create an InternalError with a helpful hint
     pub fn internal_error(message: String, hint: Option<String>) -> Self {
         DelaError::InternalError { message, hint }
+    }
+
+    /// Create an MCP-not-ready error with a helpful hint
+    pub fn mcp_not_ready(message: String) -> Self {
+        DelaError::McpNotReady {
+            message,
+            hint: Some(
+                "Run 'dela init' to create ~/.config/dela before starting the MCP server"
+                    .to_string(),
+            ),
+        }
     }
 }
 
@@ -189,6 +233,76 @@ mod tests {
     }
 
     #[test]
+    fn test_runner_unavailable_node_package_manager_hints() {
+        let npm_hint = DelaError::runner_unavailable("npm".to_string(), "build".to_string())
+            .to_error_data()
+            .data
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .to_string();
+        let yarn_hint = DelaError::runner_unavailable("yarn".to_string(), "build".to_string())
+            .to_error_data()
+            .data
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .to_string();
+        let pnpm_hint = DelaError::runner_unavailable("pnpm".to_string(), "build".to_string())
+            .to_error_data()
+            .data
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .to_string();
+        let bun_hint = DelaError::runner_unavailable("bun".to_string(), "build".to_string())
+            .to_error_data()
+            .data
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .to_string();
+
+        assert!(npm_hint.contains("Node.js and npm"));
+        assert!(yarn_hint.contains("Yarn"));
+        assert!(yarn_hint.contains("Corepack"));
+        assert!(pnpm_hint.contains("pnpm"));
+        assert!(pnpm_hint.contains("Corepack"));
+        assert!(bun_hint.contains("Bun"));
+    }
+
+    #[test]
+    fn test_runner_unavailable_python_tool_hints() {
+        let uv_hint = DelaError::runner_unavailable("uv".to_string(), "test".to_string())
+            .to_error_data()
+            .data
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .to_string();
+        let poetry_hint = DelaError::runner_unavailable("poetry".to_string(), "test".to_string())
+            .to_error_data()
+            .data
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .to_string();
+        let poe_hint = DelaError::runner_unavailable("poe".to_string(), "test".to_string())
+            .to_error_data()
+            .data
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .to_string();
+
+        assert!(uv_hint.contains("Install uv"));
+        assert!(!uv_hint.contains("Install Python"));
+        assert!(poetry_hint.contains("Install Poetry"));
+        assert!(poe_hint.contains("poethepoet"));
+        assert!(!poe_hint.contains("Install Python"));
+    }
+
+    #[test]
     fn test_task_not_found_error() {
         let error = DelaError::task_not_found("nonexistent".to_string());
         let error_data = error.to_error_data();
@@ -203,6 +317,24 @@ mod tests {
                 .as_str()
                 .unwrap()
                 .contains("list_tasks")
+        );
+    }
+
+    #[test]
+    fn test_mcp_not_ready_error() {
+        let error = DelaError::mcp_not_ready("Dela is not initialized".to_string());
+        let error_data = error.to_error_data();
+
+        assert_eq!(error_data.code.0, -32013);
+        assert!(error_data.message.contains("not initialized"));
+        assert!(
+            error_data
+                .data
+                .as_ref()
+                .unwrap()
+                .as_str()
+                .unwrap()
+                .contains("dela init")
         );
     }
 }

@@ -276,6 +276,16 @@ pub async fn execute(
         return Ok(());
     }
 
+    crate::allowlist::load_allowlist().map_err(|e| {
+        crate::mcp::DelaError::mcp_not_ready(format!(
+            "MCP server cannot start because dela configuration is unavailable: {}",
+            e
+        ))
+        .to_error_data()
+        .message
+        .into_owned()
+    })?;
+
     // Start the MCP server
     mcp::run_stdio_server(root_path)
         .await
