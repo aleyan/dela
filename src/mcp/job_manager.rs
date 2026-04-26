@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -132,6 +133,7 @@ pub struct Job {
     pub pid: u32,
     pub metadata: JobMetadata,
     pub state: JobState,
+    pub completed_at: Option<DateTime<Utc>>,
     pub output_buffer: RingBuffer,
     pub last_activity: Instant,
 }
@@ -148,6 +150,7 @@ impl Job {
             pid,
             metadata,
             state: JobState::Running,
+            completed_at: None,
             output_buffer: RingBuffer::new(max_output_lines, max_output_bytes),
             last_activity: Instant::now(),
         }
@@ -161,12 +164,14 @@ impl Job {
     /// Mark the job as exited with the given exit code
     pub fn mark_exited(&mut self, exit_code: i32) {
         self.state = JobState::Exited(exit_code);
+        self.completed_at = Some(Utc::now());
         self.touch();
     }
 
     /// Mark the job as failed with the given error message
     pub fn mark_failed(&mut self, error: String) {
         self.state = JobState::Failed(error);
+        self.completed_at = Some(Utc::now());
         self.touch();
     }
 
@@ -316,6 +321,10 @@ impl JobManager {
             Job {
                 pid,
                 metadata,
+                completed_at: match state {
+                    JobState::Running => None,
+                    JobState::Exited(_) | JobState::Failed(_) => Some(Utc::now()),
+                },
                 state,
                 output_buffer: RingBuffer::new(
                     self.config.max_output_lines_per_job,
@@ -352,8 +361,15 @@ impl JobManager {
     pub async fn update_job_state(&self, pid: u32, state: JobState) -> Result<(), String> {
         let mut jobs = self.jobs.write().await;
         if let Some(job) = jobs.get_mut(&pid) {
-            job.state = state;
-            job.touch();
+            match state {
+                JobState::Running => {
+                    job.state = JobState::Running;
+                    job.completed_at = None;
+                    job.touch();
+                }
+                JobState::Exited(exit_code) => job.mark_exited(exit_code),
+                JobState::Failed(error) => job.mark_failed(error),
+            }
             Ok(())
         } else {
             Err(format!("Job with PID {} not found", pid))
@@ -809,6 +825,7 @@ mod tests {
         let job = job.unwrap();
         assert_eq!(job.pid, pid);
         assert_eq!(job.metadata.unique_name, "test-task");
+        assert!(job.completed_at.is_none());
     }
 
     #[tokio::test]
@@ -894,5 +911,39 @@ mod tests {
         // Job should be removed
         let stats = manager.get_stats().await;
         assert_eq!(stats.total_jobs, 0);
+    }
+
+    #[tokio::test]
+    async fn test_job_manager_records_completion_metadata() {
+        let manager = JobManager::new();
+
+        let mut cmd = Command::new("echo");
+        cmd.arg("test");
+        cmd.stdout(std::process::Stdio::piped());
+        cmd.stderr(std::process::Stdio::piped());
+
+        let child = cmd.spawn().unwrap();
+        let pid = child.id().unwrap();
+
+        let metadata = JobMetadata {
+            started_at: Instant::now(),
+            unique_name: "test-task".to_string(),
+            source_name: "test".to_string(),
+            args: None,
+            env: None,
+            cwd: None,
+            command: "echo test".to_string(),
+            file_path: PathBuf::from("Makefile"),
+        };
+
+        manager.start_job(pid, metadata, child).await.unwrap();
+        manager
+            .update_job_state(pid, JobState::Exited(0))
+            .await
+            .unwrap();
+
+        let job = manager.get_job(pid).await.unwrap();
+        assert_eq!(job.state, JobState::Exited(0));
+        assert!(job.completed_at.is_some());
     }
 }

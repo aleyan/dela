@@ -7,6 +7,7 @@ use super::errors::DelaError;
 use super::job_manager::{JobManager, JobMetadata, JobState};
 use crate::runner::{is_runner_available_for_mcp, split_command_words};
 use crate::task_discovery;
+use chrono::SecondsFormat;
 use rmcp::{
     ServerHandler, ServiceExt,
     handler::server::wrapper::Parameters,
@@ -730,11 +731,15 @@ impl DelaMcpServer {
         let job_statuses: Vec<serde_json::Value> = jobs
             .into_iter()
             .map(|job| {
-                let state = match job.state {
-                    JobState::Running => "running",
-                    JobState::Exited(_) => "exited",
-                    JobState::Failed(_) => "failed",
+                let (state, exit_code) = match &job.state {
+                    JobState::Running => ("running", None),
+                    JobState::Exited(code) => ("exited", Some(*code)),
+                    JobState::Failed(_) => ("failed", None),
                 };
+                let completed_at = job
+                    .completed_at
+                    .as_ref()
+                    .map(|timestamp| timestamp.to_rfc3339_opts(SecondsFormat::Secs, true));
 
                 serde_json::json!({
                     "pid": job.pid,
@@ -742,6 +747,8 @@ impl DelaMcpServer {
                     "source_name": job.metadata.source_name,
                     "state": state,
                     "elapsed_seconds": job.metadata.started_at.elapsed().as_secs(),
+                    "exit_code": exit_code,
+                    "completed_at": completed_at,
                     "command": job.metadata.command,
                     "file_path": job.metadata.file_path.to_string_lossy(),
                     "args": job.metadata.args,
@@ -1614,6 +1621,8 @@ mod tests {
                     assert!(job["pid"].is_number());
                     assert!(job["state"].is_string());
                     assert_eq!(job["state"], "running");
+                    assert!(job["exit_code"].is_null());
+                    assert!(job["completed_at"].is_null());
                 }
             }
             _ => panic!("Expected text content with JSON"),
@@ -1680,6 +1689,63 @@ mod tests {
                 let job = &jobs[0];
                 assert_eq!(job["unique_name"], "test-task");
                 assert_eq!(job["state"], "exited");
+                assert_eq!(job["exit_code"], 0);
+                assert!(job["completed_at"].is_string());
+            }
+            _ => panic!("Expected text content with JSON"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_task_status_failed_job_includes_completed_at() {
+        let temp_dir = std::env::temp_dir();
+        let server = DelaMcpServer::new(temp_dir);
+
+        let metadata = JobMetadata {
+            started_at: std::time::Instant::now(),
+            unique_name: "test-task".to_string(),
+            source_name: "test".to_string(),
+            args: None,
+            env: None,
+            cwd: None,
+            command: "echo test".to_string(),
+            file_path: PathBuf::from("Makefile"),
+        };
+
+        let mut cmd = tokio::process::Command::new("echo");
+        cmd.arg("test");
+        cmd.stdout(std::process::Stdio::piped());
+        cmd.stderr(std::process::Stdio::piped());
+        let child = cmd.spawn().unwrap();
+        let pid = child.id().unwrap();
+
+        server
+            .job_manager
+            .start_job(pid as u32, metadata, child)
+            .await
+            .unwrap();
+        server
+            .job_manager
+            .update_job_state(pid as u32, JobState::Failed("boom".to_string()))
+            .await
+            .unwrap();
+
+        let result = server
+            .task_status(Parameters(TaskStatusArgs {
+                unique_name: "test-task".to_string(),
+            }))
+            .await
+            .unwrap();
+
+        let content = &result.content[0];
+        match &content.raw {
+            RawContent::Text(text_content) => {
+                let json: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
+                let jobs = json["jobs"].as_array().unwrap();
+                assert_eq!(jobs.len(), 1);
+                assert_eq!(jobs[0]["state"], "failed");
+                assert!(jobs[0]["exit_code"].is_null());
+                assert!(jobs[0]["completed_at"].is_string());
             }
             _ => panic!("Expected text content with JSON"),
         }

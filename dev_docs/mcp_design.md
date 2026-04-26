@@ -43,7 +43,7 @@ This redesign narrows each tool to a single, clear responsibility and aligns wit
   - description (optional)
 - **status** → Return a list of **all running tasks** (across all names) with PIDs and minimal status.
 - **task_start** → Start a task by **unique_name** with optional args/env/cwd. If it **finishes within 1s**, return its full output and exit status. If it **does not finish in 1s**, background it, return `running` with PID and any output captured during that first second.
-- **task_status** → Return status for instances of a given **unique_name**. There may be multiple PIDs if the same task was started with different arguments. Current wire format emphasizes state and elapsed time; future revisions should also expose completion metadata such as `exit_code` and `completed_at`.
+- **task_status** → Return status for instances of a given **unique_name**. There may be multiple PIDs if the same task was started with different arguments. The wire format includes state, elapsed time, and completion metadata (`exit_code`, `completed_at`) so clients do not need to infer outcomes from notifications alone.
 - **task_output** → Return the **last N lines** of output for a **PID** (with a default N). Supports simple paging via an optional `from` byte cursor (future).
 - **task_stop** → Stop a running task by **PID** (TERM with grace, then KILL on timeout).
 - 
@@ -146,8 +146,8 @@ pub struct TaskStatusJobDto {
   pub unique_name: String,
   pub state: String,               // "running"|"exited"|"failed"
   pub elapsed_seconds: u64,
-  pub exit_code: Option<i32>,      // future
-  pub completed_at: Option<String> // future RFC3339 timestamp
+  pub exit_code: Option<i32>,
+  pub completed_at: Option<String> // RFC3339 timestamp for completed jobs
 }
 
 pub struct TaskOutputArgs {
@@ -353,8 +353,8 @@ All errors follow the JSON-RPC 2.0 error format:
   ]
 }
 ```
-`exit_code` and `completed_at` are planned enrichments that make polling clients simpler and remove
-the need to infer success/failure from logging notifications alone.
+`exit_code` is populated for exited jobs, and `completed_at` is populated for exited/failed jobs so
+polling clients can determine completion without depending on logging notifications alone.
 
 ### 5) task_output
 **Args**
@@ -407,7 +407,7 @@ Cursor-based paging lets clients fetch only new output instead of repeatedly re-
 These are not required for the minimal MCP surface, but they materially improve agent/editor UX:
 
 - **Bounded wait on start**: implemented via `task_start(wait_for_exit_seconds=...)` to avoid poll loops for common commands like tests and builds.
-- **Completion metadata in `task_status`**: include `exit_code` and `completed_at` for closed jobs.
+- **Completion metadata in `task_status`**: implemented so clients can read `exit_code` and `completed_at` directly from polling responses.
 - **Incremental log paging**: add `from` cursors to `task_output` or `joblog://` resources.
 - **Discovery caching**: cache task discovery for hot paths such as repeated `list_tasks` calls.
 - **Workspace-aware editor config generation**: allow generated MCP configs to pre-bind `cwd`,
@@ -466,8 +466,7 @@ impl ServerHandler for DelaMcpServer {
 **task_status** - Returns status for running instances of a specific task
 - Filters jobs by unique_name
 - Returns all PIDs associated with that task name
-- Includes state (running/exited/failed), elapsed_seconds, command, and args
-- Planned enrichment: include `exit_code` and `completed_at` for completed jobs
+- Includes state (running/exited/failed), elapsed_seconds, command, args, `exit_code`, and `completed_at`
 
 **task_output** - Returns the last N lines of output for a running task
 - Default 200 lines, configurable via `lines` parameter
@@ -491,7 +490,7 @@ impl ServerHandler for DelaMcpServer {
 - Per-PID ring buffer (VecDeque) with configurable limits:
   - Max 1000 lines per job
   - Max 5MB output per job
-- Job metadata includes: started_at (internal), elapsed_seconds (wire), command, unique_name, source_name, args, cwd, file_path
+- Job metadata includes: started_at (internal), elapsed_seconds (wire), completed_at (wire for finished jobs), command, unique_name, source_name, args, cwd, file_path
 - Background monitoring task updates job state on child exit
 - Jobs transition through states: Running → Exited(exit_code) or Failed(reason)
 
