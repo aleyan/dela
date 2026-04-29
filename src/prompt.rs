@@ -248,7 +248,7 @@ mod tests {
 
     // Test helper function that simulates the TUI logic
     fn test_tui_logic(selected_index: usize) -> Result<AllowDecision, String> {
-        let options = vec![
+        let options = [
             (
                 "Allow once (this time only)",
                 AllowDecision::Allow(AllowScope::Once),

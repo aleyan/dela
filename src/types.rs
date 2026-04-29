@@ -287,7 +287,7 @@ pub struct AllowlistEntry {
     pub tasks: Option<Vec<String>>,
 }
 
-fn serialize_path<S>(path: &PathBuf, serializer: S) -> Result<S::Ok, S::Error>
+fn serialize_path<S>(path: &std::path::Path, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
 {

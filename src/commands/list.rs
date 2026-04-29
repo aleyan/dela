@@ -230,7 +230,7 @@ pub fn execute(verbose: bool) -> Result<(), String> {
 
         // Ensure all task names will be padded to this width
         // Round up to nearest multiple of 5 for better alignment
-        let display_width = (max_task_name_width + 4) / 5 * 5;
+        let display_width = max_task_name_width.div_ceil(5) * 5;
 
         // Get a sorted list of runners for deterministic output
         let mut runners: Vec<String> = tasks_by_runner.keys().cloned().collect();
@@ -390,7 +390,7 @@ fn format_task_entry(task: &Task, is_ambiguous: bool, name_width: usize) -> Stri
     };
 
     // Create the task description part
-    let description_part = if let Some(_) = &task.disambiguated_name {
+    let description_part = if task.disambiguated_name.is_some() {
         // For disambiguated tasks, show the original name with footnotes
         let orig_with_footnotes = if !footnotes.is_empty() {
             format!("{} {}", task.name.dimmed().red(), footnotes.yellow())
@@ -422,9 +422,7 @@ fn format_task_entry(task: &Task, is_ambiguous: bool, name_width: usize) -> Stri
     } else if task.disambiguated_name.is_some() {
         // For disambiguated tasks, the display name (disambiguated) should be green
         display_name.green()
-    } else if is_ambiguous {
-        display_name.dimmed().red()
-    } else if task.shadowed_by.is_some() {
+    } else if is_ambiguous || task.shadowed_by.is_some() {
         display_name.dimmed().red()
     } else {
         display_name.green()
@@ -644,8 +642,10 @@ mod tests {
         runners.sort();
 
         // Mock the task discovery
-        let mut discovered_tasks = task_discovery::DiscoveredTasks::default();
-        discovered_tasks.tasks = tasks;
+        let discovered_tasks = task_discovery::DiscoveredTasks {
+            tasks,
+            ..Default::default()
+        };
 
         // Calculate max task name width across all runners
         let max_task_name_width = discovered_tasks
@@ -658,7 +658,7 @@ mod tests {
 
         // Ensure all task names will be padded to this width
         // Round up to nearest multiple of 5 for better alignment
-        let display_width = (max_task_name_width + 4) / 5 * 5;
+        let display_width = max_task_name_width.div_ceil(5) * 5;
 
         // Process each runner
         for runner in runners {
@@ -900,8 +900,10 @@ mod tests {
         let mut writer = TestWriter::new();
 
         // Mock the task discovery with our GitHub Actions task
-        let mut discovered_tasks = task_discovery::DiscoveredTasks::default();
-        discovered_tasks.tasks = vec![task];
+        let discovered_tasks = task_discovery::DiscoveredTasks {
+            tasks: vec![task],
+            ..Default::default()
+        };
 
         // Group tasks by runner
         let mut tasks_by_runner: HashMap<String, Vec<&Task>> = HashMap::new();
@@ -922,7 +924,7 @@ mod tests {
         write!(writer, "{} — {}", runner.cyan(), display_path.dimmed()).unwrap();
 
         // Write the task
-        let formatted_task = format_task_entry(&act_tasks[0], false, 20);
+        let formatted_task = format_task_entry(act_tasks[0], false, 20);
         writeln!(writer, "\n  {}", formatted_task).unwrap();
 
         // Get the output and verify it shows the full path

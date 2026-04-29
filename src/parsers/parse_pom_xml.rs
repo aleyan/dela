@@ -84,55 +84,53 @@ fn add_profile_tasks(tasks: &mut Vec<Task>, root: Node, file_path: &Path) -> Res
 /// Add tasks from Maven plugins
 fn add_plugin_tasks(tasks: &mut Vec<Task>, root: Node, file_path: &Path) -> Result<(), String> {
     // Find <build> section and then <plugins>
-    if let Some(build_node) = root.children().find(|n| n.has_tag_name("build")) {
-        if let Some(plugins_node) = build_node.children().find(|n| n.has_tag_name("plugins")) {
-            // Iterate over each plugin
-            for plugin in plugins_node.children().filter(|n| n.has_tag_name("plugin")) {
-                // Get plugin artifact ID
-                let artifact_id = plugin
+    if let Some(build_node) = root.children().find(|n| n.has_tag_name("build"))
+        && let Some(plugins_node) = build_node.children().find(|n| n.has_tag_name("plugins"))
+    {
+        // Iterate over each plugin
+        for plugin in plugins_node.children().filter(|n| n.has_tag_name("plugin")) {
+            // Get plugin artifact ID
+            let artifact_id = plugin
+                .children()
+                .find(|n| n.has_tag_name("artifactId"))
+                .and_then(|n| n.text())
+                .unwrap_or("unknown")
+                .to_string();
+
+            // Find executions
+            if let Some(executions_node) = plugin.children().find(|n| n.has_tag_name("executions"))
+            {
+                for execution in executions_node
                     .children()
-                    .find(|n| n.has_tag_name("artifactId"))
-                    .and_then(|n| n.text())
-                    .unwrap_or("unknown")
-                    .to_string();
-
-                // Find executions
-                if let Some(executions_node) =
-                    plugin.children().find(|n| n.has_tag_name("executions"))
+                    .filter(|n| n.has_tag_name("execution"))
                 {
-                    for execution in executions_node
+                    // Get execution ID
+                    let exec_id = execution
                         .children()
-                        .filter(|n| n.has_tag_name("execution"))
-                    {
-                        // Get execution ID
-                        let exec_id = execution
-                            .children()
-                            .find(|n| n.has_tag_name("id"))
-                            .and_then(|n| n.text())
-                            .unwrap_or("default")
-                            .to_string();
+                        .find(|n| n.has_tag_name("id"))
+                        .and_then(|n| n.text())
+                        .unwrap_or("default")
+                        .to_string();
 
-                        // Get goals
-                        if let Some(goals_node) =
-                            execution.children().find(|n| n.has_tag_name("goals"))
-                        {
-                            for goal in goals_node.children().filter(|n| n.has_tag_name("goal")) {
-                                if let Some(goal_text) = goal.text() {
-                                    let task_name = format!("{}:{}", artifact_id, goal_text);
-                                    tasks.push(Task {
-                                        name: task_name.clone(),
-                                        file_path: file_path.to_path_buf(),
-                                        definition_type: TaskDefinitionType::MavenPom,
-                                        runner: TaskRunner::Maven,
-                                        source_name: task_name,
-                                        description: Some(format!(
-                                            "Maven plugin goal {} (execution: {})",
-                                            goal_text, exec_id
-                                        )),
-                                        shadowed_by: None,
-                                        disambiguated_name: None,
-                                    });
-                                }
+                    // Get goals
+                    if let Some(goals_node) = execution.children().find(|n| n.has_tag_name("goals"))
+                    {
+                        for goal in goals_node.children().filter(|n| n.has_tag_name("goal")) {
+                            if let Some(goal_text) = goal.text() {
+                                let task_name = format!("{}:{}", artifact_id, goal_text);
+                                tasks.push(Task {
+                                    name: task_name.clone(),
+                                    file_path: file_path.to_path_buf(),
+                                    definition_type: TaskDefinitionType::MavenPom,
+                                    runner: TaskRunner::Maven,
+                                    source_name: task_name,
+                                    description: Some(format!(
+                                        "Maven plugin goal {} (execution: {})",
+                                        goal_text, exec_id
+                                    )),
+                                    shadowed_by: None,
+                                    disambiguated_name: None,
+                                });
                             }
                         }
                     }

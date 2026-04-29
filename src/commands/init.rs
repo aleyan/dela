@@ -70,11 +70,11 @@ fn add_shell_integration(config_path: &PathBuf) -> Result<(), String> {
     }
 
     // Create parent directory if it doesn't exist (needed for PowerShell)
-    if let Some(parent) = config_path.parent() {
-        if !parent.exists() {
-            fs::create_dir_all(parent)
-                .map_err(|e| format!("Failed to create config directory: {}", e))?;
-        }
+    if let Some(parent) = config_path.parent()
+        && !parent.exists()
+    {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create config directory: {}", e))?;
     }
 
     // Open file in append mode
@@ -174,7 +174,7 @@ mod tests {
     use serial_test::serial;
     use tempfile::TempDir;
 
-    fn setup_test_env(shell: &str, home: &PathBuf) -> Result<(), std::io::Error> {
+    fn setup_test_env(shell: &str, home: &std::path::Path) -> Result<(), std::io::Error> {
         let test_env = TestEnvironment::new()
             .with_shell(shell)
             .with_home(home.to_string_lossy());

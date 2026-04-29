@@ -39,6 +39,9 @@ fn parse_cmake_string(content: &str, file_path: &Path) -> Result<Vec<Task>, Stri
     let target_pattern = Regex::new(r#"add_custom_target\s*\(\s*([a-zA-Z_][a-zA-Z0-9_-]*)"#)
         .map_err(|e| format!("Failed to compile regex: {}", e))?;
 
+    let comment_pattern = Regex::new(r#"COMMENT\s+"([^"]*)"#)
+        .map_err(|e| format!("Failed to compile comment regex: {}", e))?;
+
     // Find all matches in the content
     for captures in target_pattern.captures_iter(&normalized_content) {
         let target_name = captures.get(1).unwrap().as_str();
@@ -52,13 +55,10 @@ fn parse_cmake_string(content: &str, file_path: &Path) -> Result<Vec<Task>, Stri
         let mut description = format!("CMake custom target: {}", target_name);
 
         // Look for COMMENT in this specific target block
-        let comment_pattern = Regex::new(r#"COMMENT\s+"([^"]*)"#)
-            .map_err(|e| format!("Failed to compile comment regex: {}", e))?;
-
-        if let Some(comment_captures) = comment_pattern.captures(target_block) {
-            if let Some(comment) = comment_captures.get(1) {
-                description = comment.as_str().to_string();
-            }
+        if let Some(comment_captures) = comment_pattern.captures(target_block)
+            && let Some(comment) = comment_captures.get(1)
+        {
+            description = comment.as_str().to_string();
         }
 
         let task = Task {

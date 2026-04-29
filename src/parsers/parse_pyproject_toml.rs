@@ -13,26 +13,24 @@ pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
     let mut tasks = Vec::new();
 
     // Check for UV scripts
-    if let Some(project) = toml.get("project") {
-        if let Some(scripts) = project.get("scripts") {
-            if let Some(scripts_table) = scripts.as_table() {
-                if cfg!(test) || check_path_executable("uv").is_some() {
-                    for (name, cmd) in scripts_table {
-                        let description = cmd.as_str().map(|s| format!("python script: {}", s));
+    if let Some(project) = toml.get("project")
+        && let Some(scripts) = project.get("scripts")
+        && let Some(scripts_table) = scripts.as_table()
+        && (cfg!(test) || check_path_executable("uv").is_some())
+    {
+        for (name, cmd) in scripts_table {
+            let description = cmd.as_str().map(|s| format!("python script: {}", s));
 
-                        tasks.push(Task {
-                            name: name.clone(),
-                            file_path: path.to_path_buf(),
-                            definition_type: TaskDefinitionType::PyprojectToml,
-                            runner: TaskRunner::PythonUv,
-                            source_name: name.clone(),
-                            description,
-                            shadowed_by: None,
-                            disambiguated_name: None,
-                        });
-                    }
-                }
-            }
+            tasks.push(Task {
+                name: name.clone(),
+                file_path: path.to_path_buf(),
+                definition_type: TaskDefinitionType::PyprojectToml,
+                runner: TaskRunner::PythonUv,
+                source_name: name.clone(),
+                description,
+                shadowed_by: None,
+                disambiguated_name: None,
+            });
         }
     }
 
@@ -45,72 +43,68 @@ pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
             tool_val
         };
 
-        if let Some(scripts) = poetry.get("scripts") {
-            if let Some(scripts_table) = scripts.as_table() {
-                let poetry_lock_exists = path
-                    .parent()
-                    .map(|dir| dir.join("poetry.lock").exists())
-                    .unwrap_or(false);
-                if cfg!(test)
-                    || (check_path_executable("poetry").is_some()
-                        && (cfg!(test) || poetry_lock_exists))
-                {
-                    for (name, cmd) in scripts_table {
-                        let description = cmd.as_str().map(|s| format!("python script: {}", s));
+        if let Some(scripts) = poetry.get("scripts")
+            && let Some(scripts_table) = scripts.as_table()
+        {
+            let poetry_lock_exists = path
+                .parent()
+                .map(|dir| dir.join("poetry.lock").exists())
+                .unwrap_or(false);
+            if poetry_lock_exists && (cfg!(test) || check_path_executable("poetry").is_some()) {
+                for (name, cmd) in scripts_table {
+                    let description = cmd.as_str().map(|s| format!("python script: {}", s));
 
-                        tasks.push(Task {
-                            name: name.clone(),
-                            file_path: path.to_path_buf(),
-                            definition_type: TaskDefinitionType::PyprojectToml,
-                            runner: TaskRunner::PythonPoetry,
-                            source_name: name.clone(),
-                            description,
-                            shadowed_by: None,
-                            disambiguated_name: None,
-                        });
-                    }
+                    tasks.push(Task {
+                        name: name.clone(),
+                        file_path: path.to_path_buf(),
+                        definition_type: TaskDefinitionType::PyprojectToml,
+                        runner: TaskRunner::PythonPoetry,
+                        source_name: name.clone(),
+                        description,
+                        shadowed_by: None,
+                        disambiguated_name: None,
+                    });
                 }
             }
         }
     }
 
     // Check for poethepoet tasks
-    if let Some(poe) = toml.get("tool") {
-        if let Some(poe_section) = poe.get("poe") {
-            // If there is a nested "tasks" key, use that table; otherwise, use the poe_section table directly
-            if let Some(tasks_table) = if let Some(inner) = poe_section.get("tasks") {
-                inner.as_table()
-            } else {
-                poe_section.as_table()
-            } {
-                if cfg!(test) || check_path_executable("poe").is_some() {
-                    for (name, task_def) in tasks_table {
-                        let description = match task_def {
-                            toml::Value::String(cmd) => Some(format!("command: {}", cmd)),
-                            toml::Value::Table(table) => {
-                                if let Some(script) = table.get("script") {
-                                    script.as_str().map(|s| format!("python script: {}", s))
-                                } else if let Some(shell) = table.get("shell") {
-                                    shell.as_str().map(|s| format!("shell script: {}", s))
-                                } else {
-                                    None
-                                }
-                            }
-                            _ => None,
-                        };
-
-                        tasks.push(Task {
-                            name: name.clone(),
-                            file_path: path.to_path_buf(),
-                            definition_type: TaskDefinitionType::PyprojectToml,
-                            runner: TaskRunner::PythonPoe,
-                            source_name: name.clone(),
-                            description,
-                            shadowed_by: None,
-                            disambiguated_name: None,
-                        });
+    if let Some(poe) = toml.get("tool")
+        && let Some(poe_section) = poe.get("poe")
+    {
+        // If there is a nested "tasks" key, use that table; otherwise, use the poe_section table directly
+        if let Some(tasks_table) = if let Some(inner) = poe_section.get("tasks") {
+            inner.as_table()
+        } else {
+            poe_section.as_table()
+        } && (cfg!(test) || check_path_executable("poe").is_some())
+        {
+            for (name, task_def) in tasks_table {
+                let description = match task_def {
+                    toml::Value::String(cmd) => Some(format!("command: {}", cmd)),
+                    toml::Value::Table(table) => {
+                        if let Some(script) = table.get("script") {
+                            script.as_str().map(|s| format!("python script: {}", s))
+                        } else if let Some(shell) = table.get("shell") {
+                            shell.as_str().map(|s| format!("shell script: {}", s))
+                        } else {
+                            None
+                        }
                     }
-                }
+                    _ => None,
+                };
+
+                tasks.push(Task {
+                    name: name.clone(),
+                    file_path: path.to_path_buf(),
+                    definition_type: TaskDefinitionType::PyprojectToml,
+                    runner: TaskRunner::PythonPoe,
+                    source_name: name.clone(),
+                    description,
+                    shadowed_by: None,
+                    disambiguated_name: None,
+                });
             }
         }
     }

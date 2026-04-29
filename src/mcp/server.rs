@@ -317,10 +317,10 @@ impl DelaMcpServer {
     async fn get_discovered_tasks(&self) -> task_discovery::DiscoveredTasks {
         {
             let cache = self.task_cache.read().await;
-            if let Some(entry) = cache.as_ref() {
-                if entry.cached_at.elapsed() < self.task_cache_ttl {
-                    return entry.discovered.clone();
-                }
+            if let Some(entry) = cache.as_ref()
+                && entry.cached_at.elapsed() < self.task_cache_ttl
+            {
+                return entry.discovered.clone();
             }
         }
 
@@ -372,7 +372,7 @@ impl DelaMcpServer {
             .collect();
 
         Ok(CallToolResult::success(vec![
-            Content::json(&serde_json::json!({
+            Content::json(serde_json::json!({
             "tasks": task_dtos
             }))
             .expect("Failed to serialize JSON"),
@@ -401,7 +401,7 @@ impl DelaMcpServer {
             .collect();
 
         Ok(CallToolResult::success(vec![
-            Content::json(&serde_json::json!({
+            Content::json(serde_json::json!({
                 "running": running_jobs
             }))
             .expect("Failed to serialize JSON"),
@@ -743,7 +743,7 @@ impl DelaMcpServer {
         .await;
 
         // Check if process exited during initial capture
-        let process_exited = child.try_wait().map_or(false, |status| status.is_some());
+        let process_exited = child.try_wait().is_ok_and(|status| status.is_some());
 
         if process_exited {
             // Process completed within 1 second
@@ -1066,7 +1066,7 @@ impl DelaMcpServer {
             .collect();
 
         Ok(CallToolResult::success(vec![
-            Content::json(&serde_json::json!({
+            Content::json(serde_json::json!({
                 "jobs": job_statuses
             }))
             .expect("Failed to serialize JSON"),
@@ -1155,7 +1155,7 @@ impl DelaMcpServer {
             response["lines"] = serde_json::Value::Array(
                 truncated_lines
                     .into_iter()
-                    .map(|line| serde_json::Value::String(line))
+                    .map(serde_json::Value::String)
                     .collect(),
             );
             response["chunk_truncated"] = serde_json::Value::Bool(true);
@@ -1217,7 +1217,7 @@ impl DelaMcpServer {
         };
 
         Ok(CallToolResult::success(vec![
-            Content::json(&serde_json::json!({
+            Content::json(serde_json::json!({
                 "pid": args.pid,
                 "status": status,
                 "message": message,
@@ -1794,7 +1794,7 @@ mod tests {
 
         server
             .job_manager
-            .start_job(pid as u32, metadata, child)
+            .start_job(pid, metadata, child)
             .await
             .unwrap();
 
@@ -1901,12 +1901,12 @@ mod tests {
 
         server
             .job_manager
-            .start_job(pid1 as u32, metadata1, child1)
+            .start_job(pid1, metadata1, child1)
             .await
             .unwrap();
         server
             .job_manager
-            .start_job(pid2 as u32, metadata2, child2)
+            .start_job(pid2, metadata2, child2)
             .await
             .unwrap();
 
@@ -1975,14 +1975,14 @@ mod tests {
 
         server
             .job_manager
-            .start_job(pid as u32, metadata, child)
+            .start_job(pid, metadata, child)
             .await
             .unwrap();
 
         // Mark job as exited
         server
             .job_manager
-            .update_job_state(pid as u32, JobState::Exited(0))
+            .update_job_state(pid, JobState::Exited(0))
             .await
             .unwrap();
 
@@ -2039,12 +2039,12 @@ mod tests {
 
         server
             .job_manager
-            .start_job(pid as u32, metadata, child)
+            .start_job(pid, metadata, child)
             .await
             .unwrap();
         server
             .job_manager
-            .update_job_state(pid as u32, JobState::Failed("boom".to_string()))
+            .update_job_state(pid, JobState::Failed("boom".to_string()))
             .await
             .unwrap();
 
@@ -2097,19 +2097,19 @@ mod tests {
 
         server
             .job_manager
-            .start_job(pid as u32, metadata, child)
+            .start_job(pid, metadata, child)
             .await
             .unwrap();
 
         // Add some output to the job
         server
             .job_manager
-            .add_job_output(pid as u32, "Line 1\nLine 2\nLine 3\n".to_string())
+            .add_job_output(pid, "Line 1\nLine 2\nLine 3\n".to_string())
             .await
             .unwrap();
 
         let args = TaskOutputArgs {
-            pid: pid as u32,
+            pid,
             lines: Some(2),
             show_truncation: None,
         };
@@ -2163,22 +2163,19 @@ mod tests {
 
         server
             .job_manager
-            .start_job(pid as u32, metadata, child)
+            .start_job(pid, metadata, child)
             .await
             .unwrap();
 
         // Add some output to the job
         server
             .job_manager
-            .add_job_output(
-                pid as u32,
-                "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n".to_string(),
-            )
+            .add_job_output(pid, "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n".to_string())
             .await
             .unwrap();
 
         let args = TaskOutputArgs {
-            pid: pid as u32,
+            pid,
             lines: Some(3),
             show_truncation: Some(true),
         };
@@ -2238,19 +2235,19 @@ mod tests {
 
         server
             .job_manager
-            .start_job(pid as u32, metadata, child)
+            .start_job(pid, metadata, child)
             .await
             .unwrap();
 
         // Add some output to the job
         server
             .job_manager
-            .add_job_output(pid as u32, "Line 1\nLine 2\n".to_string())
+            .add_job_output(pid, "Line 1\nLine 2\n".to_string())
             .await
             .unwrap();
 
         let args = TaskOutputArgs {
-            pid: pid as u32,
+            pid,
             lines: Some(5), // Request more lines than available
             show_truncation: Some(true),
         };
@@ -2326,12 +2323,12 @@ mod tests {
 
         server
             .job_manager
-            .start_job(pid as u32, metadata, child)
+            .start_job(pid, metadata, child)
             .await
             .unwrap();
 
         let args = TaskStopArgs {
-            pid: pid as u32,
+            pid,
             grace_period: Some(2),
         };
 
@@ -2382,12 +2379,12 @@ mod tests {
 
         server
             .job_manager
-            .start_job(pid as u32, metadata, child)
+            .start_job(pid, metadata, child)
             .await
             .unwrap();
 
         let args = TaskStopArgs {
-            pid: pid as u32,
+            pid,
             grace_period: None, // Should use default 5 seconds
         };
 
@@ -2452,19 +2449,19 @@ mod tests {
 
         server
             .job_manager
-            .start_job(pid as u32, metadata, child)
+            .start_job(pid, metadata, child)
             .await
             .unwrap();
 
         // Mark job as exited
         server
             .job_manager
-            .update_job_state(pid as u32, JobState::Exited(0))
+            .update_job_state(pid, JobState::Exited(0))
             .await
             .unwrap();
 
         let args = TaskStopArgs {
-            pid: pid as u32,
+            pid,
             grace_period: Some(5),
         };
 
@@ -2510,7 +2507,7 @@ mod tests {
         let pid1 = child1.id().unwrap();
 
         job_manager
-            .start_job(pid1 as u32, metadata.clone(), child1)
+            .start_job(pid1, metadata.clone(), child1)
             .await
             .unwrap();
 
@@ -2523,7 +2520,7 @@ mod tests {
         let pid2 = child2.id().unwrap();
 
         job_manager
-            .start_job(pid2 as u32, metadata.clone(), child2)
+            .start_job(pid2, metadata.clone(), child2)
             .await
             .unwrap();
 
@@ -2535,7 +2532,7 @@ mod tests {
         let child3 = cmd3.spawn().unwrap();
         let pid3 = child3.id().unwrap();
 
-        let result = job_manager.start_job(pid3 as u32, metadata, child3).await;
+        let result = job_manager.start_job(pid3, metadata, child3).await;
 
         // Assert
         assert!(result.is_err());
@@ -2572,7 +2569,7 @@ mod tests {
 
         server
             .job_manager
-            .start_job(pid as u32, metadata, child)
+            .start_job(pid, metadata, child)
             .await
             .unwrap();
 
@@ -2580,12 +2577,12 @@ mod tests {
         let large_output = "x".repeat(10000); // 10KB line
         server
             .job_manager
-            .add_job_output(pid as u32, large_output)
+            .add_job_output(pid, large_output)
             .await
             .unwrap();
 
         let args = TaskOutputArgs {
-            pid: pid as u32,
+            pid,
             lines: Some(1),
             show_truncation: Some(true),
         };
@@ -2625,7 +2622,6 @@ mod tests {
         // This test would require mocking the job manager or creating a custom server
         // with a low concurrency limit, which is complex. For now, we'll test the
         // can_start_job method directly as shown above.
-        assert!(true); // Placeholder test
     }
 
     #[tokio::test]
@@ -3662,7 +3658,7 @@ add_custom_target(build-all COMMENT "Build everything")
                         println!(
                             "Task status immediately after start: {} jobs, first job state: {}",
                             jobs.len(),
-                            jobs.get(0)
+                            jobs.first()
                                 .map(|j| j["state"].as_str().unwrap_or("unknown"))
                                 .unwrap_or("none")
                         );
@@ -3734,7 +3730,7 @@ add_custom_target(build-all COMMENT "Build everything")
                         println!(
                             "Task status after completion: {} jobs, first job state: {}",
                             jobs.len(),
-                            jobs.get(0)
+                            jobs.first()
                                 .map(|j| j["state"].as_str().unwrap_or("unknown"))
                                 .unwrap_or("none")
                         );

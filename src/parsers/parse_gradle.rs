@@ -131,31 +131,27 @@ fn extract_custom_tasks(
 fn extract_task_description(content: &str, task_name: &str) -> Option<String> {
     // This is a simplified approach with basic regex
     let task_pattern = format!(r"task\s+{}", regex::escape(task_name));
-    let description_single_quote_pattern = format!(r"description\s+'([^']*)'");
-    let description_double_quote_pattern = format!(r#"description\s+"([^"]*)""#);
+    let description_single_quote_pattern = r"description\s+'([^']*)'".to_string();
+    let description_double_quote_pattern = r#"description\s+"([^"]*)""#.to_string();
 
     // Look for task with description using single quotes
     if let Ok(regex) = Regex::new(&format!(
         "{}.+?{}",
         task_pattern, description_single_quote_pattern
-    )) {
-        if let Some(caps) = regex.captures(content) {
-            if let Some(desc) = caps.get(1) {
-                return Some(desc.as_str().to_string());
-            }
-        }
+    )) && let Some(caps) = regex.captures(content)
+        && let Some(desc) = caps.get(1)
+    {
+        return Some(desc.as_str().to_string());
     }
 
     // Look for task with description using double quotes
     if let Ok(regex) = Regex::new(&format!(
         "{}.+?{}",
         task_pattern, description_double_quote_pattern
-    )) {
-        if let Some(caps) = regex.captures(content) {
-            if let Some(desc) = caps.get(1) {
-                return Some(desc.as_str().to_string());
-            }
-        }
+    )) && let Some(caps) = regex.captures(content)
+        && let Some(desc) = caps.get(1)
+    {
+        return Some(desc.as_str().to_string());
     }
 
     // For Kotlin DSL, look for description with equals
@@ -163,12 +159,11 @@ fn extract_task_description(content: &str, task_name: &str) -> Option<String> {
         r#"tasks.*?"{}".+?description\s*=\s*"([^"]*)""#,
         regex::escape(task_name)
     );
-    if let Ok(regex) = Regex::new(&kotlin_pattern) {
-        if let Some(caps) = regex.captures(content) {
-            if let Some(desc) = caps.get(1) {
-                return Some(desc.as_str().to_string());
-            }
-        }
+    if let Ok(regex) = Regex::new(&kotlin_pattern)
+        && let Some(caps) = regex.captures(content)
+        && let Some(desc) = caps.get(1)
+    {
+        return Some(desc.as_str().to_string());
     }
 
     Some("Custom Gradle task".to_string())
