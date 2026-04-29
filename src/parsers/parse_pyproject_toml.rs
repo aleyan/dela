@@ -50,7 +50,7 @@ pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
                 .parent()
                 .map(|dir| dir.join("poetry.lock").exists())
                 .unwrap_or(false);
-            if cfg!(test) || check_path_executable("poetry").is_some() && poetry_lock_exists {
+            if poetry_lock_exists && (cfg!(test) || check_path_executable("poetry").is_some()) {
                 for (name, cmd) in scripts_table {
                     let description = cmd.as_str().map(|s| format!("python script: {}", s));
 
