@@ -183,9 +183,6 @@ def resolve_dela_executable(
     *,
     runner: CommandRunner = subprocess.run,
 ) -> Path:
-    if DEFAULT_DELA_PATH.exists():
-        return DEFAULT_DELA_PATH
-
     _run_checked(
         runner,
         ["cargo", "build", "--quiet"],
@@ -856,7 +853,7 @@ def test_collect_target_directories_returns_existing_parent_dirs(
     assert directories == [repo_root / "nested"]
 
 
-def test_resolve_dela_executable_builds_binary_when_missing(tmp_path: Path) -> None:
+def test_resolve_dela_executable_builds_binary(tmp_path: Path) -> None:
     # Arrange
     build_calls: list[tuple[str, ...]] = []
     project_root = tmp_path / "project"
@@ -882,8 +879,6 @@ def test_resolve_dela_executable_builds_binary_when_missing(tmp_path: Path) -> N
         return subprocess.CompletedProcess(args, 0, "", "")
 
     try:
-        target_binary.unlink(missing_ok=True)
-
         # Act
         resolved = resolve_dela_executable(project_root, runner=fake_runner)
 

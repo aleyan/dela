@@ -82,6 +82,6 @@ test_long:
 	@sleep 30
 	@echo "Long-running test task completed!"
 
-coverage_github:
+coverage_github: build
 	@echo "Running parsing coverage over top github repos..."
 	uv run --script scripts/dela_coverage_git_refs.py

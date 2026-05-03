@@ -94,49 +94,59 @@ fn extract_tasks_regex(content: &str, path: &Path) -> Result<Vec<Task>, String> 
     let processed_content = content.replace("\\\n", " ");
 
     // Simple rule pattern to match task names
-    let rule_pattern = r"(?m)^([a-zA-Z0-9_][^:$\n]*?):\s*";
+    // Matches start of line, then allowed target characters, then a colon, then the rest of the line
+    let rule_pattern = r"(?m)^([a-zA-Z0-9_-][^:$\n]*?):([^\n]*)";
     let rule_regex =
         Regex::new(rule_pattern).map_err(|e| format!("Failed to create regex: {}", e))?;
 
     for cap in rule_regex.captures_iter(&processed_content) {
-        if cap.len() < 2 {
-            continue; // Need at least the target name
-        }
-
-        let name = cap[1].trim().to_string();
-
-        // Skip rules with multiple targets, pattern rules, dot targets, and underscore-prefixed targets (private)
-        if (name.contains(' ') && !name.contains("\\ "))
-            || name.contains('%')
-            || name.starts_with('.')
-            || name.starts_with('_')
-        {
+        if cap.len() < 3 {
             continue;
         }
 
-        // Only add the task if it hasn't been seen before
-        if !tasks_map.contains_key(&name) {
-            tasks_map.insert(
-                name.clone(),
-                Task {
-                    name: name.clone(),
-                    file_path: path.to_path_buf(),
-                    definition_type: TaskDefinitionType::Makefile,
-                    runner: TaskRunner::Make,
-                    source_name: name,
-                    description: None, // No descriptions in fallback mode
-                    shadowed_by: None,
-                    disambiguated_name: None,
-                },
-            );
+        let name_part = cap[1].trim();
+        let rest_of_line = cap[2].trim_start();
+
+        // Skip assignments: if the colon is followed by `=` or `:=` (meaning `:=` or `::=`)
+        if rest_of_line.starts_with('=') || rest_of_line.starts_with(":=") {
+            continue;
+        }
+
+        // Skip if the name part contains '=' (like `VAR=value : `)
+        if name_part.contains('=') {
+            continue;
+        }
+
+        // Handle multiple targets on the same line (e.g. `build test:`)
+        for name in name_part.split_whitespace() {
+            // Skip pattern rules, dot targets, and underscore-prefixed targets (private)
+            if name.contains('%') || name.starts_with('.') || name.starts_with('_') {
+                continue;
+            }
+
+            let name = name.to_string();
+
+            // Only add the task if it hasn't been seen before
+            if !tasks_map.contains_key(&name) {
+                tasks_map.insert(
+                    name.clone(),
+                    Task {
+                        name: name.clone(),
+                        file_path: path.to_path_buf(),
+                        definition_type: TaskDefinitionType::Makefile,
+                        runner: TaskRunner::Make,
+                        source_name: name,
+                        description: None, // No descriptions in fallback mode
+                        shadowed_by: None,
+                        disambiguated_name: None,
+                    },
+                );
+            }
         }
     }
 
-    // Return error if no tasks found with regex approach
-    if tasks_map.is_empty() {
-        return Err("No tasks found with regex parsing".to_string());
-    }
-
+    // We don't return an error if no tasks are found.
+    // Some Makefiles (like in the Linux kernel) only set variables and don't define tasks.
     // Convert HashMap values to a Vec
     Ok(tasks_map.into_values().collect())
 }
@@ -565,5 +575,43 @@ _helper:
         // Verify we have 'build' but not '_helper'
         let task = &tasks[0];
         assert_eq!(task.name, "build");
+    }
+
+    #[test]
+    fn test_regex_parsing_multiple_targets() {
+        let temp_dir = TempDir::new().unwrap();
+        // Add a marker to force regex parsing for this test
+        let content = r#"
+# TEST_FORCE_REGEX_PARSING
+build test deploy:
+    @echo "Doing something"
+"#;
+        let makefile_path = create_test_makefile(temp_dir.path(), content);
+
+        let tasks = parse(&makefile_path).unwrap();
+
+        assert_eq!(tasks.len(), 3);
+        let task_names: Vec<String> = tasks.into_iter().map(|t| t.name).collect();
+        assert!(task_names.contains(&"build".to_string()));
+        assert!(task_names.contains(&"test".to_string()));
+        assert!(task_names.contains(&"deploy".to_string()));
+    }
+
+    #[test]
+    fn test_regex_parsing_no_tasks() {
+        let temp_dir = TempDir::new().unwrap();
+        // Add a marker to force regex parsing for this test
+        let content = r#"
+# TEST_FORCE_REGEX_PARSING
+# A makefile with only variable assignments
+obj-m += my_module.o
+VAR := value
+OTHER_VAR ::= value
+"#;
+        let makefile_path = create_test_makefile(temp_dir.path(), content);
+
+        let tasks = parse(&makefile_path).unwrap();
+
+        assert_eq!(tasks.len(), 0);
     }
 }
