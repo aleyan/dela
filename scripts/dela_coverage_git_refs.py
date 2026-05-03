@@ -171,7 +171,7 @@ def ensure_repo_checkout(
 
 def collect_target_directories(request: RepoRequest, repo_root: Path) -> list[Path]:
     directories = {
-        (repo_root / file_path).parent
+        _target_directory_for_file(repo_root, request.tool, file_path)
         for file_path in request.files
         if (repo_root / file_path).exists()
     }
@@ -567,8 +567,10 @@ def _summarize_by_tool(
                 continue
 
             full_path = repo_root / file_path
-            directories_by_tool[request.tool].add(full_path.parent)
-            scan_result = result_by_directory.get(full_path.parent)
+            target_dir = _target_directory_for_file(repo_root, request.tool, file_path)
+            directories_by_tool[request.tool].add(target_dir)
+
+            scan_result = result_by_directory.get(target_dir)
             if scan_result is None or _scan_result_has_error_for_file(
                 scan_result, full_path
             ):
@@ -603,6 +605,13 @@ def _scan_result_has_error_for_file(scan_result: ScanResult, file_path: Path) ->
 
     file_path_str = str(file_path)
     return any(file_path_str in error for error in scan_result.parse_errors)
+
+
+def _target_directory_for_file(repo_root: Path, tool: str, file_path: str) -> Path:
+    if tool == "github-actions" and ".github/workflows" in file_path:
+        idx = file_path.find(".github/workflows")
+        return repo_root / file_path[:idx]
+    return (repo_root / file_path).parent
 
 
 def _tool_display_name(tool: str) -> str:
@@ -830,6 +839,25 @@ def test_ensure_repo_checkout_clones_and_sets_sparse_paths(tmp_path: Path) -> No
     assert any(call[3:6] == ("sparse-checkout", "set", "--no-cone") for call in calls)
     assert (repo_root / "nested" / "package.json").exists()
     assert (repo_root / "pyproject.toml").exists()
+
+
+def test_target_directory_for_file_handles_github_actions(tmp_path: Path) -> None:
+    # Arrange
+    repo_root = tmp_path / "repo"
+
+    # Act
+    root_dir = _target_directory_for_file(
+        repo_root, "github-actions", ".github/workflows/ci.yml"
+    )
+    nested_dir = _target_directory_for_file(
+        repo_root, "github-actions", "nested/.github/workflows/deploy.yml"
+    )
+    normal_dir = _target_directory_for_file(repo_root, "npm", "nested/package.json")
+
+    # Assert
+    assert root_dir == repo_root
+    assert nested_dir == repo_root / "nested"
+    assert normal_dir == repo_root / "nested"
 
 
 def test_collect_target_directories_returns_existing_parent_dirs(
