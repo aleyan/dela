@@ -629,6 +629,7 @@ def _tool_display_name(tool: str) -> str:
         "poetry": "pyproject.toml (poetry)",
         "task": "Taskfile",
         "travis": ".travis.yml",
+        "turborepo": "turborepo",
         "uv": "pyproject.toml (uv)",
         "yarn": "package.json (yarn)",
     }
@@ -650,6 +651,7 @@ def _tool_runner_name(tool: str) -> str:
         "poetry": "poetry",
         "task": "task",
         "travis": "travis",
+        "turborepo": "turbo",
         "uv": "uv",
         "yarn": "yarn",
     }
@@ -1103,6 +1105,42 @@ def test_format_tool_summary_aligns_columns() -> None:
         "package.json (bun) :   10 files,    9 parsed,   13 tasks,    1 errors.",
         "Makefile           : 2404 files, 1289 parsed, 5555 tasks, 1115 errors.",
     ]
+
+
+def test_summarize_by_tool_counts_turborepo_tasks(tmp_path: Path) -> None:
+    # Arrange
+    scratch_root = tmp_path / "scratch"
+    repo = "github.com/vercel/next.js"
+    repo_root = checkout_path_for_repo(repo, scratch_root)
+    (repo_root / ".git").mkdir(parents=True, exist_ok=True)
+    turbo_json_path = repo_root / "turbo.json"
+    turbo_json_path.write_text("{}", encoding="utf-8")
+    request = RepoRequest(
+        tool="turborepo",
+        repo=repo,
+        files=("turbo.json",),
+    )
+    result = ScanResult(
+        directory=repo_root,
+        command=("dela", "list", "--verbose"),
+        returncode=0,
+        stdout="",
+        stderr="",
+        parse_errors=(),
+        task_counts_by_runner={"turbo": 3},
+    )
+
+    # Act
+    summary = _summarize_by_tool(
+        [request],
+        scratch_root=scratch_root,
+        results=[result],
+        missing_files={},
+        repo_failures={},
+    )
+
+    # Assert
+    assert summary == [("turborepo", 1, 1, 3, 0)]
 
 
 if __name__ == "__main__":
