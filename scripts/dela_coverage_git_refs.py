@@ -58,6 +58,7 @@ class ScanResult:
     stdout: str
     stderr: str
     parse_errors: tuple[str, ...]
+    task_counts_by_runner: dict[str, int]
 
 
 def parse_repo_slug(repo: str) -> tuple[str, str]:
@@ -212,6 +213,7 @@ def run_dela_scan(
         check=False,
     )
     parse_errors = tuple(_extract_parse_errors(completed.stdout, completed.stderr))
+    task_counts_by_runner = _extract_task_counts(completed.stdout)
 
     return ScanResult(
         directory=directory,
@@ -220,6 +222,7 @@ def run_dela_scan(
         stdout=completed.stdout,
         stderr=completed.stderr,
         parse_errors=parse_errors,
+        task_counts_by_runner=task_counts_by_runner,
     )
 
 
@@ -294,10 +297,10 @@ def render_report(
     if tool_summary:
         _write_line(stdout, "")
         _write_line(stdout, "Summary by tool:")
-        for tool_name, total_files, correct_files, error_files in tool_summary:
+        for summary_line in _format_tool_summary(tool_summary):
             _write_line(
                 stdout,
-                f"{tool_name}: {total_files} files, {correct_files} correct, {error_files} errors.",
+                summary_line,
             )
 
     if problem_count == 0:
@@ -494,6 +497,28 @@ def _extract_parse_errors(stdout: str, stderr: str) -> list[str]:
     return errors
 
 
+def _extract_task_counts(stdout: str) -> dict[str, int]:
+    task_counts: dict[str, int] = defaultdict(int)
+    current_runner: str | None = None
+
+    for raw_line in stdout.splitlines():
+        line = ANSI_ESCAPE_RE.sub("", raw_line).rstrip()
+        stripped = line.strip()
+
+        if not stripped:
+            current_runner = None
+            continue
+
+        if not line.startswith(" "):
+            current_runner = _extract_runner_name_from_header(line)
+            continue
+
+        if current_runner is not None and line.startswith("  "):
+            task_counts[current_runner] += 1
+
+    return dict(task_counts)
+
+
 def _first_non_empty_line(text: str) -> str | None:
     for line in text.splitlines():
         stripped = ANSI_ESCAPE_RE.sub("", line).strip()
@@ -522,11 +547,12 @@ def _summarize_by_tool(
     results: list[ScanResult],
     missing_files: dict[str, tuple[str, ...]],
     repo_failures: dict[str, str],
-) -> list[tuple[str, int, int, int]]:
+) -> list[tuple[str, int, int, int, int]]:
     result_by_directory = {result.directory: result for result in results}
     counts_by_tool: dict[str, dict[str, int]] = defaultdict(
-        lambda: {"files": 0, "correct": 0, "errors": 0}
+        lambda: {"files": 0, "parsed": 0, "tasks": 0, "errors": 0}
     )
+    directories_by_tool: dict[str, set[Path]] = defaultdict(set)
 
     for request in requests:
         tool_counts = counts_by_tool[request.tool]
@@ -544,6 +570,7 @@ def _summarize_by_tool(
                 continue
 
             full_path = repo_root / file_path
+            directories_by_tool[request.tool].add(full_path.parent)
             scan_result = result_by_directory.get(full_path.parent)
             if scan_result is None or _scan_result_has_error_for_file(
                 scan_result, full_path
@@ -551,13 +578,22 @@ def _summarize_by_tool(
                 tool_counts["errors"] += 1
                 continue
 
-            tool_counts["correct"] += 1
+            tool_counts["parsed"] += 1
+
+    for tool, directories in directories_by_tool.items():
+        runner_name = _tool_runner_name(tool)
+        counts_by_tool[tool]["tasks"] = sum(
+            result_by_directory[directory].task_counts_by_runner.get(runner_name, 0)
+            for directory in directories
+            if directory in result_by_directory
+        )
 
     return [
         (
             _tool_display_name(tool),
             counts["files"],
-            counts["correct"],
+            counts["parsed"],
+            counts["tasks"],
             counts["errors"],
         )
         for tool, counts in sorted(counts_by_tool.items(), key=lambda item: item[0])
@@ -591,6 +627,63 @@ def _tool_display_name(tool: str) -> str:
         "yarn": "package.json (yarn)",
     }
     return tool_names.get(tool, tool)
+
+
+def _tool_runner_name(tool: str) -> str:
+    runner_names = {
+        "bun": "bun",
+        "cmake": "cmake",
+        "docker-compose": "docker compose",
+        "github-actions": "act",
+        "gradle": "gradle",
+        "just": "just",
+        "make": "make",
+        "maven": "mvn",
+        "npm": "npm",
+        "pnpm": "pnpm",
+        "poetry": "poetry",
+        "task": "task",
+        "travis": "travis",
+        "uv": "uv",
+        "yarn": "yarn",
+    }
+    return runner_names.get(tool, tool)
+
+
+def _extract_runner_name_from_header(line: str) -> str | None:
+    if " — " not in line:
+        return None
+
+    header_name = line.split(" — ", 1)[0].strip()
+    return re.sub(r"(?:\s+[*§†‡‖]+)$", "", header_name)
+
+
+def _format_tool_summary(
+    tool_summary: list[tuple[str, int, int, int, int]],
+) -> list[str]:
+    if not tool_summary:
+        return []
+
+    name_width = max(len(tool_name) for tool_name, *_ in tool_summary)
+    files_width = max(len(str(total_files)) for _, total_files, *_ in tool_summary)
+    parsed_width = max(
+        len(str(parsed_files)) for _, _, parsed_files, _, _ in tool_summary
+    )
+    tasks_width = max(len(str(task_count)) for _, _, _, task_count, _ in tool_summary)
+    errors_width = max(
+        len(str(error_count)) for _, _, _, _, error_count in tool_summary
+    )
+
+    return [
+        (
+            f"{tool_name.ljust(name_width)} : "
+            f"{total_files:>{files_width}} files, "
+            f"{parsed_files:>{parsed_width}} parsed, "
+            f"{task_count:>{tasks_width}} tasks, "
+            f"{error_count:>{errors_width}} errors."
+        )
+        for tool_name, total_files, parsed_files, task_count, error_count in tool_summary
+    ]
 
 
 def test_parse_repo_slug_extracts_owner_and_name() -> None:
@@ -824,6 +917,10 @@ def test_run_dela_scan_extracts_parse_errors(tmp_path: Path) -> None:
             "\n".join(
                 [
                     "Task definition files:",
+                    "",
+                    "npm — package.json",
+                    "  build               - build app",
+                    "  test                - run tests",
                     "Errors encountered:",
                     "  • Failed to parse /tmp/repo/package.json: bad json",
                 ]
@@ -837,6 +934,7 @@ def test_run_dela_scan_extracts_parse_errors(tmp_path: Path) -> None:
     # Assert
     assert result.returncode == 0
     assert result.parse_errors == ("Failed to parse /tmp/repo/package.json: bad json",)
+    assert result.task_counts_by_runner == {"npm": 2}
 
 
 def test_render_report_returns_non_zero_when_issues_are_present(
@@ -851,6 +949,7 @@ def test_render_report_returns_non_zero_when_issues_are_present(
         stdout="",
         stderr="",
         parse_errors=("Failed to parse /tmp/repo/package.json: bad json",),
+        task_counts_by_runner={},
     )
 
     with output_path.open("w+", encoding="utf-8") as handle:
@@ -883,8 +982,8 @@ def test_render_report_returns_non_zero_when_issues_are_present(
     assert "Missing requested files:" in report
     assert "Parse failures:" in report
     assert "Summary by tool:" in report
-    assert "Makefile: 1 files, 0 correct, 1 errors." in report
-    assert "package.json (npm): 1 files, 0 correct, 1 errors." in report
+    assert "Makefile           : 1 files, 0 parsed, 0 tasks, 1 errors." in report
+    assert "package.json (npm) : 1 files, 0 parsed, 0 tasks, 1 errors." in report
     assert "Detected 3 problem areas." in report
 
 
@@ -928,7 +1027,16 @@ def test_main_processes_requests_and_reports_success(tmp_path: Path) -> None:
             return subprocess.CompletedProcess(args, 0, "", "")
         if cwd is not None:
             return subprocess.CompletedProcess(
-                args, 0, "No tasks found in the current directory.", ""
+                args,
+                0,
+                "\n".join(
+                    [
+                        "npm — package.json",
+                        "  build               - build app",
+                        "  test                - run tests",
+                    ]
+                ),
+                "",
             )
         return subprocess.CompletedProcess(args, 0, "", "")
 
@@ -953,8 +1061,25 @@ def test_main_processes_requests_and_reports_success(tmp_path: Path) -> None:
     assert exit_code == 0
     assert "[1/1] github.com/aleyan/dela" in report
     assert "Scanned 1 directories." in report
-    assert "package.json (npm): 1 files, 1 correct, 0 errors." in report
+    assert "package.json (npm) : 1 files, 1 parsed, 2 tasks, 0 errors." in report
     assert "No parse issues detected." in report
+
+
+def test_format_tool_summary_aligns_columns() -> None:
+    # Arrange
+    tool_summary = [
+        ("package.json (bun)", 10, 9, 13, 1),
+        ("Makefile", 2404, 1289, 5555, 1115),
+    ]
+
+    # Act
+    lines = _format_tool_summary(tool_summary)
+
+    # Assert
+    assert lines == [
+        "package.json (bun) :   10 files,    9 parsed,   13 tasks,    1 errors.",
+        "Makefile           : 2404 files, 1289 parsed, 5555 tasks, 1115 errors.",
+    ]
 
 
 if __name__ == "__main__":
