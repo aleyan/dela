@@ -1,4 +1,4 @@
-.PHONY: release_verify release_publish
+.PHONY: release_verify release_publish release_notes
 
 RELEASE_VERIFY_EXPECT_TAG ?=
 RELEASE_VERIFY_SKIP_TAG_EXISTS ?= 0
@@ -49,8 +49,8 @@ release_verify:
 			echo "Error: jq is required for release_verify."; \
 			exit 1; \
 		fi; \
-		RESPONSE=$$(curl --fail --silent --show-error --location https://crates.io/api/v1/crates/dela); \
-		if echo "$$RESPONSE" | jq -e --arg version "$$VERSION" '.versions[] | select(.num == $$version)' >/dev/null; then \
+		RESPONSE=$$(curl --fail --silent --show-error --location https://crates.io/api/v1/crates/dela || true); \
+		if [ -n "$$RESPONSE" ] && echo "$$RESPONSE" | jq -e --arg version "$$VERSION" '.versions[] | select(.num == $$version)' >/dev/null; then \
 			echo "Error: version $$VERSION already exists on crates.io."; \
 			exit 1; \
 		fi; \
@@ -66,6 +66,17 @@ release_verify:
 		cargo publish --dry-run --locked; \
 	fi; \
 	echo "Release verification passed for $$TAG."
+
+# Extracts release notes for the current version from CHANGELOG.md into release_notes.md
+release_notes:
+	@set -euo pipefail; \
+	VERSION=$$(grep -m 1 '^version = ' Cargo.toml | cut -d '"' -f2); \
+	echo "Extracting release notes for $$VERSION into release_notes.md..."; \
+	awk -v version="$$VERSION" ' \
+		BEGIN { pattern = "^## \\[" version "\\]"; } \
+		/^## \[/ { if (in_section) exit; if ($$0 ~ pattern) { in_section = 1; next; } } \
+		in_section { print; } \
+	' CHANGELOG.md > release_notes.md
 
 # Trigger a release by pushing a new version tag to github
 # verifies that a human is doing it via cli interaction
