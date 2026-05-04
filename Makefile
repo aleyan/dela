@@ -1,10 +1,14 @@
 .PHONY: build tests tests_integration test_unit test_noinit test_mcp test_zsh test_bash test_fish test_pwsh run install builder publish
 
+SHELL := /bin/bash
+
 # Default to non-verbose output
 VERBOSE ?= 0
 
 # Load environment variables from .env file if it exists
 -include .env
+
+include make/release.mk
 
 build:
 	@echo "Building dela..."
@@ -64,7 +68,7 @@ inspect_mcp:
 	MCPI_NO_COLOR=1 RUST_LOG=warn RUSTFLAGS="-A warnings" npx @modelcontextprotocol/inspector ./target/debug/dela mcp --cwd $(PWD)
 
 
-# Publish to crates.io
+# Publish to crates.io. Deprecated. Will be removed once 0.0.7 is released sucessfully using the new release process.
 publish: tests tests_integration
 	@echo "Publishing dela to crates.io"
 	@if [ -z "$(CARGO_REGISTRY_TOKEN)" ]; then \
@@ -72,7 +76,6 @@ publish: tests tests_integration
 		exit 1; \
 	fi
 	@cargo publish
-
 format:
 	cargo fmt --all
 

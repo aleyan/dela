@@ -3,7 +3,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [0.6.0] - 2025-07-22
+## [0.0.6] - 2025-07-22
 
 ### Added
 
@@ -17,7 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Allow dialog is now a tui with 5 selectable options.
 - Update the `dela --help` command to filter out internal commands.
 
-## [0.5.0] - 2025-05-17
+## [0.0.5] - 2025-05-17
 
 ### Added
 
@@ -29,14 +29,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Increased robustness of `task` parser.
 - New output layout for `dela list`.
 
-## [0.4.0] - 2025-03-27
+## [0.0.4] - 2025-03-27
 
 ### Added
 
 - Added `maven` and `gradle` support.
 - Added `Github Actions` support via `act`.
 
-## [0.3.0] - 2025-02-23
+## [0.0.3] - 2025-02-23
 
 ### Added
 
@@ -54,5 +54,5 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Security
 
-## [0.2.0] - 2025-02-16
+## [0.0.1] - 2025-02-16
 - Initial release

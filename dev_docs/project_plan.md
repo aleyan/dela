@@ -214,7 +214,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [x] [DTKT-47] Bump version in `Cargo.toml`.
   - [x] [DTKT-48] Publish to crates.io.
   - [ ] [DTKT-49] Tag a stable release in the repository.
-  - [ ] [DTKT-115] Mark realeses on github.
+  - [x] [DTKT-115] Mark realeses on github.
 
 - [ ] **Community Feedback**
   - [ ] [DTKT-50] Collect user feedback on command discovery and allowlist features.
