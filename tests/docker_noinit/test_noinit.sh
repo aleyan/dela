@@ -402,6 +402,46 @@ else
     exit 1
 fi
 
+# Test 22c: Verify recursive Makefile include discovery
+echo "\nTest 22c: Testing recursive Makefile include discovery"
+mkdir -p /home/testuser/make_include_project/mk
+cat > /home/testuser/make_include_project/Makefile <<'EOF'
+include mk/common.mk
+-include mk/missing.mk
+
+build:
+	@echo "Build from root"
+EOF
+cat > /home/testuser/make_include_project/mk/common.mk <<'EOF'
+include nested.mk
+
+included-task:
+	@echo "Included task"
+EOF
+cat > /home/testuser/make_include_project/mk/nested.mk <<'EOF'
+nested-task:
+	@echo "Nested task"
+EOF
+
+cd /home/testuser/make_include_project
+dela list 2>/dev/null > make_include_list.txt
+if grep -q "included-task" make_include_list.txt && grep -q "nested-task" make_include_list.txt; then
+    echo "${GREEN}✓ dela list discovers tasks from recursively included makefiles${NC}"
+else
+    echo "${RED}✗ dela list did not discover tasks from recursively included makefiles${NC}"
+    cat make_include_list.txt
+    exit 1
+fi
+
+output=$(dela get-command nested-task 2>&1)
+if echo "$output" | grep -q "make nested-task"; then
+    echo "${GREEN}✓ get-command works for tasks from included makefiles${NC}"
+else
+    echo "${RED}✗ get-command failed for task from included makefiles${NC}"
+    echo "Got: $output"
+    exit 1
+fi
+
 cd /home/testuser/test_project
 
 # Test 23: Verify ambiguous task detection in dela list

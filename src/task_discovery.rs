@@ -1,4 +1,4 @@
-use crate::composed_paths::ComposedDefinitionSource;
+use crate::composed_paths::{ComposedDefinitionSource, RecursiveDiscoveryState, VisitState};
 use crate::parsers::{
     parse_cmake, parse_docker_compose, parse_github_actions, parse_gradle, parse_justfile,
     parse_makefile, parse_package_json, parse_pom_xml, parse_pyproject_toml, parse_taskfile,
@@ -309,21 +309,120 @@ fn discover_makefile_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Resu
         return Ok(());
     }
 
-    match parse_makefile::parse(&makefile_path) {
-        Ok(tasks) => {
-            handle_discovery_success(
-                tasks,
-                makefile_path,
-                TaskDefinitionType::Makefile,
-                discovered,
-            );
+    let root_source = ComposedDefinitionSource::direct(makefile_path.clone());
+    let mut traversal_state = RecursiveDiscoveryState::new();
+    let mut seen_task_names = std::collections::HashSet::new();
+    let mut tasks = Vec::new();
+    let mut include_errors = Vec::new();
+
+    let result = collect_makefile_tasks_recursive(
+        &makefile_path,
+        &root_source,
+        &mut traversal_state,
+        &mut seen_task_names,
+        &mut tasks,
+        &mut include_errors,
+    );
+
+    for task in &mut tasks {
+        task.shadowed_by = check_shadowing(&task.name);
+    }
+
+    discovered.tasks.extend(tasks);
+    discovered.errors.extend(include_errors);
+
+    let status = match result {
+        Ok(()) => TaskFileStatus::Parsed,
+        Err(error) => {
+            discovered
+                .errors
+                .push(format!("Failed to parse {}: {}", makefile_path.display(), error));
+            TaskFileStatus::ParseError(error)
         }
-        Err(e) => {
-            handle_discovery_error(e, makefile_path, TaskDefinitionType::Makefile, discovered);
+    };
+    discovered.definitions.makefile = Some(TaskDefinitionFile {
+        path: makefile_path,
+        definition_type: TaskDefinitionType::Makefile,
+        status,
+    });
+
+    Ok(())
+}
+
+fn collect_makefile_tasks_recursive(
+    root_makefile_path: &Path,
+    current_source: &ComposedDefinitionSource,
+    traversal_state: &mut RecursiveDiscoveryState,
+    seen_task_names: &mut std::collections::HashSet<String>,
+    collected_tasks: &mut Vec<Task>,
+    include_errors: &mut Vec<String>,
+) -> Result<(), String> {
+    match traversal_state.mark_visited(current_source.definition_path()) {
+        VisitState::AlreadyVisited(_) => return Ok(()),
+        VisitState::New(_) => {}
+    }
+
+    let mut first_error: Option<String> = None;
+
+    let mut tasks = parse_makefile::parse(current_source.definition_path())?;
+    for task in &mut tasks {
+        current_source.apply_to_task(task);
+    }
+    for task in tasks {
+        if seen_task_names.insert(task.name.clone()) {
+            collected_tasks.push(task);
         }
     }
 
-    Ok(())
+    let includes = parse_makefile::extract_include_directives(current_source.definition_path())?;
+
+    for include in includes {
+        let resolved_include = current_source.resolve_child(&include.path);
+
+        if !resolved_include.is_file() {
+            if include.optional {
+                continue;
+            }
+
+            let error = format!(
+                "Required included makefile '{}' referenced from '{}' was not found",
+                resolved_include.display(),
+                current_source.definition_path().display()
+            );
+            include_errors.push(error.clone());
+            if first_error.is_none() {
+                first_error = Some(error);
+            }
+            continue;
+        }
+
+        let include_source =
+            ComposedDefinitionSource::composed(root_makefile_path, resolved_include.clone());
+        if let Err(error) = collect_makefile_tasks_recursive(
+            root_makefile_path,
+            &include_source,
+            traversal_state,
+            seen_task_names,
+            collected_tasks,
+            include_errors,
+        ) {
+            let error = format!(
+                "Failed to parse included makefile '{}': {}",
+                resolved_include.display(),
+                error
+            );
+            include_errors.push(error.clone());
+            if first_error.is_none() {
+                first_error = Some(error);
+            }
+        }
+    }
+
+    if let Some(error) = first_error {
+        Err(error)
+    } else {
+        Ok(())
+    }
 }
 
 fn discover_npm_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<(), String> {
@@ -1015,6 +1114,144 @@ test:
         let test_task = discovered.tasks.iter().find(|t| t.name == "test").unwrap();
         assert_eq!(test_task.runner, TaskRunner::Make);
         assert_eq!(test_task.description, Some("Running tests".to_string()));
+    }
+
+    #[test]
+    fn test_discover_tasks_with_included_makefiles() {
+        let temp_dir = TempDir::new().unwrap();
+        let included_dir = temp_dir.path().join("mk");
+        std::fs::create_dir_all(&included_dir).unwrap();
+
+        create_test_makefile(
+            temp_dir.path(),
+            r#"include mk/common.mk
+
+build:
+	@echo "Build from root""#,
+        );
+        std::fs::write(
+            included_dir.join("common.mk"),
+            r#"include nested.mk
+
+test:
+	@echo "Test from common""#,
+        )
+        .unwrap();
+        std::fs::write(
+            included_dir.join("nested.mk"),
+            r#"lint:
+	@echo "Lint from nested""#,
+        )
+        .unwrap();
+
+        let discovered = discover_tasks(temp_dir.path());
+
+        assert!(discovered.errors.is_empty(), "{:?}", discovered.errors);
+        assert!(matches!(
+            discovered.definitions.makefile.unwrap().status,
+            TaskFileStatus::Parsed
+        ));
+        assert_eq!(discovered.tasks.len(), 3);
+
+        let root_makefile = temp_dir.path().join("Makefile");
+        let common_makefile = included_dir.join("common.mk");
+        let nested_makefile = included_dir.join("nested.mk");
+
+        let build_task = discovered.tasks.iter().find(|t| t.name == "build").unwrap();
+        assert_eq!(build_task.file_path, root_makefile);
+        assert_eq!(build_task.definition_path(), root_makefile.as_path());
+
+        let test_task = discovered.tasks.iter().find(|t| t.name == "test").unwrap();
+        assert_eq!(test_task.file_path, root_makefile);
+        assert_eq!(test_task.definition_path(), common_makefile.as_path());
+
+        let lint_task = discovered.tasks.iter().find(|t| t.name == "lint").unwrap();
+        assert_eq!(lint_task.file_path, root_makefile);
+        assert_eq!(lint_task.definition_path(), nested_makefile.as_path());
+    }
+
+    #[test]
+    fn test_discover_tasks_with_optional_missing_included_makefile() {
+        let temp_dir = TempDir::new().unwrap();
+        create_test_makefile(
+            temp_dir.path(),
+            r#"-include missing.mk
+
+build:
+	@echo "Build from root""#,
+        );
+
+        let discovered = discover_tasks(temp_dir.path());
+
+        assert!(matches!(
+            discovered.definitions.makefile.unwrap().status,
+            TaskFileStatus::Parsed
+        ));
+        assert!(discovered.errors.is_empty(), "{:?}", discovered.errors);
+        assert_eq!(discovered.tasks.len(), 1);
+        assert!(discovered.tasks.iter().any(|t| t.name == "build"));
+    }
+
+    #[test]
+    fn test_discover_tasks_with_recursive_makefile_include_cycle() {
+        let temp_dir = TempDir::new().unwrap();
+        let included_dir = temp_dir.path().join("mk");
+        std::fs::create_dir_all(&included_dir).unwrap();
+
+        create_test_makefile(
+            temp_dir.path(),
+            r#"include mk/common.mk
+
+build:
+	@echo "Build from root""#,
+        );
+        std::fs::write(
+            included_dir.join("common.mk"),
+            r#"include ../Makefile
+
+test:
+	@echo "Test from common""#,
+        )
+        .unwrap();
+
+        let discovered = discover_tasks(temp_dir.path());
+
+        assert!(matches!(
+            discovered.definitions.makefile.unwrap().status,
+            TaskFileStatus::Parsed
+        ));
+        assert!(discovered.errors.is_empty(), "{:?}", discovered.errors);
+        assert_eq!(discovered.tasks.len(), 2);
+        assert!(discovered.tasks.iter().any(|t| t.name == "build"));
+        assert!(discovered.tasks.iter().any(|t| t.name == "test"));
+    }
+
+    #[test]
+    fn test_discover_tasks_with_missing_required_included_makefile() {
+        let temp_dir = TempDir::new().unwrap();
+        create_test_makefile(
+            temp_dir.path(),
+            r#"include missing.mk
+
+build:
+	@echo "Build from root""#,
+        );
+
+        let discovered = discover_tasks(temp_dir.path());
+
+        assert!(matches!(
+            discovered.definitions.makefile.unwrap().status,
+            TaskFileStatus::ParseError(_)
+        ));
+        assert!(discovered.tasks.iter().any(|t| t.name == "build"));
+        assert!(
+            discovered
+                .errors
+                .iter()
+                .any(|error| error.contains("missing.mk")),
+            "{:?}",
+            discovered.errors
+        );
     }
 
     #[test]

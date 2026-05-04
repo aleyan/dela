@@ -2,7 +2,14 @@ use crate::types::{Task, TaskDefinitionType, TaskRunner};
 use makefile_lossless::Makefile;
 use regex::Regex;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::path::Path;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MakefileInclude {
+    pub path: PathBuf,
+    pub optional: bool,
+}
 
 /// Parse a Makefile at the given path and extract tasks
 pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
@@ -85,6 +92,142 @@ fn extract_tasks(makefile: &Makefile, path: &Path) -> Result<Vec<Task>, String> 
 
     // Convert HashMap values to a Vec
     Ok(tasks_map.into_values().collect())
+}
+
+/// Extract Makefile include directives from a file.
+pub fn extract_include_directives(path: &Path) -> Result<Vec<MakefileInclude>, String> {
+    let content =
+        std::fs::read_to_string(path).map_err(|e| format!("Failed to read Makefile: {}", e))?;
+    Ok(extract_include_directives_from_str(&content))
+}
+
+fn extract_include_directives_from_str(content: &str) -> Vec<MakefileInclude> {
+    let normalized = collapse_line_continuations(content);
+    let mut includes = Vec::new();
+
+    for line in normalized.lines() {
+        if line.starts_with('\t') {
+            continue;
+        }
+
+        let trimmed = line.trim_start();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+
+        let (optional, remainder) = if let Some(rest) = trimmed.strip_prefix("include") {
+            (false, rest)
+        } else if let Some(rest) = trimmed.strip_prefix("-include") {
+            (true, rest)
+        } else if let Some(rest) = trimmed.strip_prefix("sinclude") {
+            (true, rest)
+        } else {
+            continue;
+        };
+
+        if !remainder
+            .chars()
+            .next()
+            .is_some_and(char::is_whitespace)
+        {
+            continue;
+        }
+
+        let comment_stripped = strip_trailing_comment(remainder).trim();
+        if comment_stripped.is_empty() {
+            continue;
+        }
+
+        let path_tokens =
+            shell_words::split(comment_stripped).unwrap_or_else(|_| split_include_fallback(comment_stripped));
+
+        for token in path_tokens {
+            if token.is_empty() || contains_dynamic_make_syntax(&token) {
+                continue;
+            }
+
+            includes.push(MakefileInclude {
+                path: PathBuf::from(token),
+                optional,
+            });
+        }
+    }
+
+    includes
+}
+
+fn collapse_line_continuations(content: &str) -> String {
+    let mut collapsed = String::new();
+    let mut current = String::new();
+    let mut continuing = false;
+
+    for line in content.lines() {
+        let trimmed_end = line.trim_end();
+        let continues = trimmed_end.ends_with('\\');
+        let segment = if continues {
+            trimmed_end.trim_end_matches('\\').trim_end()
+        } else {
+            trimmed_end
+        };
+
+        if !current.is_empty() {
+            current.push(' ');
+        }
+        if continuing {
+            current.push_str(segment.trim_start());
+        } else {
+            current.push_str(segment);
+        }
+
+        if continues {
+            continuing = true;
+            continue;
+        }
+
+        collapsed.push_str(&current);
+        collapsed.push('\n');
+        current.clear();
+        continuing = false;
+    }
+
+    if !current.is_empty() {
+        collapsed.push_str(&current);
+    }
+
+    collapsed
+}
+
+fn strip_trailing_comment(input: &str) -> &str {
+    let mut in_single = false;
+    let mut in_double = false;
+    let mut escape = false;
+
+    for (idx, ch) in input.char_indices() {
+        match ch {
+            '\\' if !escape => {
+                escape = true;
+                continue;
+            }
+            '\'' if !escape && !in_double => in_single = !in_single,
+            '"' if !escape && !in_single => in_double = !in_double,
+            '#' if !escape && !in_single && !in_double => return &input[..idx],
+            _ => {}
+        }
+        escape = false;
+    }
+
+    input
+}
+
+fn split_include_fallback(input: &str) -> Vec<String> {
+    input
+        .split_whitespace()
+        .map(str::to_string)
+        .collect()
+}
+
+fn contains_dynamic_make_syntax(token: &str) -> bool {
+    token.contains('$') || token.contains('*') || token.contains('?') || token.contains('[')
 }
 
 /// Extract tasks using regex as a fallback method when standard parsing fails
@@ -615,5 +758,43 @@ OTHER_VAR ::= value
         let tasks = parse(&makefile_path).unwrap();
 
         assert_eq!(tasks.len(), 0);
+    }
+
+    #[test]
+    fn test_extract_include_directives() {
+        let content = r#"
+include common.mk more.mk
+-include .env
+sinclude config/local.mk
+"#;
+
+        let includes = extract_include_directives_from_str(content);
+
+        assert_eq!(includes.len(), 4);
+        assert_eq!(includes[0].path, PathBuf::from("common.mk"));
+        assert!(!includes[0].optional);
+        assert_eq!(includes[1].path, PathBuf::from("more.mk"));
+        assert!(!includes[1].optional);
+        assert_eq!(includes[2].path, PathBuf::from(".env"));
+        assert!(includes[2].optional);
+        assert_eq!(includes[3].path, PathBuf::from("config/local.mk"));
+        assert!(includes[3].optional);
+    }
+
+    #[test]
+    fn test_extract_include_directives_ignores_recipes_and_dynamic_paths() {
+        let content = r#"
+include first.mk \
+        second.mk
+include $(GENERATED_MAKEFILES) *.mk
+build:
+	@include from-recipe.mk
+"#;
+
+        let includes = extract_include_directives_from_str(content);
+
+        assert_eq!(includes.len(), 2);
+        assert_eq!(includes[0].path, PathBuf::from("first.mk"));
+        assert_eq!(includes[1].path, PathBuf::from("second.mk"));
     }
 }
