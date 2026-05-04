@@ -6,13 +6,11 @@ use std::path::{Component, Path, PathBuf};
 /// Shared path metadata for tasks discovered through composed definitions such
 /// as includes or inherited configs.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(dead_code)] // DTKT-198/200/201 will consume the full recursive source API.
 pub struct ComposedDefinitionSource {
     runner_path: PathBuf,
     definition_path: PathBuf,
 }
 
-#[allow(dead_code)] // DTKT-198/200/201 will consume the full recursive source API.
 impl ComposedDefinitionSource {
     /// Create a source where the runner path and defining file are the same.
     pub fn direct(path: impl Into<PathBuf>) -> Self {
@@ -29,10 +27,6 @@ impl ComposedDefinitionSource {
             runner_path: normalize_path(runner_path.into()),
             definition_path: normalize_path(definition_path.into()),
         }
-    }
-
-    pub fn runner_path(&self) -> &Path {
-        &self.runner_path
     }
 
     pub fn definition_path(&self) -> &Path {
@@ -58,19 +52,16 @@ impl ComposedDefinitionSource {
 /// Track visited definitions for recursive discovery so include cycles can be
 /// handled consistently across runners.
 #[derive(Debug, Clone, Default)]
-#[allow(dead_code)] // DTKT-198/200/201 will use recursive traversal state directly.
 pub struct RecursiveDiscoveryState {
     visited: HashSet<PathBuf>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(dead_code)] // DTKT-198/200/201 will use visit outcomes for include traversal.
 pub enum VisitState {
     New(PathBuf),
     AlreadyVisited(PathBuf),
 }
 
-#[allow(dead_code)] // DTKT-198/200/201 will use recursive traversal state directly.
 impl RecursiveDiscoveryState {
     pub fn new() -> Self {
         Self::default()
@@ -87,7 +78,6 @@ impl RecursiveDiscoveryState {
 }
 
 /// Resolve a referenced definition path relative to the file that included it.
-#[allow(dead_code)] // DTKT-198/200/201 will reuse this for include resolution.
 pub fn resolve_nested_definition_path(
     current_definition_path: &Path,
     referenced_path: &Path,
@@ -166,7 +156,7 @@ mod tests {
     fn test_direct_source_uses_same_path_for_runner_and_definition() {
         let source = ComposedDefinitionSource::direct("/repo/Makefile");
 
-        assert_eq!(source.runner_path(), Path::new("/repo/Makefile"));
+        assert_eq!(source.runner_path, PathBuf::from("/repo/Makefile"));
         assert_eq!(source.definition_path(), Path::new("/repo/Makefile"));
     }
 
