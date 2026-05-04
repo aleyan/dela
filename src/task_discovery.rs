@@ -334,9 +334,11 @@ fn discover_makefile_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Resu
     let status = match result {
         Ok(()) => TaskFileStatus::Parsed,
         Err(error) => {
-            discovered
-                .errors
-                .push(format!("Failed to parse {}: {}", makefile_path.display(), error));
+            discovered.errors.push(format!(
+                "Failed to parse {}: {}",
+                makefile_path.display(),
+                error
+            ));
             TaskFileStatus::ParseError(error)
         }
     };
@@ -1155,6 +1157,74 @@ test:
         let lint_task = discovered.tasks.iter().find(|t| t.name == "lint").unwrap();
         assert_eq!(lint_task.file_path, root_makefile);
         assert_eq!(lint_task.definition_path(), nested_makefile.as_path());
+    }
+
+    #[test]
+    #[serial]
+    fn test_duplicate_task_names_from_included_makefile_use_definition_path() {
+        let temp_dir = TempDir::new().unwrap();
+        let included_dir = temp_dir.path().join("mk");
+        std::fs::create_dir_all(&included_dir).unwrap();
+
+        reset_mock();
+        enable_mock();
+        mock_executable("npm");
+
+        create_test_makefile(
+            temp_dir.path(),
+            r#"include mk/common.mk
+
+build:
+	@echo "Build from root""#,
+        );
+        std::fs::write(
+            included_dir.join("common.mk"),
+            r#"test:
+	@echo "Test from included makefile""#,
+        )
+        .unwrap();
+        std::fs::write(
+            temp_dir.path().join("package.json"),
+            r#"{
+  "name": "test-package",
+  "scripts": {
+    "test": "jest"
+  }
+}"#,
+        )
+        .unwrap();
+        std::fs::write(temp_dir.path().join("package-lock.json"), "{}").unwrap();
+
+        let discovered = discover_tasks(temp_dir.path());
+        let matching_tasks: Vec<&Task> = discovered
+            .tasks
+            .iter()
+            .filter(|task| task.name == "test")
+            .collect();
+
+        assert_eq!(matching_tasks.len(), 2);
+
+        let make_task = matching_tasks
+            .iter()
+            .copied()
+            .find(|task| task.runner == TaskRunner::Make)
+            .unwrap();
+        assert_eq!(
+            make_task.definition_path(),
+            included_dir.join("common.mk").as_path()
+        );
+        assert_eq!(make_task.file_path, temp_dir.path().join("Makefile"));
+        assert_eq!(make_task.disambiguated_name.as_deref(), Some("test-m"));
+
+        let error = format_ambiguous_task_error("test", &matching_tasks);
+        assert!(
+            error.contains("mk/common.mk"),
+            "unexpected ambiguous-task error: {}",
+            error
+        );
+
+        reset_mock();
+        reset_to_real_environment();
     }
 
     #[test]

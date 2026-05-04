@@ -24,10 +24,7 @@ impl ComposedDefinitionSource {
     }
 
     /// Create a source where the runner path differs from the defining file.
-    pub fn composed(
-        runner_path: impl Into<PathBuf>,
-        definition_path: impl Into<PathBuf>,
-    ) -> Self {
+    pub fn composed(runner_path: impl Into<PathBuf>, definition_path: impl Into<PathBuf>) -> Self {
         Self {
             runner_path: normalize_path(runner_path.into()),
             definition_path: normalize_path(definition_path.into()),
@@ -220,10 +217,8 @@ mod tests {
 
     #[test]
     fn test_composed_source_resolves_children_relative_to_definition_file() {
-        let source = ComposedDefinitionSource::composed(
-            "/repo/Makefile",
-            "/repo/includes/common/tasks.mk",
-        );
+        let source =
+            ComposedDefinitionSource::composed("/repo/Makefile", "/repo/includes/common/tasks.mk");
 
         assert_eq!(
             source.resolve_child("../../other.mk"),

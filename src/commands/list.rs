@@ -3,9 +3,10 @@ use crate::task_discovery;
 use crate::types::ShadowType;
 use crate::types::{Task, TaskFileStatus};
 use colored::Colorize;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::io::Write;
+use std::path::Path;
 
 #[cfg(test)]
 macro_rules! test_println {
@@ -212,16 +213,6 @@ pub fn execute(verbose: bool) -> Result<(), String> {
             "No tasks found in the current directory.".yellow()
         ))?;
     } else {
-        // Collect file paths for each runner for reference
-        let mut runner_files: HashMap<String, String> = HashMap::new();
-        for task in &discovered.tasks {
-            let runner_name = task.runner.short_name().to_string();
-            runner_files.insert(
-                runner_name,
-                task.definition_path().to_string_lossy().to_string(),
-            );
-        }
-
         // Calculate max task name width across all runners
         let max_task_name_width = discovered
             .tasks
@@ -264,25 +255,19 @@ pub fn execute(verbose: bool) -> Result<(), String> {
                 None
             };
 
-            // Get file path for this runner
-            let empty_string = String::new();
-            let file_path = runner_files.get(&runner).unwrap_or(&empty_string);
-
-            // For GitHub Actions, show the full relative path instead of just the filename
-            let display_path = if runner == "act" {
-                let path = std::path::Path::new(file_path);
-                if let Ok(relative_path) = path.strip_prefix(&current_dir) {
-                    relative_path.to_string_lossy().to_string()
-                } else {
-                    file_path.clone()
-                }
+            let runner_paths: HashSet<_> =
+                sorted_tasks.iter().map(|task| &task.file_path).collect();
+            let display_path = if runner_paths.len() == 1 {
+                format_runner_path_for_display(&runner, &sorted_tasks[0].file_path, &current_dir)
             } else {
-                // For other runners, show just the filename
-                std::path::Path::new(file_path)
-                    .file_name()
-                    .map(|f| f.to_string_lossy().to_string())
-                    .unwrap_or_else(|| file_path.clone())
+                "multiple files".to_string()
             };
+            let show_task_sources = sorted_tasks
+                .iter()
+                .map(|task| task.definition_path().to_path_buf())
+                .collect::<HashSet<_>>()
+                .len()
+                > 1;
 
             // Write section header
             let colored_runner = if tool_not_installed {
@@ -318,6 +303,11 @@ pub fn execute(verbose: bool) -> Result<(), String> {
 
                 // Format the task entry
                 let formatted_task = format_task_entry(task, is_ambiguous, display_width);
+                let source_label = show_task_sources.then(|| {
+                    format_definition_path_for_display(task.definition_path(), &current_dir)
+                });
+                let formatted_task =
+                    format_task_entry_with_source(formatted_task, source_label.as_deref());
                 write_line(&format!("  {}", formatted_task))?;
             }
         }
@@ -452,6 +442,37 @@ fn format_task_entry(task: &Task, is_ambiguous: bool, name_width: usize) -> Stri
     format!("{}  {}", padded_name, colored_description)
 }
 
+fn format_task_entry_with_source(formatted_task: String, source_label: Option<&str>) -> String {
+    match source_label {
+        Some(source_label) if !source_label.is_empty() => {
+            format!(
+                "{} {}",
+                formatted_task,
+                format!("[{}]", source_label).dimmed()
+            )
+        }
+        _ => formatted_task,
+    }
+}
+
+fn format_definition_path_for_display(path: &Path, current_dir: &Path) -> String {
+    if let Ok(relative_path) = path.strip_prefix(current_dir) {
+        relative_path.to_string_lossy().to_string()
+    } else {
+        path.to_string_lossy().to_string()
+    }
+}
+
+fn format_runner_path_for_display(runner: &str, path: &Path, current_dir: &Path) -> String {
+    if runner == "act" {
+        format_definition_path_for_display(path, current_dir)
+    } else {
+        path.file_name()
+            .map(|file_name| file_name.to_string_lossy().to_string())
+            .unwrap_or_else(|| format_definition_path_for_display(path, current_dir))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -460,7 +481,7 @@ mod tests {
     use serial_test::serial;
     use std::fs::{self, File};
     use std::io::{self, Write};
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
     use tempfile::TempDir;
 
     // Custom writer for testing
@@ -956,5 +977,43 @@ mod tests {
             output.contains("Integration Tests"),
             "Should show task description"
         );
+    }
+
+    #[test]
+    fn test_runner_path_display_uses_execution_context_for_composed_tasks() {
+        let current_dir = Path::new("/project");
+        let runner_path = Path::new("/project/Makefile");
+        let definition_path = Path::new("/project/mk/common.mk");
+
+        assert_eq!(
+            format_runner_path_for_display("make", runner_path, current_dir),
+            "Makefile"
+        );
+        assert_eq!(
+            format_definition_path_for_display(definition_path, current_dir),
+            "mk/common.mk"
+        );
+    }
+
+    #[test]
+    fn test_task_entry_source_suffix_uses_definition_path_for_composed_tasks() {
+        let task = Task {
+            name: "included-task".to_string(),
+            file_path: PathBuf::from("/project/Makefile"),
+            definition_path: Some(PathBuf::from("/project/mk/common.mk")),
+            definition_type: TaskDefinitionType::Makefile,
+            runner: TaskRunner::Make,
+            source_name: "included-task".to_string(),
+            description: Some("Included task".to_string()),
+            shadowed_by: None,
+            disambiguated_name: None,
+        };
+
+        let formatted = format_task_entry(&task, false, 18);
+        let formatted = format_task_entry_with_source(formatted, Some("mk/common.mk"));
+
+        assert!(formatted.contains("included-task"));
+        assert!(formatted.contains("Included task"));
+        assert!(formatted.contains("[mk/common.mk]"));
     }
 }

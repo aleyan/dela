@@ -2,8 +2,8 @@ use crate::types::{Task, TaskDefinitionType, TaskRunner};
 use makefile_lossless::Makefile;
 use regex::Regex;
 use std::collections::HashMap;
-use std::path::PathBuf;
 use std::path::Path;
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MakefileInclude {
@@ -125,11 +125,7 @@ fn extract_include_directives_from_str(content: &str) -> Vec<MakefileInclude> {
             continue;
         };
 
-        if !remainder
-            .chars()
-            .next()
-            .is_some_and(char::is_whitespace)
-        {
+        if !remainder.chars().next().is_some_and(char::is_whitespace) {
             continue;
         }
 
@@ -138,8 +134,8 @@ fn extract_include_directives_from_str(content: &str) -> Vec<MakefileInclude> {
             continue;
         }
 
-        let path_tokens =
-            shell_words::split(comment_stripped).unwrap_or_else(|_| split_include_fallback(comment_stripped));
+        let path_tokens = shell_words::split(comment_stripped)
+            .unwrap_or_else(|_| split_include_fallback(comment_stripped));
 
         for token in path_tokens {
             if token.is_empty() || contains_dynamic_make_syntax(&token) {
@@ -220,10 +216,7 @@ fn strip_trailing_comment(input: &str) -> &str {
 }
 
 fn split_include_fallback(input: &str) -> Vec<String> {
-    input
-        .split_whitespace()
-        .map(str::to_string)
-        .collect()
+    input.split_whitespace().map(str::to_string).collect()
 }
 
 fn contains_dynamic_make_syntax(token: &str) -> bool {

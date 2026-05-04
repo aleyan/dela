@@ -266,6 +266,26 @@ mod tests {
     }
 
     #[test]
+    fn test_taskdto_uses_definition_path_for_composed_make_task() {
+        let task = Task {
+            name: "included-task".to_string(),
+            file_path: PathBuf::from("/project/Makefile"),
+            definition_path: Some(PathBuf::from("/project/mk/common.mk")),
+            definition_type: TaskDefinitionType::Makefile,
+            runner: TaskRunner::Make,
+            source_name: "included-task".to_string(),
+            description: Some("Included task".to_string()),
+            shadowed_by: None,
+            disambiguated_name: None,
+        };
+
+        let dto = TaskDto::from_task(&task);
+
+        assert_eq!(dto.command, "make included-task");
+        assert_eq!(dto.file_path, "/project/mk/common.mk");
+    }
+
+    #[test]
     fn test_taskdto_serialization() {
         // Arrange
         let task = Task {

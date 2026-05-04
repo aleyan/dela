@@ -406,4 +406,49 @@ test: ## Running tests
 
         reset_to_real_environment();
     }
+
+    #[test]
+    #[serial]
+    fn test_allow_command_uses_definition_path_for_included_make_task() {
+        let (project_dir, home_dir) = setup_test_env();
+        env::set_current_dir(&project_dir).expect("Failed to change directory");
+
+        fs::create_dir_all(project_dir.path().join("mk")).expect("Failed to create include dir");
+        fs::write(
+            project_dir.path().join("Makefile"),
+            r#"include mk/common.mk
+
+build:
+	@echo Building..."#,
+        )
+        .expect("Failed to write root Makefile");
+        fs::write(
+            project_dir.path().join("mk").join("common.mk"),
+            r#"included-task:
+	@echo Included"#,
+        )
+        .expect("Failed to write included Makefile");
+
+        let result = execute("included-task", Some(3)); // 3 = file scope
+        assert!(
+            result.is_ok(),
+            "Should allow included task by defining file"
+        );
+
+        let allowlist = fs::read_to_string(preferred_allowlist_path_for(home_dir.path())).unwrap();
+        assert!(
+            allowlist.contains(
+                &project_dir
+                    .path()
+                    .join("mk")
+                    .join("common.mk")
+                    .display()
+                    .to_string()
+            ),
+            "allowlist should use included file path, got:\n{}",
+            allowlist
+        );
+
+        reset_to_real_environment();
+    }
 }

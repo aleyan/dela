@@ -446,12 +446,29 @@ if [ -s make_include_stderr.txt ]; then
     exit 1
 fi
 
+if grep -q "mk/common.mk" make_include_list.txt && grep -q "mk/nested.mk" make_include_list.txt; then
+    echo "${GREEN}✓ dela list shows defining files for included make tasks${NC}"
+else
+    echo "${RED}✗ dela list did not show defining files for included make tasks${NC}"
+    cat make_include_list.txt
+    exit 1
+fi
+
 output=$(dela get-command nested-task 2>&1)
 if echo "$output" | grep -q "make nested-task"; then
     echo "${GREEN}✓ get-command works for tasks from included makefiles${NC}"
 else
     echo "${RED}✗ get-command failed for task from included makefiles${NC}"
     echo "Got: $output"
+    exit 1
+fi
+
+echo "3" | dela allow-command included-task >/dev/null 2>&1
+if grep -q "/home/testuser/make_include_project/mk/common.mk" /home/testuser/.config/dela/allowlist.toml; then
+    echo "${GREEN}✓ allow-command stores the defining included makefile path${NC}"
+else
+    echo "${RED}✗ allow-command did not store the defining included makefile path${NC}"
+    cat /home/testuser/.config/dela/allowlist.toml
     exit 1
 fi
 
