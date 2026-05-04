@@ -380,19 +380,6 @@ fn collect_makefile_tasks_recursive(
         let resolved_include = current_source.resolve_child(&include.path);
 
         if !resolved_include.is_file() {
-            if include.optional {
-                continue;
-            }
-
-            let error = format!(
-                "Required included makefile '{}' referenced from '{}' was not found",
-                resolved_include.display(),
-                current_source.definition_path().display()
-            );
-            include_errors.push(error.clone());
-            if first_error.is_none() {
-                first_error = Some(error);
-            }
             continue;
         }
 
@@ -1241,17 +1228,10 @@ build:
 
         assert!(matches!(
             discovered.definitions.makefile.unwrap().status,
-            TaskFileStatus::ParseError(_)
+            TaskFileStatus::Parsed
         ));
+        assert!(discovered.errors.is_empty(), "{:?}", discovered.errors);
         assert!(discovered.tasks.iter().any(|t| t.name == "build"));
-        assert!(
-            discovered
-                .errors
-                .iter()
-                .any(|error| error.contains("missing.mk")),
-            "{:?}",
-            discovered.errors
-        );
     }
 
     #[test]

@@ -407,7 +407,8 @@ echo "\nTest 22c: Testing recursive Makefile include discovery"
 mkdir -p /home/testuser/make_include_project/mk
 cat > /home/testuser/make_include_project/Makefile <<'EOF'
 include mk/common.mk
--include mk/missing.mk
+include mk/missing-required.mk
+-include mk/missing-optional.mk
 
 build:
 	@echo "Build from root"
@@ -424,12 +425,24 @@ nested-task:
 EOF
 
 cd /home/testuser/make_include_project
-dela list 2>/dev/null > make_include_list.txt
+dela list > make_include_list.txt 2> make_include_stderr.txt
+if [ $? -ne 0 ]; then
+    echo "${RED}✗ dela list failed when a required included makefile was missing${NC}"
+    cat make_include_stderr.txt
+    exit 1
+fi
+
 if grep -q "included-task" make_include_list.txt && grep -q "nested-task" make_include_list.txt; then
     echo "${GREEN}✓ dela list discovers tasks from recursively included makefiles${NC}"
 else
     echo "${RED}✗ dela list did not discover tasks from recursively included makefiles${NC}"
     cat make_include_list.txt
+    exit 1
+fi
+
+if [ -s make_include_stderr.txt ]; then
+    echo "${RED}✗ dela emitted errors for missing included makefiles${NC}"
+    cat make_include_stderr.txt
     exit 1
 fi
 
