@@ -1,4 +1,6 @@
-name: Release
+name: Release to crates.io
+
+# Read dev_docs/release.md for more information.
 
 on:
   push:
