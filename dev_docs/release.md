@@ -3,6 +3,7 @@
 Use the `Makefile` targets. They are the source of truth for the local release steps.
 
 The release automation is in [.github/workflows/release.yml](/Users/aleyan/Projects/dela/.github/workflows/release.yml:1):
+The release automation is in .github/workflows/release.yml:
 
 - manual runs are dry-run only
 - real releases happen only from a pushed `v*` tag
