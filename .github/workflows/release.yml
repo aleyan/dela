@@ -154,7 +154,6 @@ jobs:
         run: cargo build --release --locked --target "${{ matrix.target }}"
 
       - name: Prepare archive
-        if: runner.os != 'Windows'
         shell: bash
         run: |
           set -euo pipefail
@@ -244,9 +243,9 @@ jobs:
           set -euo pipefail
 
           VERSION="${{ needs.verify-release.outputs.version }}"
-          RESPONSE=$(curl --fail --silent --location https://crates.io/api/v1/crates/dela || true)
+          RESPONSE=$(curl --fail --silent --show-error --location https://crates.io/api/v1/crates/dela)
 
-          if [ -n "${RESPONSE}" ] && echo "${RESPONSE}" | jq -e --arg version "${VERSION}" '.versions[] | select(.num == $version)' >/dev/null; then
+          if echo "${RESPONSE}" | jq -e --arg version "${VERSION}" '.versions[] | select(.num == $version)' >/dev/null; then
             echo "exists=true" >> "${GITHUB_OUTPUT}"
           else
             echo "exists=false" >> "${GITHUB_OUTPUT}"

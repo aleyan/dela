@@ -39,11 +39,6 @@ curl -L https://github.com/aleyan/dela/releases/latest/download/dela-darwin-arm6
 sudo mv dela /usr/local/bin/
 ```
 
-### Windows
-1. Download `dela-windows-amd64.zip` from the [releases page](https://github.com/aleyan/dela/releases)
-2. Extract the archive
-3. Add the extracted directory to your PATH
-
 ## Shell Integration
 
 After installation, run:
@@ -51,4 +46,4 @@ After installation, run:
 dela init
 ```
 
-This will set up dela's shell integration for your current shell. 
+This will set up dela's shell integration for your current shell.

@@ -49,8 +49,8 @@ release_verify:
 			echo "Error: jq is required for release_verify."; \
 			exit 1; \
 		fi; \
-		RESPONSE=$$(curl --fail --silent --show-error --location https://crates.io/api/v1/crates/dela || true); \
-		if [ -n "$$RESPONSE" ] && echo "$$RESPONSE" | jq -e --arg version "$$VERSION" '.versions[] | select(.num == $$version)' >/dev/null; then \
+		RESPONSE=$$(curl --fail --silent --show-error --location https://crates.io/api/v1/crates/dela); \
+		if echo "$$RESPONSE" | jq -e --arg version "$$VERSION" '.versions[] | select(.num == $$version)' >/dev/null; then \
 			echo "Error: version $$VERSION already exists on crates.io."; \
 			exit 1; \
 		fi; \

@@ -2,7 +2,6 @@
 
 Use the `Makefile` targets. They are the source of truth for the local release steps.
 
-The release automation is in [.github/workflows/release.yml](/Users/aleyan/Projects/dela/.github/workflows/release.yml:1):
 The release automation is in .github/workflows/release.yml:
 
 - manual runs are dry-run only
@@ -13,13 +12,26 @@ The release automation is in .github/workflows/release.yml:
 
 1. Update `Cargo.toml` and `CHANGELOG.md` in the release commit.
 2. Make sure that commit is on `main`.
-3. Run:
+3. Run the local prerelease checks:
+
+```sh
+make release_verify
+```
+
+4. Run the GitHub dry run from the UI:
+   - open `Actions`
+   - open `Release to crates.io`
+   - click `Run workflow`
+   - leave `dry_run=true`
+   - run it on `main`
+5. Confirm the dry run passed and inspect the uploaded artifacts.
+6. Publish the release tag:
 
 ```sh
 make release_publish
 ```
 
-7. Open `Actions` and watch the tag-triggered `Release` workflow finish.
+7. Open `Actions` and watch the tag-triggered `Release to crates.io` workflow finish.
 8. Verify the release on:
    - GitHub Releases
    - crates.io
