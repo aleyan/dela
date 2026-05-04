@@ -478,63 +478,189 @@ fn discover_python_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result
 }
 
 fn discover_taskfile_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<(), String> {
-    // List of possible Taskfile paths in order of priority
-    let possible_taskfiles = [
-        "Taskfile.yml",
-        "taskfile.yml",
-        "Taskfile.yaml",
-        "taskfile.yaml",
-        "Taskfile.dist.yml",
-        "taskfile.dist.yml",
-        "Taskfile.dist.yaml",
-        "taskfile.dist.yaml",
-    ];
-
-    // Try to find the first existing Taskfile
-    let mut taskfile_path = None;
-    for filename in &possible_taskfiles {
-        let path = dir.join(filename);
-        if path.exists() {
-            taskfile_path = Some(path);
-            break;
-        }
-    }
-
-    // Use a default path for reporting if no Taskfile was found
-    let default_path = dir.join("Taskfile.yml");
-
-    // If a Taskfile was found, parse it
-    if let Some(taskfile_path) = taskfile_path {
-        let mut definition = TaskDefinitionFile {
-            path: taskfile_path.clone(),
-            definition_type: TaskDefinitionType::Taskfile,
-            status: TaskFileStatus::NotImplemented,
-        };
-
-        match parse_taskfile::parse(&taskfile_path) {
-            Ok(tasks) => {
-                definition.status = TaskFileStatus::Parsed;
-                discovered.tasks.extend(tasks);
-            }
-            Err(e) => {
-                definition.status = TaskFileStatus::ParseError(e.clone());
-                discovered
-                    .errors
-                    .push(format!("Error parsing {}: {}", taskfile_path.display(), e));
-            }
-        }
-
-        set_definition(discovered, definition);
-    } else {
-        // No Taskfile found, set status as NotFound
+    let default_path = dir.join(parse_taskfile::SUPPORTED_TASKFILE_NAMES[0]);
+    let Some(taskfile_path) = parse_taskfile::find_taskfile_in_dir(dir) else {
         discovered.definitions.taskfile = Some(TaskDefinitionFile {
             path: default_path,
             definition_type: TaskDefinitionType::Taskfile,
             status: TaskFileStatus::NotFound,
         });
+        return Ok(());
+    };
+
+    let root_source = ComposedDefinitionSource::direct(taskfile_path.clone());
+    let mut traversal_state = RecursiveDiscoveryState::new();
+    let mut seen_task_names = std::collections::HashSet::new();
+    let mut tasks = Vec::new();
+    let mut include_errors = Vec::new();
+    let no_excludes = std::collections::HashSet::new();
+
+    let result = collect_taskfile_tasks_recursive(
+        &taskfile_path,
+        &root_source,
+        "",
+        None,
+        false,
+        &no_excludes,
+        &mut traversal_state,
+        &mut seen_task_names,
+        &mut tasks,
+        &mut include_errors,
+    );
+
+    for task in &mut tasks {
+        task.shadowed_by = check_shadowing(&task.name);
     }
 
+    discovered.tasks.extend(tasks);
+    discovered.errors.extend(include_errors);
+
+    let status = match result {
+        Ok(()) => TaskFileStatus::Parsed,
+        Err(error) => {
+            discovered.errors.push(format!(
+                "Failed to parse {}: {}",
+                taskfile_path.display(),
+                error
+            ));
+            TaskFileStatus::ParseError(error)
+        }
+    };
+    discovered.definitions.taskfile = Some(TaskDefinitionFile {
+        path: taskfile_path,
+        definition_type: TaskDefinitionType::Taskfile,
+        status,
+    });
+
     Ok(())
+}
+
+fn collect_taskfile_tasks_recursive(
+    root_taskfile_path: &Path,
+    current_source: &ComposedDefinitionSource,
+    namespace_prefix: &str,
+    include_label: Option<&str>,
+    hide_tasks: bool,
+    excluded_tasks: &std::collections::HashSet<String>,
+    traversal_state: &mut RecursiveDiscoveryState,
+    seen_task_names: &mut std::collections::HashSet<String>,
+    collected_tasks: &mut Vec<Task>,
+    include_errors: &mut Vec<String>,
+) -> Result<(), String> {
+    match traversal_state.mark_visited(current_source.definition_path()) {
+        VisitState::AlreadyVisited(_) => return Ok(()),
+        VisitState::New(_) => {}
+    }
+
+    let mut first_error: Option<String> = None;
+
+    let mut tasks = parse_taskfile::parse(current_source.definition_path())?;
+    tasks.sort_by(|a, b| a.name.cmp(&b.name));
+
+    if !hide_tasks {
+        for mut task in tasks {
+            let original_name = task.name.clone();
+            if excluded_tasks.contains(&original_name) {
+                continue;
+            }
+
+            let effective_name = prefix_taskfile_task_name(namespace_prefix, &original_name);
+            task.name = effective_name.clone();
+            task.source_name = effective_name;
+            current_source.apply_to_task(&mut task);
+
+            if !seen_task_names.insert(task.name.clone()) {
+                let error = match include_label {
+                    Some(include_label) => {
+                        format!(
+                            "Found multiple tasks ({}) included by \"{}\"",
+                            task.name, include_label
+                        )
+                    }
+                    None => format!("Found multiple Taskfile tasks named '{}'", task.name),
+                };
+                include_errors.push(error.clone());
+                if first_error.is_none() {
+                    first_error = Some(error);
+                }
+                continue;
+            }
+
+            collected_tasks.push(task);
+        }
+    }
+
+    let includes = parse_taskfile::extract_include_directives(current_source.definition_path())?;
+
+    for include in includes {
+        let resolved_candidate = current_source.resolve_child(&include.taskfile);
+        let resolved_include = parse_taskfile::resolve_taskfile_include_path(&resolved_candidate);
+
+        if !resolved_include.is_file() {
+            if include.optional {
+                continue;
+            }
+
+            let error = format!(
+                "Required included Taskfile '{}' referenced from '{}' was not found",
+                resolved_include.display(),
+                current_source.definition_path().display()
+            );
+            include_errors.push(error.clone());
+            if first_error.is_none() {
+                first_error = Some(error);
+            }
+            continue;
+        }
+
+        let child_source =
+            ComposedDefinitionSource::composed(root_taskfile_path, resolved_include.clone());
+        let child_namespace = if include.flatten {
+            namespace_prefix.to_string()
+        } else {
+            prefix_taskfile_task_name(namespace_prefix, &include.namespace)
+        };
+        let child_include_label = prefix_taskfile_task_name(namespace_prefix, &include.namespace);
+        let child_hide_tasks = hide_tasks || include.internal;
+        let child_excludes = include.excludes.into_iter().collect();
+
+        if let Err(error) = collect_taskfile_tasks_recursive(
+            root_taskfile_path,
+            &child_source,
+            &child_namespace,
+            Some(child_include_label.as_str()),
+            child_hide_tasks,
+            &child_excludes,
+            traversal_state,
+            seen_task_names,
+            collected_tasks,
+            include_errors,
+        ) {
+            let error = format!(
+                "Failed to parse included Taskfile '{}': {}",
+                resolved_include.display(),
+                error
+            );
+            include_errors.push(error.clone());
+            if first_error.is_none() {
+                first_error = Some(error);
+            }
+        }
+    }
+
+    if let Some(error) = first_error {
+        Err(error)
+    } else {
+        Ok(())
+    }
+}
+
+fn prefix_taskfile_task_name(namespace_prefix: &str, task_name: &str) -> String {
+    if namespace_prefix.is_empty() {
+        task_name.to_string()
+    } else {
+        format!("{}:{}", namespace_prefix, task_name)
+    }
 }
 
 fn discover_turbo_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<(), String> {
@@ -1893,6 +2019,148 @@ tasks:
         );
 
         reset_mock();
+    }
+
+    #[test]
+    #[serial]
+    fn test_discover_tasks_with_included_taskfiles() {
+        let temp_dir = TempDir::new().unwrap();
+        let docs_dir = temp_dir.path().join("docs");
+        let api_dir = docs_dir.join("api");
+        std::fs::create_dir_all(&api_dir).unwrap();
+
+        reset_mock();
+        enable_mock();
+        mock_executable("task");
+
+        std::fs::write(
+            temp_dir.path().join("Taskfile.yml"),
+            r#"version: '3'
+includes:
+  docs: ./docs
+tasks:
+  build:
+    desc: Build task
+    cmds:
+      - echo "Build""#,
+        )
+        .unwrap();
+        std::fs::write(
+            docs_dir.join("Taskfile.yml"),
+            r#"version: '3'
+includes:
+  api: ./api
+tasks:
+  serve:
+    desc: Serve docs
+    cmds:
+      - echo "Serve""#,
+        )
+        .unwrap();
+        std::fs::write(
+            api_dir.join("Taskfile.yml"),
+            r#"version: '3'
+tasks:
+  generate:
+    desc: Generate API docs
+    cmds:
+      - echo "Generate""#,
+        )
+        .unwrap();
+
+        let discovered = discover_tasks(temp_dir.path());
+
+        assert!(discovered.errors.is_empty(), "{:?}", discovered.errors);
+        assert!(matches!(
+            discovered.definitions.taskfile.unwrap().status,
+            TaskFileStatus::Parsed
+        ));
+
+        let root_taskfile = temp_dir.path().join("Taskfile.yml");
+        let docs_taskfile = docs_dir.join("Taskfile.yml");
+        let api_taskfile = api_dir.join("Taskfile.yml");
+
+        let build_task = discovered.tasks.iter().find(|t| t.name == "build").unwrap();
+        assert_eq!(build_task.runner, TaskRunner::Task);
+        assert_eq!(build_task.file_path, root_taskfile);
+        assert_eq!(build_task.definition_path(), root_taskfile.as_path());
+        assert_eq!(build_task.source_name, "build");
+
+        let docs_task = discovered
+            .tasks
+            .iter()
+            .find(|t| t.name == "docs:serve")
+            .unwrap();
+        assert_eq!(docs_task.file_path, root_taskfile);
+        assert_eq!(docs_task.definition_path(), docs_taskfile.as_path());
+        assert_eq!(docs_task.source_name, "docs:serve");
+
+        let api_task = discovered
+            .tasks
+            .iter()
+            .find(|t| t.name == "docs:api:generate")
+            .unwrap();
+        assert_eq!(api_task.file_path, root_taskfile);
+        assert_eq!(api_task.definition_path(), api_taskfile.as_path());
+        assert_eq!(api_task.source_name, "docs:api:generate");
+
+        reset_mock();
+        reset_to_real_environment();
+    }
+
+    #[test]
+    #[serial]
+    fn test_discover_tasks_with_duplicate_flattened_taskfile_include() {
+        let temp_dir = TempDir::new().unwrap();
+        let shared_dir = temp_dir.path().join("shared");
+        std::fs::create_dir_all(&shared_dir).unwrap();
+
+        reset_mock();
+        enable_mock();
+        mock_executable("task");
+
+        std::fs::write(
+            temp_dir.path().join("Taskfile.yml"),
+            r#"version: '3'
+includes:
+  shared:
+    taskfile: ./shared
+    flatten: true
+tasks:
+  build:
+    desc: Root build
+    cmds:
+      - echo "Build""#,
+        )
+        .unwrap();
+        std::fs::write(
+            shared_dir.join("Taskfile.yml"),
+            r#"version: '3'
+tasks:
+  build:
+    desc: Shared build
+    cmds:
+      - echo "Shared build""#,
+        )
+        .unwrap();
+
+        let discovered = discover_tasks(temp_dir.path());
+
+        assert!(matches!(
+            discovered.definitions.taskfile.unwrap().status,
+            TaskFileStatus::ParseError(_)
+        ));
+        assert!(
+            discovered
+                .errors
+                .iter()
+                .any(|error| error.contains("Found multiple tasks (build) included by \"shared\"")),
+            "{:?}",
+            discovered.errors
+        );
+
+        reset_mock();
+        reset_to_real_environment();
     }
 
     #[test]

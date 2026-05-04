@@ -110,6 +110,99 @@ else
     exit 1
 fi
 
+# Test 6b: Verify recursive Taskfile include discovery
+echo "\nTest 6b: Testing recursive Taskfile include discovery"
+mkdir -p /home/testuser/task_include_project/docs/api
+cat > /home/testuser/task_include_project/Taskfile.yml <<'EOF'
+version: '3'
+includes:
+  docs: ./docs
+tasks:
+  task-root:
+    desc: Root task
+    cmds:
+      - echo "Root"
+EOF
+cat > /home/testuser/task_include_project/docs/Taskfile.yml <<'EOF'
+version: '3'
+includes:
+  api: ./api
+tasks:
+  serve:
+    desc: Docs serve
+    cmds:
+      - echo "Serve docs"
+EOF
+cat > /home/testuser/task_include_project/docs/api/Taskfile.yml <<'EOF'
+version: '3'
+tasks:
+  generate:
+    desc: Generate docs
+    cmds:
+      - echo "Generate docs"
+EOF
+
+cd /home/testuser/task_include_project
+dela list > task_include_list.txt 2> task_include_stderr.txt
+if [ $? -ne 0 ]; then
+    echo "${RED}✗ dela list failed for recursive Taskfile includes${NC}"
+    cat task_include_stderr.txt
+    exit 1
+fi
+
+if grep -q "docs:serve" task_include_list.txt && grep -q "docs:api:generate" task_include_list.txt; then
+    echo "${GREEN}✓ dela list discovers recursively included Taskfile tasks${NC}"
+else
+    echo "${RED}✗ dela list did not discover recursively included Taskfile tasks${NC}"
+    cat task_include_list.txt
+    exit 1
+fi
+
+output=$(dela get-command docs:api:generate 2>&1)
+if echo "$output" | grep -q "task docs:api:generate"; then
+    echo "${GREEN}✓ get-command works for recursively included Taskfile tasks${NC}"
+else
+    echo "${RED}✗ get-command failed for recursively included Taskfile task${NC}"
+    echo "Got: $output"
+    exit 1
+fi
+
+# Test 6c: Verify flattened Taskfile include duplicate detection
+echo "\nTest 6c: Testing duplicate flattened Taskfile include detection"
+mkdir -p /home/testuser/task_include_duplicates/shared
+cat > /home/testuser/task_include_duplicates/Taskfile.yml <<'EOF'
+version: '3'
+includes:
+  shared:
+    taskfile: ./shared
+    flatten: true
+tasks:
+  build:
+    desc: Root build
+    cmds:
+      - echo "Root build"
+EOF
+cat > /home/testuser/task_include_duplicates/shared/Taskfile.yml <<'EOF'
+version: '3'
+tasks:
+  build:
+    desc: Shared build
+    cmds:
+      - echo "Shared build"
+EOF
+
+cd /home/testuser/task_include_duplicates
+duplicate_output=$(dela list 2>&1)
+if echo "$duplicate_output" | grep -q 'Found multiple tasks (build) included by "shared"'; then
+    echo "${GREEN}✓ dela reports duplicate flattened Taskfile task names${NC}"
+else
+    echo "${RED}✗ dela did not report duplicate flattened Taskfile task names${NC}"
+    echo "$duplicate_output"
+    exit 1
+fi
+
+cd /home/testuser/test_project
+
 # Test 7: Basic dela list for Maven tasks
 echo "\nTest 7: Testing dela list for Maven tasks"
 if list_and_grep "clean" && list_and_grep "compile" && list_and_grep "profile:dev"; then
