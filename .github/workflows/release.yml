@@ -1,240 +1,288 @@
 name: Release
 
 on:
+  push:
+    tags:
+      - "v*"
   workflow_dispatch:
     inputs:
-      skip_github_release:
-        description: 'Skip GitHub release creation'
+      dry_run:
+        description: "Build and validate the release without publishing"
         type: boolean
-        default: false
-      skip_binary_build:
-        description: 'Skip binary builds'
-        type: boolean
-        default: false
-      skip_crates_publish:
-        description: 'Skip publishing to crates.io'
-        type: boolean
-        default: false
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
 
 jobs:
-  verify-version:
+  verify-release:
+    name: Verify Release Metadata
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Check version consistency
-        run: |
-          # Get version from Cargo.toml
-          CARGO_VERSION=$(grep -m 1 '^version = ' Cargo.toml | cut -d '"' -f2)
-          echo "Cargo.toml version: $CARGO_VERSION"
-          
-          # Check if this version exists in CHANGELOG.md
-          if ! grep -q "^\## \[$CARGO_VERSION\]" CHANGELOG.md; then
-            echo "::error::Version $CARGO_VERSION not found in CHANGELOG.md"
-            exit 1
-          fi
-          
-          # Check if CHANGELOG version is marked as Unreleased
-          if grep -q "^\## \[$CARGO_VERSION\] - Unreleased" CHANGELOG.md; then
-            echo "::error::Version $CARGO_VERSION is still marked as Unreleased in CHANGELOG.md"
-            exit 1
-          fi
-          
-          # Check if CHANGELOG version has a date
-          if ! grep -q "^\## \[$CARGO_VERSION\] - [0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}" CHANGELOG.md; then
-            echo "::error::Version $CARGO_VERSION in CHANGELOG.md doesn't have a proper date (YYYY-MM-DD)"
-            exit 1
-          fi
-          
-          # Verify version follows semver
-          if ! echo "$CARGO_VERSION" | grep -q '^[0-9]\+\.[0-9]\+\.[0-9]\+$'; then
-            echo "::error::Version $CARGO_VERSION doesn't follow semantic versioning (X.Y.Z)"
-            exit 1
-          fi
-          
-          echo "Version verification passed!"
-
-  verify-workflow-status:
-    needs: verify-version
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check workflow status
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Check the status of the last Rust workflow run
-          rust_status=$(gh run list --workflow=Rust --branch main --limit 1 --json conclusion -q '.[0].conclusion')
-          if [ "$rust_status" != "success" ]; then
-            echo "::error::Latest Rust workflow run did not succeed. Please ensure tests are passing."
-            exit 1
-          fi
-          
-          # Check the status of the last Integration Tests workflow run
-          integration_status=$(gh run list --workflow="Integration Tests" --branch main --limit 1 --json conclusion -q '.[0].conclusion')
-          if [ "$integration_status" != "success" ]; then
-            echo "::error::Latest Integration Tests workflow run did not succeed. Please ensure tests are passing."
-            exit 1
-          fi
-
-  create-release:
-    needs: [verify-version, verify-workflow-status]
-    runs-on: ubuntu-latest
-    if: ${{ !inputs.skip_github_release }}
     outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      version: ${{ steps.release_meta.outputs.version }}
+      tag_name: ${{ steps.release_meta.outputs.tag_name }}
     steps:
-      - uses: actions/checkout@v4
-      
-      # Check if release already exists
-      - name: Check existing release
-        id: check_release
-        run: |
-          TAG_NAME="${GITHUB_REF#refs/tags/}"
-          if gh release view "$TAG_NAME" &> /dev/null; then
-            echo "Release already exists"
-            UPLOAD_URL=$(gh release view "$TAG_NAME" --json uploadUrl -q .uploadUrl)
-            echo "upload_url=$UPLOAD_URL" >> $GITHUB_OUTPUT
-            echo "exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "exists=false" >> $GITHUB_OUTPUT
-          fi
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
-      - name: Create Release
-        id: create_release
-        if: steps.check_release.outputs.exists != 'true'
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # master
         with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          draft: false
-          prerelease: false
+          toolchain: 1.91.1
 
-  build-release:
-    name: Build Release
-    needs: create-release
-    if: ${{ !inputs.skip_binary_build }}
+      - name: Verify version and changelog
+        id: release_meta
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" != "true" ]; then
+            echo "::error::Manual runs are dry-run only. Push a v* tag to publish."
+            exit 1
+          fi
+
+          VERSION=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "dela") | .version')
+          TAG_NAME="v${VERSION}"
+
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "tag_name=${TAG_NAME}" >> "${GITHUB_OUTPUT}"
+
+          if ! grep -q "^\## \[${VERSION}\]" CHANGELOG.md; then
+            echo "::error::Version ${VERSION} not found in CHANGELOG.md"
+            exit 1
+          fi
+
+          if grep -q "^\## \[${VERSION}\] - Unreleased" CHANGELOG.md; then
+            echo "::error::Version ${VERSION} is still marked as Unreleased in CHANGELOG.md"
+            exit 1
+          fi
+
+          if ! grep -q "^\## \[${VERSION}\] - [0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}" CHANGELOG.md; then
+            echo "::error::Version ${VERSION} in CHANGELOG.md does not have a YYYY-MM-DD date"
+            exit 1
+          fi
+
+          if ! echo "${VERSION}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Version ${VERSION} does not follow semantic versioning (X.Y.Z)"
+            exit 1
+          fi
+
+          if [ "${GITHUB_EVENT_NAME}" = "push" ] && [ "${GITHUB_REF_TYPE}" = "tag" ] && [ "${GITHUB_REF_NAME}" != "${TAG_NAME}" ]; then
+            echo "::error::Git tag ${GITHUB_REF_NAME} does not match Cargo.toml version ${VERSION}. Expected ${TAG_NAME}."
+            exit 1
+          fi
+
+  lint-and-unit-tests:
+    name: Lint And Unit Tests
+    needs: verify-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # master
+        with:
+          toolchain: 1.91.1
+          components: rustfmt, clippy
+
+      - name: Run lint
+        run: make lint
+
+      - name: Run unit tests
+        run: make tests
+
+  integration-tests:
+    name: Integration Tests
+    needs: verify-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Run shell integration tests
+        env:
+          VERBOSE: 1
+          DOCKER_PLATFORM: linux/amd64
+        run: make tests_integration
+
+  package-check:
+    name: Cargo Publish Dry Run
+    needs: verify-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # master
+        with:
+          toolchain: 1.91.1
+
+      - name: Validate publish package
+        run: cargo publish --dry-run --locked
+
+  build-artifacts:
+    name: Build ${{ matrix.archive_name }}
+    needs: [verify-release, lint-and-unit-tests, integration-tests, package-check]
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         include:
-          - build: linux
-            os: ubuntu-latest
-            rust: stable
+          - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             archive_name: dela-linux-amd64.tar.gz
-          - build: linux-arm64
-            os: ubuntu-latest
-            rust: stable
+            artifact_name: dela-linux-amd64
+          - os: ubuntu-latest
             target: aarch64-unknown-linux-gnu
             archive_name: dela-linux-arm64.tar.gz
-          - build: macos
-            os: macos-latest
-            rust: stable
+            artifact_name: dela-linux-arm64
+            linker: aarch64-linux-gnu-gcc
+          - os: macos-latest
             target: x86_64-apple-darwin
             archive_name: dela-darwin-amd64.tar.gz
-          - build: macos-arm64
-            os: macos-latest
-            rust: stable
+            artifact_name: dela-darwin-amd64
+          - os: macos-latest
             target: aarch64-apple-darwin
             archive_name: dela-darwin-arm64.tar.gz
-          - build: windows
-            os: windows-latest
-            rust: stable
-            target: x86_64-pc-windows-msvc
-            archive_name: dela-windows-amd64.zip
-      fail-fast: false
-
+            artifact_name: dela-darwin-arm64
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
-      with:
-        targets: ${{ matrix.target }}
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # master
+        with:
+          toolchain: 1.91.1
+          targets: ${{ matrix.target }}
 
-    - name: Install Cross-Compilation Tools
-      if: matrix.build == 'linux-arm64'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y gcc-aarch64-linux-gnu
+      - name: Install Linux cross-compilation tools
+        if: runner.os == 'Linux' && matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
 
-    - name: Build Binary
-      run: |
-        cargo build --release --target ${{ matrix.target }}
+      - name: Build binary
+        shell: bash
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: ${{ matrix.linker }}
+        run: cargo build --release --locked --target "${{ matrix.target }}"
 
-    - name: Prepare Archive (Unix)
-      if: matrix.os != 'windows-latest'
-      run: |
-        cd target/${{ matrix.target }}/release
-        tar czvf ../../../${{ matrix.archive_name }} dela
-        cd -
+      - name: Prepare archive
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp "target/${{ matrix.target }}/release/dela" .
+          tar czf "${{ matrix.archive_name }}" dela
 
-    - name: Prepare Archive (Windows)
-      if: matrix.os == 'windows-latest'
-      run: |
-        cd target/${{ matrix.target }}/release
-        7z a ../../../${{ matrix.archive_name }} dela.exe
-        cd -
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ./${{ matrix.archive_name }}
+          if-no-files-found: error
 
-    # Check if asset already exists
-    - name: Check existing asset
-      id: check_asset
-      run: |
-        TAG_NAME="${GITHUB_REF#refs/tags/}"
-        if gh release view "$TAG_NAME" --json assets -q ".assets[].name" | grep -q "^${{ matrix.archive_name }}$"; then
-          echo "Asset already exists"
-          echo "exists=true" >> $GITHUB_OUTPUT
-        else
-          echo "exists=false" >> $GITHUB_OUTPUT
-        fi
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      shell: bash
-
-    - name: Upload Release Asset
-      uses: actions/upload-release-asset@v1
-      if: steps.check_asset.outputs.exists != 'true'
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ needs.create-release.outputs.upload_url }}
-        asset_path: ./${{ matrix.archive_name }}
-        asset_name: ${{ matrix.archive_name }}
-        asset_content_type: application/octet-stream
-
-  publish-crate:
-    name: Publish to crates.io
-    needs: [create-release, build-release]
-    if: ${{ !inputs.skip_crates_publish }}
+  create-draft-release:
+    name: Create Draft GitHub Release
+    needs: [verify-release, build-artifacts]
+    if: ${{ github.event_name == 'push' && github.ref_type == 'tag' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      # Check if version is already published
-      - name: Check if version exists on crates.io
-        id: check_version
+      - name: Ensure draft release exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ needs.verify-release.outputs.tag_name }}
+        shell: bash
         run: |
-          VERSION=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version')
-          if cargo search dela --limit 1 | grep -q "dela = \"$VERSION\""; then
-            echo "Version $VERSION already exists on crates.io"
-            echo "exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "exists=false" >> $GITHUB_OUTPUT
+          set -euo pipefail
+
+          if gh release view "${TAG_NAME}" >/dev/null 2>&1; then
+            echo "Draft or release ${TAG_NAME} already exists"
+            exit 0
           fi
 
-      - name: Check package
-        if: steps.check_version.outputs.exists != 'true'
-        run: cargo package --locked
+          gh release create "${TAG_NAME}" \
+            --draft \
+            --verify-tag \
+            --title "${TAG_NAME}" \
+            --generate-notes
 
-      - name: Publish to crates.io
-        if: steps.check_version.outputs.exists != 'true'
+  upload-release-assets:
+    name: Upload Draft Release Assets
+    needs: [verify-release, build-artifacts, create-draft-release]
+    if: ${{ github.event_name == 'push' && github.ref_type == 'tag' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download built archives
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Upload assets to draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ needs.verify-release.outputs.tag_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release upload "${TAG_NAME}" dist/* --clobber
+
+  publish-crate:
+    name: Publish To Crates.io
+    needs: [verify-release, build-artifacts, upload-release-assets]
+    if: ${{ github.event_name == 'push' && github.ref_type == 'tag' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # master
+        with:
+          toolchain: 1.91.1
+
+      - name: Check whether version is already published
+        id: crates_version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          VERSION="${{ needs.verify-release.outputs.version }}"
+          RESPONSE=$(curl --fail --silent --location https://crates.io/api/v1/crates/dela || true)
+
+          if [ -n "${RESPONSE}" ] && echo "${RESPONSE}" | jq -e --arg version "${VERSION}" '.versions[] | select(.num == $version)' >/dev/null; then
+            echo "exists=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "exists=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Publish crate
+        if: steps.crates_version.outputs.exists != 'true'
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        run: cargo publish --locked 
+        run: cargo publish --locked
+
+  publish-github-release:
+    name: Publish GitHub Release
+    needs: [verify-release, publish-crate]
+    if: ${{ github.event_name == 'push' && github.ref_type == 'tag' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ needs.verify-release.outputs.tag_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          RELEASE_ID=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG_NAME}" --jq .id)
+          gh api \
+            --method PATCH \
+            -H "Accept: application/vnd.github+json" \
+            "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" \
+            -F draft=false
