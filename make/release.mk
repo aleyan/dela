@@ -96,6 +96,13 @@ release_publish:
 		git status --short; \
 		exit 1; \
 	fi; \
+	echo "Fetching origin/main to verify sync..."; \
+	git fetch origin main --quiet; \
+	REMOTE_COMMIT=$$(git rev-parse --verify origin/main); \
+	if [ "$$(git rev-parse HEAD)" != "$$REMOTE_COMMIT" ]; then \
+		echo "Error: local HEAD does not match origin/main. Please pull or push first."; \
+		exit 1; \
+	fi; \
 	$(MAKE) release_verify; \
 	VERSION=$$(grep -m 1 '^version = ' Cargo.toml | cut -d '"' -f2); \
 	TAG="v$$VERSION"; \
