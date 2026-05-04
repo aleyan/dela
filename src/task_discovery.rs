@@ -494,18 +494,21 @@ fn discover_taskfile_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Resu
     let mut tasks = Vec::new();
     let mut include_errors = Vec::new();
     let no_excludes = std::collections::HashSet::new();
+    let mut traversal = TaskfileTraversal {
+        root_taskfile_path: &taskfile_path,
+        traversal_state: &mut traversal_state,
+        seen_task_names: &mut seen_task_names,
+        collected_tasks: &mut tasks,
+        include_errors: &mut include_errors,
+    };
 
     let result = collect_taskfile_tasks_recursive(
-        &taskfile_path,
         &root_source,
         "",
         None,
         false,
         &no_excludes,
-        &mut traversal_state,
-        &mut seen_task_names,
-        &mut tasks,
-        &mut include_errors,
+        &mut traversal,
     );
 
     for task in &mut tasks {
@@ -535,19 +538,26 @@ fn discover_taskfile_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Resu
     Ok(())
 }
 
+struct TaskfileTraversal<'a> {
+    root_taskfile_path: &'a Path,
+    traversal_state: &'a mut RecursiveDiscoveryState,
+    seen_task_names: &'a mut std::collections::HashSet<String>,
+    collected_tasks: &'a mut Vec<Task>,
+    include_errors: &'a mut Vec<String>,
+}
+
 fn collect_taskfile_tasks_recursive(
-    root_taskfile_path: &Path,
     current_source: &ComposedDefinitionSource,
     namespace_prefix: &str,
     include_label: Option<&str>,
     hide_tasks: bool,
     excluded_tasks: &std::collections::HashSet<String>,
-    traversal_state: &mut RecursiveDiscoveryState,
-    seen_task_names: &mut std::collections::HashSet<String>,
-    collected_tasks: &mut Vec<Task>,
-    include_errors: &mut Vec<String>,
+    traversal: &mut TaskfileTraversal<'_>,
 ) -> Result<(), String> {
-    match traversal_state.mark_visited(current_source.definition_path()) {
+    match traversal
+        .traversal_state
+        .mark_visited(current_source.definition_path())
+    {
         VisitState::AlreadyVisited(_) => return Ok(()),
         VisitState::New(_) => {}
     }
@@ -569,7 +579,7 @@ fn collect_taskfile_tasks_recursive(
             task.source_name = effective_name;
             current_source.apply_to_task(&mut task);
 
-            if !seen_task_names.insert(task.name.clone()) {
+            if !traversal.seen_task_names.insert(task.name.clone()) {
                 let error = match include_label {
                     Some(include_label) => {
                         format!(
@@ -579,14 +589,14 @@ fn collect_taskfile_tasks_recursive(
                     }
                     None => format!("Found multiple Taskfile tasks named '{}'", task.name),
                 };
-                include_errors.push(error.clone());
+                traversal.include_errors.push(error.clone());
                 if first_error.is_none() {
                     first_error = Some(error);
                 }
                 continue;
             }
 
-            collected_tasks.push(task);
+            traversal.collected_tasks.push(task);
         }
     }
 
@@ -600,8 +610,10 @@ fn collect_taskfile_tasks_recursive(
             continue;
         }
 
-        let child_source =
-            ComposedDefinitionSource::composed(root_taskfile_path, resolved_include.clone());
+        let child_source = ComposedDefinitionSource::composed(
+            traversal.root_taskfile_path,
+            resolved_include.clone(),
+        );
         let child_namespace = if include.flatten {
             namespace_prefix.to_string()
         } else {
@@ -612,23 +624,19 @@ fn collect_taskfile_tasks_recursive(
         let child_excludes = include.excludes.into_iter().collect();
 
         if let Err(error) = collect_taskfile_tasks_recursive(
-            root_taskfile_path,
             &child_source,
             &child_namespace,
             Some(child_include_label.as_str()),
             child_hide_tasks,
             &child_excludes,
-            traversal_state,
-            seen_task_names,
-            collected_tasks,
-            include_errors,
+            traversal,
         ) {
             let error = format!(
                 "Failed to parse included Taskfile '{}': {}",
                 resolved_include.display(),
                 error
             );
-            include_errors.push(error.clone());
+            traversal.include_errors.push(error.clone());
             if first_error.is_none() {
                 first_error = Some(error);
             }
