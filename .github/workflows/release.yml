@@ -36,7 +36,7 @@ jobs:
         with:
           toolchain: 1.91.1
 
-      - name: Verify version and changelog
+      - name: Verify release metadata
         id: release_meta
         shell: bash
         run: |
@@ -52,31 +52,11 @@ jobs:
 
           echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
           echo "tag_name=${TAG_NAME}" >> "${GITHUB_OUTPUT}"
-
-          if ! grep -q "^\## \[${VERSION}\]" CHANGELOG.md; then
-            echo "::error::Version ${VERSION} not found in CHANGELOG.md"
-            exit 1
-          fi
-
-          if grep -q "^\## \[${VERSION}\] - Unreleased" CHANGELOG.md; then
-            echo "::error::Version ${VERSION} is still marked as Unreleased in CHANGELOG.md"
-            exit 1
-          fi
-
-          if ! grep -q "^\## \[${VERSION}\] - [0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}" CHANGELOG.md; then
-            echo "::error::Version ${VERSION} in CHANGELOG.md does not have a YYYY-MM-DD date"
-            exit 1
-          fi
-
-          if ! echo "${VERSION}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "::error::Version ${VERSION} does not follow semantic versioning (X.Y.Z)"
-            exit 1
-          fi
-
-          if [ "${GITHUB_EVENT_NAME}" = "push" ] && [ "${GITHUB_REF_TYPE}" = "tag" ] && [ "${GITHUB_REF_NAME}" != "${TAG_NAME}" ]; then
-            echo "::error::Git tag ${GITHUB_REF_NAME} does not match Cargo.toml version ${VERSION}. Expected ${TAG_NAME}."
-            exit 1
-          fi
+          make release_verify \
+            RELEASE_VERIFY_EXPECT_TAG="${TAG_NAME}" \
+            RELEASE_VERIFY_SKIP_TAG_EXISTS=1 \
+            RELEASE_VERIFY_SKIP_CRATES_CHECK=1 \
+            RELEASE_VERIFY_SKIP_TESTS=1
 
   lint-and-unit-tests:
     name: Lint And Unit Tests
