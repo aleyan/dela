@@ -7,7 +7,7 @@ use crate::parsers::{
 use crate::repo_root::find_git_repo_root;
 use crate::task_shadowing::check_shadowing;
 use crate::types::{Task, TaskDefinitionFile, TaskDefinitionType, TaskFileStatus, TaskRunner};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
@@ -663,16 +663,335 @@ fn discover_turbo_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<
         return Ok(());
     }
 
-    match parse_turbo_json::parse(&turbo_json) {
-        Ok(tasks) => {
-            handle_discovery_success(tasks, turbo_json, TaskDefinitionType::TurboJson, discovered);
+    let mut tasks_by_name = BTreeMap::new();
+    let mut config_errors = Vec::new();
+
+    let result = collect_turbo_tasks_for_context(
+        &repo_root,
+        dir,
+        &turbo_json,
+        &mut tasks_by_name,
+        &mut config_errors,
+    );
+
+    let mut tasks: Vec<_> = tasks_by_name.into_values().collect();
+    for task in &mut tasks {
+        task.shadowed_by = check_shadowing(&task.name);
+    }
+
+    discovered.tasks.extend(tasks);
+    discovered.errors.extend(config_errors);
+
+    let status = match result {
+        Ok(()) => TaskFileStatus::Parsed,
+        Err(error) => {
+            discovered.errors.push(format!(
+                "Failed to parse {}: {}",
+                turbo_json.display(),
+                error
+            ));
+            TaskFileStatus::ParseError(error)
         }
-        Err(e) => {
-            handle_discovery_error(e, turbo_json, TaskDefinitionType::TurboJson, discovered);
+    };
+    discovered.definitions.turbo_json = Some(TaskDefinitionFile {
+        path: turbo_json,
+        definition_type: TaskDefinitionType::TurboJson,
+        status,
+    });
+
+    Ok(())
+}
+
+fn collect_turbo_tasks_for_context(
+    repo_root: &Path,
+    dir: &Path,
+    root_turbo_json: &Path,
+    collected_tasks: &mut BTreeMap<String, Task>,
+    config_errors: &mut Vec<String>,
+) -> Result<(), String> {
+    let root_source = ComposedDefinitionSource::direct(root_turbo_json.to_path_buf());
+    let mut package_configs_by_name = None;
+    let root_tasks = resolve_effective_turbo_tasks(
+        &root_source,
+        repo_root,
+        root_turbo_json,
+        &mut package_configs_by_name,
+        &mut RecursiveDiscoveryState::new(),
+    )?;
+    collected_tasks.extend(root_tasks);
+
+    let mut first_error = None;
+
+    if dir == repo_root {
+        for config_path in collect_descendant_turbo_config_paths(repo_root) {
+            let config_source =
+                ComposedDefinitionSource::composed(root_turbo_json, config_path.clone());
+            match resolve_effective_turbo_tasks(
+                &config_source,
+                repo_root,
+                root_turbo_json,
+                &mut package_configs_by_name,
+                &mut RecursiveDiscoveryState::new(),
+            ) {
+                Ok(tasks) => {
+                    for (name, task) in tasks {
+                        collected_tasks.entry(name).or_insert(task);
+                    }
+                }
+                Err(error) => {
+                    let error = format!(
+                        "Failed to parse workspace-local turbo config '{}': {}",
+                        config_path.display(),
+                        error
+                    );
+                    config_errors.push(error.clone());
+                    if first_error.is_none() {
+                        first_error = Some(error);
+                    }
+                }
+            }
+        }
+    } else {
+        for config_path in collect_turbo_ancestor_config_paths(dir, repo_root) {
+            let config_source =
+                ComposedDefinitionSource::composed(root_turbo_json, config_path.clone());
+            match resolve_effective_turbo_tasks(
+                &config_source,
+                repo_root,
+                root_turbo_json,
+                &mut package_configs_by_name,
+                &mut RecursiveDiscoveryState::new(),
+            ) {
+                Ok(tasks) if !tasks.is_empty() => {
+                    *collected_tasks = tasks;
+                    break;
+                }
+                Ok(_) => {}
+                Err(error) => {
+                    let error = format!(
+                        "Failed to parse workspace-local turbo config '{}': {}",
+                        config_path.display(),
+                        error
+                    );
+                    config_errors.push(error.clone());
+                    if first_error.is_none() {
+                        first_error = Some(error);
+                    }
+                    break;
+                }
+            }
         }
     }
 
-    Ok(())
+    if let Some(error) = first_error {
+        Err(error)
+    } else {
+        Ok(())
+    }
+}
+
+fn resolve_effective_turbo_tasks(
+    current_source: &ComposedDefinitionSource,
+    repo_root: &Path,
+    root_turbo_json: &Path,
+    package_configs_by_name: &mut Option<HashMap<String, PathBuf>>,
+    traversal_state: &mut RecursiveDiscoveryState,
+) -> Result<BTreeMap<String, Task>, String> {
+    match traversal_state.mark_visited(current_source.definition_path()) {
+        VisitState::AlreadyVisited(_) => return Ok(BTreeMap::new()),
+        VisitState::New(_) => {}
+    }
+
+    let config = parse_turbo_json::load_config(current_source.definition_path())?;
+
+    if current_source.definition_path() != root_turbo_json && config.extends.is_empty() {
+        return Ok(BTreeMap::new());
+    }
+
+    let mut tasks = BTreeMap::new();
+
+    if current_source.definition_path() != root_turbo_json {
+        for extend_entry in &config.extends {
+            let Some(parent_config_path) = resolve_turbo_extends_entry(
+                current_source,
+                extend_entry,
+                repo_root,
+                root_turbo_json,
+                package_configs_by_name,
+            ) else {
+                continue;
+            };
+
+            if !parent_config_path.is_file() {
+                continue;
+            }
+
+            let parent_source =
+                ComposedDefinitionSource::composed(root_turbo_json, parent_config_path.clone());
+            let inherited_tasks = resolve_effective_turbo_tasks(
+                &parent_source,
+                repo_root,
+                root_turbo_json,
+                package_configs_by_name,
+                traversal_state,
+            )?;
+            tasks.extend(inherited_tasks);
+        }
+    }
+
+    for (name, task_config) in &config.tasks {
+        if !task_config.is_effective_task_definition() {
+            tasks.remove(name.as_str());
+        }
+    }
+
+    let mut local_tasks = parse_turbo_json::parse(current_source.definition_path())?;
+    for task in &mut local_tasks {
+        current_source.apply_to_task(task);
+    }
+    for task in local_tasks {
+        tasks.insert(task.name.clone(), task);
+    }
+
+    Ok(tasks)
+}
+
+fn resolve_turbo_extends_entry(
+    current_source: &ComposedDefinitionSource,
+    extend_entry: &str,
+    repo_root: &Path,
+    root_turbo_json: &Path,
+    package_configs_by_name: &mut Option<HashMap<String, PathBuf>>,
+) -> Option<PathBuf> {
+    if extend_entry == "//" {
+        return Some(root_turbo_json.to_path_buf());
+    }
+
+    if looks_like_turbo_config_path(extend_entry) {
+        let candidate = current_source.resolve_child(extend_entry);
+        return Some(resolve_turbo_config_path_candidate(&candidate));
+    }
+
+    let package_configs_by_name =
+        package_configs_by_name.get_or_insert_with(|| build_turbo_package_config_index(repo_root));
+    package_configs_by_name.get(extend_entry).cloned()
+}
+
+fn collect_turbo_ancestor_config_paths(dir: &Path, repo_root: &Path) -> Vec<PathBuf> {
+    let mut current = dir.to_path_buf();
+    let mut config_paths = Vec::new();
+
+    while current.starts_with(repo_root) && current != repo_root {
+        let candidate = current.join("turbo.json");
+        if candidate.is_file() {
+            config_paths.push(candidate);
+        }
+
+        if !current.pop() {
+            break;
+        }
+    }
+
+    config_paths
+}
+
+fn collect_descendant_turbo_config_paths(repo_root: &Path) -> Vec<PathBuf> {
+    let mut config_paths = Vec::new();
+    collect_descendant_turbo_config_paths_recursive(repo_root, repo_root, &mut config_paths);
+    config_paths.sort();
+    config_paths
+}
+
+fn collect_descendant_turbo_config_paths_recursive(
+    repo_root: &Path,
+    current_dir: &Path,
+    config_paths: &mut Vec<PathBuf>,
+) {
+    let Ok(entries) = fs::read_dir(current_dir) else {
+        return;
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+
+        let Some(file_name) = path.file_name().and_then(|name| name.to_str()) else {
+            continue;
+        };
+        if should_skip_turbo_config_scan(file_name) {
+            continue;
+        }
+
+        let candidate = path.join("turbo.json");
+        if candidate.is_file() && candidate != repo_root.join("turbo.json") {
+            config_paths.push(candidate);
+        }
+
+        collect_descendant_turbo_config_paths_recursive(repo_root, &path, config_paths);
+    }
+}
+
+fn should_skip_turbo_config_scan(file_name: &str) -> bool {
+    matches!(file_name, ".git" | "node_modules")
+}
+
+fn looks_like_turbo_config_path(extend_entry: &str) -> bool {
+    let extend_path = Path::new(extend_entry);
+    extend_path.is_absolute()
+        || extend_entry.starts_with('.')
+        || extend_entry.contains(std::path::MAIN_SEPARATOR)
+        || extend_entry.contains('/')
+        || extend_entry.contains('\\')
+}
+
+fn resolve_turbo_config_path_candidate(candidate: &Path) -> PathBuf {
+    if candidate
+        .file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name == "turbo.json")
+    {
+        return candidate.to_path_buf();
+    }
+
+    if candidate.extension().is_none() || candidate.is_dir() {
+        return candidate.join("turbo.json");
+    }
+
+    candidate.to_path_buf()
+}
+
+fn build_turbo_package_config_index(repo_root: &Path) -> HashMap<String, PathBuf> {
+    let mut package_configs = HashMap::new();
+
+    let root_turbo_json = repo_root.join("turbo.json");
+    if root_turbo_json.is_file()
+        && let Some(package_name) = read_package_name(repo_root)
+    {
+        package_configs.insert(package_name, root_turbo_json);
+    }
+
+    for config_path in collect_descendant_turbo_config_paths(repo_root) {
+        let Some(config_dir) = config_path.parent() else {
+            continue;
+        };
+        let Some(package_name) = read_package_name(config_dir) else {
+            continue;
+        };
+        package_configs.entry(package_name).or_insert(config_path);
+    }
+
+    package_configs
+}
+
+fn read_package_name(dir: &Path) -> Option<String> {
+    let package_json_path = dir.join("package.json");
+    let contents = fs::read_to_string(package_json_path).ok()?;
+    let json: serde_json::Value = serde_json::from_str(&contents).ok()?;
+    json.get("name")
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_string)
 }
 
 fn discover_maven_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<(), String> {
@@ -1148,6 +1467,26 @@ mod tests {
         writeln!(file, "{}", content).unwrap();
     }
 
+    fn create_test_turbo_json(dir: &Path, content: &str) {
+        std::fs::create_dir_all(dir).unwrap();
+        std::fs::write(dir.join("turbo.json"), content).unwrap();
+    }
+
+    fn create_test_package_json(dir: &Path, name: &str) {
+        std::fs::create_dir_all(dir).unwrap();
+        std::fs::write(
+            dir.join("package.json"),
+            format!(
+                r#"{{
+  "name": "{}",
+  "private": true
+}}"#,
+                name
+            ),
+        )
+        .unwrap();
+    }
+
     #[test]
     fn test_discover_tasks_empty_directory() {
         let temp_dir = TempDir::new().unwrap();
@@ -1423,8 +1762,8 @@ build:
         std::fs::create_dir_all(temp_dir.path().join(".git")).unwrap();
         std::fs::create_dir_all(temp_dir.path().join("apps").join("web")).unwrap();
 
-        std::fs::write(
-            temp_dir.path().join("turbo.json"),
+        create_test_turbo_json(
+            temp_dir.path(),
             r#"{
   "$schema": "https://turborepo.dev/schema.json",
   "tasks": {
@@ -1434,22 +1773,203 @@ build:
     }
   }
 }"#,
-        )
-        .unwrap();
+        );
 
         let discovered = discover_tasks(&temp_dir.path().join("apps").join("web"));
 
         let build_task = discovered.tasks.iter().find(|t| t.name == "build").unwrap();
         assert_eq!(build_task.runner, TaskRunner::Turbo);
         assert_eq!(build_task.file_path, temp_dir.path().join("turbo.json"));
+        assert_eq!(
+            build_task.definition_path(),
+            temp_dir.path().join("turbo.json").as_path()
+        );
 
         let test_task = discovered.tasks.iter().find(|t| t.name == "test").unwrap();
         assert_eq!(test_task.runner, TaskRunner::Turbo);
         assert_eq!(test_task.file_path, temp_dir.path().join("turbo.json"));
+        assert_eq!(
+            test_task.definition_path(),
+            temp_dir.path().join("turbo.json").as_path()
+        );
 
         assert_eq!(
             discovered.definitions.turbo_json.unwrap().status,
             TaskFileStatus::Parsed
+        );
+    }
+
+    #[test]
+    fn test_discover_tasks_includes_workspace_local_turbo_tasks_from_repo_root() {
+        let temp_dir = TempDir::new().unwrap();
+        let repo_root = temp_dir.path();
+        let web_dir = repo_root.join("apps").join("web");
+        std::fs::create_dir_all(repo_root.join(".git")).unwrap();
+
+        create_test_turbo_json(
+            repo_root,
+            r#"{
+  "tasks": {
+    "build": {},
+    "test": {}
+  }
+}"#,
+        );
+        create_test_package_json(&web_dir, "web");
+        create_test_turbo_json(
+            &web_dir,
+            r#"{
+  "extends": ["//"],
+  "tasks": {
+    "lint": {},
+    "test": {
+      "extends": false
+    }
+  }
+}"#,
+        );
+
+        let discovered = discover_tasks(repo_root);
+
+        assert!(discovered.errors.is_empty(), "{:?}", discovered.errors);
+        assert!(discovered.tasks.iter().any(|task| task.name == "build"));
+        assert!(discovered.tasks.iter().any(|task| task.name == "test"));
+
+        let lint_task = discovered
+            .tasks
+            .iter()
+            .find(|task| task.name == "lint")
+            .unwrap();
+        assert_eq!(lint_task.runner, TaskRunner::Turbo);
+        assert_eq!(lint_task.file_path, repo_root.join("turbo.json"));
+        assert_eq!(
+            lint_task.definition_path(),
+            web_dir.join("turbo.json").as_path()
+        );
+    }
+
+    #[test]
+    fn test_discover_tasks_resolves_workspace_local_turbo_tasks_for_nested_package() {
+        let temp_dir = TempDir::new().unwrap();
+        let repo_root = temp_dir.path();
+        let web_dir = repo_root.join("apps").join("web");
+        std::fs::create_dir_all(repo_root.join(".git")).unwrap();
+
+        create_test_turbo_json(
+            repo_root,
+            r#"{
+  "tasks": {
+    "build": {},
+    "test": {}
+  }
+}"#,
+        );
+        create_test_package_json(&web_dir, "web");
+        create_test_turbo_json(
+            &web_dir,
+            r#"{
+  "extends": ["//"],
+  "tasks": {
+    "lint": {},
+    "test": {
+      "extends": false
+    }
+  }
+}"#,
+        );
+
+        let discovered = discover_tasks(&web_dir);
+        let task_names: Vec<_> = discovered
+            .tasks
+            .iter()
+            .map(|task| task.name.as_str())
+            .collect();
+
+        assert!(discovered.errors.is_empty(), "{:?}", discovered.errors);
+        assert_eq!(task_names, vec!["build", "lint"]);
+
+        let build_task = discovered
+            .tasks
+            .iter()
+            .find(|task| task.name == "build")
+            .unwrap();
+        assert_eq!(
+            build_task.definition_path(),
+            repo_root.join("turbo.json").as_path()
+        );
+
+        let lint_task = discovered
+            .tasks
+            .iter()
+            .find(|task| task.name == "lint")
+            .unwrap();
+        assert_eq!(lint_task.file_path, repo_root.join("turbo.json"));
+        assert_eq!(
+            lint_task.definition_path(),
+            web_dir.join("turbo.json").as_path()
+        );
+    }
+
+    #[test]
+    fn test_discover_tasks_recursively_resolves_turbo_extends_chain() {
+        let temp_dir = TempDir::new().unwrap();
+        let repo_root = temp_dir.path();
+        let shared_dir = repo_root.join("packages").join("shared-config");
+        let web_dir = repo_root.join("apps").join("web");
+        std::fs::create_dir_all(repo_root.join(".git")).unwrap();
+
+        create_test_turbo_json(
+            repo_root,
+            r#"{
+  "tasks": {
+    "build": {}
+  }
+}"#,
+        );
+        create_test_package_json(&shared_dir, "shared-config");
+        create_test_turbo_json(
+            &shared_dir,
+            r#"{
+  "extends": ["//"],
+  "tasks": {
+    "lint": {}
+  }
+}"#,
+        );
+        create_test_package_json(&web_dir, "web");
+        create_test_turbo_json(
+            &web_dir,
+            r#"{
+  "extends": ["//", "shared-config"],
+  "tasks": {
+    "deploy": {}
+  }
+}"#,
+        );
+
+        let discovered = discover_tasks(&web_dir);
+
+        assert!(discovered.errors.is_empty(), "{:?}", discovered.errors);
+        assert!(discovered.tasks.iter().any(|task| task.name == "build"));
+
+        let lint_task = discovered
+            .tasks
+            .iter()
+            .find(|task| task.name == "lint")
+            .unwrap();
+        assert_eq!(
+            lint_task.definition_path(),
+            shared_dir.join("turbo.json").as_path()
+        );
+
+        let deploy_task = discovered
+            .tasks
+            .iter()
+            .find(|task| task.name == "deploy")
+            .unwrap();
+        assert_eq!(
+            deploy_task.definition_path(),
+            web_dir.join("turbo.json").as_path()
         );
     }
 

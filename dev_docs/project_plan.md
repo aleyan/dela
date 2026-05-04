@@ -261,7 +261,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [x] [DTKT-198] Support Makefile `include`, `-include`, and `sinclude` during task discovery, including recursively loading referenced makefiles and covering the behavior with unit and integration tests. These will be parsed using the lossless parser and the fallback regex parser.
   - [x] [DTKT-199] Preserve source-file attribution for tasks discovered from included makefiles so `dela list`, allowlists, and MCP metadata point at the defining file, with tests covering duplicates and allowlist decisions from included files.
   - [x] [DTKT-200] Support Taskfile `includes` so tasks from included Taskfiles are discovered and exposed by dela, with unit and integration coverage for recursive includes and duplicate task names.
-  - [ ] [DTKT-201] Support Turborepo workspace-local `turbo.json` configs that extend the root config so inherited package tasks are discovered, with unit and integration coverage for recursive config resolution.
+  - [x] [DTKT-201] Support Turborepo workspace-local `turbo.json` configs that extend the root config so inherited package tasks are discovered, with unit and integration coverage for recursive config resolution.
 
 - [ ] **Additional Task Runners support**
   - [x] [DTKT-119] Implement Maven `pom.xml` parser and task discovery

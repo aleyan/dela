@@ -1,0 +1,9 @@
+{
+  "extends": ["//"],
+  "tasks": {
+    "web-lint": {},
+    "test": {
+      "extends": false
+    }
+  }
+}

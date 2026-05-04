@@ -444,26 +444,57 @@ fi
 
 echo "${GREEN}✓ All get-command argument passing tests passed successfully${NC}"
 
-# Test 21b: Discover turbo tasks from a nested package using the git repo root
-echo "\nTest 21b: Testing Turborepo discovery from a nested package"
+# Test 21b: Discover turbo tasks from workspace-local configs
+echo "\nTest 21b: Testing Turborepo workspace-local config discovery"
 cd /home/testuser/turbo_repo
 git init >/dev/null 2>&1
-cd /home/testuser/turbo_repo/apps/web
 
-dela list 2>/dev/null > turbo_list_output.txt
-if grep -q "build-t" turbo_list_output.txt && grep -q "test-t" turbo_list_output.txt; then
-    echo "${GREEN}✓ dela list shows turbo tasks from repo root when run in a nested package${NC}"
+dela list > turbo_root_list_output.txt 2> turbo_root_stderr.txt
+if grep -q "web-lint" turbo_root_list_output.txt && grep -q "apps/web/turbo.json" turbo_root_list_output.txt; then
+    echo "${GREEN}✓ dela list shows workspace-local turbo tasks and source paths from the repo root${NC}"
 else
-    echo "${RED}✗ dela list failed to show turbo tasks from repo root${NC}"
-    cat turbo_list_output.txt
+    echo "${RED}✗ dela list failed to show workspace-local turbo tasks from the repo root${NC}"
+    cat turbo_root_list_output.txt
     exit 1
 fi
 
-output=$(dela get-command build-t 2>&1)
-if echo "$output" | grep -q "turbo run build"; then
-    echo "${GREEN}✓ get-command returns the turbo command for a nested package task${NC}"
+if [ -s turbo_root_stderr.txt ]; then
+    echo "${RED}✗ dela emitted errors while listing turbo tasks from the repo root${NC}"
+    cat turbo_root_stderr.txt
+    exit 1
+fi
+
+echo "2" | dela allow-command web-lint >/dev/null 2>&1
+if grep -q "/home/testuser/turbo_repo/apps/web/turbo.json" /home/testuser/.config/dela/allowlist.toml; then
+    echo "${GREEN}✓ allow-command stores the workspace-local turbo.json path${NC}"
 else
-    echo "${RED}✗ get-command failed for turbo task${NC}"
+    echo "${RED}✗ allow-command did not store the workspace-local turbo.json path${NC}"
+    cat /home/testuser/.config/dela/allowlist.toml
+    exit 1
+fi
+
+cd /home/testuser/turbo_repo/apps/web
+
+dela list > turbo_package_list_output.txt 2> turbo_package_stderr.txt
+if grep -q "build-t" turbo_package_list_output.txt && grep -q "web-lint-t" turbo_package_list_output.txt && ! grep -q "test-t" turbo_package_list_output.txt; then
+    echo "${GREEN}✓ dela list resolves effective turbo tasks for a nested package${NC}"
+else
+    echo "${RED}✗ dela list did not resolve the expected nested-package turbo tasks${NC}"
+    cat turbo_package_list_output.txt
+    exit 1
+fi
+
+if [ -s turbo_package_stderr.txt ]; then
+    echo "${RED}✗ dela emitted errors while listing turbo tasks from a nested package${NC}"
+    cat turbo_package_stderr.txt
+    exit 1
+fi
+
+output=$(dela get-command web-lint-t 2>&1)
+if echo "$output" | grep -q "turbo run web-lint"; then
+    echo "${GREEN}✓ get-command returns the turbo command for a workspace-local task${NC}"
+else
+    echo "${RED}✗ get-command failed for the workspace-local turbo task${NC}"
     echo "Full output: $output"
     exit 1
 fi
