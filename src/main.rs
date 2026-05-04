@@ -37,6 +37,7 @@ mod types;
 • Docker Compose (docker-compose.yml, compose.yml)
 • CMake (CMakeLists.txt)
 • Travis CI (.travis.yml)
+• Just (Justfile)
 "#,
     long_about = r#"Dela integrates with you shell to let you to execute locally defined
 tasks such as in Makefile or package.json without specifying the task runner.

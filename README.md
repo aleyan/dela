@@ -49,7 +49,7 @@ Running build from ~/Projects/dela/Makefile for the first time. Allow?
 4) Deny
 ```
 
-You can also use `dr` to explicitly invoke `dela`:
+You can also use `dr` (acronym for `dela run`) to explicitly invoke a task via `dela`:
 
 ```sh
 $ dr build

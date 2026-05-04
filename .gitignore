@@ -6,3 +6,4 @@
 .env
 tests/task_definitions/build/*
 .cursor
+/scratch
