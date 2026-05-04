@@ -185,8 +185,14 @@ jobs:
           set -euo pipefail
 
           if gh release view "${TAG_NAME}" >/dev/null 2>&1; then
-            echo "Draft or release ${TAG_NAME} already exists"
-            exit 0
+            IS_DRAFT=$(gh release view "${TAG_NAME}" --json draft --jq .draft)
+            if [ "${IS_DRAFT}" = "true" ]; then
+              echo "Draft release ${TAG_NAME} already exists."
+              exit 0
+            else
+              echo "Error: Published release ${TAG_NAME} already exists. Refusing to operate on a published release."
+              exit 1
+            fi
           fi
 
           make release_notes
