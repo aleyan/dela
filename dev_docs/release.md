@@ -15,19 +15,6 @@ The release automation is in [.github/workflows/release.yml](/Users/aleyan/Proje
 3. Run:
 
 ```sh
-make release_verify
-```
-
-4. Run the GitHub Actions dry run:
-   - open `Actions`
-   - open `Release`
-   - click `Run workflow`
-   - leave `dry_run=true`
-   - run it on `main`
-5. Confirm the dry run passed and inspect the uploaded artifacts.
-6. Run:
-
-```sh
 make release_publish
 ```
 
