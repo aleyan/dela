@@ -3,6 +3,7 @@ use clap::{Parser, Subcommand};
 mod allowlist;
 mod builtins;
 mod commands;
+mod composed_paths;
 mod config;
 mod environment;
 mod mcp;

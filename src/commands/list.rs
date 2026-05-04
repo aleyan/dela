@@ -216,7 +216,10 @@ pub fn execute(verbose: bool) -> Result<(), String> {
         let mut runner_files: HashMap<String, String> = HashMap::new();
         for task in &discovered.tasks {
             let runner_name = task.runner.short_name().to_string();
-            runner_files.insert(runner_name, task.file_path.to_string_lossy().to_string());
+            runner_files.insert(
+                runner_name,
+                task.definition_path().to_string_lossy().to_string(),
+            );
         }
 
         // Calculate max task name width across all runners
@@ -490,6 +493,7 @@ mod tests {
         Task {
             name: name.to_string(),
             file_path,
+            definition_path: None,
             definition_type: match runner {
                 TaskRunner::Make => TaskDefinitionType::Makefile,
                 TaskRunner::NodeNpm
@@ -737,6 +741,7 @@ mod tests {
         let task = Task {
             name: "build".to_string(),
             file_path: makefile_path,
+            definition_path: None,
             definition_type: TaskDefinitionType::Makefile,
             runner: TaskRunner::Make,
             source_name: "build".to_string(),
@@ -888,6 +893,7 @@ mod tests {
         let task = Task {
             name: "integration".to_string(),
             file_path: PathBuf::from(".github/workflows"),
+            definition_path: None,
             definition_type: TaskDefinitionType::GitHubActions,
             runner: TaskRunner::Act,
             source_name: "integration".to_string(),

@@ -4,6 +4,7 @@ pub mod allowlist;
 pub mod builtins;
 pub mod colors;
 pub mod commands;
+pub mod composed_paths;
 pub mod config;
 pub mod environment;
 pub mod mcp;

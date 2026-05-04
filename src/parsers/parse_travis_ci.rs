@@ -43,6 +43,7 @@ fn parse_travis_string(content: &str, file_path: &Path) -> Result<Vec<Task>, Str
                 let task = Task {
                     name: job_name.clone(),
                     file_path: file_path.to_path_buf(),
+                    definition_path: None,
                     definition_type: TaskDefinitionType::TravisCi,
                     runner: TaskRunner::TravisCi,
                     source_name: job_name.clone(),
@@ -73,6 +74,7 @@ fn parse_travis_string(content: &str, file_path: &Path) -> Result<Vec<Task>, Str
                             let task = Task {
                                 name: job_name.clone(),
                                 file_path: file_path.to_path_buf(),
+                                definition_path: None,
                                 definition_type: TaskDefinitionType::TravisCi,
                                 runner: TaskRunner::TravisCi,
                                 source_name: job_name.clone(),
@@ -90,6 +92,7 @@ fn parse_travis_string(content: &str, file_path: &Path) -> Result<Vec<Task>, Str
                             let task = Task {
                                 name: job_name.clone(),
                                 file_path: file_path.to_path_buf(),
+                                definition_path: None,
                                 definition_type: TaskDefinitionType::TravisCi,
                                 runner: TaskRunner::TravisCi,
                                 source_name: job_name.clone(),
@@ -110,6 +113,7 @@ fn parse_travis_string(content: &str, file_path: &Path) -> Result<Vec<Task>, Str
             let task = Task {
                 name: "travis".to_string(),
                 file_path: file_path.to_path_buf(),
+                definition_path: None,
                 definition_type: TaskDefinitionType::TravisCi,
                 runner: TaskRunner::TravisCi,
                 source_name: "travis".to_string(),

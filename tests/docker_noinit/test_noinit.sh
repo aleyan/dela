@@ -289,6 +289,17 @@ else
     exit 1
 fi
 
+# Test 19b: Verify allow-command stores the defining workflow path
+echo "\nTest 19b: Verifying GitHub Actions allowlist source attribution"
+echo "2" | dela allow-command test-a >/dev/null 2>&1
+if grep -q "/home/testuser/test_project/.github/workflows/test.yml" /home/testuser/.config/dela/allowlist.toml; then
+    echo "${GREEN}✓ GitHub Actions allowlist entries use the defining workflow file${NC}"
+else
+    echo "${RED}✗ GitHub Actions allowlist entry did not use the defining workflow file${NC}"
+    cat /home/testuser/.config/dela/allowlist.toml
+    exit 1
+fi
+
 # Test 20: Test single argument passing with print-arg-task
 echo "\nTest 20: Testing single argument passing with print-arg-task"
 

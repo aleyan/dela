@@ -59,19 +59,25 @@ fn path_matches(task_path: &Path, allowlist_path: &Path, allow_subdirs: bool) ->
     }
 }
 
-/// Check if a given task is explicitly allowed or denied by the allowlist
-/// Returns (explicitly_allowed, explicitly_denied) - both false means not found in allowlist
-/// This is the core allowlist checking logic without any prompting or persistence
-pub fn is_task_allowed(task: &Task) -> Result<(bool, bool), String> {
-    // Only proceed with allowlist operations if dela is initialized
-    let allowlist = load_allowlist()?;
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AllowlistMatch {
+    Allowed,
+    Denied,
+    NotFound,
+}
+
+/// Evaluate a task against an already-loaded allowlist.
+/// This is shared between the CLI and MCP surfaces so composed definitions use
+/// identical path and precedence semantics everywhere.
+pub fn evaluate_task_against_allowlist(task: &Task, allowlist: &Allowlist) -> AllowlistMatch {
+    let task_path = task.allowlist_path();
 
     // First pass: Check for deny entries (highest precedence)
     for entry in &allowlist.entries {
         if let AllowScope::Deny = entry.scope
-            && path_matches(&task.file_path, &entry.path, true)
+            && path_matches(task_path, &entry.path, true)
         {
-            return Ok((false, true));
+            return AllowlistMatch::Denied;
         }
     }
 
@@ -79,32 +85,55 @@ pub fn is_task_allowed(task: &Task) -> Result<(bool, bool), String> {
     for entry in &allowlist.entries {
         match entry.scope {
             AllowScope::Directory => {
-                if path_matches(&task.file_path, &entry.path, true) {
-                    return Ok((true, false));
+                if path_matches(task_path, &entry.path, true) {
+                    return AllowlistMatch::Allowed;
                 }
             }
             AllowScope::File => {
-                if path_matches(&task.file_path, &entry.path, false) {
-                    return Ok((true, false));
+                if path_matches(task_path, &entry.path, false) {
+                    return AllowlistMatch::Allowed;
                 }
             }
             AllowScope::Task => {
-                if path_matches(&task.file_path, &entry.path, false)
+                if path_matches(task_path, &entry.path, false)
                     && let Some(ref tasks) = entry.tasks
                     && tasks.contains(&task.name)
                 {
-                    return Ok((true, false));
+                    return AllowlistMatch::Allowed;
                 }
             }
-            AllowScope::Deny | AllowScope::Once => {
-                // Already handled deny in first pass, skip Once
-                continue;
-            }
+            AllowScope::Deny | AllowScope::Once => continue,
         }
     }
 
-    // If no matching entry found, return (false, false) - not found
-    Ok((false, false))
+    AllowlistMatch::NotFound
+}
+
+pub fn allowlist_entry_for_task(task: &Task, scope: AllowScope) -> AllowlistEntry {
+    let tasks = if scope == AllowScope::Task {
+        Some(vec![task.name.clone()])
+    } else {
+        None
+    };
+
+    AllowlistEntry {
+        path: task.allowlist_path().to_path_buf(),
+        scope,
+        tasks,
+    }
+}
+
+/// Check if a given task is explicitly allowed or denied by the allowlist
+/// Returns (explicitly_allowed, explicitly_denied) - both false means not found in allowlist
+/// This is the core allowlist checking logic without any prompting or persistence
+pub fn is_task_allowed(task: &Task) -> Result<(bool, bool), String> {
+    // Only proceed with allowlist operations if dela is initialized
+    let allowlist = load_allowlist()?;
+    Ok(match evaluate_task_against_allowlist(task, &allowlist) {
+        AllowlistMatch::Allowed => (true, false),
+        AllowlistMatch::Denied => (false, true),
+        AllowlistMatch::NotFound => (false, false),
+    })
 }
 
 /// Check if a given task is allowed, based on the loaded allowlist
@@ -134,20 +163,10 @@ pub fn check_task_allowed(task: &Task) -> Result<bool, String> {
                     Ok(true)
                 }
                 scope => {
-                    // Create a new allowlist entry
-                    let mut entry = AllowlistEntry {
-                        path: task.file_path.clone(),
-                        scope: scope.clone(),
-                        tasks: None,
-                    };
-
-                    // For Task scope, add the specific task name
-                    if scope == AllowScope::Task {
-                        entry.tasks = Some(vec![task.name.clone()]);
-                    }
-
                     // Add the entry and save
-                    allowlist.entries.push(entry);
+                    allowlist
+                        .entries
+                        .push(allowlist_entry_for_task(task, scope.clone()));
                     save_allowlist(&allowlist)?;
                     Ok(true)
                 }
@@ -155,11 +174,7 @@ pub fn check_task_allowed(task: &Task) -> Result<bool, String> {
         }
         AllowDecision::Deny => {
             // Add a deny entry and save
-            let entry = AllowlistEntry {
-                path: task.file_path.clone(),
-                scope: AllowScope::Deny,
-                tasks: None,
-            };
+            let entry = allowlist_entry_for_task(task, AllowScope::Deny);
             allowlist.entries.push(entry);
             save_allowlist(&allowlist)?;
             Ok(false)
@@ -172,20 +187,10 @@ pub fn check_task_allowed_with_scope(task: &Task, scope: AllowScope) -> Result<b
     // Only proceed with allowlist operations if dela is initialized
     let mut allowlist = load_allowlist()?;
 
-    // Create a new allowlist entry
-    let mut entry = AllowlistEntry {
-        path: task.file_path.clone(),
-        scope: scope.clone(),
-        tasks: None,
-    };
-
-    // For Task scope, add the specific task name
-    if scope == AllowScope::Task {
-        entry.tasks = Some(vec![task.name.clone()]);
-    }
-
     // Add the entry and save
-    allowlist.entries.push(entry);
+    allowlist
+        .entries
+        .push(allowlist_entry_for_task(task, scope));
     save_allowlist(&allowlist)?;
     Ok(true)
 }
@@ -204,6 +209,7 @@ mod tests {
         Task {
             name: name.to_string(),
             file_path,
+            definition_path: None,
             definition_type: TaskDefinitionType::Makefile,
             runner: TaskRunner::Make,
             source_name: name.to_string(),
@@ -418,6 +424,27 @@ mod tests {
 
         // Task should be denied
         assert_eq!(is_task_allowed(&task).unwrap(), (false, true));
+
+        drop(temp_dir);
+        reset_to_real_environment();
+    }
+
+    #[test]
+    #[serial]
+    fn test_is_task_allowed_uses_definition_path_for_composed_tasks() {
+        let (temp_dir, mut task) = setup_test_env();
+        task.file_path = PathBuf::from("/project/.github/workflows");
+        task.definition_path = Some(PathBuf::from("/project/.github/workflows/test.yml"));
+
+        let mut allowlist = Allowlist::default();
+        allowlist.entries.push(AllowlistEntry {
+            path: PathBuf::from("/project/.github/workflows/test.yml"),
+            scope: AllowScope::File,
+            tasks: None,
+        });
+        save_allowlist(&allowlist).unwrap();
+
+        assert_eq!(is_task_allowed(&task).unwrap(), (true, false));
 
         drop(temp_dir);
         reset_to_real_environment();

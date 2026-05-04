@@ -71,6 +71,7 @@ fn extract_tasks(makefile: &Makefile, path: &Path) -> Result<Vec<Task>, String> 
                 Task {
                     name: name.clone(),
                     file_path: path.to_path_buf(),
+                    definition_path: None,
                     definition_type: TaskDefinitionType::Makefile,
                     runner: TaskRunner::Make,
                     source_name: name,
@@ -133,6 +134,7 @@ fn extract_tasks_regex(content: &str, path: &Path) -> Result<Vec<Task>, String> 
                     Task {
                         name: name.clone(),
                         file_path: path.to_path_buf(),
+                        definition_path: None,
                         definition_type: TaskDefinitionType::Makefile,
                         runner: TaskRunner::Make,
                         source_name: name,

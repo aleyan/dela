@@ -24,6 +24,7 @@ pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
             tasks.push(Task {
                 name: name.clone(),
                 file_path: path.to_path_buf(),
+                definition_path: None,
                 definition_type: TaskDefinitionType::PyprojectToml,
                 runner: TaskRunner::PythonUv,
                 source_name: name.clone(),
@@ -57,6 +58,7 @@ pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
                     tasks.push(Task {
                         name: name.clone(),
                         file_path: path.to_path_buf(),
+                        definition_path: None,
                         definition_type: TaskDefinitionType::PyprojectToml,
                         runner: TaskRunner::PythonPoetry,
                         source_name: name.clone(),
@@ -98,6 +100,7 @@ pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
                 tasks.push(Task {
                     name: name.clone(),
                     file_path: path.to_path_buf(),
+                    definition_path: None,
                     definition_type: TaskDefinitionType::PyprojectToml,
                     runner: TaskRunner::PythonPoe,
                     source_name: name.clone(),

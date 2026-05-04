@@ -1,3 +1,4 @@
+use crate::composed_paths::ComposedDefinitionSource;
 use crate::parsers::{
     parse_cmake, parse_docker_compose, parse_github_actions, parse_gradle, parse_justfile,
     parse_makefile, parse_package_json, parse_pom_xml, parse_pyproject_toml, parse_taskfile,
@@ -223,7 +224,7 @@ pub fn format_ambiguous_task_error(task_name: &str, matching_tasks: &[&Task]) ->
                 "  • {} ({} from {})\n",
                 disambiguated,
                 task.runner.short_name(),
-                task.file_path.display()
+                task.definition_path().display()
             ));
         }
     }
@@ -639,10 +640,11 @@ fn discover_github_actions_tasks(
     for file_path in workflow_files {
         match parse_github_actions(&file_path) {
             Ok(mut tasks) => {
-                // Override the file path to use the common parent directory
-                // instead of individual workflow files
+                let source =
+                    ComposedDefinitionSource::composed(workflows_parent.clone(), file_path);
                 for task in &mut tasks {
-                    task.file_path = workflows_parent.clone();
+                    source.apply_to_task(task);
+                    task.shadowed_by = check_shadowing(&task.name);
                 }
                 all_tasks.extend(tasks);
             }
@@ -838,6 +840,7 @@ fn discover_shell_script_tasks(dir: &Path, discovered: &mut DiscoveredTasks) {
                 discovered.tasks.push(Task {
                     name: name.clone(),
                     file_path: path,
+                    definition_path: None,
                     definition_type: TaskDefinitionType::ShellScript,
                     runner: TaskRunner::ShellScript,
                     source_name,
@@ -1880,8 +1883,19 @@ jobs:
 
         // With the new workflow grouping, all tasks should have the same workflow directory
         let common_path = temp_dir.path().join(".github").join("workflows");
+        let expected_definition_paths = [
+            github_workflows_dir.join("ci.yml"),
+            temp_dir.path().join("workflow.yml"),
+            custom_dir.join("custom.yml"),
+        ];
+
         for task in act_tasks {
             assert_eq!(task.file_path, common_path);
+            assert!(
+                expected_definition_paths.contains(&task.definition_path().to_path_buf()),
+                "unexpected workflow definition path: {}",
+                task.definition_path().display()
+            );
         }
     }
 
@@ -1895,6 +1909,7 @@ jobs:
         discovered.tasks.push(Task {
             name: "test".to_string(),
             file_path: PathBuf::from("/test/Makefile"),
+            definition_path: None,
             definition_type: TaskDefinitionType::Makefile,
             runner: TaskRunner::Make,
             source_name: "test".to_string(),
@@ -1907,6 +1922,7 @@ jobs:
         discovered.tasks.push(Task {
             name: "ls".to_string(),
             file_path: PathBuf::from("/test/Makefile"),
+            definition_path: None,
             definition_type: TaskDefinitionType::Makefile,
             runner: TaskRunner::Make,
             source_name: "ls".to_string(),
@@ -1919,6 +1935,7 @@ jobs:
         discovered.tasks.push(Task {
             name: "build".to_string(),
             file_path: PathBuf::from("/test/Makefile"),
+            definition_path: None,
             definition_type: TaskDefinitionType::Makefile,
             runner: TaskRunner::Make,
             source_name: "build".to_string(),
@@ -1957,6 +1974,7 @@ jobs:
         discovered.tasks.push(Task {
             name: "test".to_string(),
             file_path: PathBuf::from("/test/Makefile"),
+            definition_path: None,
             definition_type: TaskDefinitionType::Makefile,
             runner: TaskRunner::Make,
             source_name: "test".to_string(),
@@ -1968,6 +1986,7 @@ jobs:
         discovered.tasks.push(Task {
             name: "test".to_string(),
             file_path: PathBuf::from("/test/package.json"),
+            definition_path: None,
             definition_type: TaskDefinitionType::PackageJson,
             runner: TaskRunner::NodeNpm,
             source_name: "test".to_string(),
@@ -1980,6 +1999,7 @@ jobs:
         discovered.tasks.push(Task {
             name: "ls".to_string(),
             file_path: PathBuf::from("/test/Makefile"),
+            definition_path: None,
             definition_type: TaskDefinitionType::Makefile,
             runner: TaskRunner::Make,
             source_name: "ls".to_string(),
@@ -1992,6 +2012,7 @@ jobs:
         discovered.tasks.push(Task {
             name: "cd".to_string(),
             file_path: PathBuf::from("/test/Makefile"),
+            definition_path: None,
             definition_type: TaskDefinitionType::Makefile,
             runner: TaskRunner::Make,
             source_name: "cd".to_string(),
@@ -2003,6 +2024,7 @@ jobs:
         discovered.tasks.push(Task {
             name: "cd".to_string(),
             file_path: PathBuf::from("/test/Taskfile.yml"),
+            definition_path: None,
             definition_type: TaskDefinitionType::Taskfile,
             runner: TaskRunner::Task,
             source_name: "cd".to_string(),
@@ -2015,6 +2037,7 @@ jobs:
         discovered.tasks.push(Task {
             name: "build".to_string(),
             file_path: PathBuf::from("/test/Makefile"),
+            definition_path: None,
             definition_type: TaskDefinitionType::Makefile,
             runner: TaskRunner::Make,
             source_name: "build".to_string(),
@@ -2085,6 +2108,7 @@ jobs:
         discovered.tasks.push(Task {
             name: "install".to_string(),
             file_path: PathBuf::from("/test/Makefile"),
+            definition_path: None,
             definition_type: TaskDefinitionType::Makefile,
             runner: TaskRunner::Make,
             source_name: "install".to_string(),
@@ -2117,6 +2141,7 @@ jobs:
         let task = Task {
             name: "test".to_string(),
             file_path: PathBuf::from("/path/to/Makefile"),
+            definition_path: None,
             definition_type: TaskDefinitionType::Makefile,
             runner: TaskRunner::Make,
             source_name: "test".to_string(),
@@ -2153,6 +2178,7 @@ jobs:
         let task = Task {
             name: "grep".to_string(),
             file_path: PathBuf::from("/path/to/Makefile"),
+            definition_path: None,
             definition_type: TaskDefinitionType::Makefile,
             runner: TaskRunner::Make,
             source_name: "grep".to_string(),
@@ -2191,6 +2217,7 @@ jobs:
         let task1 = Task {
             name: "test".to_string(),
             file_path: PathBuf::from("/path/to/Makefile"),
+            definition_path: None,
             definition_type: TaskDefinitionType::Makefile,
             runner: TaskRunner::Make,
             source_name: "test".to_string(),
@@ -2202,6 +2229,7 @@ jobs:
         let task2 = Task {
             name: "test".to_string(),
             file_path: PathBuf::from("/path/to/package.json"),
+            definition_path: None,
             definition_type: TaskDefinitionType::PackageJson,
             runner: TaskRunner::NodeNpm,
             source_name: "test".to_string(),
