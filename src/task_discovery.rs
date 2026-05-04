@@ -597,19 +597,6 @@ fn collect_taskfile_tasks_recursive(
         let resolved_include = parse_taskfile::resolve_taskfile_include_path(&resolved_candidate);
 
         if !resolved_include.is_file() {
-            if include.optional {
-                continue;
-            }
-
-            let error = format!(
-                "Required included Taskfile '{}' referenced from '{}' was not found",
-                resolved_include.display(),
-                current_source.definition_path().display()
-            );
-            include_errors.push(error.clone());
-            if first_error.is_none() {
-                first_error = Some(error);
-            }
             continue;
         }
 
@@ -2103,6 +2090,51 @@ tasks:
         assert_eq!(api_task.file_path, root_taskfile);
         assert_eq!(api_task.definition_path(), api_taskfile.as_path());
         assert_eq!(api_task.source_name, "docs:api:generate");
+
+        reset_mock();
+        reset_to_real_environment();
+    }
+
+    #[test]
+    #[serial]
+    fn test_discover_tasks_with_missing_required_taskfile_include() {
+        let temp_dir = TempDir::new().unwrap();
+
+        reset_mock();
+        enable_mock();
+        mock_executable("task");
+
+        std::fs::write(
+            temp_dir.path().join("Taskfile.yml"),
+            r#"version: '3'
+includes:
+  docs: ./docs
+  optional:
+    taskfile: ./optional
+    optional: true
+tasks:
+  build:
+    desc: Build task
+    cmds:
+      - echo "Build""#,
+        )
+        .unwrap();
+
+        let discovered = discover_tasks(temp_dir.path());
+
+        assert!(discovered.errors.is_empty(), "{:?}", discovered.errors);
+        assert!(matches!(
+            discovered.definitions.taskfile.unwrap().status,
+            TaskFileStatus::Parsed
+        ));
+        assert_eq!(discovered.tasks.len(), 1);
+
+        let build_task = discovered.tasks.iter().find(|t| t.name == "build").unwrap();
+        assert_eq!(build_task.runner, TaskRunner::Task);
+        assert_eq!(
+            build_task.definition_path(),
+            temp_dir.path().join("Taskfile.yml").as_path()
+        );
 
         reset_mock();
         reset_to_real_environment();

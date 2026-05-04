@@ -117,6 +117,10 @@ cat > /home/testuser/task_include_project/Taskfile.yml <<'EOF'
 version: '3'
 includes:
   docs: ./docs
+  missing-required: ./missing
+  missing-optional:
+    taskfile: ./optional
+    optional: true
 tasks:
   task-root:
     desc: Root task
@@ -155,6 +159,12 @@ if grep -q "docs:serve" task_include_list.txt && grep -q "docs:api:generate" tas
 else
     echo "${RED}✗ dela list did not discover recursively included Taskfile tasks${NC}"
     cat task_include_list.txt
+    exit 1
+fi
+
+if [ -s task_include_stderr.txt ]; then
+    echo "${RED}✗ dela emitted errors for missing included Taskfiles${NC}"
+    cat task_include_stderr.txt
     exit 1
 fi
 
