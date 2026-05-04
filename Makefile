@@ -84,4 +84,4 @@ test_long:
 
 coverage_github: build
 	@echo "Running parsing coverage over top github repos..."
-	uv run --script scripts/dela_coverage_git_refs.py
+	uv run --script scripts/dela_coverage_git_refs.py --dela-bin ./target/debug/dela

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -183,6 +184,8 @@ def resolve_dela_executable(
     *,
     runner: CommandRunner = subprocess.run,
 ) -> Path:
+    target_binary = project_root / "target" / "debug" / "dela"
+
     _run_checked(
         runner,
         ["cargo", "build", "--quiet"],
@@ -190,10 +193,10 @@ def resolve_dela_executable(
         context="build dela",
     )
 
-    if not DEFAULT_DELA_PATH.exists():
-        raise RuntimeError(f"Expected dela binary at {DEFAULT_DELA_PATH}")
+    if not target_binary.exists():
+        raise RuntimeError(f"Expected dela binary at {target_binary}")
 
-    return DEFAULT_DELA_PATH
+    return target_binary
 
 
 def run_dela_scan(
@@ -353,9 +356,13 @@ def main(
     if args.limit is not None:
         requests = requests[: args.limit]
 
-    dela_executable = args.dela_bin or resolve_dela_executable(
-        PROJECT_ROOT,
-        runner=runner,
+    dela_executable = (
+        args.dela_bin.resolve()
+        if args.dela_bin is not None
+        else resolve_dela_executable(
+            PROJECT_ROOT,
+            runner=runner,
+        )
     )
 
     results: list[ScanResult] = []
@@ -890,9 +897,6 @@ def test_resolve_dela_executable_builds_binary(tmp_path: Path) -> None:
     target_binary = project_root / "target" / "debug" / "dela"
     target_binary.parent.mkdir(parents=True, exist_ok=True)
 
-    original_default = globals()["DEFAULT_DELA_PATH"]
-    globals()["DEFAULT_DELA_PATH"] = target_binary
-
     def fake_runner(
         args: list[str],
         *,
@@ -908,15 +912,12 @@ def test_resolve_dela_executable_builds_binary(tmp_path: Path) -> None:
         target_binary.write_text("binary", encoding="utf-8")
         return subprocess.CompletedProcess(args, 0, "", "")
 
-    try:
-        # Act
-        resolved = resolve_dela_executable(project_root, runner=fake_runner)
+    # Act
+    resolved = resolve_dela_executable(project_root, runner=fake_runner)
 
-        # Assert
-        assert resolved == target_binary
-        assert build_calls == [("cargo", "build", "--quiet")]
-    finally:
-        globals()["DEFAULT_DELA_PATH"] = original_default
+    # Assert
+    assert resolved == target_binary
+    assert build_calls == [("cargo", "build", "--quiet")]
 
 
 def test_run_dela_scan_extracts_parse_errors(tmp_path: Path) -> None:
@@ -1088,6 +1089,89 @@ def test_main_processes_requests_and_reports_success(tmp_path: Path) -> None:
     assert "Scanned 1 directories." in report
     assert "package.json (npm) : 1 files, 1 parsed, 2 tasks, 0 errors." in report
     assert "No parse issues detected." in report
+
+
+def test_main_resolves_relative_dela_bin_before_scanning(tmp_path: Path) -> None:
+    # Arrange
+    jsonl_path = tmp_path / "refs.jsonl"
+    jsonl_path.write_text(
+        json.dumps(
+            {
+                "tool": "npm",
+                "repo": "github.com/aleyan/dela",
+                "files": ["nested/package.json"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    scratch_root = tmp_path / "scratch"
+    dela_binary = tmp_path / "bin" / "dela"
+    dela_binary.parent.mkdir(parents=True, exist_ok=True)
+    dela_binary.write_text("binary", encoding="utf-8")
+    output_path = tmp_path / "output.txt"
+    original_cwd = Path.cwd()
+
+    def fake_runner(
+        args: list[str],
+        *,
+        cwd: Path | None = None,
+        input: str | None = None,
+        capture_output: bool = False,
+        text: bool = False,
+        check: bool = False,
+    ) -> subprocess.CompletedProcess[str]:
+        del capture_output, text, check
+        if args[:2] == ["git", "clone"]:
+            repo_root = Path(args[-1])
+            (repo_root / ".git").mkdir(parents=True)
+            return subprocess.CompletedProcess(args, 0, "", "")
+        if args[3:6] == ["sparse-checkout", "set", "--no-cone"]:
+            assert input == "nested/package.json\n"
+            repo_root = Path(args[2])
+            target = repo_root / "nested" / "package.json"
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text("{}", encoding="utf-8")
+            return subprocess.CompletedProcess(args, 0, "", "")
+        if cwd is not None:
+            assert Path(args[0]) == dela_binary.resolve()
+            return subprocess.CompletedProcess(
+                args,
+                0,
+                "\n".join(
+                    [
+                        "npm — package.json",
+                        "  build               - build app",
+                    ]
+                ),
+                "",
+            )
+        return subprocess.CompletedProcess(args, 0, "", "")
+
+    try:
+        os.chdir(tmp_path)
+        with output_path.open("w+", encoding="utf-8") as handle:
+            # Act
+            exit_code = main(
+                [
+                    "--jsonl",
+                    str(jsonl_path),
+                    "--scratch-root",
+                    str(scratch_root),
+                    "--dela-bin",
+                    "bin/dela",
+                ],
+                runner=fake_runner,
+                stdout=handle,
+            )
+            handle.seek(0)
+            report = handle.read()
+    finally:
+        os.chdir(original_cwd)
+
+    # Assert
+    assert exit_code == 0
+    assert "Scanned 1 directories." in report
+    assert "package.json (npm) : 1 files, 1 parsed, 1 tasks, 0 errors." in report
 
 
 def test_format_tool_summary_aligns_columns() -> None:
