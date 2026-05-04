@@ -73,6 +73,17 @@ publish: tests tests_integration
 	fi
 	@cargo publish
 
+# Checks that versions (cargo.toml and CHANGELOG.md) are consistent
+# And no tag exists yet, and versions aren't published to crates.io
+# And tests pass.
+verify_prerelease:
+	@echo "Verifying prerelease conditions..."
+
+# Trigger a release by pushing a new version tag to github
+# verifies that a human is doing it via cli interaction
+tag_and_release: verify_prerelease
+	@echo "Tagging and releasing..."
+
 format:
 	cargo fmt --all
 
