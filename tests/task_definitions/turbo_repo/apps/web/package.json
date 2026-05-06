@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "build": "echo building web",
-    "test": "echo testing web"
+    "test": "echo testing web",
+    "web-lint": "echo linting web"
   }
 }

@@ -774,7 +774,7 @@ impl DelaMcpServer {
                 env: args.env.clone(),
                 cwd: args.cwd.as_ref().map(PathBuf::from),
                 command: task.runner.get_command(task),
-                file_path: task.file_path.clone(),
+                file_path: task.definition_path().to_path_buf(),
             };
 
             let exit_state = JobState::Exited(exit_code.unwrap_or(-1));
@@ -831,7 +831,7 @@ impl DelaMcpServer {
             env: args.env.clone(),
             cwd: args.cwd.as_ref().map(PathBuf::from),
             command: task.runner.get_command(task),
-            file_path: task.file_path.clone(),
+            file_path: task.definition_path().to_path_buf(),
         };
 
         // Start background job management

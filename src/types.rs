@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Information about what shadows a task name
 #[derive(Debug, Clone, PartialEq)]
@@ -160,8 +160,14 @@ pub struct DiscoveredTaskDefinitions {
 pub struct Task {
     /// Name of the task (e.g., "build", "test", "start")
     pub name: String,
-    /// Path to the file containing this task
+    /// Path the runner should use for execution context.
+    /// For simple task definitions this is the same as the defining file.
+    /// For composed definitions this may point at the root file or directory
+    /// that the runner executes against.
     pub file_path: PathBuf,
+    /// Path to the file that actually defines this task when it differs from
+    /// the runner path. For simple task definitions this is None.
+    pub definition_path: Option<PathBuf>,
     /// The type of definition file this task came from
     pub definition_type: TaskDefinitionType,
     /// The type of runner needed for this task
@@ -174,6 +180,18 @@ pub struct Task {
     pub shadowed_by: Option<ShadowType>,
     /// Disambiguated task name if the task name is ambiguous
     pub disambiguated_name: Option<String>,
+}
+
+impl Task {
+    /// Return the file that actually defines this task.
+    pub fn definition_path(&self) -> &Path {
+        self.definition_path.as_deref().unwrap_or(&self.file_path)
+    }
+
+    /// Return the path used for allowlist matching and user-facing source attribution.
+    pub fn allowlist_path(&self) -> &Path {
+        self.definition_path()
+    }
 }
 
 impl TaskRunner {

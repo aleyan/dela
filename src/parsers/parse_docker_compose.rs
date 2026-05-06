@@ -49,6 +49,7 @@ pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
     tasks.push(Task {
         name: "up".to_string(),
         file_path: path.clone(),
+        definition_path: None,
         definition_type: TaskDefinitionType::DockerCompose,
         runner: TaskRunner::DockerCompose,
         source_name: "up".to_string(),
@@ -61,6 +62,7 @@ pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
     tasks.push(Task {
         name: "down".to_string(),
         file_path: path.clone(),
+        definition_path: None,
         definition_type: TaskDefinitionType::DockerCompose,
         runner: TaskRunner::DockerCompose,
         source_name: "down".to_string(),
@@ -82,6 +84,7 @@ pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
         tasks.push(Task {
             name: service_name.clone(),
             file_path: path.clone(),
+            definition_path: None,
             definition_type: TaskDefinitionType::DockerCompose,
             runner: TaskRunner::DockerCompose,
             source_name: service_name,

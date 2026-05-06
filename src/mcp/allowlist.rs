@@ -1,6 +1,7 @@
-use crate::allowlist::load_allowlist;
-use crate::types::{AllowScope, Allowlist, Task};
-use std::path::Path;
+use crate::allowlist::{AllowlistMatch, evaluate_task_against_allowlist, load_allowlist};
+#[cfg(test)]
+use crate::types::AllowScope;
+use crate::types::{Allowlist, Task};
 
 /// MCP-specific allowlist evaluator for task permissions
 ///
@@ -33,54 +34,10 @@ impl McpAllowlistEvaluator {
     /// 4. Task scope allow entries
     /// 5. Not found in allowlist (deny by default for MCP)
     pub fn is_task_allowed(&self, task: &Task) -> Result<bool, String> {
-        // First pass: Check for deny entries (highest precedence)
-        for entry in &self.allowlist.entries {
-            if let AllowScope::Deny = entry.scope
-                && self.path_matches(&task.file_path, &entry.path, true)
-            {
-                return Ok(false);
-            }
-        }
-
-        // Second pass: Check for allow entries
-        for entry in &self.allowlist.entries {
-            match entry.scope {
-                AllowScope::Directory => {
-                    if self.path_matches(&task.file_path, &entry.path, true) {
-                        return Ok(true);
-                    }
-                }
-                AllowScope::File => {
-                    if self.path_matches(&task.file_path, &entry.path, false) {
-                        return Ok(true);
-                    }
-                }
-                AllowScope::Task => {
-                    if self.path_matches(&task.file_path, &entry.path, false)
-                        && let Some(ref tasks) = entry.tasks
-                        && tasks.contains(&task.name)
-                    {
-                        return Ok(true);
-                    }
-                }
-                AllowScope::Deny | AllowScope::Once => {
-                    // Already handled deny in first pass, skip Once (not applicable for MCP)
-                    continue;
-                }
-            }
-        }
-
-        // If no matching entry found, deny by default for MCP
-        Ok(false)
-    }
-
-    /// Check if two paths match, considering directory scope
-    fn path_matches(&self, task_path: &Path, allowlist_path: &Path, allow_subdirs: bool) -> bool {
-        if allow_subdirs {
-            task_path.starts_with(allowlist_path)
-        } else {
-            task_path == allowlist_path
-        }
+        Ok(matches!(
+            evaluate_task_against_allowlist(task, &self.allowlist),
+            AllowlistMatch::Allowed
+        ))
     }
 
     /// Get the number of entries in the allowlist
@@ -111,6 +68,7 @@ mod tests {
         Task {
             name: name.to_string(),
             file_path,
+            definition_path: None,
             definition_type: TaskDefinitionType::Makefile,
             runner: TaskRunner::Make,
             source_name: name.to_string(),

@@ -110,6 +110,110 @@ else
     exit 1
 fi
 
+# Test 6b: Verify recursive Taskfile include discovery
+echo "\nTest 6b: Testing recursive Taskfile include discovery"
+mkdir -p /home/testuser/task_include_project/docs/api
+cat > /home/testuser/task_include_project/Taskfile.yml <<'EOF'
+version: '3'
+includes:
+  docs: ./docs
+  missing-required: ./missing
+  missing-optional:
+    taskfile: ./optional
+    optional: true
+tasks:
+  task-root:
+    desc: Root task
+    cmds:
+      - echo "Root"
+EOF
+cat > /home/testuser/task_include_project/docs/Taskfile.yml <<'EOF'
+version: '3'
+includes:
+  api: ./api
+tasks:
+  serve:
+    desc: Docs serve
+    cmds:
+      - echo "Serve docs"
+EOF
+cat > /home/testuser/task_include_project/docs/api/Taskfile.yml <<'EOF'
+version: '3'
+tasks:
+  generate:
+    desc: Generate docs
+    cmds:
+      - echo "Generate docs"
+EOF
+
+cd /home/testuser/task_include_project
+if ! dela list > task_include_list.txt 2> task_include_stderr.txt; then
+    echo "${RED}✗ dela list failed for recursive Taskfile includes${NC}"
+    cat task_include_stderr.txt
+    exit 1
+fi
+
+if grep -q "docs:serve" task_include_list.txt && grep -q "docs:api:generate" task_include_list.txt; then
+    echo "${GREEN}✓ dela list discovers recursively included Taskfile tasks${NC}"
+else
+    echo "${RED}✗ dela list did not discover recursively included Taskfile tasks${NC}"
+    cat task_include_list.txt
+    exit 1
+fi
+
+if [ -s task_include_stderr.txt ]; then
+    echo "${RED}✗ dela emitted errors for missing included Taskfiles${NC}"
+    cat task_include_stderr.txt
+    exit 1
+fi
+
+output=$(dela get-command docs:api:generate 2>&1)
+if echo "$output" | grep -q "task docs:api:generate"; then
+    echo "${GREEN}✓ get-command works for recursively included Taskfile tasks${NC}"
+else
+    echo "${RED}✗ get-command failed for recursively included Taskfile task${NC}"
+    echo "Got: $output"
+    exit 1
+fi
+
+# Test 6c: Verify flattened Taskfile include duplicate detection
+echo "\nTest 6c: Testing duplicate flattened Taskfile include detection"
+mkdir -p /home/testuser/task_include_duplicates/shared
+cat > /home/testuser/task_include_duplicates/Taskfile.yml <<'EOF'
+version: '3'
+includes:
+  shared:
+    taskfile: ./shared
+    flatten: true
+tasks:
+  build:
+    desc: Root build
+    cmds:
+      - echo "Root build"
+EOF
+cat > /home/testuser/task_include_duplicates/shared/Taskfile.yml <<'EOF'
+version: '3'
+tasks:
+  build:
+    desc: Shared build
+    cmds:
+      - echo "Shared build"
+EOF
+
+cd /home/testuser/task_include_duplicates
+duplicate_output=$(dela list 2>&1)
+if echo "$duplicate_output" | grep -q "multiple tasks" \
+    && echo "$duplicate_output" | grep -q "build" \
+    && echo "$duplicate_output" | grep -q "shared"; then
+    echo "${GREEN}✓ dela reports duplicate flattened Taskfile task names${NC}"
+else
+    echo "${RED}✗ dela did not report duplicate flattened Taskfile task names${NC}"
+    echo "$duplicate_output"
+    exit 1
+fi
+
+cd /home/testuser/test_project
+
 # Test 7: Basic dela list for Maven tasks
 echo "\nTest 7: Testing dela list for Maven tasks"
 if list_and_grep "clean" && list_and_grep "compile" && list_and_grep "profile:dev"; then
@@ -289,6 +393,24 @@ else
     exit 1
 fi
 
+# Test 19b: Verify allow-command stores the defining workflow path
+echo "\nTest 19b: Verifying GitHub Actions allowlist source attribution"
+github_allow_stderr=$(mktemp)
+if ! echo "2" | dela allow-command test-a >/dev/null 2>"$github_allow_stderr"; then
+    echo "${RED}✗ allow-command failed for GitHub Actions task${NC}"
+    cat "$github_allow_stderr"
+    rm -f "$github_allow_stderr"
+    exit 1
+fi
+rm -f "$github_allow_stderr"
+if grep -q "/home/testuser/test_project/.github/workflows/test.yml" /home/testuser/.config/dela/allowlist.toml; then
+    echo "${GREEN}✓ GitHub Actions allowlist entries use the defining workflow file${NC}"
+else
+    echo "${RED}✗ GitHub Actions allowlist entry did not use the defining workflow file${NC}"
+    cat /home/testuser/.config/dela/allowlist.toml
+    exit 1
+fi
+
 # Test 20: Test single argument passing with print-arg-task
 echo "\nTest 20: Testing single argument passing with print-arg-task"
 
@@ -330,26 +452,57 @@ fi
 
 echo "${GREEN}✓ All get-command argument passing tests passed successfully${NC}"
 
-# Test 21b: Discover turbo tasks from a nested package using the git repo root
-echo "\nTest 21b: Testing Turborepo discovery from a nested package"
+# Test 21b: Discover turbo tasks from workspace-local configs
+echo "\nTest 21b: Testing Turborepo workspace-local config discovery"
 cd /home/testuser/turbo_repo
 git init >/dev/null 2>&1
-cd /home/testuser/turbo_repo/apps/web
 
-dela list 2>/dev/null > turbo_list_output.txt
-if grep -q "build-t" turbo_list_output.txt && grep -q "test-t" turbo_list_output.txt; then
-    echo "${GREEN}✓ dela list shows turbo tasks from repo root when run in a nested package${NC}"
+dela list > turbo_root_list_output.txt 2> turbo_root_stderr.txt
+if grep -q "web-lint" turbo_root_list_output.txt && grep -q "apps/web/turbo.json" turbo_root_list_output.txt; then
+    echo "${GREEN}✓ dela list shows workspace-local turbo tasks and source paths from the repo root${NC}"
 else
-    echo "${RED}✗ dela list failed to show turbo tasks from repo root${NC}"
-    cat turbo_list_output.txt
+    echo "${RED}✗ dela list failed to show workspace-local turbo tasks from the repo root${NC}"
+    cat turbo_root_list_output.txt
     exit 1
 fi
 
-output=$(dela get-command build-t 2>&1)
-if echo "$output" | grep -q "turbo run build"; then
-    echo "${GREEN}✓ get-command returns the turbo command for a nested package task${NC}"
+if [ -s turbo_root_stderr.txt ]; then
+    echo "${RED}✗ dela emitted errors while listing turbo tasks from the repo root${NC}"
+    cat turbo_root_stderr.txt
+    exit 1
+fi
+
+echo "2" | dela allow-command web-lint >/dev/null 2>&1
+if grep -q "/home/testuser/turbo_repo/apps/web/turbo.json" /home/testuser/.config/dela/allowlist.toml; then
+    echo "${GREEN}✓ allow-command stores the workspace-local turbo.json path${NC}"
 else
-    echo "${RED}✗ get-command failed for turbo task${NC}"
+    echo "${RED}✗ allow-command did not store the workspace-local turbo.json path${NC}"
+    cat /home/testuser/.config/dela/allowlist.toml
+    exit 1
+fi
+
+cd /home/testuser/turbo_repo/apps/web
+
+dela list > turbo_package_list_output.txt 2> turbo_package_stderr.txt
+if grep -q "build-t" turbo_package_list_output.txt && grep -q "web-lint-t" turbo_package_list_output.txt && ! grep -q "test-t" turbo_package_list_output.txt; then
+    echo "${GREEN}✓ dela list resolves effective turbo tasks for a nested package${NC}"
+else
+    echo "${RED}✗ dela list did not resolve the expected nested-package turbo tasks${NC}"
+    cat turbo_package_list_output.txt
+    exit 1
+fi
+
+if [ -s turbo_package_stderr.txt ]; then
+    echo "${RED}✗ dela emitted errors while listing turbo tasks from a nested package${NC}"
+    cat turbo_package_stderr.txt
+    exit 1
+fi
+
+output=$(dela get-command web-lint-t 2>&1)
+if echo "$output" | grep -q "turbo run web-lint"; then
+    echo "${GREEN}✓ get-command returns the turbo command for a workspace-local task${NC}"
+else
+    echo "${RED}✗ get-command failed for the workspace-local turbo task${NC}"
     echo "Full output: $output"
     exit 1
 fi
@@ -388,6 +541,75 @@ else
     echo "${RED}✗ dela run did not preserve quoted arguments${NC}"
     echo "Output was:"
     echo "$run_output"
+    exit 1
+fi
+
+# Test 22c: Verify recursive Makefile include discovery
+echo "\nTest 22c: Testing recursive Makefile include discovery"
+mkdir -p /home/testuser/make_include_project/mk
+cat > /home/testuser/make_include_project/Makefile <<'EOF'
+include mk/common.mk
+include mk/missing-required.mk
+-include mk/missing-optional.mk
+
+build:
+	@echo "Build from root"
+EOF
+cat > /home/testuser/make_include_project/mk/common.mk <<'EOF'
+include nested.mk
+
+included-task:
+	@echo "Included task"
+EOF
+cat > /home/testuser/make_include_project/mk/nested.mk <<'EOF'
+nested-task:
+	@echo "Nested task"
+EOF
+
+cd /home/testuser/make_include_project
+if ! dela list > make_include_list.txt 2> make_include_stderr.txt; then
+    echo "${RED}✗ dela list failed when a required included makefile was missing${NC}"
+    cat make_include_stderr.txt
+    exit 1
+fi
+
+if grep -q "included-task" make_include_list.txt && grep -q "nested-task" make_include_list.txt; then
+    echo "${GREEN}✓ dela list discovers tasks from recursively included makefiles${NC}"
+else
+    echo "${RED}✗ dela list did not discover tasks from recursively included makefiles${NC}"
+    cat make_include_list.txt
+    exit 1
+fi
+
+if [ -s make_include_stderr.txt ]; then
+    echo "${RED}✗ dela emitted errors for missing included makefiles${NC}"
+    cat make_include_stderr.txt
+    exit 1
+fi
+
+if grep -q "mk/common.mk" make_include_list.txt && grep -q "mk/nested.mk" make_include_list.txt; then
+    echo "${GREEN}✓ dela list shows defining files for included make tasks${NC}"
+else
+    echo "${RED}✗ dela list did not show defining files for included make tasks${NC}"
+    cat make_include_list.txt
+    exit 1
+fi
+
+output=$(dela get-command nested-task 2>&1)
+if echo "$output" | grep -q "make nested-task"; then
+    echo "${GREEN}✓ get-command works for tasks from included makefiles${NC}"
+else
+    echo "${RED}✗ get-command failed for task from included makefiles${NC}"
+    echo "Got: $output"
+    exit 1
+fi
+
+echo "3" | dela allow-command included-task >/dev/null 2>&1
+if grep -q "/home/testuser/make_include_project/mk/common.mk" /home/testuser/.config/dela/allowlist.toml; then
+    echo "${GREEN}✓ allow-command stores the defining included makefile path${NC}"
+else
+    echo "${RED}✗ allow-command did not store the defining included makefile path${NC}"
+    cat /home/testuser/.config/dela/allowlist.toml
     exit 1
 fi
 

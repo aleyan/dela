@@ -64,6 +64,7 @@ fn parse_cmake_string(content: &str, file_path: &Path) -> Result<Vec<Task>, Stri
         let task = Task {
             name: target_name.to_string(),
             file_path: file_path.to_path_buf(),
+            definition_path: None,
             definition_type: TaskDefinitionType::CMake,
             runner: TaskRunner::CMake,
             source_name: target_name.to_string(),

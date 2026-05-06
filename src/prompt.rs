@@ -69,7 +69,7 @@ fn prompt_for_task_fallback(task: &Task) -> Result<AllowDecision, String> {
     println!(
         "\nTask '{}' from '{}' requires approval.",
         task.name,
-        task.file_path.display()
+        task.definition_path().display()
     );
     if let Some(desc) = &task.description {
         println!("Description: {}", desc);
@@ -189,7 +189,7 @@ fn ui(f: &mut Frame, task: &Task, options: &[(&str, AllowDecision)], selected: u
                 .add_modifier(Modifier::BOLD),
         )]),
         Line::from(vec![Span::styled(
-            format!("  {}", task.file_path.display()),
+            format!("  {}", task.definition_path().display()),
             Style::default()
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),
