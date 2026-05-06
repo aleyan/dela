@@ -920,10 +920,14 @@ fn collect_descendant_turbo_config_paths_recursive(
     };
 
     for entry in entries.flatten() {
-        let path = entry.path();
-        if !path.is_dir() {
+        let Ok(file_type) = entry.file_type() else {
+            continue;
+        };
+        if file_type.is_symlink() || !file_type.is_dir() {
             continue;
         }
+
+        let path = entry.path();
 
         let Some(file_name) = path.file_name().and_then(|name| name.to_str()) else {
             continue;

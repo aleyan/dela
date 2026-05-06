@@ -49,17 +49,13 @@ pub fn load_config(path: &Path) -> Result<TurboConfig, String> {
         })
         .unwrap_or_default();
 
-    let tasks = json
-        .get("tasks")
-        .or_else(|| json.get("pipeline"))
-        .and_then(Value::as_object)
-        .map(|task_map| {
-            task_map
-                .iter()
-                .map(|(name, value)| (name.clone(), parse_task_config(value)))
-                .collect()
-        })
-        .unwrap_or_default();
+    let tasks = if let Some(value) = json.get("tasks") {
+        parse_task_map("tasks", value)?
+    } else if let Some(value) = json.get("pipeline") {
+        parse_task_map("pipeline", value)?
+    } else {
+        BTreeMap::new()
+    };
 
     Ok(TurboConfig { extends, tasks })
 }
@@ -99,6 +95,32 @@ fn parse_task_config(value: &Value) -> TurboTaskConfig {
             .unwrap_or(true),
         declared_locally: true,
         has_local_configuration: object.keys().any(|key| key != "extends"),
+    }
+}
+
+fn parse_task_map(key: &str, value: &Value) -> Result<BTreeMap<String, TurboTaskConfig>, String> {
+    let Some(task_map) = value.as_object() else {
+        return Err(format!(
+            "Failed to parse turbo.json: '{}' must be an object, found {}",
+            key,
+            json_type_name(value)
+        ));
+    };
+
+    Ok(task_map
+        .iter()
+        .map(|(name, value)| (name.clone(), parse_task_config(value)))
+        .collect())
+}
+
+fn json_type_name(value: &Value) -> &'static str {
+    match value {
+        Value::Null => "null",
+        Value::Bool(_) => "boolean",
+        Value::Number(_) => "number",
+        Value::String(_) => "string",
+        Value::Array(_) => "array",
+        Value::Object(_) => "object",
     }
 }
 
@@ -270,6 +292,30 @@ mod tests {
         assert_eq!(tasks.len(), 2);
         assert!(tasks.iter().any(|task| task.name == "lint"));
         assert!(tasks.iter().any(|task| task.name == "check-types"));
+    }
+
+    #[test]
+    fn test_parse_turbo_json_errors_when_tasks_is_not_an_object() {
+        let temp_dir = TempDir::new().unwrap();
+        let turbo_json_path = temp_dir.path().join("turbo.json");
+        std::fs::write(&turbo_json_path, r#"{"tasks":["build"]}"#).unwrap();
+
+        let err = parse(&turbo_json_path).unwrap_err();
+
+        assert!(err.contains("'tasks' must be an object"));
+        assert!(err.contains("array"));
+    }
+
+    #[test]
+    fn test_parse_turbo_json_errors_when_pipeline_is_not_an_object() {
+        let temp_dir = TempDir::new().unwrap();
+        let turbo_json_path = temp_dir.path().join("turbo.json");
+        std::fs::write(&turbo_json_path, r#"{"pipeline":"build"}"#).unwrap();
+
+        let err = parse(&turbo_json_path).unwrap_err();
+
+        assert!(err.contains("'pipeline' must be an object"));
+        assert!(err.contains("string"));
     }
 
     #[test]

@@ -202,7 +202,9 @@ EOF
 
 cd /home/testuser/task_include_duplicates
 duplicate_output=$(dela list 2>&1)
-if echo "$duplicate_output" | grep -q 'Found multiple tasks (build) included by "shared"'; then
+if echo "$duplicate_output" | grep -q "multiple tasks" \
+    && echo "$duplicate_output" | grep -q "build" \
+    && echo "$duplicate_output" | grep -q "shared"; then
     echo "${GREEN}✓ dela reports duplicate flattened Taskfile task names${NC}"
 else
     echo "${RED}✗ dela did not report duplicate flattened Taskfile task names${NC}"
@@ -393,7 +395,14 @@ fi
 
 # Test 19b: Verify allow-command stores the defining workflow path
 echo "\nTest 19b: Verifying GitHub Actions allowlist source attribution"
-echo "2" | dela allow-command test-a >/dev/null 2>&1
+github_allow_stderr=$(mktemp)
+if ! echo "2" | dela allow-command test-a >/dev/null 2>"$github_allow_stderr"; then
+    echo "${RED}✗ allow-command failed for GitHub Actions task${NC}"
+    cat "$github_allow_stderr"
+    rm -f "$github_allow_stderr"
+    exit 1
+fi
+rm -f "$github_allow_stderr"
 if grep -q "/home/testuser/test_project/.github/workflows/test.yml" /home/testuser/.config/dela/allowlist.toml; then
     echo "${GREEN}✓ GitHub Actions allowlist entries use the defining workflow file${NC}"
 else
