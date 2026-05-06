@@ -56,7 +56,7 @@ impl TaskDto {
             command: task.runner.get_command(task),
             runner_available: is_runner_available(&task.runner),
             allowlisted: false, // Default to false for legacy method
-            file_path: task.file_path.to_string_lossy().to_string(),
+            file_path: task.definition_path().to_string_lossy().to_string(),
             description: task.description.clone(),
         }
     }
@@ -78,7 +78,7 @@ impl TaskDto {
             command: task.runner.get_command(task),
             runner_available: is_runner_available_for_mcp(&task.runner),
             allowlisted: allowlist_evaluator.is_task_allowed(task).unwrap_or(false),
-            file_path: task.file_path.to_string_lossy().to_string(),
+            file_path: task.definition_path().to_string_lossy().to_string(),
             description: task.description.clone(),
         }
     }
@@ -104,6 +104,7 @@ mod tests {
         let task = Task {
             name: "build".to_string(),
             file_path: PathBuf::from("/project/Makefile"),
+            definition_path: None,
             definition_type: TaskDefinitionType::Makefile,
             runner: TaskRunner::Make,
             source_name: "build".to_string(),
@@ -131,6 +132,7 @@ mod tests {
         let task = Task {
             name: "test".to_string(),
             file_path: PathBuf::from("/project/package.json"),
+            definition_path: None,
             definition_type: TaskDefinitionType::PackageJson,
             runner: TaskRunner::NodeNpm,
             source_name: "test".to_string(),
@@ -157,6 +159,7 @@ mod tests {
         let task = Task {
             name: "clean".to_string(),
             file_path: PathBuf::from("/project/Makefile"),
+            definition_path: None,
             definition_type: TaskDefinitionType::Makefile,
             runner: TaskRunner::Make,
             source_name: "clean".to_string(),
@@ -203,6 +206,7 @@ mod tests {
             let task = Task {
                 name: "build".to_string(),
                 file_path: PathBuf::from("/project/file"),
+                definition_path: None,
                 definition_type: TaskDefinitionType::Makefile,
                 runner: runner.clone(),
                 source_name: "build".to_string(),
@@ -237,6 +241,7 @@ mod tests {
         let task = Task {
             name: "serve".to_string(),
             file_path: PathBuf::from("/home/user/projects/my-app/package.json"),
+            definition_path: None,
             definition_type: TaskDefinitionType::PackageJson,
             runner: TaskRunner::NodeNpm,
             source_name: "serve".to_string(),
@@ -261,11 +266,32 @@ mod tests {
     }
 
     #[test]
+    fn test_taskdto_uses_definition_path_for_composed_make_task() {
+        let task = Task {
+            name: "included-task".to_string(),
+            file_path: PathBuf::from("/project/Makefile"),
+            definition_path: Some(PathBuf::from("/project/mk/common.mk")),
+            definition_type: TaskDefinitionType::Makefile,
+            runner: TaskRunner::Make,
+            source_name: "included-task".to_string(),
+            description: Some("Included task".to_string()),
+            shadowed_by: None,
+            disambiguated_name: None,
+        };
+
+        let dto = TaskDto::from_task(&task);
+
+        assert_eq!(dto.command, "make included-task");
+        assert_eq!(dto.file_path, "/project/mk/common.mk");
+    }
+
+    #[test]
     fn test_taskdto_serialization() {
         // Arrange
         let task = Task {
             name: "test".to_string(),
             file_path: PathBuf::from("/project/Makefile"),
+            definition_path: None,
             definition_type: TaskDefinitionType::Makefile,
             runner: TaskRunner::Make,
             source_name: "test".to_string(),
@@ -291,6 +317,7 @@ mod tests {
             Task {
                 name: "test".to_string(),
                 file_path: PathBuf::from("/project/Makefile"),
+                definition_path: None,
                 definition_type: TaskDefinitionType::Makefile,
                 runner: TaskRunner::Make,
                 source_name: "test".to_string(),
@@ -301,6 +328,7 @@ mod tests {
             Task {
                 name: "test".to_string(),
                 file_path: PathBuf::from("/project/package.json"),
+                definition_path: None,
                 definition_type: TaskDefinitionType::PackageJson,
                 runner: TaskRunner::NodeNpm,
                 source_name: "test".to_string(),
@@ -381,6 +409,7 @@ mod tests {
         let task = Task {
             name: "build".to_string(),
             file_path: PathBuf::from("/project/Makefile"),
+            definition_path: None,
             definition_type: TaskDefinitionType::Makefile,
             runner: TaskRunner::Make,
             source_name: "build".to_string(),
@@ -441,6 +470,7 @@ mod tests {
             let task = Task {
                 name: task_name.to_string(),
                 file_path: PathBuf::from("/project/file"),
+                definition_path: None,
                 definition_type: TaskDefinitionType::Makefile,
                 runner: runner.clone(),
                 source_name: task_name.to_string(),
@@ -482,6 +512,7 @@ mod tests {
             let task = Task {
                 name: task_name.to_string(),
                 file_path: PathBuf::from("/project/docker-compose.yml"),
+                definition_path: None,
                 definition_type: TaskDefinitionType::DockerCompose,
                 runner: TaskRunner::DockerCompose,
                 source_name: task_name.to_string(),
@@ -510,6 +541,7 @@ mod tests {
         let task = Task {
             name: "test".to_string(),
             file_path: PathBuf::from("/project/.travis.yml"),
+            definition_path: None,
             definition_type: TaskDefinitionType::TravisCi,
             runner: TaskRunner::TravisCi,
             source_name: "test".to_string(),
@@ -543,6 +575,7 @@ mod tests {
         let task = Task {
             name: "build-all".to_string(),
             file_path: PathBuf::from("/project/CMakeLists.txt"),
+            definition_path: None,
             definition_type: TaskDefinitionType::CMake,
             runner: TaskRunner::CMake,
             source_name: "build-all".to_string(),

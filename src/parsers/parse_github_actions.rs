@@ -65,6 +65,7 @@ fn parse_workflow_string(content: &str, file_path: &Path) -> Result<Vec<Task>, S
     let task = Task {
         name: task_name.clone(),
         file_path: file_path.to_path_buf(),
+        definition_path: None,
         definition_type: TaskDefinitionType::GitHubActions,
         runner: TaskRunner::Act,
         source_name: task_name, // Source name is the same as the task name (entire workflow)

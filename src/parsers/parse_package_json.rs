@@ -27,6 +27,7 @@ pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
             tasks.push(Task {
                 name: name.clone(),
                 file_path: path.clone(),
+                definition_path: None,
                 definition_type: TaskDefinitionType::PackageJson,
                 runner: runner.clone(),
                 source_name: name.clone(),

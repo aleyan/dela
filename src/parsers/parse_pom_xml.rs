@@ -41,6 +41,7 @@ fn add_default_maven_goals(tasks: &mut Vec<Task>, file_path: &Path) {
         tasks.push(Task {
             name: goal.to_string(),
             file_path: file_path.to_path_buf(),
+            definition_path: None,
             definition_type: TaskDefinitionType::MavenPom,
             runner: TaskRunner::Maven,
             source_name: goal.to_string(),
@@ -67,6 +68,7 @@ fn add_profile_tasks(tasks: &mut Vec<Task>, root: Node, file_path: &Path) -> Res
                 tasks.push(Task {
                     name: format!("profile:{}", profile_id),
                     file_path: file_path.to_path_buf(),
+                    definition_path: None,
                     definition_type: TaskDefinitionType::MavenPom,
                     runner: TaskRunner::Maven,
                     source_name: profile_id.clone(),
@@ -121,6 +123,7 @@ fn add_plugin_tasks(tasks: &mut Vec<Task>, root: Node, file_path: &Path) -> Resu
                                 tasks.push(Task {
                                     name: task_name.clone(),
                                     file_path: file_path.to_path_buf(),
+                                    definition_path: None,
                                     definition_type: TaskDefinitionType::MavenPom,
                                     runner: TaskRunner::Maven,
                                     source_name: task_name,

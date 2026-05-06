@@ -1,3 +1,4 @@
+use crate::composed_paths::{ComposedDefinitionSource, RecursiveDiscoveryState, VisitState};
 use crate::parsers::{
     parse_cmake, parse_docker_compose, parse_github_actions, parse_gradle, parse_justfile,
     parse_makefile, parse_package_json, parse_pom_xml, parse_pyproject_toml, parse_taskfile,
@@ -6,7 +7,7 @@ use crate::parsers::{
 use crate::repo_root::find_git_repo_root;
 use crate::task_shadowing::check_shadowing;
 use crate::types::{Task, TaskDefinitionFile, TaskDefinitionType, TaskFileStatus, TaskRunner};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
@@ -223,7 +224,7 @@ pub fn format_ambiguous_task_error(task_name: &str, matching_tasks: &[&Task]) ->
                 "  • {} ({} from {})\n",
                 disambiguated,
                 task.runner.short_name(),
-                task.file_path.display()
+                task.definition_path().display()
             ));
         }
     }
@@ -308,21 +309,109 @@ fn discover_makefile_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Resu
         return Ok(());
     }
 
-    match parse_makefile::parse(&makefile_path) {
-        Ok(tasks) => {
-            handle_discovery_success(
-                tasks,
-                makefile_path,
-                TaskDefinitionType::Makefile,
-                discovered,
-            );
+    let root_source = ComposedDefinitionSource::direct(makefile_path.clone());
+    let mut traversal_state = RecursiveDiscoveryState::new();
+    let mut seen_task_names = std::collections::HashSet::new();
+    let mut tasks = Vec::new();
+    let mut include_errors = Vec::new();
+
+    let result = collect_makefile_tasks_recursive(
+        &makefile_path,
+        &root_source,
+        &mut traversal_state,
+        &mut seen_task_names,
+        &mut tasks,
+        &mut include_errors,
+    );
+
+    for task in &mut tasks {
+        task.shadowed_by = check_shadowing(&task.name);
+    }
+
+    discovered.tasks.extend(tasks);
+    discovered.errors.extend(include_errors);
+
+    let status = match result {
+        Ok(()) => TaskFileStatus::Parsed,
+        Err(error) => {
+            discovered.errors.push(format!(
+                "Failed to parse {}: {}",
+                makefile_path.display(),
+                error
+            ));
+            TaskFileStatus::ParseError(error)
         }
-        Err(e) => {
-            handle_discovery_error(e, makefile_path, TaskDefinitionType::Makefile, discovered);
+    };
+    discovered.definitions.makefile = Some(TaskDefinitionFile {
+        path: makefile_path,
+        definition_type: TaskDefinitionType::Makefile,
+        status,
+    });
+
+    Ok(())
+}
+
+fn collect_makefile_tasks_recursive(
+    root_makefile_path: &Path,
+    current_source: &ComposedDefinitionSource,
+    traversal_state: &mut RecursiveDiscoveryState,
+    seen_task_names: &mut std::collections::HashSet<String>,
+    collected_tasks: &mut Vec<Task>,
+    include_errors: &mut Vec<String>,
+) -> Result<(), String> {
+    match traversal_state.mark_visited(current_source.definition_path()) {
+        VisitState::AlreadyVisited(_) => return Ok(()),
+        VisitState::New(_) => {}
+    }
+
+    let mut first_error: Option<String> = None;
+
+    let mut tasks = parse_makefile::parse(current_source.definition_path())?;
+    for task in &mut tasks {
+        current_source.apply_to_task(task);
+    }
+    for task in tasks {
+        if seen_task_names.insert(task.name.clone()) {
+            collected_tasks.push(task);
         }
     }
 
-    Ok(())
+    let includes = parse_makefile::extract_include_directives(current_source.definition_path())?;
+
+    for include in includes {
+        let resolved_include = current_source.resolve_child(&include.path);
+
+        if !resolved_include.is_file() {
+            continue;
+        }
+
+        let include_source =
+            ComposedDefinitionSource::composed(root_makefile_path, resolved_include.clone());
+        if let Err(error) = collect_makefile_tasks_recursive(
+            root_makefile_path,
+            &include_source,
+            traversal_state,
+            seen_task_names,
+            collected_tasks,
+            include_errors,
+        ) {
+            let error = format!(
+                "Failed to parse included makefile '{}': {}",
+                resolved_include.display(),
+                error
+            );
+            include_errors.push(error.clone());
+            if first_error.is_none() {
+                first_error = Some(error);
+            }
+        }
+    }
+
+    if let Some(error) = first_error {
+        Err(error)
+    } else {
+        Ok(())
+    }
 }
 
 fn discover_npm_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<(), String> {
@@ -389,63 +478,184 @@ fn discover_python_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result
 }
 
 fn discover_taskfile_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<(), String> {
-    // List of possible Taskfile paths in order of priority
-    let possible_taskfiles = [
-        "Taskfile.yml",
-        "taskfile.yml",
-        "Taskfile.yaml",
-        "taskfile.yaml",
-        "Taskfile.dist.yml",
-        "taskfile.dist.yml",
-        "Taskfile.dist.yaml",
-        "taskfile.dist.yaml",
-    ];
-
-    // Try to find the first existing Taskfile
-    let mut taskfile_path = None;
-    for filename in &possible_taskfiles {
-        let path = dir.join(filename);
-        if path.exists() {
-            taskfile_path = Some(path);
-            break;
-        }
-    }
-
-    // Use a default path for reporting if no Taskfile was found
-    let default_path = dir.join("Taskfile.yml");
-
-    // If a Taskfile was found, parse it
-    if let Some(taskfile_path) = taskfile_path {
-        let mut definition = TaskDefinitionFile {
-            path: taskfile_path.clone(),
-            definition_type: TaskDefinitionType::Taskfile,
-            status: TaskFileStatus::NotImplemented,
-        };
-
-        match parse_taskfile::parse(&taskfile_path) {
-            Ok(tasks) => {
-                definition.status = TaskFileStatus::Parsed;
-                discovered.tasks.extend(tasks);
-            }
-            Err(e) => {
-                definition.status = TaskFileStatus::ParseError(e.clone());
-                discovered
-                    .errors
-                    .push(format!("Error parsing {}: {}", taskfile_path.display(), e));
-            }
-        }
-
-        set_definition(discovered, definition);
-    } else {
-        // No Taskfile found, set status as NotFound
+    let default_path = dir.join(parse_taskfile::SUPPORTED_TASKFILE_NAMES[0]);
+    let Some(taskfile_path) = parse_taskfile::find_taskfile_in_dir(dir) else {
         discovered.definitions.taskfile = Some(TaskDefinitionFile {
             path: default_path,
             definition_type: TaskDefinitionType::Taskfile,
             status: TaskFileStatus::NotFound,
         });
+        return Ok(());
+    };
+
+    let root_source = ComposedDefinitionSource::direct(taskfile_path.clone());
+    let mut traversal_state = RecursiveDiscoveryState::new();
+    let mut seen_task_names = std::collections::HashSet::new();
+    let mut tasks = Vec::new();
+    let mut include_errors = Vec::new();
+    let no_excludes = std::collections::HashSet::new();
+    let mut traversal = TaskfileTraversal {
+        root_taskfile_path: &taskfile_path,
+        traversal_state: &mut traversal_state,
+        seen_task_names: &mut seen_task_names,
+        collected_tasks: &mut tasks,
+        include_errors: &mut include_errors,
+    };
+
+    let result = collect_taskfile_tasks_recursive(
+        &root_source,
+        "",
+        None,
+        false,
+        &no_excludes,
+        &mut traversal,
+    );
+
+    for task in &mut tasks {
+        task.shadowed_by = check_shadowing(&task.name);
     }
 
+    discovered.tasks.extend(tasks);
+    discovered.errors.extend(include_errors);
+
+    let status = match result {
+        Ok(()) => TaskFileStatus::Parsed,
+        Err(error) => {
+            discovered.errors.push(format!(
+                "Failed to parse {}: {}",
+                taskfile_path.display(),
+                error
+            ));
+            TaskFileStatus::ParseError(error)
+        }
+    };
+    discovered.definitions.taskfile = Some(TaskDefinitionFile {
+        path: taskfile_path,
+        definition_type: TaskDefinitionType::Taskfile,
+        status,
+    });
+
     Ok(())
+}
+
+struct TaskfileTraversal<'a> {
+    root_taskfile_path: &'a Path,
+    traversal_state: &'a mut RecursiveDiscoveryState,
+    seen_task_names: &'a mut std::collections::HashSet<String>,
+    collected_tasks: &'a mut Vec<Task>,
+    include_errors: &'a mut Vec<String>,
+}
+
+fn collect_taskfile_tasks_recursive(
+    current_source: &ComposedDefinitionSource,
+    namespace_prefix: &str,
+    include_label: Option<&str>,
+    hide_tasks: bool,
+    excluded_tasks: &std::collections::HashSet<String>,
+    traversal: &mut TaskfileTraversal<'_>,
+) -> Result<(), String> {
+    match traversal
+        .traversal_state
+        .mark_visited(current_source.definition_path())
+    {
+        VisitState::AlreadyVisited(_) => return Ok(()),
+        VisitState::New(_) => {}
+    }
+
+    let mut first_error: Option<String> = None;
+
+    let mut tasks = parse_taskfile::parse(current_source.definition_path())?;
+    tasks.sort_by(|a, b| a.name.cmp(&b.name));
+
+    if !hide_tasks {
+        for mut task in tasks {
+            let original_name = task.name.clone();
+            if excluded_tasks.contains(&original_name) {
+                continue;
+            }
+
+            let effective_name = prefix_taskfile_task_name(namespace_prefix, &original_name);
+            task.name = effective_name.clone();
+            task.source_name = effective_name;
+            current_source.apply_to_task(&mut task);
+
+            if !traversal.seen_task_names.insert(task.name.clone()) {
+                let error = match include_label {
+                    Some(include_label) => {
+                        format!(
+                            "Found multiple tasks ({}) included by \"{}\"",
+                            task.name, include_label
+                        )
+                    }
+                    None => format!("Found multiple Taskfile tasks named '{}'", task.name),
+                };
+                traversal.include_errors.push(error.clone());
+                if first_error.is_none() {
+                    first_error = Some(error);
+                }
+                continue;
+            }
+
+            traversal.collected_tasks.push(task);
+        }
+    }
+
+    let includes = parse_taskfile::extract_include_directives(current_source.definition_path())?;
+
+    for include in includes {
+        let resolved_candidate = current_source.resolve_child(&include.taskfile);
+        let resolved_include = parse_taskfile::resolve_taskfile_include_path(&resolved_candidate);
+
+        if !resolved_include.is_file() {
+            continue;
+        }
+
+        let child_source = ComposedDefinitionSource::composed(
+            traversal.root_taskfile_path,
+            resolved_include.clone(),
+        );
+        let child_namespace = if include.flatten {
+            namespace_prefix.to_string()
+        } else {
+            prefix_taskfile_task_name(namespace_prefix, &include.namespace)
+        };
+        let child_include_label = prefix_taskfile_task_name(namespace_prefix, &include.namespace);
+        let child_hide_tasks = hide_tasks || include.internal;
+        let child_excludes = include.excludes.into_iter().collect();
+
+        if let Err(error) = collect_taskfile_tasks_recursive(
+            &child_source,
+            &child_namespace,
+            Some(child_include_label.as_str()),
+            child_hide_tasks,
+            &child_excludes,
+            traversal,
+        ) {
+            let error = format!(
+                "Failed to parse included Taskfile '{}': {}",
+                resolved_include.display(),
+                error
+            );
+            traversal.include_errors.push(error.clone());
+            if first_error.is_none() {
+                first_error = Some(error);
+            }
+        }
+    }
+
+    if let Some(error) = first_error {
+        Err(error)
+    } else {
+        Ok(())
+    }
+}
+
+fn prefix_taskfile_task_name(namespace_prefix: &str, task_name: &str) -> String {
+    if namespace_prefix.is_empty() {
+        task_name.to_string()
+    } else {
+        format!("{}:{}", namespace_prefix, task_name)
+    }
 }
 
 fn discover_turbo_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<(), String> {
@@ -461,16 +671,339 @@ fn discover_turbo_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<
         return Ok(());
     }
 
-    match parse_turbo_json::parse(&turbo_json) {
-        Ok(tasks) => {
-            handle_discovery_success(tasks, turbo_json, TaskDefinitionType::TurboJson, discovered);
+    let mut tasks_by_name = BTreeMap::new();
+    let mut config_errors = Vec::new();
+
+    let result = collect_turbo_tasks_for_context(
+        &repo_root,
+        dir,
+        &turbo_json,
+        &mut tasks_by_name,
+        &mut config_errors,
+    );
+
+    let mut tasks: Vec<_> = tasks_by_name.into_values().collect();
+    for task in &mut tasks {
+        task.shadowed_by = check_shadowing(&task.name);
+    }
+
+    discovered.tasks.extend(tasks);
+    discovered.errors.extend(config_errors);
+
+    let status = match result {
+        Ok(()) => TaskFileStatus::Parsed,
+        Err(error) => {
+            discovered.errors.push(format!(
+                "Failed to parse {}: {}",
+                turbo_json.display(),
+                error
+            ));
+            TaskFileStatus::ParseError(error)
         }
-        Err(e) => {
-            handle_discovery_error(e, turbo_json, TaskDefinitionType::TurboJson, discovered);
+    };
+    discovered.definitions.turbo_json = Some(TaskDefinitionFile {
+        path: turbo_json,
+        definition_type: TaskDefinitionType::TurboJson,
+        status,
+    });
+
+    Ok(())
+}
+
+fn collect_turbo_tasks_for_context(
+    repo_root: &Path,
+    dir: &Path,
+    root_turbo_json: &Path,
+    collected_tasks: &mut BTreeMap<String, Task>,
+    config_errors: &mut Vec<String>,
+) -> Result<(), String> {
+    let root_source = ComposedDefinitionSource::direct(root_turbo_json.to_path_buf());
+    let mut package_configs_by_name = None;
+    let root_tasks = resolve_effective_turbo_tasks(
+        &root_source,
+        repo_root,
+        root_turbo_json,
+        &mut package_configs_by_name,
+        &mut RecursiveDiscoveryState::new(),
+    )?;
+    collected_tasks.extend(root_tasks);
+
+    let mut first_error = None;
+
+    if dir == repo_root {
+        for config_path in collect_descendant_turbo_config_paths(repo_root) {
+            let config_source =
+                ComposedDefinitionSource::composed(root_turbo_json, config_path.clone());
+            match resolve_effective_turbo_tasks(
+                &config_source,
+                repo_root,
+                root_turbo_json,
+                &mut package_configs_by_name,
+                &mut RecursiveDiscoveryState::new(),
+            ) {
+                Ok(tasks) => {
+                    for (name, task) in tasks {
+                        collected_tasks.entry(name).or_insert(task);
+                    }
+                }
+                Err(error) => {
+                    let error = format!(
+                        "Failed to parse workspace-local turbo config '{}': {}",
+                        config_path.display(),
+                        error
+                    );
+                    config_errors.push(error.clone());
+                    if first_error.is_none() {
+                        first_error = Some(error);
+                    }
+                }
+            }
+        }
+    } else {
+        for config_path in collect_turbo_ancestor_config_paths(dir, repo_root) {
+            let config_source =
+                ComposedDefinitionSource::composed(root_turbo_json, config_path.clone());
+            match resolve_effective_turbo_tasks(
+                &config_source,
+                repo_root,
+                root_turbo_json,
+                &mut package_configs_by_name,
+                &mut RecursiveDiscoveryState::new(),
+            ) {
+                Ok(tasks) if !tasks.is_empty() => {
+                    *collected_tasks = tasks;
+                    break;
+                }
+                Ok(_) => {}
+                Err(error) => {
+                    let error = format!(
+                        "Failed to parse workspace-local turbo config '{}': {}",
+                        config_path.display(),
+                        error
+                    );
+                    config_errors.push(error.clone());
+                    if first_error.is_none() {
+                        first_error = Some(error);
+                    }
+                    break;
+                }
+            }
         }
     }
 
-    Ok(())
+    if let Some(error) = first_error {
+        Err(error)
+    } else {
+        Ok(())
+    }
+}
+
+fn resolve_effective_turbo_tasks(
+    current_source: &ComposedDefinitionSource,
+    repo_root: &Path,
+    root_turbo_json: &Path,
+    package_configs_by_name: &mut Option<HashMap<String, PathBuf>>,
+    traversal_state: &mut RecursiveDiscoveryState,
+) -> Result<BTreeMap<String, Task>, String> {
+    match traversal_state.mark_visited(current_source.definition_path()) {
+        VisitState::AlreadyVisited(_) => return Ok(BTreeMap::new()),
+        VisitState::New(_) => {}
+    }
+
+    let config = parse_turbo_json::load_config(current_source.definition_path())?;
+
+    if current_source.definition_path() != root_turbo_json && config.extends.is_empty() {
+        return Ok(BTreeMap::new());
+    }
+
+    let mut tasks = BTreeMap::new();
+
+    if current_source.definition_path() != root_turbo_json {
+        for extend_entry in &config.extends {
+            let Some(parent_config_path) = resolve_turbo_extends_entry(
+                current_source,
+                extend_entry,
+                repo_root,
+                root_turbo_json,
+                package_configs_by_name,
+            ) else {
+                continue;
+            };
+
+            if !parent_config_path.is_file() {
+                continue;
+            }
+
+            let parent_source =
+                ComposedDefinitionSource::composed(root_turbo_json, parent_config_path.clone());
+            let inherited_tasks = resolve_effective_turbo_tasks(
+                &parent_source,
+                repo_root,
+                root_turbo_json,
+                package_configs_by_name,
+                traversal_state,
+            )?;
+            tasks.extend(inherited_tasks);
+        }
+    }
+
+    for (name, task_config) in &config.tasks {
+        if !task_config.is_effective_task_definition() {
+            tasks.remove(name.as_str());
+        }
+    }
+
+    let mut local_tasks = parse_turbo_json::parse(current_source.definition_path())?;
+    for task in &mut local_tasks {
+        current_source.apply_to_task(task);
+    }
+    for task in local_tasks {
+        tasks.insert(task.name.clone(), task);
+    }
+
+    Ok(tasks)
+}
+
+fn resolve_turbo_extends_entry(
+    current_source: &ComposedDefinitionSource,
+    extend_entry: &str,
+    repo_root: &Path,
+    root_turbo_json: &Path,
+    package_configs_by_name: &mut Option<HashMap<String, PathBuf>>,
+) -> Option<PathBuf> {
+    if extend_entry == "//" {
+        return Some(root_turbo_json.to_path_buf());
+    }
+
+    if looks_like_turbo_config_path(extend_entry) {
+        let candidate = current_source.resolve_child(extend_entry);
+        return Some(resolve_turbo_config_path_candidate(&candidate));
+    }
+
+    let package_configs_by_name =
+        package_configs_by_name.get_or_insert_with(|| build_turbo_package_config_index(repo_root));
+    package_configs_by_name.get(extend_entry).cloned()
+}
+
+fn collect_turbo_ancestor_config_paths(dir: &Path, repo_root: &Path) -> Vec<PathBuf> {
+    let mut current = dir.to_path_buf();
+    let mut config_paths = Vec::new();
+
+    while current.starts_with(repo_root) && current != repo_root {
+        let candidate = current.join("turbo.json");
+        if candidate.is_file() {
+            config_paths.push(candidate);
+        }
+
+        if !current.pop() {
+            break;
+        }
+    }
+
+    config_paths
+}
+
+fn collect_descendant_turbo_config_paths(repo_root: &Path) -> Vec<PathBuf> {
+    let mut config_paths = Vec::new();
+    collect_descendant_turbo_config_paths_recursive(repo_root, repo_root, &mut config_paths);
+    config_paths.sort();
+    config_paths
+}
+
+fn collect_descendant_turbo_config_paths_recursive(
+    repo_root: &Path,
+    current_dir: &Path,
+    config_paths: &mut Vec<PathBuf>,
+) {
+    let Ok(entries) = fs::read_dir(current_dir) else {
+        return;
+    };
+
+    for entry in entries.flatten() {
+        let Ok(file_type) = entry.file_type() else {
+            continue;
+        };
+        if file_type.is_symlink() || !file_type.is_dir() {
+            continue;
+        }
+
+        let path = entry.path();
+
+        let Some(file_name) = path.file_name().and_then(|name| name.to_str()) else {
+            continue;
+        };
+        if should_skip_turbo_config_scan(file_name) {
+            continue;
+        }
+
+        let candidate = path.join("turbo.json");
+        if candidate.is_file() && candidate != repo_root.join("turbo.json") {
+            config_paths.push(candidate);
+        }
+
+        collect_descendant_turbo_config_paths_recursive(repo_root, &path, config_paths);
+    }
+}
+
+fn should_skip_turbo_config_scan(file_name: &str) -> bool {
+    matches!(file_name, ".git" | "node_modules")
+}
+
+fn looks_like_turbo_config_path(extend_entry: &str) -> bool {
+    let extend_path = Path::new(extend_entry);
+    extend_path.is_absolute()
+        || extend_entry.starts_with('.')
+        || extend_entry.contains(std::path::MAIN_SEPARATOR)
+        || extend_entry.contains('/')
+        || extend_entry.contains('\\')
+}
+
+fn resolve_turbo_config_path_candidate(candidate: &Path) -> PathBuf {
+    if candidate
+        .file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name == "turbo.json")
+    {
+        return candidate.to_path_buf();
+    }
+
+    if candidate.extension().is_none() || candidate.is_dir() {
+        return candidate.join("turbo.json");
+    }
+
+    candidate.to_path_buf()
+}
+
+fn build_turbo_package_config_index(repo_root: &Path) -> HashMap<String, PathBuf> {
+    let mut package_configs = HashMap::new();
+
+    let root_turbo_json = repo_root.join("turbo.json");
+    if root_turbo_json.is_file()
+        && let Some(package_name) = read_package_name(repo_root)
+    {
+        package_configs.insert(package_name, root_turbo_json);
+    }
+
+    for config_path in collect_descendant_turbo_config_paths(repo_root) {
+        let Some(config_dir) = config_path.parent() else {
+            continue;
+        };
+        let Some(package_name) = read_package_name(config_dir) else {
+            continue;
+        };
+        package_configs.entry(package_name).or_insert(config_path);
+    }
+
+    package_configs
+}
+
+fn read_package_name(dir: &Path) -> Option<String> {
+    let package_json_path = dir.join("package.json");
+    let contents = fs::read_to_string(package_json_path).ok()?;
+    let json: serde_json::Value = serde_json::from_str(&contents).ok()?;
+    json.get("name")
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_string)
 }
 
 fn discover_maven_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<(), String> {
@@ -639,10 +1172,11 @@ fn discover_github_actions_tasks(
     for file_path in workflow_files {
         match parse_github_actions(&file_path) {
             Ok(mut tasks) => {
-                // Override the file path to use the common parent directory
-                // instead of individual workflow files
+                let source =
+                    ComposedDefinitionSource::composed(workflows_parent.clone(), file_path);
                 for task in &mut tasks {
-                    task.file_path = workflows_parent.clone();
+                    source.apply_to_task(task);
+                    task.shadowed_by = check_shadowing(&task.name);
                 }
                 all_tasks.extend(tasks);
             }
@@ -838,6 +1372,7 @@ fn discover_shell_script_tasks(dir: &Path, discovered: &mut DiscoveredTasks) {
                 discovered.tasks.push(Task {
                     name: name.clone(),
                     file_path: path,
+                    definition_path: None,
                     definition_type: TaskDefinitionType::ShellScript,
                     runner: TaskRunner::ShellScript,
                     source_name,
@@ -944,6 +1479,26 @@ mod tests {
         writeln!(file, "{}", content).unwrap();
     }
 
+    fn create_test_turbo_json(dir: &Path, content: &str) {
+        std::fs::create_dir_all(dir).unwrap();
+        std::fs::write(dir.join("turbo.json"), content).unwrap();
+    }
+
+    fn create_test_package_json(dir: &Path, name: &str) {
+        std::fs::create_dir_all(dir).unwrap();
+        std::fs::write(
+            dir.join("package.json"),
+            format!(
+                r#"{{
+  "name": "{}",
+  "private": true
+}}"#,
+                name
+            ),
+        )
+        .unwrap();
+    }
+
     #[test]
     fn test_discover_tasks_empty_directory() {
         let temp_dir = TempDir::new().unwrap();
@@ -1015,13 +1570,212 @@ test:
     }
 
     #[test]
+    fn test_discover_tasks_with_included_makefiles() {
+        let temp_dir = TempDir::new().unwrap();
+        let included_dir = temp_dir.path().join("mk");
+        std::fs::create_dir_all(&included_dir).unwrap();
+
+        create_test_makefile(
+            temp_dir.path(),
+            r#"include mk/common.mk
+
+build:
+	@echo "Build from root""#,
+        );
+        std::fs::write(
+            included_dir.join("common.mk"),
+            r#"include nested.mk
+
+test:
+	@echo "Test from common""#,
+        )
+        .unwrap();
+        std::fs::write(
+            included_dir.join("nested.mk"),
+            r#"lint:
+	@echo "Lint from nested""#,
+        )
+        .unwrap();
+
+        let discovered = discover_tasks(temp_dir.path());
+
+        assert!(discovered.errors.is_empty(), "{:?}", discovered.errors);
+        assert!(matches!(
+            discovered.definitions.makefile.unwrap().status,
+            TaskFileStatus::Parsed
+        ));
+        assert_eq!(discovered.tasks.len(), 3);
+
+        let root_makefile = temp_dir.path().join("Makefile");
+        let common_makefile = included_dir.join("common.mk");
+        let nested_makefile = included_dir.join("nested.mk");
+
+        let build_task = discovered.tasks.iter().find(|t| t.name == "build").unwrap();
+        assert_eq!(build_task.file_path, root_makefile);
+        assert_eq!(build_task.definition_path(), root_makefile.as_path());
+
+        let test_task = discovered.tasks.iter().find(|t| t.name == "test").unwrap();
+        assert_eq!(test_task.file_path, root_makefile);
+        assert_eq!(test_task.definition_path(), common_makefile.as_path());
+
+        let lint_task = discovered.tasks.iter().find(|t| t.name == "lint").unwrap();
+        assert_eq!(lint_task.file_path, root_makefile);
+        assert_eq!(lint_task.definition_path(), nested_makefile.as_path());
+    }
+
+    #[test]
+    #[serial]
+    fn test_duplicate_task_names_from_included_makefile_use_definition_path() {
+        let temp_dir = TempDir::new().unwrap();
+        let included_dir = temp_dir.path().join("mk");
+        std::fs::create_dir_all(&included_dir).unwrap();
+
+        reset_mock();
+        enable_mock();
+        mock_executable("npm");
+
+        create_test_makefile(
+            temp_dir.path(),
+            r#"include mk/common.mk
+
+build:
+	@echo "Build from root""#,
+        );
+        std::fs::write(
+            included_dir.join("common.mk"),
+            r#"test:
+	@echo "Test from included makefile""#,
+        )
+        .unwrap();
+        std::fs::write(
+            temp_dir.path().join("package.json"),
+            r#"{
+  "name": "test-package",
+  "scripts": {
+    "test": "jest"
+  }
+}"#,
+        )
+        .unwrap();
+        std::fs::write(temp_dir.path().join("package-lock.json"), "{}").unwrap();
+
+        let discovered = discover_tasks(temp_dir.path());
+        let matching_tasks: Vec<&Task> = discovered
+            .tasks
+            .iter()
+            .filter(|task| task.name == "test")
+            .collect();
+
+        assert_eq!(matching_tasks.len(), 2);
+
+        let make_task = matching_tasks
+            .iter()
+            .copied()
+            .find(|task| task.runner == TaskRunner::Make)
+            .unwrap();
+        assert_eq!(
+            make_task.definition_path(),
+            included_dir.join("common.mk").as_path()
+        );
+        assert_eq!(make_task.file_path, temp_dir.path().join("Makefile"));
+        assert_eq!(make_task.disambiguated_name.as_deref(), Some("test-m"));
+
+        let error = format_ambiguous_task_error("test", &matching_tasks);
+        assert!(
+            error.contains("mk/common.mk"),
+            "unexpected ambiguous-task error: {}",
+            error
+        );
+
+        reset_mock();
+        reset_to_real_environment();
+    }
+
+    #[test]
+    fn test_discover_tasks_with_optional_missing_included_makefile() {
+        let temp_dir = TempDir::new().unwrap();
+        create_test_makefile(
+            temp_dir.path(),
+            r#"-include missing.mk
+
+build:
+	@echo "Build from root""#,
+        );
+
+        let discovered = discover_tasks(temp_dir.path());
+
+        assert!(matches!(
+            discovered.definitions.makefile.unwrap().status,
+            TaskFileStatus::Parsed
+        ));
+        assert!(discovered.errors.is_empty(), "{:?}", discovered.errors);
+        assert_eq!(discovered.tasks.len(), 1);
+        assert!(discovered.tasks.iter().any(|t| t.name == "build"));
+    }
+
+    #[test]
+    fn test_discover_tasks_with_recursive_makefile_include_cycle() {
+        let temp_dir = TempDir::new().unwrap();
+        let included_dir = temp_dir.path().join("mk");
+        std::fs::create_dir_all(&included_dir).unwrap();
+
+        create_test_makefile(
+            temp_dir.path(),
+            r#"include mk/common.mk
+
+build:
+	@echo "Build from root""#,
+        );
+        std::fs::write(
+            included_dir.join("common.mk"),
+            r#"include ../Makefile
+
+test:
+	@echo "Test from common""#,
+        )
+        .unwrap();
+
+        let discovered = discover_tasks(temp_dir.path());
+
+        assert!(matches!(
+            discovered.definitions.makefile.unwrap().status,
+            TaskFileStatus::Parsed
+        ));
+        assert!(discovered.errors.is_empty(), "{:?}", discovered.errors);
+        assert_eq!(discovered.tasks.len(), 2);
+        assert!(discovered.tasks.iter().any(|t| t.name == "build"));
+        assert!(discovered.tasks.iter().any(|t| t.name == "test"));
+    }
+
+    #[test]
+    fn test_discover_tasks_with_missing_required_included_makefile() {
+        let temp_dir = TempDir::new().unwrap();
+        create_test_makefile(
+            temp_dir.path(),
+            r#"include missing.mk
+
+build:
+	@echo "Build from root""#,
+        );
+
+        let discovered = discover_tasks(temp_dir.path());
+
+        assert!(matches!(
+            discovered.definitions.makefile.unwrap().status,
+            TaskFileStatus::Parsed
+        ));
+        assert!(discovered.errors.is_empty(), "{:?}", discovered.errors);
+        assert!(discovered.tasks.iter().any(|t| t.name == "build"));
+    }
+
+    #[test]
     fn test_discover_tasks_finds_turbo_json_at_git_repo_root() {
         let temp_dir = TempDir::new().unwrap();
         std::fs::create_dir_all(temp_dir.path().join(".git")).unwrap();
         std::fs::create_dir_all(temp_dir.path().join("apps").join("web")).unwrap();
 
-        std::fs::write(
-            temp_dir.path().join("turbo.json"),
+        create_test_turbo_json(
+            temp_dir.path(),
             r#"{
   "$schema": "https://turborepo.dev/schema.json",
   "tasks": {
@@ -1031,22 +1785,203 @@ test:
     }
   }
 }"#,
-        )
-        .unwrap();
+        );
 
         let discovered = discover_tasks(&temp_dir.path().join("apps").join("web"));
 
         let build_task = discovered.tasks.iter().find(|t| t.name == "build").unwrap();
         assert_eq!(build_task.runner, TaskRunner::Turbo);
         assert_eq!(build_task.file_path, temp_dir.path().join("turbo.json"));
+        assert_eq!(
+            build_task.definition_path(),
+            temp_dir.path().join("turbo.json").as_path()
+        );
 
         let test_task = discovered.tasks.iter().find(|t| t.name == "test").unwrap();
         assert_eq!(test_task.runner, TaskRunner::Turbo);
         assert_eq!(test_task.file_path, temp_dir.path().join("turbo.json"));
+        assert_eq!(
+            test_task.definition_path(),
+            temp_dir.path().join("turbo.json").as_path()
+        );
 
         assert_eq!(
             discovered.definitions.turbo_json.unwrap().status,
             TaskFileStatus::Parsed
+        );
+    }
+
+    #[test]
+    fn test_discover_tasks_includes_workspace_local_turbo_tasks_from_repo_root() {
+        let temp_dir = TempDir::new().unwrap();
+        let repo_root = temp_dir.path();
+        let web_dir = repo_root.join("apps").join("web");
+        std::fs::create_dir_all(repo_root.join(".git")).unwrap();
+
+        create_test_turbo_json(
+            repo_root,
+            r#"{
+  "tasks": {
+    "build": {},
+    "test": {}
+  }
+}"#,
+        );
+        create_test_package_json(&web_dir, "web");
+        create_test_turbo_json(
+            &web_dir,
+            r#"{
+  "extends": ["//"],
+  "tasks": {
+    "lint": {},
+    "test": {
+      "extends": false
+    }
+  }
+}"#,
+        );
+
+        let discovered = discover_tasks(repo_root);
+
+        assert!(discovered.errors.is_empty(), "{:?}", discovered.errors);
+        assert!(discovered.tasks.iter().any(|task| task.name == "build"));
+        assert!(discovered.tasks.iter().any(|task| task.name == "test"));
+
+        let lint_task = discovered
+            .tasks
+            .iter()
+            .find(|task| task.name == "lint")
+            .unwrap();
+        assert_eq!(lint_task.runner, TaskRunner::Turbo);
+        assert_eq!(lint_task.file_path, repo_root.join("turbo.json"));
+        assert_eq!(
+            lint_task.definition_path(),
+            web_dir.join("turbo.json").as_path()
+        );
+    }
+
+    #[test]
+    fn test_discover_tasks_resolves_workspace_local_turbo_tasks_for_nested_package() {
+        let temp_dir = TempDir::new().unwrap();
+        let repo_root = temp_dir.path();
+        let web_dir = repo_root.join("apps").join("web");
+        std::fs::create_dir_all(repo_root.join(".git")).unwrap();
+
+        create_test_turbo_json(
+            repo_root,
+            r#"{
+  "tasks": {
+    "build": {},
+    "test": {}
+  }
+}"#,
+        );
+        create_test_package_json(&web_dir, "web");
+        create_test_turbo_json(
+            &web_dir,
+            r#"{
+  "extends": ["//"],
+  "tasks": {
+    "lint": {},
+    "test": {
+      "extends": false
+    }
+  }
+}"#,
+        );
+
+        let discovered = discover_tasks(&web_dir);
+        let task_names: Vec<_> = discovered
+            .tasks
+            .iter()
+            .map(|task| task.name.as_str())
+            .collect();
+
+        assert!(discovered.errors.is_empty(), "{:?}", discovered.errors);
+        assert_eq!(task_names, vec!["build", "lint"]);
+
+        let build_task = discovered
+            .tasks
+            .iter()
+            .find(|task| task.name == "build")
+            .unwrap();
+        assert_eq!(
+            build_task.definition_path(),
+            repo_root.join("turbo.json").as_path()
+        );
+
+        let lint_task = discovered
+            .tasks
+            .iter()
+            .find(|task| task.name == "lint")
+            .unwrap();
+        assert_eq!(lint_task.file_path, repo_root.join("turbo.json"));
+        assert_eq!(
+            lint_task.definition_path(),
+            web_dir.join("turbo.json").as_path()
+        );
+    }
+
+    #[test]
+    fn test_discover_tasks_recursively_resolves_turbo_extends_chain() {
+        let temp_dir = TempDir::new().unwrap();
+        let repo_root = temp_dir.path();
+        let shared_dir = repo_root.join("packages").join("shared-config");
+        let web_dir = repo_root.join("apps").join("web");
+        std::fs::create_dir_all(repo_root.join(".git")).unwrap();
+
+        create_test_turbo_json(
+            repo_root,
+            r#"{
+  "tasks": {
+    "build": {}
+  }
+}"#,
+        );
+        create_test_package_json(&shared_dir, "shared-config");
+        create_test_turbo_json(
+            &shared_dir,
+            r#"{
+  "extends": ["//"],
+  "tasks": {
+    "lint": {}
+  }
+}"#,
+        );
+        create_test_package_json(&web_dir, "web");
+        create_test_turbo_json(
+            &web_dir,
+            r#"{
+  "extends": ["//", "shared-config"],
+  "tasks": {
+    "deploy": {}
+  }
+}"#,
+        );
+
+        let discovered = discover_tasks(&web_dir);
+
+        assert!(discovered.errors.is_empty(), "{:?}", discovered.errors);
+        assert!(discovered.tasks.iter().any(|task| task.name == "build"));
+
+        let lint_task = discovered
+            .tasks
+            .iter()
+            .find(|task| task.name == "lint")
+            .unwrap();
+        assert_eq!(
+            lint_task.definition_path(),
+            shared_dir.join("turbo.json").as_path()
+        );
+
+        let deploy_task = discovered
+            .tasks
+            .iter()
+            .find(|task| task.name == "deploy")
+            .unwrap();
+        assert_eq!(
+            deploy_task.definition_path(),
+            web_dir.join("turbo.json").as_path()
         );
     }
 
@@ -1606,6 +2541,193 @@ tasks:
     }
 
     #[test]
+    #[serial]
+    fn test_discover_tasks_with_included_taskfiles() {
+        let temp_dir = TempDir::new().unwrap();
+        let docs_dir = temp_dir.path().join("docs");
+        let api_dir = docs_dir.join("api");
+        std::fs::create_dir_all(&api_dir).unwrap();
+
+        reset_mock();
+        enable_mock();
+        mock_executable("task");
+
+        std::fs::write(
+            temp_dir.path().join("Taskfile.yml"),
+            r#"version: '3'
+includes:
+  docs: ./docs
+tasks:
+  build:
+    desc: Build task
+    cmds:
+      - echo "Build""#,
+        )
+        .unwrap();
+        std::fs::write(
+            docs_dir.join("Taskfile.yml"),
+            r#"version: '3'
+includes:
+  api: ./api
+tasks:
+  serve:
+    desc: Serve docs
+    cmds:
+      - echo "Serve""#,
+        )
+        .unwrap();
+        std::fs::write(
+            api_dir.join("Taskfile.yml"),
+            r#"version: '3'
+tasks:
+  generate:
+    desc: Generate API docs
+    cmds:
+      - echo "Generate""#,
+        )
+        .unwrap();
+
+        let discovered = discover_tasks(temp_dir.path());
+
+        assert!(discovered.errors.is_empty(), "{:?}", discovered.errors);
+        assert!(matches!(
+            discovered.definitions.taskfile.unwrap().status,
+            TaskFileStatus::Parsed
+        ));
+
+        let root_taskfile = temp_dir.path().join("Taskfile.yml");
+        let docs_taskfile = docs_dir.join("Taskfile.yml");
+        let api_taskfile = api_dir.join("Taskfile.yml");
+
+        let build_task = discovered.tasks.iter().find(|t| t.name == "build").unwrap();
+        assert_eq!(build_task.runner, TaskRunner::Task);
+        assert_eq!(build_task.file_path, root_taskfile);
+        assert_eq!(build_task.definition_path(), root_taskfile.as_path());
+        assert_eq!(build_task.source_name, "build");
+
+        let docs_task = discovered
+            .tasks
+            .iter()
+            .find(|t| t.name == "docs:serve")
+            .unwrap();
+        assert_eq!(docs_task.file_path, root_taskfile);
+        assert_eq!(docs_task.definition_path(), docs_taskfile.as_path());
+        assert_eq!(docs_task.source_name, "docs:serve");
+
+        let api_task = discovered
+            .tasks
+            .iter()
+            .find(|t| t.name == "docs:api:generate")
+            .unwrap();
+        assert_eq!(api_task.file_path, root_taskfile);
+        assert_eq!(api_task.definition_path(), api_taskfile.as_path());
+        assert_eq!(api_task.source_name, "docs:api:generate");
+
+        reset_mock();
+        reset_to_real_environment();
+    }
+
+    #[test]
+    #[serial]
+    fn test_discover_tasks_with_missing_required_taskfile_include() {
+        let temp_dir = TempDir::new().unwrap();
+
+        reset_mock();
+        enable_mock();
+        mock_executable("task");
+
+        std::fs::write(
+            temp_dir.path().join("Taskfile.yml"),
+            r#"version: '3'
+includes:
+  docs: ./docs
+  optional:
+    taskfile: ./optional
+    optional: true
+tasks:
+  build:
+    desc: Build task
+    cmds:
+      - echo "Build""#,
+        )
+        .unwrap();
+
+        let discovered = discover_tasks(temp_dir.path());
+
+        assert!(discovered.errors.is_empty(), "{:?}", discovered.errors);
+        assert!(matches!(
+            discovered.definitions.taskfile.unwrap().status,
+            TaskFileStatus::Parsed
+        ));
+        assert_eq!(discovered.tasks.len(), 1);
+
+        let build_task = discovered.tasks.iter().find(|t| t.name == "build").unwrap();
+        assert_eq!(build_task.runner, TaskRunner::Task);
+        assert_eq!(
+            build_task.definition_path(),
+            temp_dir.path().join("Taskfile.yml").as_path()
+        );
+
+        reset_mock();
+        reset_to_real_environment();
+    }
+
+    #[test]
+    #[serial]
+    fn test_discover_tasks_with_duplicate_flattened_taskfile_include() {
+        let temp_dir = TempDir::new().unwrap();
+        let shared_dir = temp_dir.path().join("shared");
+        std::fs::create_dir_all(&shared_dir).unwrap();
+
+        reset_mock();
+        enable_mock();
+        mock_executable("task");
+
+        std::fs::write(
+            temp_dir.path().join("Taskfile.yml"),
+            r#"version: '3'
+includes:
+  shared:
+    taskfile: ./shared
+    flatten: true
+tasks:
+  build:
+    desc: Root build
+    cmds:
+      - echo "Build""#,
+        )
+        .unwrap();
+        std::fs::write(
+            shared_dir.join("Taskfile.yml"),
+            r#"version: '3'
+tasks:
+  build:
+    desc: Shared build
+    cmds:
+      - echo "Shared build""#,
+        )
+        .unwrap();
+
+        let discovered = discover_tasks(temp_dir.path());
+
+        assert!(matches!(
+            discovered.definitions.taskfile.unwrap().status,
+            TaskFileStatus::ParseError(_)
+        ));
+        assert!(
+            discovered
+                .errors
+                .iter()
+                .any(|error| error.contains("Found multiple tasks (build) included by \"shared\"")),
+            "{:?}",
+            discovered.errors
+        );
+
+        reset_mock();
+        reset_to_real_environment();
+    }
+
+    #[test]
     fn test_discover_maven_tasks() {
         let temp_dir = tempfile::tempdir().unwrap();
         let dir_path = temp_dir.path();
@@ -1880,8 +3002,19 @@ jobs:
 
         // With the new workflow grouping, all tasks should have the same workflow directory
         let common_path = temp_dir.path().join(".github").join("workflows");
+        let expected_definition_paths = [
+            github_workflows_dir.join("ci.yml"),
+            temp_dir.path().join("workflow.yml"),
+            custom_dir.join("custom.yml"),
+        ];
+
         for task in act_tasks {
             assert_eq!(task.file_path, common_path);
+            assert!(
+                expected_definition_paths.contains(&task.definition_path().to_path_buf()),
+                "unexpected workflow definition path: {}",
+                task.definition_path().display()
+            );
         }
     }
 
@@ -1895,6 +3028,7 @@ jobs:
         discovered.tasks.push(Task {
             name: "test".to_string(),
             file_path: PathBuf::from("/test/Makefile"),
+            definition_path: None,
             definition_type: TaskDefinitionType::Makefile,
             runner: TaskRunner::Make,
             source_name: "test".to_string(),
@@ -1907,6 +3041,7 @@ jobs:
         discovered.tasks.push(Task {
             name: "ls".to_string(),
             file_path: PathBuf::from("/test/Makefile"),
+            definition_path: None,
             definition_type: TaskDefinitionType::Makefile,
             runner: TaskRunner::Make,
             source_name: "ls".to_string(),
@@ -1919,6 +3054,7 @@ jobs:
         discovered.tasks.push(Task {
             name: "build".to_string(),
             file_path: PathBuf::from("/test/Makefile"),
+            definition_path: None,
             definition_type: TaskDefinitionType::Makefile,
             runner: TaskRunner::Make,
             source_name: "build".to_string(),
@@ -1957,6 +3093,7 @@ jobs:
         discovered.tasks.push(Task {
             name: "test".to_string(),
             file_path: PathBuf::from("/test/Makefile"),
+            definition_path: None,
             definition_type: TaskDefinitionType::Makefile,
             runner: TaskRunner::Make,
             source_name: "test".to_string(),
@@ -1968,6 +3105,7 @@ jobs:
         discovered.tasks.push(Task {
             name: "test".to_string(),
             file_path: PathBuf::from("/test/package.json"),
+            definition_path: None,
             definition_type: TaskDefinitionType::PackageJson,
             runner: TaskRunner::NodeNpm,
             source_name: "test".to_string(),
@@ -1980,6 +3118,7 @@ jobs:
         discovered.tasks.push(Task {
             name: "ls".to_string(),
             file_path: PathBuf::from("/test/Makefile"),
+            definition_path: None,
             definition_type: TaskDefinitionType::Makefile,
             runner: TaskRunner::Make,
             source_name: "ls".to_string(),
@@ -1992,6 +3131,7 @@ jobs:
         discovered.tasks.push(Task {
             name: "cd".to_string(),
             file_path: PathBuf::from("/test/Makefile"),
+            definition_path: None,
             definition_type: TaskDefinitionType::Makefile,
             runner: TaskRunner::Make,
             source_name: "cd".to_string(),
@@ -2003,6 +3143,7 @@ jobs:
         discovered.tasks.push(Task {
             name: "cd".to_string(),
             file_path: PathBuf::from("/test/Taskfile.yml"),
+            definition_path: None,
             definition_type: TaskDefinitionType::Taskfile,
             runner: TaskRunner::Task,
             source_name: "cd".to_string(),
@@ -2015,6 +3156,7 @@ jobs:
         discovered.tasks.push(Task {
             name: "build".to_string(),
             file_path: PathBuf::from("/test/Makefile"),
+            definition_path: None,
             definition_type: TaskDefinitionType::Makefile,
             runner: TaskRunner::Make,
             source_name: "build".to_string(),
@@ -2085,6 +3227,7 @@ jobs:
         discovered.tasks.push(Task {
             name: "install".to_string(),
             file_path: PathBuf::from("/test/Makefile"),
+            definition_path: None,
             definition_type: TaskDefinitionType::Makefile,
             runner: TaskRunner::Make,
             source_name: "install".to_string(),
@@ -2117,6 +3260,7 @@ jobs:
         let task = Task {
             name: "test".to_string(),
             file_path: PathBuf::from("/path/to/Makefile"),
+            definition_path: None,
             definition_type: TaskDefinitionType::Makefile,
             runner: TaskRunner::Make,
             source_name: "test".to_string(),
@@ -2153,6 +3297,7 @@ jobs:
         let task = Task {
             name: "grep".to_string(),
             file_path: PathBuf::from("/path/to/Makefile"),
+            definition_path: None,
             definition_type: TaskDefinitionType::Makefile,
             runner: TaskRunner::Make,
             source_name: "grep".to_string(),
@@ -2191,6 +3336,7 @@ jobs:
         let task1 = Task {
             name: "test".to_string(),
             file_path: PathBuf::from("/path/to/Makefile"),
+            definition_path: None,
             definition_type: TaskDefinitionType::Makefile,
             runner: TaskRunner::Make,
             source_name: "test".to_string(),
@@ -2202,6 +3348,7 @@ jobs:
         let task2 = Task {
             name: "test".to_string(),
             file_path: PathBuf::from("/path/to/package.json"),
+            definition_path: None,
             definition_type: TaskDefinitionType::PackageJson,
             runner: TaskRunner::NodeNpm,
             source_name: "test".to_string(),

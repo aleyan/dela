@@ -48,6 +48,7 @@ fn add_common_tasks(tasks: &mut Vec<Task>, file_path: &Path) {
         tasks.push(Task {
             name: task_name.to_string(),
             file_path: file_path.to_path_buf(),
+            definition_path: None,
             definition_type: TaskDefinitionType::Gradle,
             runner: TaskRunner::Gradle,
             source_name: task_name.to_string(),
@@ -82,6 +83,7 @@ fn extract_custom_tasks(
             tasks.push(Task {
                 name: task_name.as_str().to_string(),
                 file_path: file_path.to_path_buf(),
+                definition_path: None,
                 definition_type: TaskDefinitionType::Gradle,
                 runner: TaskRunner::Gradle,
                 source_name: task_name.as_str().to_string(),
@@ -98,6 +100,7 @@ fn extract_custom_tasks(
             tasks.push(Task {
                 name: task_name.as_str().to_string(),
                 file_path: file_path.to_path_buf(),
+                definition_path: None,
                 definition_type: TaskDefinitionType::Gradle,
                 runner: TaskRunner::Gradle,
                 source_name: task_name.as_str().to_string(),
@@ -114,6 +117,7 @@ fn extract_custom_tasks(
             tasks.push(Task {
                 name: task_name.as_str().to_string(),
                 file_path: file_path.to_path_buf(),
+                definition_path: None,
                 definition_type: TaskDefinitionType::Gradle,
                 runner: TaskRunner::Gradle,
                 source_name: task_name.as_str().to_string(),
@@ -226,6 +230,7 @@ fn extract_plugin_tasks(
                     tasks.push(Task {
                         name: task_name.to_string(),
                         file_path: file_path.to_path_buf(),
+                        definition_path: None,
                         definition_type: TaskDefinitionType::Gradle,
                         runner: TaskRunner::Gradle,
                         source_name: task_name.to_string(),
