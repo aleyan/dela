@@ -6,12 +6,13 @@ use std::path::Path;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TurboTaskConfig {
     pub inherits: bool,
+    pub declared_locally: bool,
     pub has_local_configuration: bool,
 }
 
 impl TurboTaskConfig {
     pub fn is_effective_task_definition(&self) -> bool {
-        self.inherits || self.has_local_configuration
+        self.declared_locally && (self.inherits || self.has_local_configuration)
     }
 }
 
@@ -86,7 +87,8 @@ fn parse_task_config(value: &Value) -> TurboTaskConfig {
     let Some(object) = value.as_object() else {
         return TurboTaskConfig {
             inherits: true,
-            has_local_configuration: true,
+            declared_locally: false,
+            has_local_configuration: false,
         };
     };
 
@@ -95,6 +97,7 @@ fn parse_task_config(value: &Value) -> TurboTaskConfig {
             .get("extends")
             .and_then(Value::as_bool)
             .unwrap_or(true),
+        declared_locally: true,
         has_local_configuration: object.keys().any(|key| key != "extends"),
     }
 }
@@ -165,6 +168,7 @@ mod tests {
             config.tasks.get("build"),
             Some(&TurboTaskConfig {
                 inherits: true,
+                declared_locally: true,
                 has_local_configuration: false,
             })
         );
@@ -172,6 +176,7 @@ mod tests {
             config.tasks.get("test"),
             Some(&TurboTaskConfig {
                 inherits: false,
+                declared_locally: true,
                 has_local_configuration: false,
             })
         );
@@ -179,6 +184,7 @@ mod tests {
             config.tasks.get("lint"),
             Some(&TurboTaskConfig {
                 inherits: false,
+                declared_locally: true,
                 has_local_configuration: true,
             })
         );
@@ -211,6 +217,38 @@ mod tests {
 
         assert_eq!(task_names, vec!["build", "lint"]);
         assert!(!task_names.contains(&"test"));
+    }
+
+    #[test]
+    fn test_parse_turbo_json_treats_non_object_task_as_inherit_only() {
+        let temp_dir = TempDir::new().unwrap();
+        let turbo_json_path = temp_dir.path().join("turbo.json");
+        std::fs::write(
+            &turbo_json_path,
+            r#"{
+  "tasks": {
+    "build": null,
+    "test": {}
+  }
+}"#,
+        )
+        .unwrap();
+
+        let config = load_config(&turbo_json_path).unwrap();
+        assert_eq!(
+            config.tasks.get("build"),
+            Some(&TurboTaskConfig {
+                inherits: true,
+                declared_locally: false,
+                has_local_configuration: false,
+            })
+        );
+
+        let tasks = parse(&turbo_json_path).unwrap();
+        let task_names: Vec<_> = tasks.iter().map(|task| task.name.as_str()).collect();
+
+        assert_eq!(task_names, vec!["test"]);
+        assert!(!task_names.contains(&"build"));
     }
 
     #[test]

@@ -147,8 +147,7 @@ tasks:
 EOF
 
 cd /home/testuser/task_include_project
-dela list > task_include_list.txt 2> task_include_stderr.txt
-if [ $? -ne 0 ]; then
+if ! dela list > task_include_list.txt 2> task_include_stderr.txt; then
     echo "${RED}✗ dela list failed for recursive Taskfile includes${NC}"
     cat task_include_stderr.txt
     exit 1
@@ -559,8 +558,7 @@ nested-task:
 EOF
 
 cd /home/testuser/make_include_project
-dela list > make_include_list.txt 2> make_include_stderr.txt
-if [ $? -ne 0 ]; then
+if ! dela list > make_include_list.txt 2> make_include_stderr.txt; then
     echo "${RED}✗ dela list failed when a required included makefile was missing${NC}"
     cat make_include_stderr.txt
     exit 1
