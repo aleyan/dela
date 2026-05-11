@@ -1,0 +1,133 @@
+use crate::task_discovery::DiscoveredTasks;
+use crate::types::{Task, TaskRunner};
+use std::collections::{HashMap, HashSet};
+
+pub fn process_task_disambiguation(discovered: &mut DiscoveredTasks) {
+    let mut task_name_counts: HashMap<String, usize> = HashMap::new();
+    let mut tasks_by_name: HashMap<String, Vec<usize>> = HashMap::new();
+
+    for (index, task) in discovered.tasks.iter().enumerate() {
+        *task_name_counts.entry(task.name.clone()).or_insert(0) += 1;
+        tasks_by_name
+            .entry(task.name.clone())
+            .or_default()
+            .push(index);
+    }
+
+    discovered.task_name_counts = task_name_counts.clone();
+
+    for (name, count) in &task_name_counts {
+        if *count <= 1 {
+            continue;
+        }
+
+        let task_indices = tasks_by_name
+            .get(name)
+            .expect("task collision indexes should exist");
+        let mut used_prefixes = HashSet::new();
+
+        for &index in task_indices {
+            let task = &mut discovered.tasks[index];
+            let runner_prefix = generate_runner_prefix(&task.runner, &used_prefixes);
+            used_prefixes.insert(runner_prefix.clone());
+            task.disambiguated_name = Some(format!("{}-{}", task.name, runner_prefix));
+        }
+    }
+
+    for task in &mut discovered.tasks {
+        if task.disambiguated_name.is_some() {
+            continue;
+        }
+
+        if task.shadowed_by.is_some() {
+            let runner_prefix = generate_runner_prefix(&task.runner, &HashSet::new());
+            task.disambiguated_name = Some(format!("{}-{}", task.name, runner_prefix));
+        }
+    }
+}
+
+fn generate_runner_prefix(runner: &TaskRunner, used_prefixes: &HashSet<String>) -> String {
+    let short_name = runner.short_name().to_lowercase();
+
+    let single_char = short_name
+        .chars()
+        .next()
+        .expect("runner short names are never empty")
+        .to_string();
+    if !used_prefixes.contains(&single_char) {
+        return single_char;
+    }
+
+    let prefix_length = std::cmp::min(3, short_name.len());
+    let mut prefix = short_name[0..prefix_length].to_string();
+    if !used_prefixes.contains(&prefix) {
+        return prefix;
+    }
+
+    for length in (prefix_length + 1)..=short_name.len() {
+        prefix = short_name[0..length].to_string();
+        if !used_prefixes.contains(&prefix) {
+            return prefix;
+        }
+    }
+
+    let mut index = 1;
+    loop {
+        let numbered_prefix = format!("{}{}", short_name, index);
+        if !used_prefixes.contains(&numbered_prefix) {
+            return numbered_prefix;
+        }
+        index += 1;
+    }
+}
+
+pub fn is_task_ambiguous(discovered: &DiscoveredTasks, task_name: &str) -> bool {
+    discovered
+        .task_name_counts
+        .get(task_name)
+        .is_some_and(|&count| count > 1)
+}
+
+#[allow(dead_code)]
+pub fn get_disambiguated_task_names(discovered: &DiscoveredTasks, task_name: &str) -> Vec<String> {
+    discovered
+        .tasks
+        .iter()
+        .filter(|task| task.name == task_name)
+        .filter_map(|task| task.disambiguated_name.clone())
+        .collect()
+}
+
+pub fn get_matching_tasks<'a>(discovered: &'a DiscoveredTasks, task_name: &str) -> Vec<&'a Task> {
+    if let Some(task) = discovered.tasks.iter().find(|task| {
+        task.disambiguated_name
+            .as_ref()
+            .is_some_and(|name| name == task_name)
+    }) {
+        return vec![task];
+    }
+
+    discovered
+        .tasks
+        .iter()
+        .filter(|task| task.name == task_name)
+        .collect()
+}
+
+pub fn format_ambiguous_task_error(task_name: &str, matching_tasks: &[&Task]) -> String {
+    let mut message = format!("Multiple tasks named '{}' found. Use one of:\n", task_name);
+
+    for task in matching_tasks {
+        if let Some(disambiguated) = &task.disambiguated_name {
+            message.push_str(&format!(
+                "  • {} ({} from {})\n",
+                disambiguated,
+                task.runner.short_name(),
+                task.definition_path().display()
+            ));
+        }
+    }
+
+    message.push_str("Please use the specific task name with its suffix to disambiguate.");
+    message
+}
