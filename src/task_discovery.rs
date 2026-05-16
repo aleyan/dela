@@ -461,6 +461,37 @@ build:
     }
 
     #[test]
+    fn test_discover_tasks_with_invalid_included_makefile_keeps_root_tasks() {
+        let temp_dir = TempDir::new().unwrap();
+        let included_dir = temp_dir.path().join("mk");
+        std::fs::create_dir_all(&included_dir).unwrap();
+
+        create_test_makefile(
+            temp_dir.path(),
+            r#"include mk/common.mk
+
+build:
+	@echo "Build from root""#,
+        );
+        std::fs::write(
+            included_dir.join("common.mk"),
+            "<hello>not a make file</hello>",
+        )
+        .unwrap();
+
+        let discovered = discover_tasks(temp_dir.path());
+
+        assert!(matches!(
+            discovered.definitions.makefile.unwrap().status,
+            TaskFileStatus::Parsed
+        ));
+        assert_eq!(discovered.tasks.len(), 1);
+        assert!(discovered.tasks.iter().any(|t| t.name == "build"));
+        assert_eq!(discovered.errors.len(), 1);
+        assert!(discovered.errors[0].contains("mk/common.mk"));
+    }
+
+    #[test]
     fn test_discover_tasks_finds_turbo_json_at_git_repo_root() {
         let temp_dir = TempDir::new().unwrap();
         std::fs::create_dir_all(temp_dir.path().join(".git")).unwrap();

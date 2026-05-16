@@ -118,7 +118,7 @@ fn collect_makefile_tasks_recursive(
                 error
             );
             include_errors.push(error.clone());
-            if first_error.is_none() {
+            if first_error.is_none() && collected_tasks.is_empty() {
                 first_error = Some(error);
             }
         }
