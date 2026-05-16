@@ -2,6 +2,8 @@ use crate::task_discovery::DiscoveredTasks;
 use crate::types::{Task, TaskRunner};
 use std::collections::{HashMap, HashSet};
 
+const MIN_PREFIX_LEN: usize = 3;
+
 pub fn process_task_disambiguation(discovered: &mut DiscoveredTasks) {
     let mut task_name_counts: HashMap<String, usize> = HashMap::new();
     let mut tasks_by_name: HashMap<String, Vec<usize>> = HashMap::new();
@@ -62,7 +64,7 @@ fn generate_prefix_from_short_name(short_name: &str, used_prefixes: &HashSet<Str
     }
 
     let short_name_len = short_name.chars().count();
-    let prefix_length = std::cmp::min(3, short_name_len);
+    let prefix_length = std::cmp::min(MIN_PREFIX_LEN, short_name_len);
     let mut prefix = short_name.chars().take(prefix_length).collect::<String>();
     if !used_prefixes.contains(&prefix) {
         return prefix;

@@ -10,11 +10,11 @@ pub(crate) struct MakefileDiscovery;
 
 impl TaskDiscovery for MakefileDiscovery {
     fn discover(&self, dir: &Path, discovered: &mut DiscoveredTasks) {
-        let _ = discover_makefile_tasks(dir, discovered);
+        discover_makefile_tasks(dir, discovered);
     }
 }
 
-fn discover_makefile_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<(), String> {
+fn discover_makefile_tasks(dir: &Path, discovered: &mut DiscoveredTasks) {
     let makefile_path = dir.join("Makefile");
 
     if !makefile_path.exists() {
@@ -26,7 +26,7 @@ fn discover_makefile_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Resu
                 status: TaskFileStatus::NotFound,
             },
         );
-        return Ok(());
+        return;
     }
 
     let root_source = ComposedDefinitionSource::direct(makefile_path.clone());
@@ -68,8 +68,6 @@ fn discover_makefile_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Resu
             status,
         },
     );
-
-    Ok(())
 }
 
 fn collect_makefile_tasks_recursive(

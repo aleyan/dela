@@ -20,8 +20,7 @@ use std::collections::HashMap;
 use std::path::Path;
 
 pub use disambiguation::{
-    format_ambiguous_task_error, get_disambiguated_task_names, get_matching_tasks,
-    is_task_ambiguous, process_task_disambiguation,
+    format_ambiguous_task_error, get_matching_tasks, is_task_ambiguous, process_task_disambiguation,
 };
 
 #[derive(Debug, Clone, Default)]

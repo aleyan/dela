@@ -359,6 +359,15 @@ fn build_turbo_package_config_index(repo_root: &Path) -> HashMap<String, PathBuf
     package_configs
 }
 
+fn read_package_name(dir: &Path) -> Option<String> {
+    let package_json_path = dir.join("package.json");
+    let contents = fs::read_to_string(package_json_path).ok()?;
+    let json: serde_json::Value = serde_json::from_str(&contents).ok()?;
+    json.get("name")
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_string)
+}
+
 #[cfg(test)]
 mod tests {
     use super::looks_like_turbo_config_path;
@@ -369,13 +378,4 @@ mod tests {
         assert!(looks_like_turbo_config_path("packages/shared"));
         assert!(looks_like_turbo_config_path(".turbo/shared"));
     }
-}
-
-fn read_package_name(dir: &Path) -> Option<String> {
-    let package_json_path = dir.join("package.json");
-    let contents = fs::read_to_string(package_json_path).ok()?;
-    let json: serde_json::Value = serde_json::from_str(&contents).ok()?;
-    json.get("name")
-        .and_then(serde_json::Value::as_str)
-        .map(str::to_string)
 }

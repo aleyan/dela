@@ -290,8 +290,8 @@ pub fn execute(verbose: bool) -> Result<(), String> {
                     used_footnotes.insert('‖', true);
                 }
 
-                if task.shadowed_by.is_some() {
-                    match task.shadowed_by.as_ref().unwrap() {
+                if let Some(shadowed_by) = &task.shadowed_by {
+                    match shadowed_by {
                         ShadowType::ShellBuiltin(_) => {
                             used_footnotes.insert('†', true);
                         }
