@@ -105,18 +105,16 @@ pub fn get_disambiguated_task_names(discovered: &DiscoveredTasks, task_name: &st
 }
 
 pub fn get_matching_tasks<'a>(discovered: &'a DiscoveredTasks, task_name: &str) -> Vec<&'a Task> {
-    if let Some(task) = discovered.tasks.iter().find(|task| {
-        task.disambiguated_name
-            .as_ref()
-            .is_some_and(|name| name == task_name)
-    }) {
-        return vec![task];
-    }
-
     discovered
         .tasks
         .iter()
-        .filter(|task| task.name == task_name)
+        .filter(|task| {
+            task.name == task_name
+                || task
+                    .disambiguated_name
+                    .as_ref()
+                    .is_some_and(|name| name == task_name)
+        })
         .collect()
 }
 

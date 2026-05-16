@@ -1946,6 +1946,41 @@ jobs:
     }
 
     #[test]
+    #[serial]
+    fn test_get_matching_tasks_treats_alias_collision_as_ambiguous() {
+        let mut discovered = DiscoveredTasks::default();
+
+        discovered.tasks.push(Task {
+            name: "test".to_string(),
+            file_path: PathBuf::from("/test/Makefile"),
+            definition_path: None,
+            definition_type: TaskDefinitionType::Makefile,
+            runner: TaskRunner::Make,
+            source_name: "test".to_string(),
+            description: None,
+            shadowed_by: Some(ShadowType::PathExecutable("/bin/test".to_string())),
+            disambiguated_name: Some("test-m".to_string()),
+        });
+        discovered.tasks.push(Task {
+            name: "test-m".to_string(),
+            file_path: PathBuf::from("/test/package.json"),
+            definition_path: None,
+            definition_type: TaskDefinitionType::PackageJson,
+            runner: TaskRunner::NodeNpm,
+            source_name: "test-m".to_string(),
+            description: None,
+            shadowed_by: None,
+            disambiguated_name: None,
+        });
+
+        let matching_tasks = get_matching_tasks(&discovered, "test-m");
+
+        assert_eq!(matching_tasks.len(), 2);
+        assert!(matching_tasks.iter().any(|task| task.name == "test"));
+        assert!(matching_tasks.iter().any(|task| task.name == "test-m"));
+    }
+
+    #[test]
     fn test_execute_task_with_disambiguated_name() {
         let mut discovered_tasks = DiscoveredTasks::new();
 
@@ -2090,6 +2125,43 @@ jobs:
         let err_msg = result3.unwrap_err();
         println!("Error message: {}", err_msg);
         assert!(err_msg.contains("Ambiguous"));
+    }
+
+    #[test]
+    fn test_execute_task_alias_collision_is_ambiguous() {
+        let mut discovered_tasks = DiscoveredTasks::new();
+
+        discovered_tasks.add_task(Task {
+            name: "test".to_string(),
+            file_path: PathBuf::from("/path/to/Makefile"),
+            definition_path: None,
+            definition_type: TaskDefinitionType::Makefile,
+            runner: TaskRunner::Make,
+            source_name: "test".to_string(),
+            description: None,
+            shadowed_by: Some(ShadowType::PathExecutable("/bin/test".to_string())),
+            disambiguated_name: Some("test-m".to_string()),
+        });
+        discovered_tasks.add_task(Task {
+            name: "test-m".to_string(),
+            file_path: PathBuf::from("/path/to/package.json"),
+            definition_path: None,
+            definition_type: TaskDefinitionType::PackageJson,
+            runner: TaskRunner::NodeNpm,
+            source_name: "test-m".to_string(),
+            description: None,
+            shadowed_by: None,
+            disambiguated_name: None,
+        });
+
+        let mut executor = CommandExecutor::new(MockTaskExecutor::new());
+        let result = executor.execute_task_by_name(&mut discovered_tasks, "test-m", &[]);
+
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err();
+        assert!(err_msg.contains("Ambiguous task name: 'test-m'"));
+        assert!(err_msg.contains("  • test-m (make from /path/to/Makefile)"));
+        assert!(err_msg.contains("  • test-m (npm from /path/to/package.json)"));
     }
 
     #[test]
