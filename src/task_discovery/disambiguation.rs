@@ -48,7 +48,10 @@ pub fn process_task_disambiguation(discovered: &mut DiscoveredTasks) {
 
 fn generate_runner_prefix(runner: &TaskRunner, used_prefixes: &HashSet<String>) -> String {
     let short_name = runner.short_name().to_lowercase();
+    generate_prefix_from_short_name(&short_name, used_prefixes)
+}
 
+fn generate_prefix_from_short_name(short_name: &str, used_prefixes: &HashSet<String>) -> String {
     let single_char = short_name
         .chars()
         .next()
@@ -58,14 +61,15 @@ fn generate_runner_prefix(runner: &TaskRunner, used_prefixes: &HashSet<String>) 
         return single_char;
     }
 
-    let prefix_length = std::cmp::min(3, short_name.len());
-    let mut prefix = short_name[0..prefix_length].to_string();
+    let short_name_len = short_name.chars().count();
+    let prefix_length = std::cmp::min(3, short_name_len);
+    let mut prefix = short_name.chars().take(prefix_length).collect::<String>();
     if !used_prefixes.contains(&prefix) {
         return prefix;
     }
 
-    for length in (prefix_length + 1)..=short_name.len() {
-        prefix = short_name[0..length].to_string();
+    for length in (prefix_length + 1)..=short_name_len {
+        prefix = short_name.chars().take(length).collect::<String>();
         if !used_prefixes.contains(&prefix) {
             return prefix;
         }
@@ -130,4 +134,20 @@ pub fn format_ambiguous_task_error(task_name: &str, matching_tasks: &[&Task]) ->
 
     message.push_str("Please use the specific task name with its suffix to disambiguate.");
     message
+}
+
+#[cfg(test)]
+mod tests {
+    use super::generate_prefix_from_short_name;
+    use std::collections::HashSet;
+
+    #[test]
+    fn generate_prefix_handles_multibyte_runner_names() {
+        let used_prefixes = HashSet::from(["å".to_string(), "ång".to_string(), "ångs".to_string()]);
+
+        assert_eq!(
+            generate_prefix_from_short_name("ångström", &used_prefixes),
+            "ångst".to_string()
+        );
+    }
 }
