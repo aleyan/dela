@@ -171,6 +171,11 @@ mod tests {
         writeln!(file, "{}", content).unwrap();
     }
 
+    fn create_named_makefile(dir: &Path, name: &str, content: &str) {
+        let mut file = File::create(dir.join(name)).unwrap();
+        writeln!(file, "{}", content).unwrap();
+    }
+
     fn create_test_turbo_json(dir: &Path, content: &str) {
         std::fs::create_dir_all(dir).unwrap();
         std::fs::write(dir.join("turbo.json"), content).unwrap();
@@ -259,6 +264,81 @@ test:
         let test_task = discovered.tasks.iter().find(|t| t.name == "test").unwrap();
         assert_eq!(test_task.runner, TaskRunner::Make);
         assert_eq!(test_task.description, Some("Running tests".to_string()));
+    }
+
+    #[test]
+    fn test_discover_tasks_with_gnumakefile() {
+        let temp_dir = TempDir::new().unwrap();
+        create_named_makefile(
+            temp_dir.path(),
+            "GNUmakefile",
+            r#"build:
+	@echo "Building from GNUmakefile""#,
+        );
+
+        let discovered = discover_tasks(temp_dir.path());
+
+        assert!(matches!(
+            discovered.definitions.makefile.as_ref().unwrap().status,
+            TaskFileStatus::Parsed
+        ));
+        assert_eq!(
+            discovered.definitions.makefile.as_ref().unwrap().path,
+            temp_dir.path().join("GNUmakefile")
+        );
+        assert_eq!(discovered.tasks.len(), 1);
+        assert_eq!(
+            discovered.tasks[0].file_path,
+            temp_dir.path().join("GNUmakefile")
+        );
+    }
+
+    #[test]
+    fn test_discover_tasks_prefers_gnumakefile_over_other_makefile_names() {
+        let temp_dir = TempDir::new().unwrap();
+        create_named_makefile(
+            temp_dir.path(),
+            "Makefile",
+            r#"from_makefile:
+	@echo "From Makefile""#,
+        );
+        create_named_makefile(
+            temp_dir.path(),
+            "makefile",
+            r#"from_lowercase:
+	@echo "From makefile""#,
+        );
+        create_named_makefile(
+            temp_dir.path(),
+            "GNUmakefile",
+            r#"from_gnumakefile:
+	@echo "From GNUmakefile""#,
+        );
+
+        let discovered = discover_tasks(temp_dir.path());
+
+        assert_eq!(
+            discovered.definitions.makefile.as_ref().unwrap().path,
+            temp_dir.path().join("GNUmakefile")
+        );
+        assert!(
+            discovered
+                .tasks
+                .iter()
+                .any(|task| task.name == "from_gnumakefile")
+        );
+        assert!(
+            !discovered
+                .tasks
+                .iter()
+                .any(|task| task.name == "from_lowercase")
+        );
+        assert!(
+            !discovered
+                .tasks
+                .iter()
+                .any(|task| task.name == "from_makefile")
+        );
     }
 
     #[test]

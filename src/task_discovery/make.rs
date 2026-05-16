@@ -8,6 +8,8 @@ use std::path::Path;
 
 pub(crate) struct MakefileDiscovery;
 
+const MAKEFILE_NAMES: [&str; 3] = ["GNUmakefile", "makefile", "Makefile"];
+
 impl TaskDiscovery for MakefileDiscovery {
     fn discover(&self, dir: &Path, discovered: &mut DiscoveredTasks) {
         discover_makefile_tasks(dir, discovered);
@@ -15,19 +17,21 @@ impl TaskDiscovery for MakefileDiscovery {
 }
 
 fn discover_makefile_tasks(dir: &Path, discovered: &mut DiscoveredTasks) {
-    let makefile_path = dir.join("Makefile");
-
-    if !makefile_path.exists() {
+    let Some(makefile_path) = MAKEFILE_NAMES
+        .iter()
+        .map(|name| dir.join(name))
+        .find(|path| path.exists())
+    else {
         set_definition(
             discovered,
             TaskDefinitionFile {
-                path: makefile_path,
+                path: dir.join("Makefile"),
                 definition_type: TaskDefinitionType::Makefile,
                 status: TaskFileStatus::NotFound,
             },
         );
         return;
-    }
+    };
 
     let root_source = ComposedDefinitionSource::direct(makefile_path.clone());
     let mut traversal_state = RecursiveDiscoveryState::new();
