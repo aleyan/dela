@@ -105,6 +105,9 @@ fn collect_makefile_tasks_recursive(
     for task in &mut tasks {
         current_source.apply_to_task(task);
     }
+    // We intentionally keep discovery name-oriented instead of reimplementing GNU make's
+    // full override semantics. Dela only needs a stable task list here; `make` remains the
+    // source of truth for which recipe actually executes when duplicate targets exist.
     for task in tasks {
         if seen_task_names.insert(task.name.clone()) {
             collected_tasks.push(task);
