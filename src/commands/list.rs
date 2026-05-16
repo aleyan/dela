@@ -257,17 +257,13 @@ pub fn execute(verbose: bool) -> Result<(), String> {
 
             let runner_paths: HashSet<_> =
                 sorted_tasks.iter().map(|task| &task.file_path).collect();
-            let display_path = if runner_paths.len() == 1 {
-                format_runner_path_for_display(&runner, &sorted_tasks[0].file_path, &current_dir)
+            let section_runner_path =
+                (runner_paths.len() == 1).then_some(sorted_tasks[0].file_path.as_path());
+            let display_path = if let Some(runner_path) = section_runner_path {
+                format_runner_path_for_display(&runner, runner_path, &current_dir)
             } else {
                 "multiple files".to_string()
             };
-            let show_task_sources = sorted_tasks
-                .iter()
-                .map(|task| task.definition_path().to_path_buf())
-                .collect::<HashSet<_>>()
-                .len()
-                > 1;
 
             // Write section header
             let colored_runner = if tool_not_installed {
@@ -303,9 +299,7 @@ pub fn execute(verbose: bool) -> Result<(), String> {
 
                 // Format the task entry
                 let formatted_task = format_task_entry(task, is_ambiguous, display_width);
-                let source_label = show_task_sources.then(|| {
-                    format_definition_path_for_display(task.definition_path(), &current_dir)
-                });
+                let source_label = task_source_label(task, section_runner_path, &current_dir);
                 let formatted_task =
                     format_task_entry_with_source(formatted_task, source_label.as_deref());
                 write_line(&format!("  {}", formatted_task))?;
@@ -452,6 +446,20 @@ fn format_task_entry_with_source(formatted_task: String, source_label: Option<&s
             )
         }
         _ => formatted_task,
+    }
+}
+
+fn task_source_label(
+    task: &Task,
+    section_runner_path: Option<&Path>,
+    current_dir: &Path,
+) -> Option<String> {
+    match section_runner_path {
+        Some(runner_path) if task.definition_path() == runner_path => None,
+        _ => Some(format_definition_path_for_display(
+            task.definition_path(),
+            current_dir,
+        )),
     }
 }
 
@@ -1015,5 +1023,43 @@ mod tests {
         assert!(formatted.contains("included-task"));
         assert!(formatted.contains("Included task"));
         assert!(formatted.contains("[mk/common.mk]"));
+    }
+
+    #[test]
+    fn test_task_source_label_omits_section_runner_path_and_keeps_composed_source() {
+        let current_dir = Path::new("/project");
+        let runner_path = Path::new("/project/Makefile");
+
+        let root_task = Task {
+            name: "build".to_string(),
+            file_path: runner_path.to_path_buf(),
+            definition_path: None,
+            definition_type: TaskDefinitionType::Makefile,
+            runner: TaskRunner::Make,
+            source_name: "build".to_string(),
+            description: Some("Build task".to_string()),
+            shadowed_by: None,
+            disambiguated_name: None,
+        };
+        let included_task = Task {
+            name: "release_notes".to_string(),
+            file_path: runner_path.to_path_buf(),
+            definition_path: Some(PathBuf::from("/project/mk/common.mk")),
+            definition_type: TaskDefinitionType::Makefile,
+            runner: TaskRunner::Make,
+            source_name: "release_notes".to_string(),
+            description: Some("Release task".to_string()),
+            shadowed_by: None,
+            disambiguated_name: None,
+        };
+
+        assert_eq!(
+            task_source_label(&root_task, Some(runner_path), current_dir),
+            None
+        );
+        assert_eq!(
+            task_source_label(&included_task, Some(runner_path), current_dir),
+            Some("mk/common.mk".to_string())
+        );
     }
 }

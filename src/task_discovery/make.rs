@@ -4,6 +4,7 @@ use crate::task_discovery::support::{apply_shadowing, set_definition};
 use crate::task_discovery::{DiscoveredTasks, TaskDiscovery};
 use crate::types::{Task, TaskDefinitionFile, TaskDefinitionType, TaskFileStatus};
 use std::collections::HashSet;
+use std::fs;
 use std::path::Path;
 
 pub(crate) struct MakefileDiscovery;
@@ -17,11 +18,7 @@ impl TaskDiscovery for MakefileDiscovery {
 }
 
 fn discover_makefile_tasks(dir: &Path, discovered: &mut DiscoveredTasks) {
-    let Some(makefile_path) = MAKEFILE_NAMES
-        .iter()
-        .map(|name| dir.join(name))
-        .find(|path| path.exists())
-    else {
+    let Some(makefile_path) = find_makefile_path(dir) else {
         set_definition(
             discovered,
             TaskDefinitionFile {
@@ -72,6 +69,23 @@ fn discover_makefile_tasks(dir: &Path, discovered: &mut DiscoveredTasks) {
             status,
         },
     );
+}
+
+fn find_makefile_path(dir: &Path) -> Option<std::path::PathBuf> {
+    let entries = fs::read_dir(dir).ok()?;
+    let mut paths_by_name = std::collections::HashMap::new();
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let Some(file_name) = path.file_name().and_then(|name| name.to_str()) else {
+            continue;
+        };
+        paths_by_name.insert(file_name.to_string(), path);
+    }
+
+    MAKEFILE_NAMES
+        .iter()
+        .find_map(|name| paths_by_name.remove(*name))
 }
 
 fn collect_makefile_tasks_recursive(

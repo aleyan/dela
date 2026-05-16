@@ -248,14 +248,14 @@ test:
         assert!(discovered.errors.is_empty());
 
         // Check Makefile status
-        assert!(matches!(
-            discovered.definitions.makefile.unwrap().status,
-            TaskFileStatus::Parsed
-        ));
+        let makefile_def = discovered.definitions.makefile.as_ref().unwrap();
+        assert!(matches!(makefile_def.status, TaskFileStatus::Parsed));
+        assert_eq!(makefile_def.path, temp_dir.path().join("Makefile"));
 
         // Verify tasks
         let build_task = discovered.tasks.iter().find(|t| t.name == "build").unwrap();
         assert_eq!(build_task.runner, TaskRunner::Make);
+        assert_eq!(build_task.file_path, temp_dir.path().join("Makefile"));
         assert_eq!(
             build_task.description,
             Some("Building the project".to_string())
@@ -264,6 +264,33 @@ test:
         let test_task = discovered.tasks.iter().find(|t| t.name == "test").unwrap();
         assert_eq!(test_task.runner, TaskRunner::Make);
         assert_eq!(test_task.description, Some("Running tests".to_string()));
+    }
+
+    #[test]
+    fn test_discover_tasks_with_lowercase_makefile() {
+        let temp_dir = TempDir::new().unwrap();
+        create_named_makefile(
+            temp_dir.path(),
+            "makefile",
+            r#"build:
+	@echo "Building from makefile""#,
+        );
+
+        let discovered = discover_tasks(temp_dir.path());
+
+        assert!(matches!(
+            discovered.definitions.makefile.as_ref().unwrap().status,
+            TaskFileStatus::Parsed
+        ));
+        assert_eq!(
+            discovered.definitions.makefile.as_ref().unwrap().path,
+            temp_dir.path().join("makefile")
+        );
+        assert_eq!(discovered.tasks.len(), 1);
+        assert_eq!(
+            discovered.tasks[0].file_path,
+            temp_dir.path().join("makefile")
+        );
     }
 
     #[test]
@@ -294,19 +321,13 @@ test:
     }
 
     #[test]
-    fn test_discover_tasks_prefers_gnumakefile_over_other_makefile_names() {
+    fn test_discover_tasks_prefers_gnumakefile_over_makefile() {
         let temp_dir = TempDir::new().unwrap();
         create_named_makefile(
             temp_dir.path(),
             "Makefile",
             r#"from_makefile:
 	@echo "From Makefile""#,
-        );
-        create_named_makefile(
-            temp_dir.path(),
-            "makefile",
-            r#"from_lowercase:
-	@echo "From makefile""#,
         );
         create_named_makefile(
             temp_dir.path(),
@@ -326,12 +347,6 @@ test:
                 .tasks
                 .iter()
                 .any(|task| task.name == "from_gnumakefile")
-        );
-        assert!(
-            !discovered
-                .tasks
-                .iter()
-                .any(|task| task.name == "from_lowercase")
         );
         assert!(
             !discovered
