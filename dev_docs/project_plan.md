@@ -25,6 +25,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [x] [DTKT-6] Implement parser for `pyproject.toml` scripts (`pyproject-toml`).
   - [x] [DTKT-106] For `package.json`, detect if there is a lock file `pnpm` or  `npm` or `yarn` or `bun` use that to run tasks.
   - [x] [DTKT-104] Update makefile-lossless to new version supporting trailing text.
+  - [x] [DTKT-200] Refactor `src/task_discovery.rs` into a registry-based `TaskDiscovery` trait with per-runner modules under `src/task_discovery/`.
 
 - [ ] **Structs and Runners**
   - [x] [DTKT-7] Define `Task` and `TaskRunner` enums in `types.rs`.
