@@ -1,11 +1,10 @@
 use crate::task_discovery::{
-    DiscoveredTasks, TaskDiscovery, cmake::CmakeDiscovery, docker_compose::DockerComposeDiscovery,
+    TaskDiscovery, cmake::CmakeDiscovery, docker_compose::DockerComposeDiscovery,
     github_actions::GithubActionsDiscovery, gradle::GradleDiscovery, justfile::JustfileDiscovery,
     make::MakefileDiscovery, maven::MavenDiscovery, npm::NpmDiscovery, python::PythonDiscovery,
     shell_scripts::ShellScriptDiscovery, taskfile::TaskfileDiscovery, travis_ci::TravisCiDiscovery,
     turbo::TurboDiscovery,
 };
-use std::path::Path;
 
 static MAKEFILE_DISCOVERY: MakefileDiscovery = MakefileDiscovery;
 static NPM_DISCOVERY: NpmDiscovery = NpmDiscovery;
@@ -37,13 +36,4 @@ pub(crate) fn registered_discoveries() -> Vec<&'static dyn TaskDiscovery> {
         &JUSTFILE_DISCOVERY,
         &SHELL_SCRIPT_DISCOVERY,
     ]
-}
-
-#[allow(dead_code)]
-pub(crate) fn run_discovery(
-    discovery: &dyn TaskDiscovery,
-    dir: &Path,
-    discovered: &mut DiscoveredTasks,
-) {
-    discovery.discover(dir, discovered);
 }

@@ -122,14 +122,13 @@ pub fn format_ambiguous_task_error(task_name: &str, matching_tasks: &[&Task]) ->
     let mut message = format!("Multiple tasks named '{}' found. Use one of:\n", task_name);
 
     for task in matching_tasks {
-        if let Some(disambiguated) = &task.disambiguated_name {
-            message.push_str(&format!(
-                "  • {} ({} from {})\n",
-                disambiguated,
-                task.runner.short_name(),
-                task.definition_path().display()
-            ));
-        }
+        let display_name = task.disambiguated_name.as_deref().unwrap_or(&task.name);
+        message.push_str(&format!(
+            "  • {} ({} from {})\n",
+            display_name,
+            task.runner.short_name(),
+            task.definition_path().display()
+        ));
     }
 
     message.push_str("Please use the specific task name with its suffix to disambiguate.");
@@ -138,8 +137,10 @@ pub fn format_ambiguous_task_error(task_name: &str, matching_tasks: &[&Task]) ->
 
 #[cfg(test)]
 mod tests {
-    use super::generate_prefix_from_short_name;
+    use super::{format_ambiguous_task_error, generate_prefix_from_short_name};
+    use crate::types::{Task, TaskDefinitionType, TaskRunner};
     use std::collections::HashSet;
+    use std::path::PathBuf;
 
     #[test]
     fn generate_prefix_handles_multibyte_runner_names() {
@@ -149,5 +150,36 @@ mod tests {
             generate_prefix_from_short_name("ångström", &used_prefixes),
             "ångst".to_string()
         );
+    }
+
+    #[test]
+    fn format_ambiguous_task_error_includes_tasks_without_disambiguated_names() {
+        let make_task = Task {
+            name: "test".to_string(),
+            file_path: PathBuf::from("/tmp/Makefile"),
+            definition_path: None,
+            definition_type: TaskDefinitionType::Makefile,
+            runner: TaskRunner::Make,
+            source_name: "test".to_string(),
+            description: None,
+            shadowed_by: None,
+            disambiguated_name: None,
+        };
+        let npm_task = Task {
+            name: "test".to_string(),
+            file_path: PathBuf::from("/tmp/package.json"),
+            definition_path: None,
+            definition_type: TaskDefinitionType::PackageJson,
+            runner: TaskRunner::NodeNpm,
+            source_name: "test".to_string(),
+            description: None,
+            shadowed_by: None,
+            disambiguated_name: Some("test-npm".to_string()),
+        };
+
+        let error = format_ambiguous_task_error("test", &[&make_task, &npm_task]);
+
+        assert!(error.contains("  • test (make from /tmp/Makefile)"));
+        assert!(error.contains("  • test-npm (npm from /tmp/package.json)"));
     }
 }

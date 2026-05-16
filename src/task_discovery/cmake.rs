@@ -1,7 +1,9 @@
 use crate::parsers::parse_cmake;
-use crate::task_discovery::support::{handle_discovery_error, handle_discovery_success};
+use crate::task_discovery::support::{
+    handle_discovery_error, handle_discovery_success, set_definition,
+};
 use crate::task_discovery::{DiscoveredTasks, TaskDiscovery};
-use crate::types::TaskDefinitionType;
+use crate::types::{TaskDefinitionFile, TaskDefinitionType, TaskFileStatus};
 use std::path::Path;
 
 pub(crate) struct CmakeDiscovery;
@@ -15,6 +17,14 @@ impl TaskDiscovery for CmakeDiscovery {
 fn discover_cmake_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<(), String> {
     let cmake_path = dir.join("CMakeLists.txt");
     if !cmake_path.exists() {
+        set_definition(
+            discovered,
+            TaskDefinitionFile {
+                path: cmake_path,
+                definition_type: TaskDefinitionType::CMake,
+                status: TaskFileStatus::NotFound,
+            },
+        );
         return Ok(());
     }
 

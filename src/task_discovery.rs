@@ -2564,6 +2564,18 @@ add_custom_target(build-all
     }
 
     #[test]
+    fn test_discover_cmake_tasks_not_found() {
+        let temp_dir = TempDir::new().unwrap();
+
+        let discovered = discover_tasks(temp_dir.path());
+
+        let cmake_def = discovered.definitions.cmake.as_ref().unwrap();
+        assert_eq!(cmake_def.path, temp_dir.path().join("CMakeLists.txt"));
+        assert_eq!(cmake_def.definition_type, TaskDefinitionType::CMake);
+        assert!(matches!(cmake_def.status, TaskFileStatus::NotFound));
+    }
+
+    #[test]
     fn test_discover_justfile_variants() {
         let temp_dir = TempDir::new().unwrap();
         let dir = temp_dir.path();

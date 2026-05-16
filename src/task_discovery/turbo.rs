@@ -312,11 +312,12 @@ fn should_skip_turbo_config_scan(file_name: &str) -> bool {
 
 fn looks_like_turbo_config_path(extend_entry: &str) -> bool {
     let extend_path = Path::new(extend_entry);
+    let is_scoped_package = extend_entry.starts_with('@');
     extend_path.is_absolute()
         || extend_entry.starts_with('.')
-        || extend_entry.contains(std::path::MAIN_SEPARATOR)
-        || extend_entry.contains('/')
-        || extend_entry.contains('\\')
+        || (!is_scoped_package && extend_entry.contains(std::path::MAIN_SEPARATOR))
+        || (!is_scoped_package && extend_entry.contains('/'))
+        || (!is_scoped_package && extend_entry.contains('\\'))
 }
 
 fn resolve_turbo_config_path_candidate(candidate: &Path) -> PathBuf {
@@ -356,6 +357,18 @@ fn build_turbo_package_config_index(repo_root: &Path) -> HashMap<String, PathBuf
     }
 
     package_configs
+}
+
+#[cfg(test)]
+mod tests {
+    use super::looks_like_turbo_config_path;
+
+    #[test]
+    fn looks_like_turbo_config_path_treats_scoped_packages_as_packages() {
+        assert!(!looks_like_turbo_config_path("@scope/pkg"));
+        assert!(looks_like_turbo_config_path("packages/shared"));
+        assert!(looks_like_turbo_config_path(".turbo/shared"));
+    }
 }
 
 fn read_package_name(dir: &Path) -> Option<String> {
