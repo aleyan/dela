@@ -83,8 +83,6 @@ fn collect_makefile_tasks_recursive(
         VisitState::New(_) => {}
     }
 
-    let mut first_error = None;
-
     let mut tasks = parse_makefile::parse(current_source.definition_path())?;
     for task in &mut tasks {
         current_source.apply_to_task(task);
@@ -117,16 +115,9 @@ fn collect_makefile_tasks_recursive(
                 resolved_include.display(),
                 error
             );
-            include_errors.push(error.clone());
-            if first_error.is_none() && collected_tasks.is_empty() {
-                first_error = Some(error);
-            }
+            include_errors.push(error);
         }
     }
 
-    if let Some(error) = first_error {
-        Err(error)
-    } else {
-        Ok(())
-    }
+    Ok(())
 }

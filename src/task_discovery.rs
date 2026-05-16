@@ -492,6 +492,45 @@ build:
     }
 
     #[test]
+    fn test_discover_tasks_skips_broken_include_and_continues() {
+        let temp_dir = TempDir::new().unwrap();
+        let included_dir = temp_dir.path().join("mk");
+        std::fs::create_dir_all(&included_dir).unwrap();
+
+        create_test_makefile(
+            temp_dir.path(),
+            r#"include mk/broken.mk
+include mk/valid.mk"#,
+        );
+        std::fs::write(
+            included_dir.join("broken.mk"),
+            "<hello>not a make file</hello>",
+        )
+        .unwrap();
+        std::fs::write(
+            included_dir.join("valid.mk"),
+            r#"test:
+	@echo "Test from valid include""#,
+        )
+        .unwrap();
+
+        let discovered = discover_tasks(temp_dir.path());
+
+        assert!(matches!(
+            discovered.definitions.makefile.unwrap().status,
+            TaskFileStatus::Parsed
+        ));
+        assert_eq!(discovered.tasks.len(), 1);
+        let task = discovered.tasks.iter().find(|t| t.name == "test").unwrap();
+        assert_eq!(
+            task.definition_path(),
+            included_dir.join("valid.mk").as_path()
+        );
+        assert_eq!(discovered.errors.len(), 1);
+        assert!(discovered.errors[0].contains("mk/broken.mk"));
+    }
+
+    #[test]
     fn test_discover_tasks_finds_turbo_json_at_git_repo_root() {
         let temp_dir = TempDir::new().unwrap();
         std::fs::create_dir_all(temp_dir.path().join(".git")).unwrap();
