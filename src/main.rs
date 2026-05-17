@@ -217,10 +217,7 @@ mod tests {
 
         // Function to test error handling
         let mut handle_error = |err: &str| {
-            if err
-                .to_string()
-                .starts_with("dela: command or task not found")
-            {
+            if err.starts_with("dela: command or task not found") {
                 writeln!(stderr_file, "{}", err).unwrap();
             } else {
                 writeln!(stderr_file, "Error: {}", err).unwrap();
