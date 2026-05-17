@@ -24,7 +24,9 @@ fn parse_workflow_string(content: &str, file_path: &Path) -> Result<Vec<Task>, D
     let workflow_map = match workflow {
         Value::Mapping(map) => map,
         _ => {
-            return Err(DelaParseError::Syntax("Workflow YAML is not a mapping".to_string()));
+            return Err(DelaParseError::Syntax(
+                "Workflow YAML is not a mapping".to_string(),
+            ));
         }
     };
 
@@ -40,12 +42,16 @@ fn parse_workflow_string(content: &str, file_path: &Path) -> Result<Vec<Task>, D
     let jobs = match workflow_map.get(Value::String("jobs".to_string())) {
         Some(Value::Mapping(jobs_map)) => jobs_map,
         _ => {
-            return Err(DelaParseError::Syntax("No jobs found in workflow file".to_string()));
+            return Err(DelaParseError::Syntax(
+                "No jobs found in workflow file".to_string(),
+            ));
         }
     };
 
     if jobs.is_empty() {
-        return Err(DelaParseError::Syntax("Workflow contains no jobs".to_string()));
+        return Err(DelaParseError::Syntax(
+            "Workflow contains no jobs".to_string(),
+        ));
     }
 
     // Extract filename without path for task name

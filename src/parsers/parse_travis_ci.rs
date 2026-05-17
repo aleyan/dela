@@ -28,7 +28,9 @@ fn parse_travis_string(content: &str, file_path: &Path) -> Result<Vec<Task>, Del
     let config_map = match config {
         Value::Mapping(map) => map,
         _ => {
-            return Err(DelaParseError::Syntax("Travis CI YAML is not a mapping".to_string()));
+            return Err(DelaParseError::Syntax(
+                "Travis CI YAML is not a mapping".to_string(),
+            ));
         }
     };
 

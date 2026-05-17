@@ -33,7 +33,6 @@ struct DockerCompose {
 
 /// Parse a docker-compose.yml file at the given path and extract services as tasks
 pub fn parse(path: &PathBuf) -> Result<Vec<Task>, DelaParseError> {
-
     let contents = std::fs::read_to_string(path)?;
 
     let docker_compose: DockerCompose = serde_yaml::from_str(&contents)?;
