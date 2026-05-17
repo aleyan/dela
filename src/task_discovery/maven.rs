@@ -24,8 +24,14 @@ fn discover_maven_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> anyhow:
             Ok(())
         }
         Err(error) => {
-            handle_discovery_error(&error, pom_path.clone(), TaskDefinitionType::MavenPom, discovered);
-            Err(anyhow::Error::new(error).context(format!("Failed to parse {}", pom_path.display())))
+            handle_discovery_error(
+                &error,
+                pom_path.clone(),
+                TaskDefinitionType::MavenPom,
+                discovered,
+            );
+            Err(anyhow::Error::new(error)
+                .context(format!("Failed to parse {}", pom_path.display())))
         }
     }
 }
