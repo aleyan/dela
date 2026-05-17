@@ -31,11 +31,11 @@ impl TurboConfig {
     }
 }
 
-pub fn load_config(path: &Path) -> Result<TurboConfig, String> {
+pub fn load_config(path: &Path) -> anyhow::Result<TurboConfig> {
     let contents =
-        std::fs::read_to_string(path).map_err(|e| format!("Failed to read turbo.json: {}", e))?;
+        std::fs::read_to_string(path).map_err(|e| anyhow::anyhow!("Failed to read turbo.json: {}", e))?;
     let json: Value = serde_json::from_str(&contents)
-        .map_err(|e| format!("Failed to parse turbo.json: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to parse turbo.json: {}", e))?;
 
     let extends = json
         .get("extends")
@@ -60,7 +60,7 @@ pub fn load_config(path: &Path) -> Result<TurboConfig, String> {
     Ok(TurboConfig { extends, tasks })
 }
 
-pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
+pub fn parse(path: &Path) -> anyhow::Result<Vec<Task>> {
     let config = load_config(path)?;
 
     Ok(config
@@ -98,9 +98,9 @@ fn parse_task_config(value: &Value) -> TurboTaskConfig {
     }
 }
 
-fn parse_task_map(key: &str, value: &Value) -> Result<BTreeMap<String, TurboTaskConfig>, String> {
+fn parse_task_map(key: &str, value: &Value) -> anyhow::Result<BTreeMap<String, TurboTaskConfig>> {
     let Some(task_map) = value.as_object() else {
-        return Err(format!(
+        return Err(anyhow::anyhow!(
             "Failed to parse turbo.json: '{}' must be an object, found {}",
             key,
             json_type_name(value)
@@ -302,8 +302,8 @@ mod tests {
 
         let err = parse(&turbo_json_path).unwrap_err();
 
-        assert!(err.contains("'tasks' must be an object"));
-        assert!(err.contains("array"));
+        assert!(err.to_string().contains("'tasks' must be an object"));
+        assert!(err.to_string().contains("array"));
     }
 
     #[test]
@@ -314,8 +314,8 @@ mod tests {
 
         let err = parse(&turbo_json_path).unwrap_err();
 
-        assert!(err.contains("'pipeline' must be an object"));
-        assert!(err.contains("string"));
+        assert!(err.to_string().contains("'pipeline' must be an object"));
+        assert!(err.to_string().contains("string"));
     }
 
     #[test]
@@ -339,6 +339,6 @@ mod tests {
         std::fs::write(&turbo_json_path, r#"{"tasks":{"build":{}}"#).unwrap();
 
         let err = parse(&turbo_json_path).unwrap_err();
-        assert!(err.contains("Failed to parse turbo.json"));
+        assert!(err.to_string().contains("Failed to parse turbo.json"));
     }
 }

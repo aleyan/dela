@@ -17,9 +17,9 @@ macro_rules! test_println {
     ($($arg:tt)*) => { println!($($arg)*) };
 }
 
-pub fn execute(verbose: bool) -> Result<(), String> {
+pub fn execute(verbose: bool) -> anyhow::Result<()> {
     let current_dir =
-        env::current_dir().map_err(|e| format!("Failed to get current directory: {}", e))?;
+        env::current_dir().map_err(|e| anyhow::anyhow!("Failed to get current directory: {}", e))?;
     let discovered = task_discovery::discover_tasks(&current_dir);
 
     // Only show task definition files status in verbose mode
@@ -188,8 +188,8 @@ pub fn execute(verbose: bool) -> Result<(), String> {
         Box::new(std::io::stdout())
     };
 
-    let mut write_line = |line: &str| -> Result<(), String> {
-        writeln!(writer, "{}", line).map_err(|e| format!("Failed to write output: {}", e))
+    let mut write_line = |line: &str| -> anyhow::Result<()> {
+        writeln!(writer, "{}", line).map_err(|e| anyhow::anyhow!("Failed to write output: {}", e))
     };
 
     // Group tasks by runner for the new format

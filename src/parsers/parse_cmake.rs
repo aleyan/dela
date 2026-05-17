@@ -8,17 +8,17 @@ use std::path::Path;
 ///
 /// This function parses a CMakeLists.txt file and extracts each custom target
 /// as a separate task. It uses regex patterns to find add_custom_target() calls.
-pub fn parse(file_path: &Path) -> Result<Vec<Task>, String> {
-    let mut file = File::open(file_path).map_err(|e| format!("Failed to open file: {}", e))?;
+pub fn parse(file_path: &Path) -> anyhow::Result<Vec<Task>> {
+    let mut file = File::open(file_path).map_err(|e| anyhow::anyhow!("Failed to open file: {}", e))?;
     let mut contents = String::new();
     file.read_to_string(&mut contents)
-        .map_err(|e| format!("Failed to read file: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to read file: {}", e))?;
 
     parse_cmake_string(&contents, file_path)
 }
 
 /// Parse CMakeLists.txt content from a string
-fn parse_cmake_string(content: &str, file_path: &Path) -> Result<Vec<Task>, String> {
+fn parse_cmake_string(content: &str, file_path: &Path) -> anyhow::Result<Vec<Task>> {
     let mut tasks = Vec::new();
 
     // First, let's normalize the content by removing comments and extra whitespace
@@ -37,10 +37,10 @@ fn parse_cmake_string(content: &str, file_path: &Path) -> Result<Vec<Task>, Stri
 
     // Use a simpler regex that just finds the target names
     let target_pattern = Regex::new(r#"add_custom_target\s*\(\s*([a-zA-Z_][a-zA-Z0-9_-]*)"#)
-        .map_err(|e| format!("Failed to compile regex: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to compile regex: {}", e))?;
 
     let comment_pattern = Regex::new(r#"COMMENT\s+"([^"]*)"#)
-        .map_err(|e| format!("Failed to compile comment regex: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to compile comment regex: {}", e))?;
 
     // Find all matches in the content
     for captures in target_pattern.captures_iter(&normalized_content) {
@@ -220,7 +220,7 @@ add_custom_target(build COMMENT "Build the project")
 
         let result = parse(&cmake_path);
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Failed to open file"));
+        assert!(result.unwrap_err().to_string().contains("Failed to open file"));
     }
 
     #[test]

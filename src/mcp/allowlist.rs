@@ -15,7 +15,7 @@ pub struct McpAllowlistEvaluator {
 
 impl McpAllowlistEvaluator {
     /// Create a new MCP allowlist evaluator by loading the allowlist from disk
-    pub fn new() -> Result<Self, String> {
+    pub fn new() -> anyhow::Result<Self> {
         let allowlist = load_allowlist()?;
         Ok(Self { allowlist })
     }
@@ -33,7 +33,7 @@ impl McpAllowlistEvaluator {
     /// 3. File scope allow entries  
     /// 4. Task scope allow entries
     /// 5. Not found in allowlist (deny by default for MCP)
-    pub fn is_task_allowed(&self, task: &Task) -> Result<bool, String> {
+    pub fn is_task_allowed(&self, task: &Task) -> anyhow::Result<bool> {
         Ok(matches!(
             evaluate_task_against_allowlist(task, &self.allowlist),
             AllowlistMatch::Allowed

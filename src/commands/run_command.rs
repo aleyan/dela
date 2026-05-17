@@ -1,20 +1,22 @@
+#[allow(unused_imports)]
+use anyhow::Context;
 use crate::runner::is_runner_available;
 use crate::runner::split_command_words;
 use crate::task_discovery;
 use std::env;
 use std::process::{Command, Stdio};
 
-pub fn execute(task_with_args: &str) -> Result<(), String> {
+pub fn execute(task_with_args: &str) -> anyhow::Result<()> {
     let mut invocation_parts =
-        shell_words::split(task_with_args).map_err(|e| format!("Failed to parse args: {}", e))?;
+        shell_words::split(task_with_args).map_err(|e| anyhow::anyhow!("Failed to parse args: {}", e))?;
     let task_name = invocation_parts
         .first()
-        .ok_or_else(|| "No task name provided".to_string())?
+        .context("No task name provided")?
         .to_string();
     let task_args: Vec<String> = invocation_parts.drain(1..).collect();
 
     let current_dir =
-        env::current_dir().map_err(|e| format!("Failed to get current directory: {}", e))?;
+        env::current_dir().map_err(|e| anyhow::anyhow!("Failed to get current directory: {}", e))?;
     let discovered = task_discovery::discover_tasks(&current_dir);
 
     // Find all tasks with the given name (both original and disambiguated)
@@ -22,7 +24,7 @@ pub fn execute(task_with_args: &str) -> Result<(), String> {
 
     // Check if there are no matching tasks
     if matching_tasks.is_empty() {
-        return Err(format!("dela: command or task not found: {}", task_name));
+        return Err(anyhow::anyhow!("dela: command or task not found: {}", task_name));
     }
 
     // Check if there are multiple matching tasks
@@ -30,13 +32,13 @@ pub fn execute(task_with_args: &str) -> Result<(), String> {
         let error_msg =
             task_discovery::format_ambiguous_task_error(task_name.as_str(), &matching_tasks);
         println!("{}", error_msg);
-        return Err(format!("Ambiguous task name: '{}'", task_name));
+        return Err(anyhow::anyhow!("Ambiguous task name: '{}'", task_name));
     }
 
     // Single task found, check if runner is available
     let task = matching_tasks[0];
     if !is_runner_available(&task.runner) {
-        return Err(format!("Runner '{}' not found", task.runner.short_name()));
+        return Err(anyhow::anyhow!("Runner '{}' not found", task.runner.short_name()));
     }
 
     // Get the command to run
@@ -47,7 +49,7 @@ pub fn execute(task_with_args: &str) -> Result<(), String> {
     let mut parts_iter = command_parts.iter();
     let executable = parts_iter
         .next()
-        .ok_or_else(|| "Empty command generated".to_string())?;
+        .context("Empty command generated")?;
     let remaining_args: Vec<&String> = parts_iter.collect();
 
     println!("Running: {}", shell_words::join(command_parts.clone()));
@@ -59,10 +61,10 @@ pub fn execute(task_with_args: &str) -> Result<(), String> {
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .status()
-        .map_err(|e| format!("Failed to execute command: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to execute command: {}", e))?;
 
     if !status.success() {
-        return Err(format!("Command failed with exit code: {}", status));
+        return Err(anyhow::anyhow!("Command failed with exit code: {}", status));
     }
 
     Ok(())
@@ -123,7 +125,7 @@ test: ## Running tests
         let result = execute("nonexistent");
         assert!(result.is_err(), "Should fail when no task found");
         assert_eq!(
-            result.unwrap_err(),
+            result.unwrap_err().to_string(),
             "dela: command or task not found: nonexistent"
         );
 
@@ -145,7 +147,7 @@ test: ## Running tests
 
         let result = execute("test");
         assert!(result.is_err(), "Should fail when runner is missing");
-        assert_eq!(result.unwrap_err(), "Runner 'make' not found");
+        assert_eq!(result.unwrap_err().to_string(), "Runner 'make' not found");
 
         reset_mock();
         reset_to_real_environment();
@@ -189,7 +191,7 @@ test: ## Running tests
         let result = execute("test");
         assert!(result.is_err(), "Should fail with ambiguous task name");
         assert!(
-            result.unwrap_err().contains("Ambiguous task name: 'test'"),
+            result.unwrap_err().to_string().contains("Ambiguous task name: 'test'"),
             "Error should mention ambiguous task name"
         );
 
@@ -224,7 +226,7 @@ test: ## Running tests
         // Instead of trying to execute the command, which causes make to print help output,
         // we'll just mock the behavior we expect - that the command would be constructed
         // correctly but would fail in the test environment.
-        let result: Result<(), String> = Err("Command failed with exit code: 127".to_string());
+        let result: anyhow::Result<()> = Err(anyhow::anyhow!("Command failed with exit code: 127"));
         assert!(
             result.is_err(),
             "Command execution should fail in test environment"
@@ -273,7 +275,7 @@ test: ## Running tests
         let result = execute("test");
         assert!(result.is_err(), "Should fail with ambiguous task name");
         assert!(
-            result.unwrap_err().contains("Ambiguous task name: 'test'"),
+            result.unwrap_err().to_string().contains("Ambiguous task name: 'test'"),
             "Error should mention ambiguous task name"
         );
 

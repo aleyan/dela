@@ -12,7 +12,7 @@ impl TaskDiscovery for GradleDiscovery {
     }
 }
 
-fn discover_gradle_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<(), String> {
+fn discover_gradle_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> anyhow::Result<()> {
     let build_gradle_path = dir.join("build.gradle");
     if build_gradle_path.exists() {
         return match parse_gradle::parse(&build_gradle_path) {
@@ -32,7 +32,7 @@ fn discover_gradle_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result
                     TaskDefinitionType::Gradle,
                     discovered,
                 );
-                Err("Error parsing build.gradle".to_string())
+                Err(anyhow::anyhow!("Error parsing build.gradle"))
             }
         };
     }
@@ -56,7 +56,7 @@ fn discover_gradle_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result
                     TaskDefinitionType::Gradle,
                     discovered,
                 );
-                Err("Error parsing build.gradle.kts".to_string())
+                Err(anyhow::anyhow!("Error parsing build.gradle.kts"))
             }
         };
     }

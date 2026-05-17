@@ -31,17 +31,17 @@ struct DockerCompose {
 }
 
 /// Parse a docker-compose.yml file at the given path and extract services as tasks
-pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
+pub fn parse(path: &PathBuf) -> anyhow::Result<Vec<Task>> {
     let file_name = path
         .file_name()
         .and_then(|n| n.to_str())
         .unwrap_or("docker-compose.yml");
 
     let contents = std::fs::read_to_string(path)
-        .map_err(|e| format!("Failed to read {}: {}", file_name, e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to read {}: {}", file_name, e))?;
 
     let docker_compose: DockerCompose = serde_yaml::from_str(&contents)
-        .map_err(|e| format!("Failed to parse {}: {}", file_name, e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to parse {}: {}", file_name, e))?;
 
     let mut tasks = Vec::new();
 
@@ -267,7 +267,7 @@ invalid: yaml: here
 
         let result = parse(&temp_dir.path().join("docker-compose.yml"));
         assert!(result.is_err()); // YAML should fail to parse with invalid structure
-        assert!(result.unwrap_err().contains("Failed to parse"));
+        assert!(result.unwrap_err().to_string().contains("Failed to parse"));
     }
 
     #[test]
@@ -275,7 +275,7 @@ invalid: yaml: here
         let temp_dir = TempDir::new().unwrap();
         let result = parse(&temp_dir.path().join("docker-compose.yml"));
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Failed to read"));
+        assert!(result.unwrap_err().to_string().contains("Failed to read"));
     }
 
     #[test]

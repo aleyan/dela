@@ -12,7 +12,7 @@ impl TaskDiscovery for NpmDiscovery {
     }
 }
 
-fn discover_npm_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<(), String> {
+fn discover_npm_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> anyhow::Result<()> {
     let package_json = dir.join("package.json");
 
     if !package_json.exists() {

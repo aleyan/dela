@@ -1,3 +1,5 @@
+#[allow(unused_imports)]
+use anyhow::anyhow;
 use crate::composed_paths::{ComposedDefinitionSource, RecursiveDiscoveryState, VisitState};
 use crate::parsers::parse_makefile;
 use crate::task_discovery::support::{apply_shadowing, set_definition};
@@ -57,7 +59,7 @@ fn discover_makefile_tasks(dir: &Path, discovered: &mut DiscoveredTasks) {
                 makefile_path.display(),
                 error
             ));
-            TaskFileStatus::ParseError(error)
+            TaskFileStatus::ParseError(error.to_string())
         }
     };
 
@@ -95,13 +97,13 @@ fn collect_makefile_tasks_recursive(
     seen_task_names: &mut HashSet<String>,
     collected_tasks: &mut Vec<Task>,
     include_errors: &mut Vec<String>,
-) -> Result<(), String> {
+) -> anyhow::Result<()> {
     match traversal_state.mark_visited(current_source.definition_path()) {
         VisitState::AlreadyVisited(_) => return Ok(()),
         VisitState::New(_) => {}
     }
 
-    let mut tasks = parse_makefile::parse(current_source.definition_path())?;
+    let mut tasks = parse_makefile::parse(current_source.definition_path()).map_err(|e| anyhow::anyhow!(e))?;
     for task in &mut tasks {
         current_source.apply_to_task(task);
     }
@@ -114,7 +116,7 @@ fn collect_makefile_tasks_recursive(
         }
     }
 
-    let includes = parse_makefile::extract_include_directives(current_source.definition_path())?;
+    let includes = parse_makefile::extract_include_directives(current_source.definition_path()).map_err(|e| anyhow::anyhow!(e))?;
     for include in includes {
         let resolved_include = current_source.resolve_child(&include.path);
         if !resolved_include.is_file() {

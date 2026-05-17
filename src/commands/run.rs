@@ -1,6 +1,6 @@
 use crate::commands::run_command;
 
-pub fn execute(task_name: &str) -> Result<(), String> {
+pub fn execute(task_name: &str) -> anyhow::Result<()> {
     println!("Note: The 'dela run' command is meant to be intercepted by shell integration.");
     println!("If you're seeing this message, it means either:");
     println!("1. Shell integration is not installed (run 'dela init' to set it up)");

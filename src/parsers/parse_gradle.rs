@@ -5,10 +5,10 @@ use std::path::Path;
 use crate::types::{Task, TaskDefinitionType, TaskRunner};
 
 /// Parse a Gradle build file (build.gradle or build.gradle.kts) and extract tasks
-pub fn parse(file_path: &Path) -> Result<Vec<Task>, String> {
+pub fn parse(file_path: &Path) -> anyhow::Result<Vec<Task>> {
     // Read the file
     let content = fs::read_to_string(file_path)
-        .map_err(|e| format!("Failed to read Gradle build file: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to read Gradle build file: {}", e))?;
 
     // Parse tasks using regex patterns for both Groovy and Kotlin DSL
     let mut tasks = Vec::new();
@@ -64,18 +64,18 @@ fn extract_custom_tasks(
     content: &str,
     tasks: &mut Vec<Task>,
     file_path: &Path,
-) -> Result<(), String> {
+) -> anyhow::Result<()> {
     // Look for task definitions in Groovy DSL (build.gradle)
     let groovy_task_regex = Regex::new(r"task\s+(\w+)(?:\s*\{|\s*\(|\s+.*?\{)")
-        .map_err(|e| format!("Failed to compile regex: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to compile regex: {}", e))?;
 
     // Regular expressions for finding tasks in Gradle Kotlin DSL files
     let kotlin_task_regex = Regex::new(r#"tasks\s*\.\s*register\s*<.*>\s*\(\s*"(\w+)"\s*\)"#)
-        .map_err(|e| format!("Failed to compile Kotlin task regex: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to compile Kotlin task regex: {}", e))?;
 
     // Alternative Kotlin syntax: task("taskName")
     let kotlin_task_alt_regex = Regex::new(r#"task\s*\(\s*"(\w+)"\s*\)"#)
-        .map_err(|e| format!("Failed to compile alternative Kotlin task regex: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to compile alternative Kotlin task regex: {}", e))?;
 
     // Process Groovy-style tasks
     for cap in groovy_task_regex.captures_iter(content) {
@@ -178,7 +178,7 @@ fn extract_plugin_tasks(
     content: &str,
     tasks: &mut Vec<Task>,
     file_path: &Path,
-) -> Result<(), String> {
+) -> anyhow::Result<()> {
     // Common plugins and their tasks
     let plugins = [
         (
@@ -204,13 +204,13 @@ fn extract_plugin_tasks(
 
     // Regular expressions to extract plugin information
     let apply_plugin_regex = Regex::new(r#"apply\s+plugin\s*:\s*['"]([^'"]+)['"]"#)
-        .map_err(|e| format!("Failed to compile apply plugin regex: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to compile apply plugin regex: {}", e))?;
 
     let plugins_id_regex = Regex::new(r#"plugins\s*\{\s*.*?id\s*\(\s*["']([^"']+)["']\s*\)"#)
-        .map_err(|e| format!("Failed to compile plugins id regex: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to compile plugins id regex: {}", e))?;
 
     let plugins_id_alt_regex = Regex::new(r#"plugins\s*\{\s*.*?id\s*["']([^"']+)["']"#)
-        .map_err(|e| format!("Failed to compile alternative plugins id regex: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to compile alternative plugins id regex: {}", e))?;
 
     // Identify plugins used in the build file
     let mut identified_plugins = Vec::new();

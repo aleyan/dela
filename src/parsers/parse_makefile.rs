@@ -12,13 +12,13 @@ pub struct MakefileInclude {
 }
 
 /// Parse a Makefile at the given path and extract tasks
-pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
+pub fn parse(path: &Path) -> anyhow::Result<Vec<Task>> {
     let content =
-        std::fs::read_to_string(path).map_err(|e| format!("Failed to read Makefile: {}", e))?;
+        std::fs::read_to_string(path).map_err(|e| anyhow::anyhow!("Failed to read Makefile: {}", e))?;
 
     // Special case for the test_discover_tasks_with_invalid_makefile test
     if content.contains("<hello>not a make file</hello>") {
-        return Err("Failed to parse Makefile: Invalid syntax".to_string());
+        return Err(anyhow::anyhow!("Failed to parse Makefile: Invalid syntax"));
     }
 
     // Special case for testing regex parsing - look for a marker in the content
@@ -33,14 +33,14 @@ pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
             // If standard parsing fails, try regex-based parsing as fallback
             match extract_tasks_regex(&content, path) {
                 Ok(tasks) => Ok(tasks),
-                Err(_) => Err(format!("Failed to parse Makefile: {}", e)),
+                Err(_) => Err(anyhow::anyhow!("Failed to parse Makefile: {}", e)),
             }
         }
     }
 }
 
 /// Extract tasks from a parsed Makefile
-fn extract_tasks(makefile: &Makefile, path: &Path) -> Result<Vec<Task>, String> {
+fn extract_tasks(makefile: &Makefile, path: &Path) -> anyhow::Result<Vec<Task>> {
     // Use a HashMap to track tasks by name to avoid duplicates
     let mut tasks_map: HashMap<String, Task> = HashMap::new();
 
@@ -95,9 +95,9 @@ fn extract_tasks(makefile: &Makefile, path: &Path) -> Result<Vec<Task>, String> 
 }
 
 /// Extract Makefile include directives from a file.
-pub fn extract_include_directives(path: &Path) -> Result<Vec<MakefileInclude>, String> {
+pub fn extract_include_directives(path: &Path) -> anyhow::Result<Vec<MakefileInclude>> {
     let content =
-        std::fs::read_to_string(path).map_err(|e| format!("Failed to read Makefile: {}", e))?;
+        std::fs::read_to_string(path).map_err(|e| anyhow::anyhow!("Failed to read Makefile: {}", e))?;
     Ok(extract_include_directives_from_str(&content))
 }
 
@@ -224,7 +224,7 @@ fn contains_dynamic_make_syntax(token: &str) -> bool {
 }
 
 /// Extract tasks using regex as a fallback method when standard parsing fails
-fn extract_tasks_regex(content: &str, path: &Path) -> Result<Vec<Task>, String> {
+fn extract_tasks_regex(content: &str, path: &Path) -> anyhow::Result<Vec<Task>> {
     let mut tasks_map: HashMap<String, Task> = HashMap::new();
 
     // Pre-process content to handle line continuations
@@ -234,7 +234,7 @@ fn extract_tasks_regex(content: &str, path: &Path) -> Result<Vec<Task>, String> 
     // Matches start of line, then allowed target characters, then a colon, then the rest of the line
     let rule_pattern = r"(?m)^([a-zA-Z0-9_-][^:$\n]*?):([^\n]*)";
     let rule_regex =
-        Regex::new(rule_pattern).map_err(|e| format!("Failed to create regex: {}", e))?;
+        Regex::new(rule_pattern).map_err(|e| anyhow::anyhow!("Failed to create regex: {}", e))?;
 
     for cap in rule_regex.captures_iter(&processed_content) {
         if cap.len() < 3 {

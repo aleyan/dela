@@ -8,9 +8,9 @@ use crate::task_shadowing::{enable_mock, mock_executable, reset_mock};
 use serial_test::serial;
 
 #[allow(dead_code)]
-pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
+pub fn parse(path: &Path) -> anyhow::Result<Vec<Task>> {
     let _content = std::fs::read_to_string(path)
-        .map_err(|e| format!("Failed to read pyproject.toml: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to read pyproject.toml: {}", e))?;
 
     let tasks = Vec::new();
     Ok(tasks)

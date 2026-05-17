@@ -14,7 +14,7 @@ impl TaskDiscovery for CmakeDiscovery {
     }
 }
 
-fn discover_cmake_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<(), String> {
+fn discover_cmake_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> anyhow::Result<()> {
     let cmake_path = dir.join("CMakeLists.txt");
     if !cmake_path.exists() {
         set_definition(
@@ -35,7 +35,7 @@ fn discover_cmake_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<
         }
         Err(error) => {
             handle_discovery_error(error, cmake_path, TaskDefinitionType::CMake, discovered);
-            Err("Error parsing CMakeLists.txt".to_string())
+            Err(anyhow::anyhow!("Error parsing CMakeLists.txt"))
         }
     }
 }

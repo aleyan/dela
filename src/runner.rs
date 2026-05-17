@@ -7,12 +7,12 @@ use serial_test::serial;
 
 /// Parse a shell-style command string into executable + args preserving quoting.
 /// Returns an error when the command cannot be parsed or is empty.
-pub fn split_command_words(command: &str) -> Result<Vec<String>, String> {
+pub fn split_command_words(command: &str) -> anyhow::Result<Vec<String>> {
     let parts = shell_words::split(command)
-        .map_err(|e| format!("Failed to parse command '{}': {}", command, e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to parse command '{}': {}", command, e))?;
 
     if parts.is_empty() {
-        return Err("Empty command generated".to_string());
+        return Err(anyhow::anyhow!("Empty command generated"));
     }
 
     Ok(parts)
@@ -92,7 +92,7 @@ mod tests {
     fn test_split_command_words_errors_on_empty() {
         let err = split_command_words("   ").unwrap_err();
         assert!(
-            err.contains("Empty command"),
+            err.to_string().contains("Empty command"),
             "unexpected error message: {}",
             err
         );

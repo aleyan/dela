@@ -1,3 +1,5 @@
+#[allow(unused_imports)]
+use anyhow::anyhow;
 use chrono::{DateTime, Utc};
 use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
@@ -266,12 +268,12 @@ impl JobManager {
     }
 
     /// Check if we can start a new job (concurrency limit check)
-    pub async fn can_start_job(&self) -> Result<(), String> {
+    pub async fn can_start_job(&self) -> anyhow::Result<()> {
         self.garbage_collect().await;
         let jobs = self.jobs.read().await;
         let running_jobs = jobs.values().filter(|job| job.is_running()).count();
         if running_jobs >= self.config.max_concurrent_jobs {
-            return Err(format!(
+            return Err(anyhow::anyhow!(
                 "Maximum concurrent jobs limit reached: {}",
                 self.config.max_concurrent_jobs
             ));
@@ -285,19 +287,19 @@ impl JobManager {
         pid: u32,
         metadata: JobMetadata,
         process: Child,
-    ) -> Result<(), String> {
+    ) -> anyhow::Result<()> {
         let mut jobs = self.jobs.write().await;
 
         // Check concurrent job limit
         if jobs.len() >= self.config.max_concurrent_jobs {
-            return Err(format!(
+            return Err(anyhow::anyhow!(
                 "Maximum concurrent jobs limit reached: {}",
                 self.config.max_concurrent_jobs
             ));
         }
 
         if matches!(jobs.get(&pid), Some(existing) if existing.is_running()) {
-            return Err(format!(
+            return Err(anyhow::anyhow!(
                 "Refusing to overwrite running job with PID {}",
                 pid
             ));
@@ -326,10 +328,10 @@ impl JobManager {
         pid: u32,
         metadata: JobMetadata,
         state: JobState,
-    ) -> Result<(), String> {
+    ) -> anyhow::Result<()> {
         let mut jobs = self.jobs.write().await;
         if matches!(jobs.get(&pid), Some(existing) if existing.is_running()) {
-            return Err(format!(
+            return Err(anyhow::anyhow!(
                 "Refusing to overwrite running job with PID {}",
                 pid
             ));
@@ -381,7 +383,7 @@ impl JobManager {
     }
 
     /// Update a job's state
-    pub async fn update_job_state(&self, pid: u32, state: JobState) -> Result<(), String> {
+    pub async fn update_job_state(&self, pid: u32, state: JobState) -> anyhow::Result<()> {
         let mut jobs = self.jobs.write().await;
         if let Some(job) = jobs.get_mut(&pid) {
             match state {
@@ -396,24 +398,24 @@ impl JobManager {
             }
             Ok(())
         } else {
-            Err(format!("Job with PID {} not found", pid))
+            Err(anyhow::anyhow!("Job with PID {} not found", pid))
         }
     }
 
     /// Add output to a job
-    pub async fn add_job_output(&self, pid: u32, output: String) -> Result<(), String> {
+    pub async fn add_job_output(&self, pid: u32, output: String) -> anyhow::Result<()> {
         let mut jobs = self.jobs.write().await;
         if let Some(job) = jobs.get_mut(&pid) {
             job.add_output(output);
             Ok(())
         } else {
-            Err(format!("Job with PID {} not found", pid))
+            Err(anyhow::anyhow!("Job with PID {} not found", pid))
         }
     }
 
     /// Stop a job (send SIGTERM)
     #[allow(dead_code)]
-    pub async fn stop_job(&self, pid: u32) -> Result<(), String> {
+    pub async fn stop_job(&self, pid: u32) -> anyhow::Result<()> {
         let mut processes = self.processes.write().await;
         if let Some(mut process) = processes.remove(&pid) {
             if let Err(e) = process.kill().await {
@@ -431,7 +433,7 @@ impl JobManager {
             }
             Ok(())
         } else {
-            Err(format!("Job with PID {} not found", pid))
+            Err(anyhow::anyhow!("Job with PID {} not found", pid))
         }
     }
 
@@ -440,7 +442,7 @@ impl JobManager {
         &self,
         pid: u32,
         grace_period_seconds: u64,
-    ) -> Result<StopResult, String> {
+    ) -> anyhow::Result<StopResult> {
         use tokio::time::{Duration, timeout};
 
         // First, try to get the process from our managed processes
@@ -455,7 +457,7 @@ impl JobManager {
                     Ok(()) => {}
                     Err(nix::errno::Errno::ESRCH) => {
                         let exit_status = process.wait().await.map_err(|e| {
-                            format!("Process already exited but wait failed: {}", e)
+                            anyhow::anyhow!("Process already exited but wait failed: {}", e)
                         })?;
                         let exit_code = exit_status.code().unwrap_or(0);
                         let mut jobs = self.jobs.write().await;
@@ -614,7 +616,7 @@ impl JobManager {
 
     /// Remove a job
     #[allow(dead_code)]
-    pub async fn remove_job(&self, pid: u32) -> Result<(), String> {
+    pub async fn remove_job(&self, pid: u32) -> anyhow::Result<()> {
         let mut jobs = self.jobs.write().await;
         let mut processes = self.processes.write().await;
 
@@ -624,7 +626,7 @@ impl JobManager {
         if job_removed || process_removed {
             Ok(())
         } else {
-            Err(format!("Job with PID {} not found", pid))
+            Err(anyhow::anyhow!("Job with PID {} not found", pid))
         }
     }
 
@@ -1007,7 +1009,7 @@ mod tests {
         assert!(result.is_err());
         assert!(
             result
-                .unwrap_err()
+                .unwrap_err().to_string()
                 .contains("Refusing to overwrite running job")
         );
 

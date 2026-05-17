@@ -1,24 +1,26 @@
+#[allow(unused_imports)]
+use anyhow::Context;
 use crate::allowlist;
 use crate::config::preferred_allowlist_path;
 use crate::task_discovery;
 use crate::types::AllowScope;
 use std::env;
 
-pub fn execute(task_with_args: &str, allow: Option<u8>) -> Result<(), String> {
+pub fn execute(task_with_args: &str, allow: Option<u8>) -> anyhow::Result<()> {
     let task_name = task_with_args
         .split_whitespace()
         .next()
-        .ok_or_else(|| "No task name provided".to_string())?;
+        .context("No task name provided")?;
 
     let current_dir =
-        env::current_dir().map_err(|e| format!("Failed to get current directory: {}", e))?;
+        env::current_dir().map_err(|e| anyhow::anyhow!("Failed to get current directory: {}", e))?;
     let discovered = task_discovery::discover_tasks(&current_dir);
 
     // Find all tasks with the given name (both original and disambiguated)
     let matching_tasks = task_discovery::get_matching_tasks(&discovered, task_name);
 
     match matching_tasks.len() {
-        0 => Err(format!("dela: command or task not found: {}", task_name)),
+        0 => Err(anyhow::anyhow!("dela: command or task not found: {}", task_name)),
         1 => {
             // Single task found, check allowlist
             let task = matching_tasks[0];
@@ -40,13 +42,13 @@ pub fn execute(task_with_args: &str, allow: Option<u8>) -> Result<(), String> {
                     }
                     5 => {
                         eprintln!("Task '{}' was denied by the allowlist.", task.name);
-                        Err(format!(
+                        Err(anyhow::anyhow!(
                             "Dela task '{}' was denied by the {}",
                             task.name,
                             preferred_allowlist_path()?.display()
                         ))
                     }
-                    _ => Err(format!(
+                    _ => Err(anyhow::anyhow!(
                         "Invalid allow choice {}. Please use a number between 2 and 5.",
                         choice
                     )),
@@ -55,7 +57,7 @@ pub fn execute(task_with_args: &str, allow: Option<u8>) -> Result<(), String> {
                 // Otherwise, use the interactive prompt
                 if !allowlist::check_task_allowed(task)? {
                     eprintln!("Task '{}' was denied by the allowlist.", task.name);
-                    return Err(format!(
+                    return Err(anyhow::anyhow!(
                         "Dela task '{}' was denied by the {}",
                         task.name,
                         preferred_allowlist_path()?.display()
@@ -68,7 +70,7 @@ pub fn execute(task_with_args: &str, allow: Option<u8>) -> Result<(), String> {
             // Multiple tasks found, print error and list them
             let error_msg = task_discovery::format_ambiguous_task_error(task_name, &matching_tasks);
             eprintln!("{}", error_msg);
-            Err(format!("Multiple tasks named '{}' found", task_name))
+            Err(anyhow::anyhow!("Multiple tasks named '{}' found", task_name))
         }
     }
 }
@@ -189,7 +191,7 @@ test: ## Running tests
             let result = execute("test", None);
             assert!(result.is_err(), "Should fail when task is denied");
             assert_eq!(
-                result.unwrap_err(),
+                result.unwrap_err().to_string(),
                 format!(
                     "Dela task 'test' was denied by the {}",
                     preferred_allowlist_path_for(home_dir.path()).display()
@@ -209,7 +211,7 @@ test: ## Running tests
         let result = execute("nonexistent", None);
         assert!(result.is_err(), "Should fail when no task found");
         assert_eq!(
-            result.unwrap_err(),
+            result.unwrap_err().to_string(),
             "dela: command or task not found: nonexistent"
         );
 
@@ -242,7 +244,7 @@ test: ## Running tests
         let result = execute("test", Some(5));
         assert!(result.is_err(), "Should fail with allow=5");
         assert_eq!(
-            result.unwrap_err(),
+            result.unwrap_err().to_string(),
             format!(
                 "Dela task 'test' was denied by the {}",
                 preferred_allowlist_path_for(home_dir.path()).display()
@@ -253,7 +255,7 @@ test: ## Running tests
         let result = execute("test", Some(1));
         assert!(result.is_err(), "Should fail with allow=1");
         assert_eq!(
-            result.unwrap_err(),
+            result.unwrap_err().to_string(),
             "Invalid allow choice 1. Please use a number between 2 and 5."
         );
 
@@ -261,7 +263,7 @@ test: ## Running tests
         let result = execute("test", Some(6));
         assert!(result.is_err(), "Should fail with allow=6");
         assert_eq!(
-            result.unwrap_err(),
+            result.unwrap_err().to_string(),
             "Invalid allow choice 6. Please use a number between 2 and 5."
         );
 
@@ -300,7 +302,7 @@ test: ## Running tests
             "Should fail when the dela config directory doesn't exist"
         );
         assert_eq!(
-            result.unwrap_err(),
+            result.unwrap_err().to_string(),
             "Dela is not initialized. Please run 'dela init' first."
         );
 
@@ -329,7 +331,7 @@ test: ## Running tests
         let result = execute("test --verbose --coverage", Some(5));
         assert!(result.is_err(), "Should fail with allow=5 and arguments");
         assert_eq!(
-            result.unwrap_err(),
+            result.unwrap_err().to_string(),
             format!(
                 "Dela task 'test' was denied by the {}",
                 preferred_allowlist_path_for(home_dir.path()).display()
@@ -369,7 +371,7 @@ test: ## Running tests
         assert!(result.is_err(), "Should error for ambiguous task");
         assert!(
             result
-                .unwrap_err()
+                .unwrap_err().to_string()
                 .contains("Multiple tasks named 'test' found"),
             "Error should mention multiple tasks"
         );

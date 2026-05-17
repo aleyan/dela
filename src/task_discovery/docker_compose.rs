@@ -15,7 +15,7 @@ impl TaskDiscovery for DockerComposeDiscovery {
 fn discover_docker_compose_tasks(
     dir: &Path,
     discovered: &mut DiscoveredTasks,
-) -> Result<(), String> {
+) -> anyhow::Result<()> {
     let docker_compose_files = parse_docker_compose::find_docker_compose_files(dir);
 
     if docker_compose_files.is_empty() {

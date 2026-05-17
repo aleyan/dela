@@ -1,3 +1,7 @@
+#[allow(unused_imports)]
+use anyhow::anyhow;
+#[allow(unused_imports)]
+use anyhow::Context;
 use crate::mcp;
 use std::fs;
 use std::path::PathBuf;
@@ -106,13 +110,13 @@ impl Editor {
 }
 
 /// Merge dela into an existing JSON config file (Cursor, VSCode, Gemini, Claude Code)
-fn merge_dela_into_json(editor: Editor, existing: &str) -> Result<String, String> {
+fn merge_dela_into_json(editor: Editor, existing: &str) -> anyhow::Result<String> {
     let mut root: serde_json::Value = serde_json::from_str(existing)
-        .map_err(|e| format!("Failed to parse config as JSON: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to parse config as JSON: {}", e))?;
 
     let obj = root
         .as_object_mut()
-        .ok_or_else(|| "Config file is not a JSON object".to_string())?;
+        .context("Config file is not a JSON object")?;
 
     let key = editor.servers_key();
     if !obj.contains_key(key) {
@@ -125,20 +129,20 @@ fn merge_dela_into_json(editor: Editor, existing: &str) -> Result<String, String
     let servers_obj = obj
         .get_mut(key)
         .and_then(|v| v.as_object_mut())
-        .ok_or_else(|| format!("'{}' in config is not an object", key))?;
+        .with_context(|| format!("'{}' in config is not an object", key))?;
 
     servers_obj.insert("dela".to_string(), editor.dela_json_entry());
 
     let mut result = serde_json::to_string_pretty(&root)
-        .map_err(|e| format!("Failed to serialize config: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to serialize config: {}", e))?;
     result.push('\n');
     Ok(result)
 }
 
 /// Merge dela into an existing TOML config file (Codex)
-fn merge_dela_into_toml(existing: &str) -> Result<String, String> {
+fn merge_dela_into_toml(existing: &str) -> anyhow::Result<String> {
     let mut table: toml::Table =
-        toml::from_str(existing).map_err(|e| format!("Failed to parse config as TOML: {}", e))?;
+        toml::from_str(existing).map_err(|e| anyhow::anyhow!("Failed to parse config as TOML: {}", e))?;
 
     if !table.contains_key("mcp_servers") {
         table.insert(
@@ -150,7 +154,7 @@ fn merge_dela_into_toml(existing: &str) -> Result<String, String> {
     let mcp_table = table
         .get_mut("mcp_servers")
         .and_then(|v| v.as_table_mut())
-        .ok_or_else(|| "'mcp_servers' in config is not a table".to_string())?;
+        .context("'mcp_servers' in config is not a table")?;
 
     let mut dela = toml::map::Map::new();
     dela.insert(
@@ -163,23 +167,23 @@ fn merge_dela_into_toml(existing: &str) -> Result<String, String> {
     );
     mcp_table.insert("dela".to_string(), toml::Value::Table(dela));
 
-    toml::to_string_pretty(&table).map_err(|e| format!("Failed to serialize config: {}", e))
+    toml::to_string_pretty(&table).map_err(|e| anyhow::anyhow!("Failed to serialize config: {}", e))
 }
 
 /// Generate MCP config file for an editor at a specific path
-fn generate_config_at(editor: Editor, config_path: &PathBuf) -> Result<(), String> {
+fn generate_config_at(editor: Editor, config_path: &PathBuf) -> anyhow::Result<()> {
     // Create parent directory if it doesn't exist
     if let Some(parent) = config_path.parent()
         && !parent.exists()
     {
         fs::create_dir_all(parent)
-            .map_err(|e| format!("Failed to create {} directory: {}", editor.name(), e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to create {} directory: {}", editor.name(), e))?;
     }
 
     // Check if config already exists
     if config_path.exists() {
         let existing = fs::read_to_string(config_path)
-            .map_err(|e| format!("Failed to read existing config: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to read existing config: {}", e))?;
 
         if existing.contains(editor.dela_marker()) {
             eprintln!(
@@ -199,7 +203,7 @@ fn generate_config_at(editor: Editor, config_path: &PathBuf) -> Result<(), Strin
         match merged {
             Ok(content) => {
                 fs::write(config_path, content)
-                    .map_err(|e| format!("Failed to write config file: {}", e))?;
+                    .map_err(|e| anyhow::anyhow!("Failed to write config file: {}", e))?;
                 eprintln!(
                     "✓ Added dela to {} config at {}",
                     editor.name(),
@@ -221,7 +225,7 @@ fn generate_config_at(editor: Editor, config_path: &PathBuf) -> Result<(), Strin
 
     // Write the config file
     fs::write(config_path, editor.template())
-        .map_err(|e| format!("Failed to write config file: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to write config file: {}", e))?;
 
     eprintln!(
         "✓ Created {} config at {}",
@@ -233,7 +237,7 @@ fn generate_config_at(editor: Editor, config_path: &PathBuf) -> Result<(), Strin
 }
 
 /// Generate MCP config file for an editor at its default global path
-fn generate_config(editor: Editor) -> Result<(), String> {
+fn generate_config(editor: Editor) -> anyhow::Result<()> {
     let config_path = editor.config_path();
     generate_config_at(editor, &config_path)
 }
@@ -246,10 +250,10 @@ pub async fn execute(
     init_codex: bool,
     init_gemini: bool,
     init_claude_code: bool,
-) -> Result<(), String> {
+) -> anyhow::Result<()> {
     // Resolve the path relative to the current working directory
     let root_path = if cwd == "." {
-        std::env::current_dir().map_err(|e| format!("Failed to get current directory: {}", e))?
+        std::env::current_dir().map_err(|e| anyhow::anyhow!("Failed to get current directory: {}", e))?
     } else {
         PathBuf::from(&cwd)
     };
@@ -276,7 +280,7 @@ pub async fn execute(
         return Ok(());
     }
 
-    crate::allowlist::load_allowlist().map_err(|e| {
+    crate::allowlist::load_allowlist().map_err(|e| anyhow::anyhow!(
         crate::mcp::DelaError::mcp_not_ready(format!(
             "MCP server cannot start because dela configuration is unavailable: {}",
             e
@@ -284,12 +288,12 @@ pub async fn execute(
         .to_error_data()
         .message
         .into_owned()
-    })?;
+    ))?;
 
     // Start the MCP server
     mcp::run_stdio_server(root_path)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| anyhow::anyhow!(e))
 }
 
 #[cfg(test)]

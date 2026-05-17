@@ -8,23 +8,23 @@ use std::path::Path;
 ///
 /// This function parses a GitHub Actions workflow file and extracts the entire workflow as a single task.
 /// The tasks can be executed using the `act` command-line tool.
-pub fn parse(file_path: &Path) -> Result<Vec<Task>, String> {
-    let mut file = File::open(file_path).map_err(|e| format!("Failed to open file: {}", e))?;
+pub fn parse(file_path: &Path) -> anyhow::Result<Vec<Task>> {
+    let mut file = File::open(file_path).map_err(|e| anyhow::anyhow!("Failed to open file: {}", e))?;
     let mut contents = String::new();
     file.read_to_string(&mut contents)
-        .map_err(|e| format!("Failed to read file: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to read file: {}", e))?;
 
     parse_workflow_string(&contents, file_path)
 }
 
 /// Parse GitHub Actions workflow content from a string
-fn parse_workflow_string(content: &str, file_path: &Path) -> Result<Vec<Task>, String> {
+fn parse_workflow_string(content: &str, file_path: &Path) -> anyhow::Result<Vec<Task>> {
     let workflow: Value = serde_yaml::from_str(content)
-        .map_err(|e| format!("Failed to parse workflow YAML: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to parse workflow YAML: {}", e))?;
 
     let workflow_map = match workflow {
         Value::Mapping(map) => map,
-        _ => return Err("Workflow YAML is not a mapping".to_string()),
+        _ => return Err(anyhow::anyhow!("Workflow YAML is not a mapping")),
     };
 
     // Try to get workflow name for description
@@ -38,11 +38,11 @@ fn parse_workflow_string(content: &str, file_path: &Path) -> Result<Vec<Task>, S
     // Extract jobs to confirm the workflow is valid
     let jobs = match workflow_map.get(Value::String("jobs".to_string())) {
         Some(Value::Mapping(jobs_map)) => jobs_map,
-        _ => return Err("No jobs found in workflow file".to_string()),
+        _ => return Err(anyhow::anyhow!("No jobs found in workflow file")),
     };
 
     if jobs.is_empty() {
-        return Err("Workflow contains no jobs".to_string());
+        return Err(anyhow::anyhow!("Workflow contains no jobs"));
     }
 
     // Extract filename without path for task name
@@ -328,6 +328,6 @@ on: [push]
 
         let result = parse(&file_path);
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("No jobs found"));
+        assert!(result.unwrap_err().to_string().contains("No jobs found"));
     }
 }

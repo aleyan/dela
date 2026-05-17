@@ -17,7 +17,7 @@ impl TaskDiscovery for GithubActionsDiscovery {
 fn discover_github_actions_tasks(
     dir: &Path,
     discovered: &mut DiscoveredTasks,
-) -> Result<(), String> {
+) -> anyhow::Result<()> {
     let mut workflow_files = Vec::new();
 
     let workflows_dir = dir.join(".github").join("workflows");

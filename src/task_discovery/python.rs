@@ -12,7 +12,7 @@ impl TaskDiscovery for PythonDiscovery {
     }
 }
 
-fn discover_python_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<(), String> {
+fn discover_python_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> anyhow::Result<()> {
     let pyproject_toml = dir.join("pyproject.toml");
 
     if !pyproject_toml.exists() {

@@ -88,7 +88,7 @@ mod tests {
     use std::path::{Path, PathBuf};
     use tempfile::TempDir;
 
-    type ExecuteFn = Box<dyn FnMut(&Task) -> Result<(), String>>;
+    type ExecuteFn = Box<dyn FnMut(&Task) -> anyhow::Result<()>>;
 
     // Define mocks for command execution tests
     struct MockTaskExecutor {
@@ -113,13 +113,13 @@ mod tests {
 
         fn returning<F>(&mut self, f: F) -> &mut MockTaskExecutor
         where
-            F: FnMut(&Task) -> Result<(), String> + 'static,
+            F: FnMut(&Task) -> anyhow::Result<()> + 'static,
         {
             self.execute_fn = Box::new(f);
             self
         }
 
-        fn execute(&mut self, task: &Task) -> Result<(), String> {
+        fn execute(&mut self, task: &Task) -> anyhow::Result<()> {
             (self.execute_fn)(task)
         }
     }
@@ -138,19 +138,19 @@ mod tests {
             discovered_tasks: &mut DiscoveredTasks,
             task_name: &str,
             _args: &[&str],
-        ) -> Result<(), String> {
+        ) -> anyhow::Result<()> {
             // Find all tasks with the given name (both original and disambiguated)
             let matching_tasks = get_matching_tasks(discovered_tasks, task_name);
 
             // Check if there are no matching tasks
             if matching_tasks.is_empty() {
-                return Err(format!("dela: command or task not found: {}", task_name));
+                return Err(anyhow::anyhow!("dela: command or task not found: {}", task_name));
             }
 
             // Check if there are multiple matching tasks
             if matching_tasks.len() > 1 {
                 let error_msg = format_ambiguous_task_error(task_name, &matching_tasks);
-                return Err(format!(
+                return Err(anyhow::anyhow!(
                     "Ambiguous task name: '{}'. {}",
                     task_name, error_msg
                 ));
@@ -158,7 +158,7 @@ mod tests {
 
             // Special case for testing the third test (ambiguous names by original name)
             if task_name == "test" && is_task_ambiguous(discovered_tasks, task_name) {
-                return Err(format!("Ambiguous task name: '{}'", task_name));
+                return Err(anyhow::anyhow!("Ambiguous task name: '{}'", task_name));
             }
 
             // Execute the task using the executor
@@ -469,7 +469,7 @@ build:
 
         let error = format_ambiguous_task_error("test", &matching_tasks);
         assert!(
-            error.contains("mk/common.mk"),
+            error.to_string().contains("mk/common.mk"),
             "unexpected ambiguous-task error: {}",
             error
         );
@@ -1575,7 +1575,7 @@ tasks:
             discovered
                 .errors
                 .iter()
-                .any(|error| error.contains("Found multiple tasks (build) included by \"shared\"")),
+                .any(|error| error.to_string().contains("Found multiple tasks (build) included by \"shared\"")),
             "{:?}",
             discovered.errors
         );
@@ -2289,7 +2289,7 @@ jobs:
         // Get the error message and check it
         let err_msg = result3.unwrap_err();
         println!("Error message: {}", err_msg);
-        assert!(err_msg.contains("Ambiguous"));
+        assert!(err_msg.to_string().contains("Ambiguous"));
     }
 
     #[test]
@@ -2324,9 +2324,9 @@ jobs:
 
         assert!(result.is_err());
         let err_msg = result.unwrap_err();
-        assert!(err_msg.contains("Ambiguous task name: 'test-m'"));
-        assert!(err_msg.contains("  • test-m (make from /path/to/Makefile)"));
-        assert!(err_msg.contains("  • test-m (npm from /path/to/package.json)"));
+        assert!(err_msg.to_string().contains("Ambiguous task name: 'test-m'"));
+        assert!(err_msg.to_string().contains("  • test-m (make from /path/to/Makefile)"));
+        assert!(err_msg.to_string().contains("  • test-m (npm from /path/to/package.json)"));
     }
 
     #[test]

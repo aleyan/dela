@@ -1,3 +1,5 @@
+#[allow(unused_imports)]
+use anyhow::anyhow;
 use crate::composed_paths::{ComposedDefinitionSource, RecursiveDiscoveryState, VisitState};
 use crate::parsers::parse_taskfile;
 use crate::task_discovery::support::{apply_shadowing, set_definition};
@@ -14,7 +16,7 @@ impl TaskDiscovery for TaskfileDiscovery {
     }
 }
 
-fn discover_taskfile_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<(), String> {
+fn discover_taskfile_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> anyhow::Result<()> {
     let default_path = dir.join(parse_taskfile::SUPPORTED_TASKFILE_NAMES[0]);
     let Some(taskfile_path) = parse_taskfile::find_taskfile_in_dir(dir) else {
         set_definition(
@@ -57,13 +59,13 @@ fn discover_taskfile_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Resu
 
     let status = match result {
         Ok(()) => TaskFileStatus::Parsed,
-        Err(error) => {
+        Err(e) => {
             discovered.errors.push(format!(
                 "Failed to parse {}: {}",
                 taskfile_path.display(),
-                error
+                e
             ));
-            TaskFileStatus::ParseError(error)
+            TaskFileStatus::ParseError(e.to_string())
         }
     };
 
@@ -94,7 +96,7 @@ fn collect_taskfile_tasks_recursive(
     hide_tasks: bool,
     excluded_tasks: &HashSet<String>,
     traversal: &mut TaskfileTraversal<'_>,
-) -> Result<(), String> {
+) -> anyhow::Result<()> {
     match traversal
         .traversal_state
         .mark_visited(current_source.definition_path())
@@ -105,7 +107,7 @@ fn collect_taskfile_tasks_recursive(
 
     let mut first_error = None;
 
-    let mut tasks = parse_taskfile::parse(current_source.definition_path())?;
+    let mut tasks = parse_taskfile::parse(current_source.definition_path()).map_err(|e| anyhow::anyhow!(e))?;
     tasks.sort_by(|a, b| a.name.cmp(&b.name));
 
     if !hide_tasks {
@@ -141,7 +143,7 @@ fn collect_taskfile_tasks_recursive(
         }
     }
 
-    let includes = parse_taskfile::extract_include_directives(current_source.definition_path())?;
+    let includes = parse_taskfile::extract_include_directives(current_source.definition_path()).map_err(|e| anyhow::anyhow!(e))?;
     for include in includes {
         let resolved_candidate = current_source.resolve_child(&include.taskfile);
         let resolved_include = parse_taskfile::resolve_taskfile_include_path(&resolved_candidate);
@@ -163,7 +165,7 @@ fn collect_taskfile_tasks_recursive(
         let child_hide_tasks = hide_tasks || include.internal;
         let child_excludes = include.excludes.into_iter().collect();
 
-        if let Err(error) = collect_taskfile_tasks_recursive(
+        if let Err(e) = collect_taskfile_tasks_recursive(
             &child_source,
             &child_namespace,
             Some(child_include_label.as_str()),
@@ -174,7 +176,7 @@ fn collect_taskfile_tasks_recursive(
             let error = format!(
                 "Failed to parse included Taskfile '{}': {}",
                 resolved_include.display(),
-                error
+                e
             );
             traversal.include_errors.push(error.clone());
             if first_error.is_none() {
@@ -184,7 +186,7 @@ fn collect_taskfile_tasks_recursive(
     }
 
     if let Some(error) = first_error {
-        Err(error)
+        Err(anyhow::anyhow!(error))
     } else {
         Ok(())
     }

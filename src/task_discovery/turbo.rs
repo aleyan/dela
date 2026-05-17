@@ -1,3 +1,5 @@
+#[allow(unused_imports)]
+use anyhow::anyhow;
 use crate::composed_paths::{ComposedDefinitionSource, RecursiveDiscoveryState, VisitState};
 use crate::parsers::parse_turbo_json;
 use crate::repo_root::find_git_repo_root;
@@ -16,7 +18,7 @@ impl TaskDiscovery for TurboDiscovery {
     }
 }
 
-fn discover_turbo_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<(), String> {
+fn discover_turbo_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> anyhow::Result<()> {
     let repo_root = find_git_repo_root(dir).unwrap_or_else(|| dir.to_path_buf());
     let turbo_json = repo_root.join("turbo.json");
 
@@ -50,13 +52,13 @@ fn discover_turbo_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<
 
     let status = match result {
         Ok(()) => TaskFileStatus::Parsed,
-        Err(error) => {
+        Err(e) => {
             discovered.errors.push(format!(
                 "Failed to parse {}: {}",
                 turbo_json.display(),
-                error
+                e
             ));
-            TaskFileStatus::ParseError(error)
+            TaskFileStatus::ParseError(e.to_string())
         }
     };
 
@@ -78,7 +80,7 @@ fn collect_turbo_tasks_for_context(
     root_turbo_json: &Path,
     collected_tasks: &mut BTreeMap<String, Task>,
     config_errors: &mut Vec<String>,
-) -> Result<(), String> {
+) -> anyhow::Result<()> {
     let root_source = ComposedDefinitionSource::direct(root_turbo_json.to_path_buf());
     let mut package_configs_by_name = None;
     let root_tasks = resolve_effective_turbo_tasks(
@@ -108,11 +110,11 @@ fn collect_turbo_tasks_for_context(
                         collected_tasks.entry(name).or_insert(task);
                     }
                 }
-                Err(error) => {
+                Err(e) => {
                     let error = format!(
                         "Failed to parse workspace-local turbo config '{}': {}",
                         config_path.display(),
-                        error
+                        e
                     );
                     config_errors.push(error.clone());
                     if first_error.is_none() {
@@ -137,11 +139,11 @@ fn collect_turbo_tasks_for_context(
                     break;
                 }
                 Ok(_) => {}
-                Err(error) => {
+                Err(e) => {
                     let error = format!(
                         "Failed to parse workspace-local turbo config '{}': {}",
                         config_path.display(),
-                        error
+                        e
                     );
                     config_errors.push(error.clone());
                     if first_error.is_none() {
@@ -154,7 +156,7 @@ fn collect_turbo_tasks_for_context(
     }
 
     if let Some(error) = first_error {
-        Err(error)
+        Err(anyhow::anyhow!(error))
     } else {
         Ok(())
     }
@@ -166,13 +168,13 @@ fn resolve_effective_turbo_tasks(
     root_turbo_json: &Path,
     package_configs_by_name: &mut Option<HashMap<String, PathBuf>>,
     traversal_state: &mut RecursiveDiscoveryState,
-) -> Result<BTreeMap<String, Task>, String> {
+) -> anyhow::Result<BTreeMap<String, Task>> {
     match traversal_state.mark_visited(current_source.definition_path()) {
         VisitState::AlreadyVisited(_) => return Ok(BTreeMap::new()),
         VisitState::New(_) => {}
     }
 
-    let config = parse_turbo_json::load_config(current_source.definition_path())?;
+    let config = parse_turbo_json::load_config(current_source.definition_path()).map_err(|e| anyhow::anyhow!(e))?;
 
     if current_source.definition_path() != root_turbo_json && config.extends.is_empty() {
         return Ok(BTreeMap::new());
@@ -215,7 +217,7 @@ fn resolve_effective_turbo_tasks(
         }
     }
 
-    let mut local_tasks = parse_turbo_json::parse(current_source.definition_path())?;
+    let mut local_tasks = parse_turbo_json::parse(current_source.definition_path()).map_err(|e| anyhow::anyhow!(e))?;
     for task in &mut local_tasks {
         current_source.apply_to_task(task);
     }
