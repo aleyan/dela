@@ -1,11 +1,11 @@
-#[allow(unused_imports)]
-use anyhow::anyhow;
 use crate::composed_paths::{ComposedDefinitionSource, RecursiveDiscoveryState, VisitState};
 use crate::parsers::parse_turbo_json;
 use crate::repo_root::find_git_repo_root;
 use crate::task_discovery::support::{apply_shadowing, set_definition};
 use crate::task_discovery::{DiscoveredTasks, TaskDiscovery};
 use crate::types::{Task, TaskDefinitionFile, TaskDefinitionType, TaskFileStatus};
+#[allow(unused_imports)]
+use anyhow::anyhow;
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -53,11 +53,9 @@ fn discover_turbo_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> anyhow:
     let status = match result {
         Ok(()) => TaskFileStatus::Parsed,
         Err(e) => {
-            discovered.errors.push(format!(
-                "Failed to parse {}: {}",
-                turbo_json.display(),
-                e
-            ));
+            discovered
+                .errors
+                .push(format!("Failed to parse {}: {}", turbo_json.display(), e));
             TaskFileStatus::ParseError(e.to_string())
         }
     };

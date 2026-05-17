@@ -1,9 +1,9 @@
-#[allow(unused_imports)]
-use anyhow::Context;
 use crate::allowlist;
 use crate::config::preferred_allowlist_path;
 use crate::task_discovery;
 use crate::types::AllowScope;
+#[allow(unused_imports)]
+use anyhow::Context;
 use std::env;
 
 pub fn execute(task_with_args: &str, allow: Option<u8>) -> anyhow::Result<()> {
@@ -12,15 +12,18 @@ pub fn execute(task_with_args: &str, allow: Option<u8>) -> anyhow::Result<()> {
         .next()
         .context("No task name provided")?;
 
-    let current_dir =
-        env::current_dir().map_err(|e| anyhow::anyhow!("Failed to get current directory: {}", e))?;
+    let current_dir = env::current_dir()
+        .map_err(|e| anyhow::anyhow!("Failed to get current directory: {}", e))?;
     let discovered = task_discovery::discover_tasks(&current_dir);
 
     // Find all tasks with the given name (both original and disambiguated)
     let matching_tasks = task_discovery::get_matching_tasks(&discovered, task_name);
 
     match matching_tasks.len() {
-        0 => Err(anyhow::anyhow!("dela: command or task not found: {}", task_name)),
+        0 => Err(anyhow::anyhow!(
+            "dela: command or task not found: {}",
+            task_name
+        )),
         1 => {
             // Single task found, check allowlist
             let task = matching_tasks[0];
@@ -70,7 +73,10 @@ pub fn execute(task_with_args: &str, allow: Option<u8>) -> anyhow::Result<()> {
             // Multiple tasks found, print error and list them
             let error_msg = task_discovery::format_ambiguous_task_error(task_name, &matching_tasks);
             eprintln!("{}", error_msg);
-            Err(anyhow::anyhow!("Multiple tasks named '{}' found", task_name))
+            Err(anyhow::anyhow!(
+                "Multiple tasks named '{}' found",
+                task_name
+            ))
         }
     }
 }
@@ -371,7 +377,8 @@ test: ## Running tests
         assert!(result.is_err(), "Should error for ambiguous task");
         assert!(
             result
-                .unwrap_err().to_string()
+                .unwrap_err()
+                .to_string()
                 .contains("Multiple tasks named 'test' found"),
             "Error should mention multiple tasks"
         );

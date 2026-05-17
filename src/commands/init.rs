@@ -1,8 +1,8 @@
-#[allow(unused_imports)]
-use anyhow::Context;
 use crate::config::{legacy_dela_config_dir, preferred_allowlist_path, preferred_config_dir_path};
 use crate::environment::{get_current_home, get_current_shell as env_get_current_shell};
 use crate::types::Allowlist;
+#[allow(unused_imports)]
+use anyhow::Context;
 use std::env;
 use std::fs;
 use std::io::Write;
@@ -120,8 +120,9 @@ pub fn execute() -> anyhow::Result<()> {
             dela_dir.display()
         );
         if let Some(parent) = dela_dir.parent() {
-            fs::create_dir_all(parent)
-                .map_err(|e| anyhow::anyhow!("Failed to create dela config parent directory: {}", e))?;
+            fs::create_dir_all(parent).map_err(|e| {
+                anyhow::anyhow!("Failed to create dela config parent directory: {}", e)
+            })?;
         }
         fs::rename(&legacy_dela_dir, &dela_dir).map_err(|e| {
             anyhow::anyhow!(
@@ -264,7 +265,10 @@ mod tests {
 
         let result = execute();
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err().to_string(), "Unsupported shell: unsupported");
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "Unsupported shell: unsupported"
+        );
 
         reset_to_real_environment();
     }

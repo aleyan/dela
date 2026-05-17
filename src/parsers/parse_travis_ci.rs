@@ -12,8 +12,7 @@ use std::path::Path;
 pub fn parse(file_path: &Path) -> Result<Vec<Task>, DelaParseError> {
     let mut file = File::open(file_path)?;
     let mut contents = String::new();
-    file.read_to_string(&mut contents)
-        ?;
+    file.read_to_string(&mut contents)?;
 
     parse_travis_string(&contents, file_path)
 }
@@ -23,13 +22,14 @@ fn parse_travis_string(content: &str, file_path: &Path) -> Result<Vec<Task>, Del
     let config: Value = if content.trim().is_empty() {
         Value::Mapping(serde_yaml::Mapping::new())
     } else {
-        serde_yaml::from_str(content)
-            ?
+        serde_yaml::from_str(content)?
     };
 
     let config_map = match config {
         Value::Mapping(map) => map,
-        _ => return Err(DelaParseError::Syntax(format!("Travis CI YAML is not a mapping"))),
+        _ => {
+            return Err(DelaParseError::Syntax("Travis CI YAML is not a mapping".to_string()));
+        }
     };
 
     let mut tasks = Vec::new();

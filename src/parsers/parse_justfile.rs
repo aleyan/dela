@@ -10,8 +10,7 @@ pub fn parse(path: &PathBuf) -> Result<Vec<Task>, DelaParseError> {
         .and_then(|n| n.to_str())
         .unwrap_or("Justfile");
 
-    let contents = std::fs::read_to_string(path)
-        ?;
+    let contents = std::fs::read_to_string(path)?;
 
     let mut tasks = Vec::new();
     let lines: Vec<&str> = contents.lines().collect();
@@ -40,7 +39,10 @@ pub fn parse(path: &PathBuf) -> Result<Vec<Task>, DelaParseError> {
 
             // Validate indentation for this recipe
             if let Err(indent_error) = validate_recipe_indentation(&lines, line_num + 1) {
-                return Err(DelaParseError::Syntax(format!("{}: {}", file_name, indent_error)));
+                return Err(DelaParseError::Syntax(format!(
+                    "{}: {}",
+                    file_name, indent_error
+                )));
             }
 
             tasks.push(Task {
@@ -670,7 +672,12 @@ build: # Build the project
 
         let result = parse(&justfile_path);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("mixed indentation in recipe"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("mixed indentation in recipe")
+        );
     }
 
     #[test]
@@ -693,7 +700,12 @@ build: # Build the project
 
         let result = parse(&justfile_path);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("mixed indentation in recipe"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("mixed indentation in recipe")
+        );
     }
 
     #[test]

@@ -14,8 +14,7 @@ pub struct MakefileInclude {
 
 /// Parse a Makefile at the given path and extract tasks
 pub fn parse(path: &Path) -> Result<Vec<Task>, DelaParseError> {
-    let content =
-        std::fs::read_to_string(path)?;
+    let content = std::fs::read_to_string(path)?;
 
     // Special case for the test_discover_tasks_with_invalid_makefile test
     if content.contains("<hello>not a make file</hello>") {
@@ -34,7 +33,10 @@ pub fn parse(path: &Path) -> Result<Vec<Task>, DelaParseError> {
             // If standard parsing fails, try regex-based parsing as fallback
             match extract_tasks_regex(&content, path) {
                 Ok(tasks) => Ok(tasks),
-                Err(_) => Err(DelaParseError::Syntax(format!("Failed to parse Makefile: {}", e))),
+                Err(_) => Err(DelaParseError::Syntax(format!(
+                    "Failed to parse Makefile: {}",
+                    e
+                ))),
             }
         }
     }
@@ -97,8 +99,7 @@ fn extract_tasks(makefile: &Makefile, path: &Path) -> Result<Vec<Task>, DelaPars
 
 /// Extract Makefile include directives from a file.
 pub fn extract_include_directives(path: &Path) -> Result<Vec<MakefileInclude>, DelaParseError> {
-    let content =
-        std::fs::read_to_string(path)?;
+    let content = std::fs::read_to_string(path)?;
     Ok(extract_include_directives_from_str(&content))
 }
 
@@ -234,8 +235,7 @@ fn extract_tasks_regex(content: &str, path: &Path) -> Result<Vec<Task>, DelaPars
     // Simple rule pattern to match task names
     // Matches start of line, then allowed target characters, then a colon, then the rest of the line
     let rule_pattern = r"(?m)^([a-zA-Z0-9_-][^:$\n]*?):([^\n]*)";
-    let rule_regex =
-        Regex::new(rule_pattern)?;
+    let rule_regex = Regex::new(rule_pattern)?;
 
     for cap in rule_regex.captures_iter(&processed_content) {
         if cap.len() < 3 {

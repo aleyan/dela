@@ -25,4 +25,3 @@ pub use parse_travis_ci::parse as parse_travis_ci;
 pub use parse_turbo_json::parse as parse_turbo_json;
 
 pub mod errors;
-pub use errors::DelaParseError;

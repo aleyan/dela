@@ -23,6 +23,4 @@ pub enum DelaParseError {
     #[error("Syntax error: {0}")]
     Syntax(String),
 
-    #[error("Validation error: {0}")]
-    Validation(String),
 }

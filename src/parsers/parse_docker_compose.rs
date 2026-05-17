@@ -33,16 +33,10 @@ struct DockerCompose {
 
 /// Parse a docker-compose.yml file at the given path and extract services as tasks
 pub fn parse(path: &PathBuf) -> Result<Vec<Task>, DelaParseError> {
-    let file_name = path
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("docker-compose.yml");
 
-    let contents = std::fs::read_to_string(path)
-        ?;
+    let contents = std::fs::read_to_string(path)?;
 
-    let docker_compose: DockerCompose = serde_yaml::from_str(&contents)
-        ?;
+    let docker_compose: DockerCompose = serde_yaml::from_str(&contents)?;
 
     let mut tasks = Vec::new();
 
@@ -268,7 +262,12 @@ invalid: yaml: here
 
         let result = parse(&temp_dir.path().join("docker-compose.yml"));
         assert!(result.is_err()); // YAML should fail to parse with invalid structure
-        assert!(result.unwrap_err().to_string().contains("YAML parsing error"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("YAML parsing error")
+        );
     }
 
     #[test]

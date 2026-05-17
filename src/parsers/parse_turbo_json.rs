@@ -33,10 +33,8 @@ impl TurboConfig {
 }
 
 pub fn load_config(path: &Path) -> Result<TurboConfig, DelaParseError> {
-    let contents =
-        std::fs::read_to_string(path)?;
-    let json: Value = serde_json::from_str(&contents)
-        ?;
+    let contents = std::fs::read_to_string(path)?;
+    let json: Value = serde_json::from_str(&contents)?;
 
     let extends = json
         .get("extends")
@@ -99,7 +97,10 @@ fn parse_task_config(value: &Value) -> TurboTaskConfig {
     }
 }
 
-fn parse_task_map(key: &str, value: &Value) -> Result<BTreeMap<String, TurboTaskConfig>, DelaParseError> {
+fn parse_task_map(
+    key: &str,
+    value: &Value,
+) -> Result<BTreeMap<String, TurboTaskConfig>, DelaParseError> {
     let Some(task_map) = value.as_object() else {
         return Err(DelaParseError::Syntax(format!(
             "Failed to parse turbo.json: '{}' must be an object, found {}",

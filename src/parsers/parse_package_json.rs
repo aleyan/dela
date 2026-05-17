@@ -4,11 +4,9 @@ use std::path::PathBuf;
 
 /// Parse a package.json file at the given path and extract tasks
 pub fn parse(path: &PathBuf) -> Result<Vec<Task>, DelaParseError> {
-    let contents =
-        std::fs::read_to_string(path)?;
+    let contents = std::fs::read_to_string(path)?;
 
-    let json: serde_json::Value = serde_json::from_str(&contents)
-        ?;
+    let json: serde_json::Value = serde_json::from_str(&contents)?;
 
     let parent = path.parent().unwrap_or(path);
     let runner = match crate::runners::runners_package_json::detect_package_manager(parent) {

@@ -1,6 +1,6 @@
+use crate::environment::get_current_home;
 #[allow(unused_imports)]
 use anyhow::Context;
-use crate::environment::get_current_home;
 use std::path::{Path, PathBuf};
 
 pub fn preferred_config_dir_path_for(home: impl AsRef<Path>) -> PathBuf {

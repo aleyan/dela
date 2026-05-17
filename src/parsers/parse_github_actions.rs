@@ -12,20 +12,20 @@ use std::path::Path;
 pub fn parse(file_path: &Path) -> Result<Vec<Task>, DelaParseError> {
     let mut file = File::open(file_path)?;
     let mut contents = String::new();
-    file.read_to_string(&mut contents)
-        ?;
+    file.read_to_string(&mut contents)?;
 
     parse_workflow_string(&contents, file_path)
 }
 
 /// Parse GitHub Actions workflow content from a string
 fn parse_workflow_string(content: &str, file_path: &Path) -> Result<Vec<Task>, DelaParseError> {
-    let workflow: Value = serde_yaml::from_str(content)
-        ?;
+    let workflow: Value = serde_yaml::from_str(content)?;
 
     let workflow_map = match workflow {
         Value::Mapping(map) => map,
-        _ => return Err(DelaParseError::Syntax(format!("Workflow YAML is not a mapping"))),
+        _ => {
+            return Err(DelaParseError::Syntax("Workflow YAML is not a mapping".to_string()));
+        }
     };
 
     // Try to get workflow name for description
@@ -39,11 +39,13 @@ fn parse_workflow_string(content: &str, file_path: &Path) -> Result<Vec<Task>, D
     // Extract jobs to confirm the workflow is valid
     let jobs = match workflow_map.get(Value::String("jobs".to_string())) {
         Some(Value::Mapping(jobs_map)) => jobs_map,
-        _ => return Err(DelaParseError::Syntax(format!("No jobs found in workflow file"))),
+        _ => {
+            return Err(DelaParseError::Syntax("No jobs found in workflow file".to_string()));
+        }
     };
 
     if jobs.is_empty() {
-        return Err(DelaParseError::Syntax(format!("Workflow contains no jobs")));
+        return Err(DelaParseError::Syntax("Workflow contains no jobs".to_string()));
     }
 
     // Extract filename without path for task name

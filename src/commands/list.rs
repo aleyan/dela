@@ -18,8 +18,8 @@ macro_rules! test_println {
 }
 
 pub fn execute(verbose: bool) -> anyhow::Result<()> {
-    let current_dir =
-        env::current_dir().map_err(|e| anyhow::anyhow!("Failed to get current directory: {}", e))?;
+    let current_dir = env::current_dir()
+        .map_err(|e| anyhow::anyhow!("Failed to get current directory: {}", e))?;
     let discovered = task_discovery::discover_tasks(&current_dir);
 
     // Only show task definition files status in verbose mode

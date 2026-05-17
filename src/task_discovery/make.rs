@@ -1,10 +1,10 @@
-#[allow(unused_imports)]
-use anyhow::anyhow;
 use crate::composed_paths::{ComposedDefinitionSource, RecursiveDiscoveryState, VisitState};
 use crate::parsers::parse_makefile;
 use crate::task_discovery::support::{apply_shadowing, set_definition};
 use crate::task_discovery::{DiscoveredTasks, TaskDiscovery};
 use crate::types::{Task, TaskDefinitionFile, TaskDefinitionType, TaskFileStatus};
+#[allow(unused_imports)]
+use anyhow::anyhow;
 use std::collections::HashSet;
 use std::fs;
 use std::path::Path;

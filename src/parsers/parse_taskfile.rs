@@ -187,16 +187,10 @@ pub fn extract_include_directives(path: &Path) -> anyhow::Result<Vec<TaskfileInc
 }
 
 fn load_taskfile(path: &Path) -> Result<Taskfile, DelaParseError> {
-    let file_name = path
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("Taskfile");
 
-    let contents = std::fs::read_to_string(path)
-        ?;
+    let contents = std::fs::read_to_string(path)?;
 
-    let taskfile = serde_yaml::from_str(&contents)
-        ?;
+    let taskfile = serde_yaml::from_str(&contents)?;
     Ok(taskfile)
 }
 

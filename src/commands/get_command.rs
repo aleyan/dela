@@ -1,33 +1,39 @@
-#[allow(unused_imports)]
-use anyhow::Context;
 use crate::runner::is_runner_available;
 use crate::task_discovery;
+#[allow(unused_imports)]
+use anyhow::Context;
 use std::env;
 
 pub fn execute(task_with_args: &str) -> anyhow::Result<()> {
     let mut parts = task_with_args.split_whitespace();
-    let task_name = parts
-        .next()
-        .context("No task name provided")?;
+    let task_name = parts.next().context("No task name provided")?;
     let args: Vec<&str> = parts.collect();
 
-    let current_dir =
-        env::current_dir().map_err(|e| anyhow::anyhow!("Failed to get current directory: {}", e))?;
+    let current_dir = env::current_dir()
+        .map_err(|e| anyhow::anyhow!("Failed to get current directory: {}", e))?;
     let discovered = task_discovery::discover_tasks(&current_dir);
 
     // Find all tasks with the given name (both original and disambiguated)
     let matching_tasks = task_discovery::get_matching_tasks(&discovered, task_name);
 
     match matching_tasks.len() {
-        0 => Err(anyhow::anyhow!("dela: command or task not found: {}", task_name)),
+        0 => Err(anyhow::anyhow!(
+            "dela: command or task not found: {}",
+            task_name
+        )),
         1 => {
             // Single task found, check if runner is available
             let task = matching_tasks[0];
             if !is_runner_available(&task.runner) {
                 if task.runner == crate::types::TaskRunner::TravisCi {
-                    return Err(anyhow::anyhow!("Travis CI tasks cannot be executed locally - they are only available for discovery"));
+                    return Err(anyhow::anyhow!(
+                        "Travis CI tasks cannot be executed locally - they are only available for discovery"
+                    ));
                 }
-                return Err(anyhow::anyhow!("Runner '{}' not found", task.runner.short_name()));
+                return Err(anyhow::anyhow!(
+                    "Runner '{}' not found",
+                    task.runner.short_name()
+                ));
             }
             let mut command = task.runner.get_command(task);
             if !args.is_empty() {
@@ -211,7 +217,8 @@ test: ## Running tests
         assert!(result.is_err(), "Should fail with ambiguous task name");
         assert!(
             result
-                .unwrap_err().to_string()
+                .unwrap_err()
+                .to_string()
                 .contains("Multiple tasks named 'test' found"),
             "Error should mention multiple tasks"
         );

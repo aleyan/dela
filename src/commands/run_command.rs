@@ -1,22 +1,22 @@
-#[allow(unused_imports)]
-use anyhow::Context;
 use crate::runner::is_runner_available;
 use crate::runner::split_command_words;
 use crate::task_discovery;
+#[allow(unused_imports)]
+use anyhow::Context;
 use std::env;
 use std::process::{Command, Stdio};
 
 pub fn execute(task_with_args: &str) -> anyhow::Result<()> {
-    let mut invocation_parts =
-        shell_words::split(task_with_args).map_err(|e| anyhow::anyhow!("Failed to parse args: {}", e))?;
+    let mut invocation_parts = shell_words::split(task_with_args)
+        .map_err(|e| anyhow::anyhow!("Failed to parse args: {}", e))?;
     let task_name = invocation_parts
         .first()
         .context("No task name provided")?
         .to_string();
     let task_args: Vec<String> = invocation_parts.drain(1..).collect();
 
-    let current_dir =
-        env::current_dir().map_err(|e| anyhow::anyhow!("Failed to get current directory: {}", e))?;
+    let current_dir = env::current_dir()
+        .map_err(|e| anyhow::anyhow!("Failed to get current directory: {}", e))?;
     let discovered = task_discovery::discover_tasks(&current_dir);
 
     // Find all tasks with the given name (both original and disambiguated)
@@ -24,7 +24,10 @@ pub fn execute(task_with_args: &str) -> anyhow::Result<()> {
 
     // Check if there are no matching tasks
     if matching_tasks.is_empty() {
-        return Err(anyhow::anyhow!("dela: command or task not found: {}", task_name));
+        return Err(anyhow::anyhow!(
+            "dela: command or task not found: {}",
+            task_name
+        ));
     }
 
     // Check if there are multiple matching tasks
@@ -38,7 +41,10 @@ pub fn execute(task_with_args: &str) -> anyhow::Result<()> {
     // Single task found, check if runner is available
     let task = matching_tasks[0];
     if !is_runner_available(&task.runner) {
-        return Err(anyhow::anyhow!("Runner '{}' not found", task.runner.short_name()));
+        return Err(anyhow::anyhow!(
+            "Runner '{}' not found",
+            task.runner.short_name()
+        ));
     }
 
     // Get the command to run
@@ -47,9 +53,7 @@ pub fn execute(task_with_args: &str) -> anyhow::Result<()> {
     command_parts.extend(task_args.clone());
 
     let mut parts_iter = command_parts.iter();
-    let executable = parts_iter
-        .next()
-        .context("Empty command generated")?;
+    let executable = parts_iter.next().context("Empty command generated")?;
     let remaining_args: Vec<&String> = parts_iter.collect();
 
     println!("Running: {}", shell_words::join(command_parts.clone()));
@@ -191,7 +195,10 @@ test: ## Running tests
         let result = execute("test");
         assert!(result.is_err(), "Should fail with ambiguous task name");
         assert!(
-            result.unwrap_err().to_string().contains("Ambiguous task name: 'test'"),
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Ambiguous task name: 'test'"),
             "Error should mention ambiguous task name"
         );
 
@@ -275,7 +282,10 @@ test: ## Running tests
         let result = execute("test");
         assert!(result.is_err(), "Should fail with ambiguous task name");
         assert!(
-            result.unwrap_err().to_string().contains("Ambiguous task name: 'test'"),
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Ambiguous task name: 'test'"),
             "Error should mention ambiguous task name"
         );
 

@@ -5,11 +5,9 @@ use std::path::Path;
 
 /// Parse a pyproject.toml file at the given path and extract tasks
 pub fn parse(path: &Path) -> Result<Vec<Task>, DelaParseError> {
-    let content = std::fs::read_to_string(path)
-        ?;
+    let content = std::fs::read_to_string(path)?;
 
-    let toml: toml::Value =
-        toml::from_str(&content)?;
+    let toml: toml::Value = toml::from_str(&content)?;
 
     let mut tasks = Vec::new();
 

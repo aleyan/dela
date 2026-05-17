@@ -97,7 +97,9 @@ fn prompt_for_task_fallback(task: &Task) -> anyhow::Result<AllowDecision> {
         "3" => Ok(AllowDecision::Allow(AllowScope::File)),
         "4" => Ok(AllowDecision::Allow(AllowScope::Directory)),
         "5" => Ok(AllowDecision::Deny),
-        _ => Err(anyhow::anyhow!("Invalid choice. Please enter a number between 1 and 5.")),
+        _ => Err(anyhow::anyhow!(
+            "Invalid choice. Please enter a number between 1 and 5."
+        )),
     }
 }
 

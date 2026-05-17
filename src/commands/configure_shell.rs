@@ -1,6 +1,6 @@
+use crate::environment::get_current_shell;
 #[allow(unused_imports)]
 use anyhow::Context;
-use crate::environment::get_current_shell;
 
 const ZSH_CONFIG: &str = include_str!("../../resources/zsh.sh");
 const BASH_CONFIG: &str = include_str!("../../resources/bash.sh");
@@ -116,7 +116,10 @@ mod tests {
         setup_test_env("/bin/unknown");
         let result = execute();
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err().to_string(), "Unsupported shell: unknown");
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "Unsupported shell: unknown"
+        );
         reset_to_real_environment();
     }
 
@@ -138,7 +141,10 @@ mod tests {
 
         let result = execute();
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err().to_string(), "SHELL environment variable not set");
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "SHELL environment variable not set"
+        );
         reset_to_real_environment();
     }
 }

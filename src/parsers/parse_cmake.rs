@@ -12,8 +12,7 @@ use std::path::Path;
 pub fn parse(file_path: &Path) -> Result<Vec<Task>, DelaParseError> {
     let mut file = File::open(file_path)?;
     let mut contents = String::new();
-    file.read_to_string(&mut contents)
-        ?;
+    file.read_to_string(&mut contents)?;
 
     parse_cmake_string(&contents, file_path)
 }
@@ -37,11 +36,9 @@ fn parse_cmake_string(content: &str, file_path: &Path) -> Result<Vec<Task>, Dela
         .join("\n");
 
     // Use a simpler regex that just finds the target names
-    let target_pattern = Regex::new(r#"add_custom_target\s*\(\s*([a-zA-Z_][a-zA-Z0-9_-]*)"#)
-        ?;
+    let target_pattern = Regex::new(r#"add_custom_target\s*\(\s*([a-zA-Z_][a-zA-Z0-9_-]*)"#)?;
 
-    let comment_pattern = Regex::new(r#"COMMENT\s+"([^"]*)"#)
-        ?;
+    let comment_pattern = Regex::new(r#"COMMENT\s+"([^"]*)"#)?;
 
     // Find all matches in the content
     for captures in target_pattern.captures_iter(&normalized_content) {

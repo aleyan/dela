@@ -144,7 +144,10 @@ mod tests {
 
             // Check if there are no matching tasks
             if matching_tasks.is_empty() {
-                return Err(anyhow::anyhow!("dela: command or task not found: {}", task_name));
+                return Err(anyhow::anyhow!(
+                    "dela: command or task not found: {}",
+                    task_name
+                ));
             }
 
             // Check if there are multiple matching tasks
@@ -152,7 +155,8 @@ mod tests {
                 let error_msg = format_ambiguous_task_error(task_name, &matching_tasks);
                 return Err(anyhow::anyhow!(
                     "Ambiguous task name: '{}'. {}",
-                    task_name, error_msg
+                    task_name,
+                    error_msg
                 ));
             }
 
@@ -1572,10 +1576,9 @@ tasks:
             TaskFileStatus::ParseError(_)
         ));
         assert!(
-            discovered
-                .errors
-                .iter()
-                .any(|error| error.to_string().contains("Found multiple tasks (build) included by \"shared\"")),
+            discovered.errors.iter().any(|error| error
+                .to_string()
+                .contains("Found multiple tasks (build) included by \"shared\"")),
             "{:?}",
             discovered.errors
         );
@@ -2324,9 +2327,21 @@ jobs:
 
         assert!(result.is_err());
         let err_msg = result.unwrap_err();
-        assert!(err_msg.to_string().contains("Ambiguous task name: 'test-m'"));
-        assert!(err_msg.to_string().contains("  • test-m (make from /path/to/Makefile)"));
-        assert!(err_msg.to_string().contains("  • test-m (npm from /path/to/package.json)"));
+        assert!(
+            err_msg
+                .to_string()
+                .contains("Ambiguous task name: 'test-m'")
+        );
+        assert!(
+            err_msg
+                .to_string()
+                .contains("  • test-m (make from /path/to/Makefile)")
+        );
+        assert!(
+            err_msg
+                .to_string()
+                .contains("  • test-m (npm from /path/to/package.json)")
+        );
     }
 
     #[test]

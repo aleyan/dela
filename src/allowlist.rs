@@ -17,7 +17,9 @@ pub fn load_allowlist() -> anyhow::Result<Allowlist> {
 
     // Check if the dela config directory exists
     if !dela_dir.exists() {
-        return Err(anyhow::anyhow!("Dela is not initialized. Please run 'dela init' first."));
+        return Err(anyhow::anyhow!(
+            "Dela is not initialized. Please run 'dela init' first."
+        ));
     }
 
     // If allowlist file doesn't exist but the config directory does, return empty allowlist
@@ -25,8 +27,8 @@ pub fn load_allowlist() -> anyhow::Result<Allowlist> {
         return Ok(Allowlist::default());
     }
 
-    let contents =
-        fs::read_to_string(&path).map_err(|e| anyhow::anyhow!("Failed to read allowlist file: {}", e))?;
+    let contents = fs::read_to_string(&path)
+        .map_err(|e| anyhow::anyhow!("Failed to read allowlist file: {}", e))?;
 
     match toml::from_str::<Allowlist>(&contents) {
         Ok(allowlist) => Ok(allowlist),
@@ -46,7 +48,8 @@ pub fn save_allowlist(allowlist: &Allowlist) -> anyhow::Result<()> {
 
     let toml = toml::to_string_pretty(&allowlist)
         .map_err(|e| anyhow::anyhow!("Failed to serialize allowlist: {}", e))?;
-    fs::write(&path, toml).map_err(|e| anyhow::anyhow!("Failed to create allowlist file: {}", e))?;
+    fs::write(&path, toml)
+        .map_err(|e| anyhow::anyhow!("Failed to create allowlist file: {}", e))?;
     Ok(())
 }
 

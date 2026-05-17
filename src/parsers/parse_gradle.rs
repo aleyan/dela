@@ -8,8 +8,7 @@ use crate::types::{Task, TaskDefinitionType, TaskRunner};
 /// Parse a Gradle build file (build.gradle or build.gradle.kts) and extract tasks
 pub fn parse(file_path: &Path) -> Result<Vec<Task>, DelaParseError> {
     // Read the file
-    let content = fs::read_to_string(file_path)
-        ?;
+    let content = fs::read_to_string(file_path)?;
 
     // Parse tasks using regex patterns for both Groovy and Kotlin DSL
     let mut tasks = Vec::new();
@@ -67,16 +66,13 @@ fn extract_custom_tasks(
     file_path: &Path,
 ) -> Result<(), DelaParseError> {
     // Look for task definitions in Groovy DSL (build.gradle)
-    let groovy_task_regex = Regex::new(r"task\s+(\w+)(?:\s*\{|\s*\(|\s+.*?\{)")
-        ?;
+    let groovy_task_regex = Regex::new(r"task\s+(\w+)(?:\s*\{|\s*\(|\s+.*?\{)")?;
 
     // Regular expressions for finding tasks in Gradle Kotlin DSL files
-    let kotlin_task_regex = Regex::new(r#"tasks\s*\.\s*register\s*<.*>\s*\(\s*"(\w+)"\s*\)"#)
-        ?;
+    let kotlin_task_regex = Regex::new(r#"tasks\s*\.\s*register\s*<.*>\s*\(\s*"(\w+)"\s*\)"#)?;
 
     // Alternative Kotlin syntax: task("taskName")
-    let kotlin_task_alt_regex = Regex::new(r#"task\s*\(\s*"(\w+)"\s*\)"#)
-        ?;
+    let kotlin_task_alt_regex = Regex::new(r#"task\s*\(\s*"(\w+)"\s*\)"#)?;
 
     // Process Groovy-style tasks
     for cap in groovy_task_regex.captures_iter(content) {
@@ -204,14 +200,11 @@ fn extract_plugin_tasks(
     ];
 
     // Regular expressions to extract plugin information
-    let apply_plugin_regex = Regex::new(r#"apply\s+plugin\s*:\s*['"]([^'"]+)['"]"#)
-        ?;
+    let apply_plugin_regex = Regex::new(r#"apply\s+plugin\s*:\s*['"]([^'"]+)['"]"#)?;
 
-    let plugins_id_regex = Regex::new(r#"plugins\s*\{\s*.*?id\s*\(\s*["']([^"']+)["']\s*\)"#)
-        ?;
+    let plugins_id_regex = Regex::new(r#"plugins\s*\{\s*.*?id\s*\(\s*["']([^"']+)["']\s*\)"#)?;
 
-    let plugins_id_alt_regex = Regex::new(r#"plugins\s*\{\s*.*?id\s*["']([^"']+)["']"#)
-        ?;
+    let plugins_id_alt_regex = Regex::new(r#"plugins\s*\{\s*.*?id\s*["']([^"']+)["']"#)?;
 
     // Identify plugins used in the build file
     let mut identified_plugins = Vec::new();

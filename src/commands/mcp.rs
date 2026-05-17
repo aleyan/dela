@@ -1,8 +1,8 @@
-#[allow(unused_imports)]
-use anyhow::anyhow;
+use crate::mcp;
 #[allow(unused_imports)]
 use anyhow::Context;
-use crate::mcp;
+#[allow(unused_imports)]
+use anyhow::anyhow;
 use std::fs;
 use std::path::PathBuf;
 
@@ -141,8 +141,8 @@ fn merge_dela_into_json(editor: Editor, existing: &str) -> anyhow::Result<String
 
 /// Merge dela into an existing TOML config file (Codex)
 fn merge_dela_into_toml(existing: &str) -> anyhow::Result<String> {
-    let mut table: toml::Table =
-        toml::from_str(existing).map_err(|e| anyhow::anyhow!("Failed to parse config as TOML: {}", e))?;
+    let mut table: toml::Table = toml::from_str(existing)
+        .map_err(|e| anyhow::anyhow!("Failed to parse config as TOML: {}", e))?;
 
     if !table.contains_key("mcp_servers") {
         table.insert(
@@ -253,7 +253,8 @@ pub async fn execute(
 ) -> anyhow::Result<()> {
     // Resolve the path relative to the current working directory
     let root_path = if cwd == "." {
-        std::env::current_dir().map_err(|e| anyhow::anyhow!("Failed to get current directory: {}", e))?
+        std::env::current_dir()
+            .map_err(|e| anyhow::anyhow!("Failed to get current directory: {}", e))?
     } else {
         PathBuf::from(&cwd)
     };
@@ -280,15 +281,17 @@ pub async fn execute(
         return Ok(());
     }
 
-    crate::allowlist::load_allowlist().map_err(|e| anyhow::anyhow!(
-        crate::mcp::DelaError::mcp_not_ready(format!(
-            "MCP server cannot start because dela configuration is unavailable: {}",
-            e
-        ))
-        .to_error_data()
-        .message
-        .into_owned()
-    ))?;
+    crate::allowlist::load_allowlist().map_err(|e| {
+        anyhow::anyhow!(
+            crate::mcp::DelaError::mcp_not_ready(format!(
+                "MCP server cannot start because dela configuration is unavailable: {}",
+                e
+            ))
+            .to_error_data()
+            .message
+            .into_owned()
+        )
+    })?;
 
     // Start the MCP server
     mcp::run_stdio_server(root_path)

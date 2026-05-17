@@ -179,7 +179,15 @@ mod tests {
 
         let error = format_ambiguous_task_error("test", &[&make_task, &npm_task]);
 
-        assert!(error.to_string().contains("  • test (make from /tmp/Makefile)"));
-        assert!(error.to_string().contains("  • test-npm (npm from /tmp/package.json)"));
+        assert!(
+            error
+                .to_string()
+                .contains("  • test (make from /tmp/Makefile)")
+        );
+        assert!(
+            error
+                .to_string()
+                .contains("  • test-npm (npm from /tmp/package.json)")
+        );
     }
 }

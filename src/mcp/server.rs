@@ -2537,7 +2537,11 @@ mod tests {
         // Assert
         assert!(result.is_err());
         let error = result.unwrap_err();
-        assert!(error.to_string().contains("Maximum concurrent jobs limit reached"));
+        assert!(
+            error
+                .to_string()
+                .contains("Maximum concurrent jobs limit reached")
+        );
         assert!(error.to_string().contains("2"));
     }
 
