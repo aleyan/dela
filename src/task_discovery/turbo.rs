@@ -174,7 +174,7 @@ fn resolve_effective_turbo_tasks(
         VisitState::New(_) => {}
     }
 
-    let config = parse_turbo_json::load_config(current_source.definition_path()).map_err(|e| anyhow::anyhow!(e))?;
+    let config = parse_turbo_json::load_config(current_source.definition_path())?;
 
     if current_source.definition_path() != root_turbo_json && config.extends.is_empty() {
         return Ok(BTreeMap::new());
@@ -217,7 +217,7 @@ fn resolve_effective_turbo_tasks(
         }
     }
 
-    let mut local_tasks = parse_turbo_json::parse(current_source.definition_path()).map_err(|e| anyhow::anyhow!(e))?;
+    let mut local_tasks = parse_turbo_json::parse(current_source.definition_path())?;
     for task in &mut local_tasks {
         current_source.apply_to_task(task);
     }

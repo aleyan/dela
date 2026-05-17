@@ -1,3 +1,4 @@
+use crate::parsers::errors::DelaParseError;
 use crate::types::{Task, TaskDefinitionType, TaskRunner};
 use serde_yaml::Value;
 use std::fs::File;
@@ -8,23 +9,23 @@ use std::path::Path;
 ///
 /// This function parses a GitHub Actions workflow file and extracts the entire workflow as a single task.
 /// The tasks can be executed using the `act` command-line tool.
-pub fn parse(file_path: &Path) -> anyhow::Result<Vec<Task>> {
-    let mut file = File::open(file_path).map_err(|e| anyhow::anyhow!("Failed to open file: {}", e))?;
+pub fn parse(file_path: &Path) -> Result<Vec<Task>, DelaParseError> {
+    let mut file = File::open(file_path)?;
     let mut contents = String::new();
     file.read_to_string(&mut contents)
-        .map_err(|e| anyhow::anyhow!("Failed to read file: {}", e))?;
+        ?;
 
     parse_workflow_string(&contents, file_path)
 }
 
 /// Parse GitHub Actions workflow content from a string
-fn parse_workflow_string(content: &str, file_path: &Path) -> anyhow::Result<Vec<Task>> {
+fn parse_workflow_string(content: &str, file_path: &Path) -> Result<Vec<Task>, DelaParseError> {
     let workflow: Value = serde_yaml::from_str(content)
-        .map_err(|e| anyhow::anyhow!("Failed to parse workflow YAML: {}", e))?;
+        ?;
 
     let workflow_map = match workflow {
         Value::Mapping(map) => map,
-        _ => return Err(anyhow::anyhow!("Workflow YAML is not a mapping")),
+        _ => return Err(DelaParseError::Syntax(format!("Workflow YAML is not a mapping"))),
     };
 
     // Try to get workflow name for description
@@ -38,11 +39,11 @@ fn parse_workflow_string(content: &str, file_path: &Path) -> anyhow::Result<Vec<
     // Extract jobs to confirm the workflow is valid
     let jobs = match workflow_map.get(Value::String("jobs".to_string())) {
         Some(Value::Mapping(jobs_map)) => jobs_map,
-        _ => return Err(anyhow::anyhow!("No jobs found in workflow file")),
+        _ => return Err(DelaParseError::Syntax(format!("No jobs found in workflow file"))),
     };
 
     if jobs.is_empty() {
-        return Err(anyhow::anyhow!("Workflow contains no jobs"));
+        return Err(DelaParseError::Syntax(format!("Workflow contains no jobs")));
     }
 
     // Extract filename without path for task name

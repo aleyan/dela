@@ -23,3 +23,6 @@ pub use parse_pyproject_toml::parse as parse_pyproject_toml;
 pub use parse_taskfile::parse as parse_taskfile;
 pub use parse_travis_ci::parse as parse_travis_ci;
 pub use parse_turbo_json::parse as parse_turbo_json;
+
+pub mod errors;
+pub use errors::DelaParseError;

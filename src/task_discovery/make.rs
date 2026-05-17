@@ -103,7 +103,7 @@ fn collect_makefile_tasks_recursive(
         VisitState::New(_) => {}
     }
 
-    let mut tasks = parse_makefile::parse(current_source.definition_path()).map_err(|e| anyhow::anyhow!(e))?;
+    let mut tasks = parse_makefile::parse(current_source.definition_path())?;
     for task in &mut tasks {
         current_source.apply_to_task(task);
     }
@@ -116,7 +116,7 @@ fn collect_makefile_tasks_recursive(
         }
     }
 
-    let includes = parse_makefile::extract_include_directives(current_source.definition_path()).map_err(|e| anyhow::anyhow!(e))?;
+    let includes = parse_makefile::extract_include_directives(current_source.definition_path())?;
     for include in includes {
         let resolved_include = current_source.resolve_child(&include.path);
         if !resolved_include.is_file() {

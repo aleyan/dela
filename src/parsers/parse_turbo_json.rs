@@ -1,3 +1,4 @@
+use crate::parsers::errors::DelaParseError;
 use crate::types::{Task, TaskDefinitionType, TaskRunner};
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -31,11 +32,11 @@ impl TurboConfig {
     }
 }
 
-pub fn load_config(path: &Path) -> anyhow::Result<TurboConfig> {
+pub fn load_config(path: &Path) -> Result<TurboConfig, DelaParseError> {
     let contents =
-        std::fs::read_to_string(path).map_err(|e| anyhow::anyhow!("Failed to read turbo.json: {}", e))?;
+        std::fs::read_to_string(path)?;
     let json: Value = serde_json::from_str(&contents)
-        .map_err(|e| anyhow::anyhow!("Failed to parse turbo.json: {}", e))?;
+        ?;
 
     let extends = json
         .get("extends")
@@ -60,7 +61,7 @@ pub fn load_config(path: &Path) -> anyhow::Result<TurboConfig> {
     Ok(TurboConfig { extends, tasks })
 }
 
-pub fn parse(path: &Path) -> anyhow::Result<Vec<Task>> {
+pub fn parse(path: &Path) -> Result<Vec<Task>, DelaParseError> {
     let config = load_config(path)?;
 
     Ok(config
@@ -98,13 +99,13 @@ fn parse_task_config(value: &Value) -> TurboTaskConfig {
     }
 }
 
-fn parse_task_map(key: &str, value: &Value) -> anyhow::Result<BTreeMap<String, TurboTaskConfig>> {
+fn parse_task_map(key: &str, value: &Value) -> Result<BTreeMap<String, TurboTaskConfig>, DelaParseError> {
     let Some(task_map) = value.as_object() else {
-        return Err(anyhow::anyhow!(
+        return Err(DelaParseError::Syntax(format!(
             "Failed to parse turbo.json: '{}' must be an object, found {}",
             key,
             json_type_name(value)
-        ));
+        )));
     };
 
     Ok(task_map
@@ -339,6 +340,6 @@ mod tests {
         std::fs::write(&turbo_json_path, r#"{"tasks":{"build":{}}"#).unwrap();
 
         let err = parse(&turbo_json_path).unwrap_err();
-        assert!(err.to_string().contains("Failed to parse turbo.json"));
+        assert!(err.to_string().contains("JSON parsing error"));
     }
 }

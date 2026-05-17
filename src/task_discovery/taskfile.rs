@@ -107,7 +107,7 @@ fn collect_taskfile_tasks_recursive(
 
     let mut first_error = None;
 
-    let mut tasks = parse_taskfile::parse(current_source.definition_path()).map_err(|e| anyhow::anyhow!(e))?;
+    let mut tasks = parse_taskfile::parse(current_source.definition_path())?;
     tasks.sort_by(|a, b| a.name.cmp(&b.name));
 
     if !hide_tasks {
@@ -143,7 +143,7 @@ fn collect_taskfile_tasks_recursive(
         }
     }
 
-    let includes = parse_taskfile::extract_include_directives(current_source.definition_path()).map_err(|e| anyhow::anyhow!(e))?;
+    let includes = parse_taskfile::extract_include_directives(current_source.definition_path())?;
     for include in includes {
         let resolved_candidate = current_source.resolve_child(&include.taskfile);
         let resolved_include = parse_taskfile::resolve_taskfile_include_path(&resolved_candidate);

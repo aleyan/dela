@@ -1,13 +1,14 @@
+use crate::parsers::errors::DelaParseError;
 use crate::types::{Task, TaskDefinitionType};
 use std::path::PathBuf;
 
 /// Parse a package.json file at the given path and extract tasks
-pub fn parse(path: &PathBuf) -> anyhow::Result<Vec<Task>> {
+pub fn parse(path: &PathBuf) -> Result<Vec<Task>, DelaParseError> {
     let contents =
-        std::fs::read_to_string(path).map_err(|e| anyhow::anyhow!("Failed to read package.json: {}", e))?;
+        std::fs::read_to_string(path)?;
 
     let json: serde_json::Value = serde_json::from_str(&contents)
-        .map_err(|e| anyhow::anyhow!("Failed to parse package.json: {}", e))?;
+        ?;
 
     let parent = path.parent().unwrap_or(path);
     let runner = match crate::runners::runners_package_json::detect_package_manager(parent) {

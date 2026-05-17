@@ -1,3 +1,4 @@
+use crate::parsers::errors::DelaParseError;
 use crate::types::{Task, TaskDefinitionType, TaskRunner};
 use serde_yaml::Value;
 use std::fs::File;
@@ -8,27 +9,27 @@ use std::path::Path;
 ///
 /// This function parses a .travis.yml file and extracts each job as a separate task.
 /// Note: Travis CI tasks are listed for discovery but cannot be executed locally.
-pub fn parse(file_path: &Path) -> anyhow::Result<Vec<Task>> {
-    let mut file = File::open(file_path).map_err(|e| anyhow::anyhow!("Failed to open file: {}", e))?;
+pub fn parse(file_path: &Path) -> Result<Vec<Task>, DelaParseError> {
+    let mut file = File::open(file_path)?;
     let mut contents = String::new();
     file.read_to_string(&mut contents)
-        .map_err(|e| anyhow::anyhow!("Failed to read file: {}", e))?;
+        ?;
 
     parse_travis_string(&contents, file_path)
 }
 
 /// Parse Travis CI configuration content from a string
-fn parse_travis_string(content: &str, file_path: &Path) -> anyhow::Result<Vec<Task>> {
+fn parse_travis_string(content: &str, file_path: &Path) -> Result<Vec<Task>, DelaParseError> {
     let config: Value = if content.trim().is_empty() {
         Value::Mapping(serde_yaml::Mapping::new())
     } else {
         serde_yaml::from_str(content)
-            .map_err(|e| anyhow::anyhow!("Failed to parse Travis CI YAML: {}", e))?
+            ?
     };
 
     let config_map = match config {
         Value::Mapping(map) => map,
-        _ => return Err(anyhow::anyhow!("Travis CI YAML is not a mapping")),
+        _ => return Err(DelaParseError::Syntax(format!("Travis CI YAML is not a mapping"))),
     };
 
     let mut tasks = Vec::new();

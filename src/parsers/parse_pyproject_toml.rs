@@ -1,14 +1,15 @@
+use crate::parsers::errors::DelaParseError;
 use crate::task_shadowing::check_path_executable;
 use crate::types::{Task, TaskDefinitionType, TaskRunner};
 use std::path::Path;
 
 /// Parse a pyproject.toml file at the given path and extract tasks
-pub fn parse(path: &Path) -> anyhow::Result<Vec<Task>> {
+pub fn parse(path: &Path) -> Result<Vec<Task>, DelaParseError> {
     let content = std::fs::read_to_string(path)
-        .map_err(|e| anyhow::anyhow!("Failed to read pyproject.toml: {}", e))?;
+        ?;
 
     let toml: toml::Value =
-        toml::from_str(&content).map_err(|e| anyhow::anyhow!("Failed to parse pyproject.toml: {}", e))?;
+        toml::from_str(&content)?;
 
     let mut tasks = Vec::new();
 

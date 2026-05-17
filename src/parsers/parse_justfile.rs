@@ -1,16 +1,17 @@
+use crate::parsers::errors::DelaParseError;
 use crate::types::{Task, TaskDefinitionType, TaskRunner};
 use regex::Regex;
 use std::path::PathBuf;
 
 /// Parse a Justfile at the given path and extract tasks
-pub fn parse(path: &PathBuf) -> anyhow::Result<Vec<Task>> {
+pub fn parse(path: &PathBuf) -> Result<Vec<Task>, DelaParseError> {
     let file_name = path
         .file_name()
         .and_then(|n| n.to_str())
         .unwrap_or("Justfile");
 
     let contents = std::fs::read_to_string(path)
-        .map_err(|e| anyhow::anyhow!("Failed to read {}: {}", file_name, e))?;
+        ?;
 
     let mut tasks = Vec::new();
     let lines: Vec<&str> = contents.lines().collect();
@@ -39,7 +40,7 @@ pub fn parse(path: &PathBuf) -> anyhow::Result<Vec<Task>> {
 
             // Validate indentation for this recipe
             if let Err(indent_error) = validate_recipe_indentation(&lines, line_num + 1) {
-                return Err(anyhow::anyhow!("{}: {}", file_name, indent_error));
+                return Err(DelaParseError::Syntax(format!("{}: {}", file_name, indent_error)));
             }
 
             tasks.push(Task {
@@ -60,7 +61,7 @@ pub fn parse(path: &PathBuf) -> anyhow::Result<Vec<Task>> {
 }
 
 /// Validate that a recipe's lines use consistent indentation
-fn validate_recipe_indentation(lines: &[&str], task_line_num: usize) -> anyhow::Result<()> {
+fn validate_recipe_indentation(lines: &[&str], task_line_num: usize) -> Result<(), DelaParseError> {
     let mut recipe_lines = Vec::new();
     let mut current_line = task_line_num;
 
@@ -97,10 +98,10 @@ fn validate_recipe_indentation(lines: &[&str], task_line_num: usize) -> anyhow::
     for (line_num, line) in recipe_lines.iter().skip(1) {
         let indent_type = get_indentation_type(line);
         if indent_type != first_indent_type {
-            return Err(anyhow::anyhow!(
+            return Err(DelaParseError::Syntax(format!(
                 "line {}: mixed indentation in recipe - found both spaces and tabs",
                 line_num
-            ));
+            )));
         }
     }
 
