@@ -230,7 +230,7 @@ test: ## Running tests
         let tasks = task_discovery::get_matching_tasks(&discovered, "test");
         assert_eq!(tasks.len(), 1, "Should find exactly one task");
 
-        let result = super::execute("test");
+        let result = super::execute("test --invalid-arg-for-make");
         assert!(
             result.is_err(),
             "Command execution should fail in test environment"

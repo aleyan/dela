@@ -46,8 +46,7 @@ pub fn parse(path: &PathBuf) -> Result<Vec<Task>, DelaParseError> {
                     ))),
                     _ => Err(DelaParseError::Syntax(format!(
                         "{}: {}",
-                        file_name,
-                        indent_error.to_string()
+                        file_name, indent_error
                     ))),
                 };
             }
