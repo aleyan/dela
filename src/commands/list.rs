@@ -17,7 +17,13 @@ macro_rules! test_println {
     ($($arg:tt)*) => { println!($($arg)*) };
 }
 
-pub fn execute(verbose: bool) -> anyhow::Result<()> {
+pub fn execute(verbose: bool, color: &str) -> anyhow::Result<()> {
+    match color {
+        "always" => colored::control::set_override(true),
+        "never" => colored::control::set_override(false),
+        _ => {}
+    }
+
     let current_dir = env::current_dir()
         .map_err(|e| anyhow::anyhow!("Failed to get current directory: {}", e))?;
     let discovered = task_discovery::discover_tasks(&current_dir);

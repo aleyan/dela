@@ -121,6 +121,10 @@ enum Commands {
         /// Show detailed information about task definition files
         #[arg(short, long)]
         verbose: bool,
+
+        /// Control colored output (always, auto, never)
+        #[arg(long, default_value = "auto")]
+        color: String,
     },
 
     /// Run a specific task
@@ -180,7 +184,7 @@ async fn main() {
         }
         Commands::Init => commands::init::execute(),
         Commands::ConfigureShell => commands::configure_shell::execute(),
-        Commands::List { verbose } => commands::list::execute(verbose),
+        Commands::List { verbose, color } => commands::list::execute(verbose, &color),
         Commands::Run { task } => commands::run::execute(&task),
         Commands::GetCommand { args } => {
             if args.is_empty() {
