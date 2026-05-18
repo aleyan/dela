@@ -39,10 +39,17 @@ pub fn parse(path: &PathBuf) -> Result<Vec<Task>, DelaParseError> {
 
             // Validate indentation for this recipe
             if let Err(indent_error) = validate_recipe_indentation(&lines, line_num + 1) {
-                return Err(DelaParseError::Syntax(format!(
-                    "{}: {}",
-                    file_name, indent_error
-                )));
+                return match indent_error {
+                    DelaParseError::Syntax(inner_msg) => Err(DelaParseError::Syntax(format!(
+                        "{}: {}",
+                        file_name, inner_msg
+                    ))),
+                    _ => Err(DelaParseError::Syntax(format!(
+                        "{}: {}",
+                        file_name,
+                        indent_error.to_string()
+                    ))),
+                };
             }
 
             tasks.push(Task {
