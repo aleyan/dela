@@ -1,4 +1,4 @@
-.PHONY: build tests tests_integration test_unit test_noinit test_mcp test_zsh test_bash test_fish test_pwsh run install builder publish
+.PHONY: build tests tests_integration test_unit test_noinit test_mcp test_zsh test_bash test_fish test_pwsh run install
 
 SHELL := /bin/bash
 
@@ -67,15 +67,6 @@ inspect_mcp:
 	# Avoid any stdout noise; Inspector expects clean MCP JSON-RPC on stdout.
 	MCPI_NO_COLOR=1 RUST_LOG=warn RUSTFLAGS="-A warnings" npx @modelcontextprotocol/inspector ./target/debug/dela mcp --cwd $(PWD)
 
-
-# Publish to crates.io. Deprecated. Will be removed once 0.0.7 is released sucessfully using the new release process.
-publish: tests tests_integration
-	@echo "Publishing dela to crates.io"
-	@if [ -z "$(CARGO_REGISTRY_TOKEN)" ]; then \
-		echo "Error: CARGO_REGISTRY_TOKEN is not set. Please add it to your .env file."; \
-		exit 1; \
-	fi
-	@cargo publish
 format:
 	cargo fmt --all
 
