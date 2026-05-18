@@ -49,9 +49,11 @@ fn get_shell_config_path() -> anyhow::Result<PathBuf> {
 /// Add dela shell integration to the shell config file
 fn add_shell_integration(config_path: &PathBuf) -> anyhow::Result<()> {
     // Read the current content
-    let content = fs::read_to_string(config_path)
-        .map_err(|e| anyhow::anyhow!("Failed to read shell config: {}", e))?;
-
+    let content = match fs::read_to_string(config_path) {
+        Ok(c) => c,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(e) => return Err(anyhow::anyhow!("Failed to read shell config: {}", e)),
+    };
     // Get the shell type from the path
     let shell = get_current_shell()?;
 

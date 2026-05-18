@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 
 /// Returns the path to the active allowlist.toml.
 fn allowlist_path() -> anyhow::Result<PathBuf> {
-    active_allowlist_path()
+    Ok(active_allowlist_path()?)
 }
 
 /// Load the allowlist from the active allowlist path.
