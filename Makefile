@@ -1,4 +1,4 @@
-.PHONY: build tests tests_integration test_unit test_noinit test_mcp test_zsh test_bash test_fish test_pwsh run install builder
+.PHONY: build tests tests_integration test_unit test_noinit test_mcp test_zsh test_bash test_fish test_pwsh run install
 
 SHELL := /bin/bash
 

@@ -21,7 +21,7 @@ pub fn execute(verbose: bool, color: &str) -> anyhow::Result<()> {
     match color {
         "always" => colored::control::set_override(true),
         "never" => colored::control::set_override(false),
-        _ => {}
+        _ => colored::control::unset_override(),
     }
 
     let current_dir = env::current_dir()
