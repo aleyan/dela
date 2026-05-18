@@ -12,7 +12,7 @@ impl TaskDiscovery for JustfileDiscovery {
     }
 }
 
-fn discover_justfile_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<(), String> {
+fn discover_justfile_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> anyhow::Result<()> {
     let possible_justfiles = ["Justfile", "justfile", ".justfile"];
     let justfile_path = possible_justfiles
         .iter()

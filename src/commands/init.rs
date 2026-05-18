@@ -1,13 +1,14 @@
 use crate::config::{legacy_dela_config_dir, preferred_allowlist_path, preferred_config_dir_path};
 use crate::environment::{get_current_home, get_current_shell as env_get_current_shell};
 use crate::types::Allowlist;
+use anyhow::Context;
 use std::env;
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
 
 /// Get the current shell name by checking the parent process
-fn get_current_shell() -> Result<String, String> {
+fn get_current_shell() -> anyhow::Result<String> {
     // Try to get shell from BASH_VERSION or ZSH_VERSION first
     if env::var("BASH_VERSION").is_ok() {
         return Ok("bash".to_string());
@@ -17,20 +18,20 @@ fn get_current_shell() -> Result<String, String> {
     }
 
     // Fallback to $SHELL if version variables aren't set
-    let shell = env_get_current_shell().ok_or("SHELL environment variable not set".to_string())?;
+    let shell = env_get_current_shell().context("SHELL environment variable not set")?;
 
     let shell_path = std::path::PathBuf::from(&shell);
     shell_path
         .file_name()
         .and_then(|name| name.to_str())
         .map(|s| s.to_string())
-        .ok_or_else(|| "Invalid shell path".to_string())
+        .context("Invalid shell path")
 }
 
 /// Get the appropriate shell config path based on current shell
-fn get_shell_config_path() -> Result<PathBuf, String> {
+fn get_shell_config_path() -> anyhow::Result<PathBuf> {
     let shell_name = get_current_shell()?;
-    let home = get_current_home().ok_or("HOME environment variable not set".to_string())?;
+    let home = get_current_home().context("HOME environment variable not set")?;
     let home_path = PathBuf::from(&home);
 
     match shell_name.as_str() {
@@ -41,16 +42,18 @@ fn get_shell_config_path() -> Result<PathBuf, String> {
             .join(".config")
             .join("powershell")
             .join("Microsoft.PowerShell_profile.ps1")),
-        name => Err(format!("Unsupported shell: {}", name)),
+        name => Err(anyhow::anyhow!("Unsupported shell: {}", name)),
     }
 }
 
 /// Add dela shell integration to the shell config file
-fn add_shell_integration(config_path: &PathBuf) -> Result<(), String> {
+fn add_shell_integration(config_path: &PathBuf) -> anyhow::Result<()> {
     // Read the current content
-    let content = fs::read_to_string(config_path)
-        .map_err(|e| format!("Failed to read shell config: {}", e))?;
-
+    let content = match fs::read_to_string(config_path) {
+        Ok(c) => c,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(e) => return Err(anyhow::anyhow!("Failed to read shell config: {}", e)),
+    };
     // Get the shell type from the path
     let shell = get_current_shell()?;
 
@@ -74,7 +77,7 @@ fn add_shell_integration(config_path: &PathBuf) -> Result<(), String> {
         && !parent.exists()
     {
         fs::create_dir_all(parent)
-            .map_err(|e| format!("Failed to create config directory: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to create config directory: {}", e))?;
     }
 
     // Open file in append mode
@@ -82,19 +85,19 @@ fn add_shell_integration(config_path: &PathBuf) -> Result<(), String> {
         .create(true)
         .append(true)
         .open(config_path)
-        .map_err(|e| format!("Failed to open shell config: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to open shell config: {}", e))?;
 
     // Add dela integration with shell-specific syntax
-    writeln!(file).map_err(|e| format!("Failed to write to shell config: {}", e))?;
+    writeln!(file).map_err(|e| anyhow::anyhow!("Failed to write to shell config: {}", e))?;
     writeln!(file, "# dela shell integration")
-        .map_err(|e| format!("Failed to write to shell config: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to write to shell config: {}", e))?;
     writeln!(file, "{}", integration_pattern)
-        .map_err(|e| format!("Failed to write to shell config: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to write to shell config: {}", e))?;
 
     Ok(())
 }
 
-pub fn execute() -> Result<(), String> {
+pub fn execute() -> anyhow::Result<()> {
     println!("Initializing dela...");
 
     // Get the shell config path first to validate shell support
@@ -107,7 +110,7 @@ pub fn execute() -> Result<(), String> {
         config_path.display()
     );
 
-    get_current_home().ok_or("HOME environment variable not set".to_string())?;
+    get_current_home().context("HOME environment variable not set")?;
     let dela_dir = preferred_config_dir_path()?;
     let legacy_dela_dir = legacy_dela_config_dir()?;
 
@@ -118,11 +121,12 @@ pub fn execute() -> Result<(), String> {
             dela_dir.display()
         );
         if let Some(parent) = dela_dir.parent() {
-            fs::create_dir_all(parent)
-                .map_err(|e| format!("Failed to create dela config parent directory: {}", e))?;
+            fs::create_dir_all(parent).map_err(|e| {
+                anyhow::anyhow!("Failed to create dela config parent directory: {}", e)
+            })?;
         }
         fs::rename(&legacy_dela_dir, &dela_dir).map_err(|e| {
-            format!(
+            anyhow::anyhow!(
                 "Failed to migrate dela configuration to {}: {}",
                 dela_dir.display(),
                 e
@@ -136,7 +140,7 @@ pub fn execute() -> Result<(), String> {
             dela_dir.display()
         );
         fs::create_dir_all(&dela_dir)
-            .map_err(|e| format!("Failed to create dela config directory: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to create dela config directory: {}", e))?;
     } else {
         println!(
             "Using existing dela configuration directory at {}",
@@ -150,9 +154,9 @@ pub fn execute() -> Result<(), String> {
         println!("Creating empty allowlist at {}", allowlist_path.display());
         let empty_allowlist = Allowlist::default();
         let toml = toml::to_string_pretty(&empty_allowlist)
-            .map_err(|e| format!("Failed to serialize empty allowlist: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to serialize empty allowlist: {}", e))?;
         fs::write(&allowlist_path, toml)
-            .map_err(|e| format!("Failed to create allowlist file: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to create allowlist file: {}", e))?;
     }
 
     // Add shell integration
@@ -262,7 +266,10 @@ mod tests {
 
         let result = execute();
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Unsupported shell: unsupported");
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "Unsupported shell: unsupported"
+        );
 
         reset_to_real_environment();
     }

@@ -7,6 +7,20 @@ use crate::types::{Task, TaskDefinitionFile, TaskDefinitionType, TaskFileStatus}
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::path::{Path, PathBuf};
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub(crate) enum TurboDiscoverError {
+    #[error("Failed to parse turbo config: {0}")]
+    ParseFailure(#[from] crate::parsers::errors::DelaParseError),
+
+    #[error("Workspace-local configuration error in '{path}': {source}")]
+    WorkspaceLocalConfig {
+        path: PathBuf,
+        #[source]
+        source: Box<TurboDiscoverError>,
+    },
+}
 
 pub(crate) struct TurboDiscovery;
 
@@ -16,7 +30,7 @@ impl TaskDiscovery for TurboDiscovery {
     }
 }
 
-fn discover_turbo_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<(), String> {
+fn discover_turbo_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> anyhow::Result<()> {
     let repo_root = find_git_repo_root(dir).unwrap_or_else(|| dir.to_path_buf());
     let turbo_json = repo_root.join("turbo.json");
 
@@ -50,13 +64,10 @@ fn discover_turbo_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<
 
     let status = match result {
         Ok(()) => TaskFileStatus::Parsed,
-        Err(error) => {
-            discovered.errors.push(format!(
-                "Failed to parse {}: {}",
-                turbo_json.display(),
-                error
-            ));
-            TaskFileStatus::ParseError(error)
+        Err(e) => {
+            let err_msg = e.to_string();
+            discovered.errors.push(err_msg.clone());
+            TaskFileStatus::ParseError(err_msg)
         }
     };
 
@@ -78,7 +89,7 @@ fn collect_turbo_tasks_for_context(
     root_turbo_json: &Path,
     collected_tasks: &mut BTreeMap<String, Task>,
     config_errors: &mut Vec<String>,
-) -> Result<(), String> {
+) -> Result<(), TurboDiscoverError> {
     let root_source = ComposedDefinitionSource::direct(root_turbo_json.to_path_buf());
     let mut package_configs_by_name = None;
     let root_tasks = resolve_effective_turbo_tasks(
@@ -108,15 +119,14 @@ fn collect_turbo_tasks_for_context(
                         collected_tasks.entry(name).or_insert(task);
                     }
                 }
-                Err(error) => {
-                    let error = format!(
-                        "Failed to parse workspace-local turbo config '{}': {}",
-                        config_path.display(),
-                        error
-                    );
-                    config_errors.push(error.clone());
+                Err(e) => {
+                    let err = TurboDiscoverError::WorkspaceLocalConfig {
+                        path: config_path.clone(),
+                        source: Box::new(e),
+                    };
+                    config_errors.push(err.to_string());
                     if first_error.is_none() {
-                        first_error = Some(error);
+                        first_error = Some(err);
                     }
                 }
             }
@@ -137,15 +147,14 @@ fn collect_turbo_tasks_for_context(
                     break;
                 }
                 Ok(_) => {}
-                Err(error) => {
-                    let error = format!(
-                        "Failed to parse workspace-local turbo config '{}': {}",
-                        config_path.display(),
-                        error
-                    );
-                    config_errors.push(error.clone());
+                Err(e) => {
+                    let err = TurboDiscoverError::WorkspaceLocalConfig {
+                        path: config_path.clone(),
+                        source: Box::new(e),
+                    };
+                    config_errors.push(err.to_string());
                     if first_error.is_none() {
-                        first_error = Some(error);
+                        first_error = Some(err);
                     }
                     break;
                 }
@@ -166,7 +175,7 @@ fn resolve_effective_turbo_tasks(
     root_turbo_json: &Path,
     package_configs_by_name: &mut Option<HashMap<String, PathBuf>>,
     traversal_state: &mut RecursiveDiscoveryState,
-) -> Result<BTreeMap<String, Task>, String> {
+) -> Result<BTreeMap<String, Task>, TurboDiscoverError> {
     match traversal_state.mark_visited(current_source.definition_path()) {
         VisitState::AlreadyVisited(_) => return Ok(BTreeMap::new()),
         VisitState::New(_) => {}

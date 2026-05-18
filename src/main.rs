@@ -184,7 +184,7 @@ async fn main() {
         Commands::Run { task } => commands::run::execute(&task),
         Commands::GetCommand { args } => {
             if args.is_empty() {
-                Err("No task name provided".to_string())
+                Err(anyhow::anyhow!("No task name provided"))
             } else {
                 commands::get_command::execute(&args.join(" "))
             }
@@ -193,7 +193,10 @@ async fn main() {
     };
 
     if let Err(err) = result {
-        if err.starts_with("dela: command or task not found") {
+        if err
+            .to_string()
+            .starts_with("dela: command or task not found")
+        {
             eprintln!("{}", err);
         } else {
             eprintln!("Error: {}", err);

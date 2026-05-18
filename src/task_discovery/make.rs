@@ -57,7 +57,7 @@ fn discover_makefile_tasks(dir: &Path, discovered: &mut DiscoveredTasks) {
                 makefile_path.display(),
                 error
             ));
-            TaskFileStatus::ParseError(error)
+            TaskFileStatus::ParseError(error.to_string())
         }
     };
 
@@ -95,7 +95,7 @@ fn collect_makefile_tasks_recursive(
     seen_task_names: &mut HashSet<String>,
     collected_tasks: &mut Vec<Task>,
     include_errors: &mut Vec<String>,
-) -> Result<(), String> {
+) -> anyhow::Result<()> {
     match traversal_state.mark_visited(current_source.definition_path()) {
         VisitState::AlreadyVisited(_) => return Ok(()),
         VisitState::New(_) => {}

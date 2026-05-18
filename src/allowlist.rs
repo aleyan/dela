@@ -5,19 +5,21 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 /// Returns the path to the active allowlist.toml.
-fn allowlist_path() -> Result<PathBuf, String> {
-    active_allowlist_path()
+fn allowlist_path() -> anyhow::Result<PathBuf> {
+    Ok(active_allowlist_path()?)
 }
 
 /// Load the allowlist from the active allowlist path.
 /// If the file does not exist, return an empty allowlist.
-pub fn load_allowlist() -> Result<Allowlist, String> {
+pub fn load_allowlist() -> anyhow::Result<Allowlist> {
     let path = allowlist_path()?;
     let dela_dir = active_dela_config_dir()?;
 
     // Check if the dela config directory exists
     if !dela_dir.exists() {
-        return Err("Dela is not initialized. Please run 'dela init' first.".to_string());
+        return Err(anyhow::anyhow!(
+            "Dela is not initialized. Please run 'dela init' first."
+        ));
     }
 
     // If allowlist file doesn't exist but the config directory does, return empty allowlist
@@ -25,28 +27,29 @@ pub fn load_allowlist() -> Result<Allowlist, String> {
         return Ok(Allowlist::default());
     }
 
-    let contents =
-        fs::read_to_string(&path).map_err(|e| format!("Failed to read allowlist file: {}", e))?;
+    let contents = fs::read_to_string(&path)
+        .map_err(|e| anyhow::anyhow!("Failed to read allowlist file: {}", e))?;
 
     match toml::from_str::<Allowlist>(&contents) {
         Ok(allowlist) => Ok(allowlist),
-        Err(e) => Err(format!("Failed to parse allowlist TOML: {}", e)),
+        Err(e) => Err(anyhow::anyhow!("Failed to parse allowlist TOML: {}", e)),
     }
 }
 
 /// Save the allowlist to ~/.config/dela/allowlist.toml.
-pub fn save_allowlist(allowlist: &Allowlist) -> Result<(), String> {
+pub fn save_allowlist(allowlist: &Allowlist) -> anyhow::Result<()> {
     let path = preferred_allowlist_path()?;
 
     // Create the config directory if it doesn't exist
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)
-            .map_err(|e| format!("Failed to create dela config directory: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to create dela config directory: {}", e))?;
     }
 
     let toml = toml::to_string_pretty(&allowlist)
-        .map_err(|e| format!("Failed to serialize allowlist: {}", e))?;
-    fs::write(&path, toml).map_err(|e| format!("Failed to create allowlist file: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to serialize allowlist: {}", e))?;
+    fs::write(&path, toml)
+        .map_err(|e| anyhow::anyhow!("Failed to create allowlist file: {}", e))?;
     Ok(())
 }
 
@@ -126,7 +129,7 @@ pub fn allowlist_entry_for_task(task: &Task, scope: AllowScope) -> AllowlistEntr
 /// Check if a given task is explicitly allowed or denied by the allowlist
 /// Returns (explicitly_allowed, explicitly_denied) - both false means not found in allowlist
 /// This is the core allowlist checking logic without any prompting or persistence
-pub fn is_task_allowed(task: &Task) -> Result<(bool, bool), String> {
+pub fn is_task_allowed(task: &Task) -> anyhow::Result<(bool, bool)> {
     // Only proceed with allowlist operations if dela is initialized
     let allowlist = load_allowlist()?;
     Ok(match evaluate_task_against_allowlist(task, &allowlist) {
@@ -138,7 +141,7 @@ pub fn is_task_allowed(task: &Task) -> Result<(bool, bool), String> {
 
 /// Check if a given task is allowed, based on the loaded allowlist
 /// If the task is not in the allowlist, prompt the user for a decision
-pub fn check_task_allowed(task: &Task) -> Result<bool, String> {
+pub fn check_task_allowed(task: &Task) -> anyhow::Result<bool> {
     // Check if task is explicitly allowed or denied
     let (explicitly_allowed, explicitly_denied) = is_task_allowed(task)?;
 
@@ -183,7 +186,7 @@ pub fn check_task_allowed(task: &Task) -> Result<bool, String> {
 }
 
 /// Check if a given task is allowed with a specific scope, without prompting
-pub fn check_task_allowed_with_scope(task: &Task, scope: AllowScope) -> Result<bool, String> {
+pub fn check_task_allowed_with_scope(task: &Task, scope: AllowScope) -> anyhow::Result<bool> {
     // Only proceed with allowlist operations if dela is initialized
     let mut allowlist = load_allowlist()?;
 

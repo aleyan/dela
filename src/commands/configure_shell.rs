@@ -1,4 +1,5 @@
 use crate::environment::get_current_shell;
+use anyhow::Context;
 
 const ZSH_CONFIG: &str = include_str!("../../resources/zsh.sh");
 const BASH_CONFIG: &str = include_str!("../../resources/bash.sh");
@@ -15,12 +16,12 @@ enum Shell {
 }
 
 impl Shell {
-    fn from_path(path: &str) -> Result<Shell, String> {
+    fn from_path(path: &str) -> anyhow::Result<Shell> {
         let shell_path = std::path::PathBuf::from(path);
         let shell_name = shell_path
             .file_name()
             .and_then(|name| name.to_str())
-            .ok_or_else(|| "Invalid shell path".to_string())?;
+            .context("Invalid shell path")?;
 
         match shell_name {
             "zsh" => Ok(Shell::Zsh),
@@ -32,9 +33,9 @@ impl Shell {
     }
 }
 
-pub fn execute() -> Result<(), String> {
+pub fn execute() -> anyhow::Result<()> {
     // Get the current shell from environment
-    let shell = get_current_shell().ok_or("SHELL environment variable not set".to_string())?;
+    let shell = get_current_shell().context("SHELL environment variable not set")?;
 
     // Parse the shell type
     let shell_type = Shell::from_path(&shell)?;
@@ -57,7 +58,7 @@ pub fn execute() -> Result<(), String> {
             print!("{}", PWSH_CONFIG);
             Ok(())
         }
-        Shell::Unknown(name) => Err(format!("Unsupported shell: {}", name)),
+        Shell::Unknown(name) => Err(anyhow::anyhow!("Unsupported shell: {}", name)),
     }
 }
 
@@ -114,7 +115,10 @@ mod tests {
         setup_test_env("/bin/unknown");
         let result = execute();
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Unsupported shell: unknown");
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "Unsupported shell: unknown"
+        );
         reset_to_real_environment();
     }
 
@@ -136,7 +140,10 @@ mod tests {
 
         let result = execute();
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "SHELL environment variable not set");
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "SHELL environment variable not set"
+        );
         reset_to_real_environment();
     }
 }

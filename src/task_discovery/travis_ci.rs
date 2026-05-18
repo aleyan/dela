@@ -14,7 +14,7 @@ impl TaskDiscovery for TravisCiDiscovery {
     }
 }
 
-fn discover_travis_ci_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<(), String> {
+fn discover_travis_ci_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> anyhow::Result<()> {
     let travis_ci_path = dir.join(".travis.yml");
 
     if travis_ci_path.exists() {

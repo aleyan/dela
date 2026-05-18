@@ -1,5 +1,12 @@
 use crate::environment::get_current_home;
 use std::path::{Path, PathBuf};
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum ConfigError {
+    #[error("HOME environment variable not set")]
+    HomeNotSet,
+}
 
 pub fn preferred_config_dir_path_for(home: impl AsRef<Path>) -> PathBuf {
     home.as_ref().join(".config").join("dela")
@@ -14,22 +21,22 @@ pub fn legacy_allowlist_path_for(home: impl AsRef<Path>) -> PathBuf {
     home.as_ref().join(".dela").join("allowlist.toml")
 }
 
-pub fn preferred_config_dir_path() -> Result<PathBuf, String> {
-    let home = get_current_home().ok_or("HOME environment variable not set".to_string())?;
+pub fn preferred_config_dir_path() -> Result<PathBuf, ConfigError> {
+    let home = get_current_home().ok_or(ConfigError::HomeNotSet)?;
     Ok(preferred_config_dir_path_for(PathBuf::from(home)))
 }
 
-pub fn legacy_dela_config_dir() -> Result<PathBuf, String> {
-    let home = get_current_home().ok_or("HOME environment variable not set".to_string())?;
+pub fn legacy_dela_config_dir() -> Result<PathBuf, ConfigError> {
+    let home = get_current_home().ok_or(ConfigError::HomeNotSet)?;
     Ok(PathBuf::from(home).join(".dela"))
 }
 
-pub fn legacy_allowlist_path() -> Result<PathBuf, String> {
-    let home = get_current_home().ok_or("HOME environment variable not set".to_string())?;
+pub fn legacy_allowlist_path() -> Result<PathBuf, ConfigError> {
+    let home = get_current_home().ok_or(ConfigError::HomeNotSet)?;
     Ok(legacy_allowlist_path_for(PathBuf::from(home)))
 }
 
-pub fn active_dela_config_dir() -> Result<PathBuf, String> {
+pub fn active_dela_config_dir() -> Result<PathBuf, ConfigError> {
     let dela_dir = preferred_config_dir_path()?;
     if dela_dir.exists() {
         return Ok(dela_dir);
@@ -43,11 +50,11 @@ pub fn active_dela_config_dir() -> Result<PathBuf, String> {
     Ok(dela_dir)
 }
 
-pub fn preferred_allowlist_path() -> Result<PathBuf, String> {
+pub fn preferred_allowlist_path() -> Result<PathBuf, ConfigError> {
     Ok(preferred_config_dir_path()?.join("allowlist.toml"))
 }
 
-pub fn active_allowlist_path() -> Result<PathBuf, String> {
+pub fn active_allowlist_path() -> Result<PathBuf, ConfigError> {
     let preferred_path = preferred_allowlist_path()?;
     if preferred_path.exists() {
         return Ok(preferred_path);

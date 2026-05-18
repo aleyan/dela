@@ -12,7 +12,7 @@ impl TaskDiscovery for MavenDiscovery {
     }
 }
 
-fn discover_maven_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<(), String> {
+fn discover_maven_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> anyhow::Result<()> {
     let pom_path = dir.join("pom.xml");
     if !pom_path.exists() {
         return Ok(());
@@ -24,8 +24,14 @@ fn discover_maven_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> Result<
             Ok(())
         }
         Err(error) => {
-            handle_discovery_error(error, pom_path, TaskDefinitionType::MavenPom, discovered);
-            Err("Error parsing pom.xml".to_string())
+            handle_discovery_error(
+                &error,
+                pom_path.clone(),
+                TaskDefinitionType::MavenPom,
+                discovered,
+            );
+            Err(anyhow::Error::new(error)
+                .context(format!("Failed to parse {}", pom_path.display())))
         }
     }
 }

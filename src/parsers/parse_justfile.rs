@@ -1,16 +1,16 @@
+use crate::parsers::errors::DelaParseError;
 use crate::types::{Task, TaskDefinitionType, TaskRunner};
 use regex::Regex;
 use std::path::PathBuf;
 
 /// Parse a Justfile at the given path and extract tasks
-pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
+pub fn parse(path: &PathBuf) -> Result<Vec<Task>, DelaParseError> {
     let file_name = path
         .file_name()
         .and_then(|n| n.to_str())
         .unwrap_or("Justfile");
 
-    let contents = std::fs::read_to_string(path)
-        .map_err(|e| format!("Failed to read {}: {}", file_name, e))?;
+    let contents = std::fs::read_to_string(path)?;
 
     let mut tasks = Vec::new();
     let lines: Vec<&str> = contents.lines().collect();
@@ -39,7 +39,16 @@ pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
 
             // Validate indentation for this recipe
             if let Err(indent_error) = validate_recipe_indentation(&lines, line_num + 1) {
-                return Err(format!("{}: {}", file_name, indent_error));
+                return match indent_error {
+                    DelaParseError::Syntax(inner_msg) => Err(DelaParseError::Syntax(format!(
+                        "{}: {}",
+                        file_name, inner_msg
+                    ))),
+                    _ => Err(DelaParseError::Syntax(format!(
+                        "{}: {}",
+                        file_name, indent_error
+                    ))),
+                };
             }
 
             tasks.push(Task {
@@ -60,7 +69,7 @@ pub fn parse(path: &PathBuf) -> Result<Vec<Task>, String> {
 }
 
 /// Validate that a recipe's lines use consistent indentation
-fn validate_recipe_indentation(lines: &[&str], task_line_num: usize) -> Result<(), String> {
+fn validate_recipe_indentation(lines: &[&str], task_line_num: usize) -> Result<(), DelaParseError> {
     let mut recipe_lines = Vec::new();
     let mut current_line = task_line_num;
 
@@ -97,10 +106,10 @@ fn validate_recipe_indentation(lines: &[&str], task_line_num: usize) -> Result<(
     for (line_num, line) in recipe_lines.iter().skip(1) {
         let indent_type = get_indentation_type(line);
         if indent_type != first_indent_type {
-            return Err(format!(
+            return Err(DelaParseError::Syntax(format!(
                 "line {}: mixed indentation in recipe - found both spaces and tabs",
                 line_num
-            ));
+            )));
         }
     }
 
@@ -669,7 +678,12 @@ build: # Build the project
 
         let result = parse(&justfile_path);
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("mixed indentation in recipe"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("mixed indentation in recipe")
+        );
     }
 
     #[test]
@@ -692,7 +706,12 @@ build: # Build the project
 
         let result = parse(&justfile_path);
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("mixed indentation in recipe"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("mixed indentation in recipe")
+        );
     }
 
     #[test]

@@ -1,3 +1,4 @@
+use crate::parsers::errors::DelaParseError;
 use roxmltree::{Document, Node};
 use std::fs;
 use std::path::Path;
@@ -5,13 +6,12 @@ use std::path::Path;
 use crate::types::{Task, TaskDefinitionType, TaskRunner};
 
 /// Parse a Maven pom.xml file and return a list of tasks
-pub fn parse(file_path: &Path) -> Result<Vec<Task>, String> {
+pub fn parse(file_path: &Path) -> Result<Vec<Task>, DelaParseError> {
     // Read the file
-    let content =
-        fs::read_to_string(file_path).map_err(|e| format!("Error reading pom.xml file: {}", e))?;
+    let content = fs::read_to_string(file_path)?;
 
     // Parse the XML
-    let doc = Document::parse(&content).map_err(|e| format!("Error parsing pom.xml: {}", e))?;
+    let doc = Document::parse(&content)?;
 
     let root = doc.root_element();
 
@@ -53,7 +53,11 @@ fn add_default_maven_goals(tasks: &mut Vec<Task>, file_path: &Path) {
 }
 
 /// Add tasks from Maven profiles
-fn add_profile_tasks(tasks: &mut Vec<Task>, root: Node, file_path: &Path) -> Result<(), String> {
+fn add_profile_tasks(
+    tasks: &mut Vec<Task>,
+    root: Node,
+    file_path: &Path,
+) -> Result<(), DelaParseError> {
     // Find <profiles> section
     if let Some(profiles_node) = root.children().find(|n| n.has_tag_name("profiles")) {
         // Iterate over each profile
@@ -84,7 +88,11 @@ fn add_profile_tasks(tasks: &mut Vec<Task>, root: Node, file_path: &Path) -> Res
 }
 
 /// Add tasks from Maven plugins
-fn add_plugin_tasks(tasks: &mut Vec<Task>, root: Node, file_path: &Path) -> Result<(), String> {
+fn add_plugin_tasks(
+    tasks: &mut Vec<Task>,
+    root: Node,
+    file_path: &Path,
+) -> Result<(), DelaParseError> {
     // Find <build> section and then <plugins>
     if let Some(build_node) = root.children().find(|n| n.has_tag_name("build"))
         && let Some(plugins_node) = build_node.children().find(|n| n.has_tag_name("plugins"))

@@ -1,3 +1,4 @@
+use crate::parsers::errors::DelaParseError;
 use crate::types::{Task, TaskDefinitionType, TaskRunner};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -103,7 +104,7 @@ pub fn resolve_taskfile_include_path(candidate: &Path) -> PathBuf {
 }
 
 /// Parse a Taskfile.yml file at the given path and extract tasks
-pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
+pub fn parse(path: &Path) -> Result<Vec<Task>, DelaParseError> {
     let taskfile = load_taskfile(path)?;
     let mut task_entries: Vec<_> = taskfile.tasks.into_iter().collect();
     task_entries.sort_by(|a, b| a.0.cmp(&b.0));
@@ -148,7 +149,7 @@ pub fn parse(path: &Path) -> Result<Vec<Task>, String> {
     Ok(tasks)
 }
 
-pub fn extract_include_directives(path: &Path) -> Result<Vec<TaskfileInclude>, String> {
+pub fn extract_include_directives(path: &Path) -> Result<Vec<TaskfileInclude>, DelaParseError> {
     let taskfile = load_taskfile(path)?;
     let mut include_entries: Vec<_> = taskfile.includes.into_iter().collect();
     include_entries.sort_by(|a, b| a.0.cmp(&b.0));
@@ -185,17 +186,10 @@ pub fn extract_include_directives(path: &Path) -> Result<Vec<TaskfileInclude>, S
     Ok(includes)
 }
 
-fn load_taskfile(path: &Path) -> Result<Taskfile, String> {
-    let file_name = path
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("Taskfile");
+fn load_taskfile(path: &Path) -> Result<Taskfile, DelaParseError> {
+    let contents = std::fs::read_to_string(path)?;
 
-    let contents = std::fs::read_to_string(path)
-        .map_err(|e| format!("Failed to read {}: {}", file_name, e))?;
-
-    let taskfile = serde_yaml::from_str(&contents)
-        .map_err(|e| format!("Failed to parse {}: {}", file_name, e))?;
+    let taskfile = serde_yaml::from_str(&contents)?;
     Ok(taskfile)
 }
 

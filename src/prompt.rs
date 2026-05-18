@@ -22,7 +22,7 @@ pub enum AllowDecision {
 }
 
 /// Prompt the user for a decision about a task using a TUI interface
-pub fn prompt_for_task(task: &Task) -> Result<AllowDecision, String> {
+pub fn prompt_for_task(task: &Task) -> anyhow::Result<AllowDecision> {
     // Check if we're in a test environment or non-interactive terminal
     let is_test = std::env::var("RUST_TEST_THREADS").is_ok() || std::env::var("CARGO_TEST").is_ok();
     let is_interactive = io::stdout().is_terminal() && io::stdin().is_terminal();
@@ -65,7 +65,7 @@ pub fn prompt_for_task(task: &Task) -> Result<AllowDecision, String> {
 }
 
 /// Fallback text-based prompt for non-interactive environments
-fn prompt_for_task_fallback(task: &Task) -> Result<AllowDecision, String> {
+fn prompt_for_task_fallback(task: &Task) -> anyhow::Result<AllowDecision> {
     println!(
         "\nTask '{}' from '{}' requires approval.",
         task.name,
@@ -84,12 +84,12 @@ fn prompt_for_task_fallback(task: &Task) -> Result<AllowDecision, String> {
     print!("\nEnter your choice (1-5): ");
     io::stdout()
         .flush()
-        .map_err(|e| format!("Failed to flush stdout: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to flush stdout: {}", e))?;
 
     let mut input = String::new();
     io::stdin()
         .read_line(&mut input)
-        .map_err(|e| format!("Failed to read input: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to read input: {}", e))?;
 
     match input.trim() {
         "1" => Ok(AllowDecision::Allow(AllowScope::Once)),
@@ -97,14 +97,16 @@ fn prompt_for_task_fallback(task: &Task) -> Result<AllowDecision, String> {
         "3" => Ok(AllowDecision::Allow(AllowScope::File)),
         "4" => Ok(AllowDecision::Allow(AllowScope::Directory)),
         "5" => Ok(AllowDecision::Deny),
-        _ => Err("Invalid choice. Please enter a number between 1 and 5.".to_string()),
+        _ => Err(anyhow::anyhow!(
+            "Invalid choice. Please enter a number between 1 and 5."
+        )),
     }
 }
 
 fn run_tui(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     task: &Task,
-) -> Result<AllowDecision, String> {
+) -> anyhow::Result<AllowDecision> {
     let options = vec![
         (
             "Allow once (this time only)",
@@ -130,14 +132,14 @@ fn run_tui(
     loop {
         terminal
             .draw(|f| ui(f, task, &options, selected))
-            .map_err(|e| format!("Failed to draw UI: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to draw UI: {}", e))?;
 
         if let Event::Key(key) =
-            event::read().map_err(|e| format!("Failed to read event: {}", e))?
+            event::read().map_err(|e| anyhow::anyhow!("Failed to read event: {}", e))?
         {
             match key.code {
                 KeyCode::Char('q') | KeyCode::Esc => {
-                    return Err("User cancelled".to_string());
+                    return Err(anyhow::anyhow!("User cancelled"));
                 }
                 KeyCode::Up | KeyCode::Char('k') => {
                     selected = if selected == 0 {
@@ -247,7 +249,7 @@ mod tests {
     use super::*;
 
     // Test helper function that simulates the TUI logic
-    fn test_tui_logic(selected_index: usize) -> Result<AllowDecision, String> {
+    fn test_tui_logic(selected_index: usize) -> anyhow::Result<AllowDecision> {
         let options = [
             (
                 "Allow once (this time only)",
@@ -271,7 +273,7 @@ mod tests {
         if selected_index < options.len() {
             Ok(options[selected_index].1.clone())
         } else {
-            Err("Invalid selection index".to_string())
+            Err(anyhow::anyhow!("Invalid selection index"))
         }
     }
 
@@ -314,6 +316,6 @@ mod tests {
     fn test_prompt_invalid_selection() {
         let result = test_tui_logic(10);
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Invalid selection index");
+        assert_eq!(result.unwrap_err().to_string(), "Invalid selection index");
     }
 }

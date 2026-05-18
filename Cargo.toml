@@ -34,6 +34,8 @@ nix = { version = "0.31", features = ["signal"] }
 dirs = "6.0.0"
 shell-words = "1.1.1"
 chrono = { version = "0.4.42", default-features = false, features = ["clock", "std"] }
+thiserror = "2.0.18"
+anyhow = "1.0.102"
 
 [dev-dependencies]
 tempfile = "3.27.0"

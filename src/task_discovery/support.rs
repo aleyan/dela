@@ -34,7 +34,7 @@ pub(crate) fn set_definition(discovered: &mut DiscoveredTasks, definition: TaskD
 }
 
 pub(crate) fn handle_discovery_error(
-    error: String,
+    error: impl std::fmt::Display,
     file_path: PathBuf,
     definition_type: TaskDefinitionType,
     discovered: &mut DiscoveredTasks,
@@ -49,7 +49,7 @@ pub(crate) fn handle_discovery_error(
         TaskDefinitionFile {
             path: file_path,
             definition_type,
-            status: TaskFileStatus::ParseError(error),
+            status: TaskFileStatus::ParseError(error.to_string()),
         },
     );
 }
