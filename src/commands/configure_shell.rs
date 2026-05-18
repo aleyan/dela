@@ -1,5 +1,4 @@
 use crate::environment::get_current_shell;
-#[allow(unused_imports)]
 use anyhow::Context;
 
 const ZSH_CONFIG: &str = include_str!("../../resources/zsh.sh");

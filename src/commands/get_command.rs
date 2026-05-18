@@ -1,6 +1,5 @@
 use crate::runner::is_runner_available;
 use crate::task_discovery;
-#[allow(unused_imports)]
 use anyhow::Context;
 use std::env;
 

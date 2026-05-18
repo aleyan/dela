@@ -1,5 +1,4 @@
 use crate::environment::get_current_home;
-#[allow(unused_imports)]
 use anyhow::Context;
 use std::path::{Path, PathBuf};
 

@@ -1,7 +1,6 @@
 use crate::config::{legacy_dela_config_dir, preferred_allowlist_path, preferred_config_dir_path};
 use crate::environment::{get_current_home, get_current_shell as env_get_current_shell};
 use crate::types::Allowlist;
-#[allow(unused_imports)]
 use anyhow::Context;
 use std::env;
 use std::fs;

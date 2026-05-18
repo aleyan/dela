@@ -1,8 +1,5 @@
 use crate::mcp;
-#[allow(unused_imports)]
 use anyhow::Context;
-#[allow(unused_imports)]
-use anyhow::anyhow;
 use std::fs;
 use std::path::PathBuf;
 

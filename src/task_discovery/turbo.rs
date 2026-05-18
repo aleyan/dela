@@ -4,8 +4,6 @@ use crate::repo_root::find_git_repo_root;
 use crate::task_discovery::support::{apply_shadowing, set_definition};
 use crate::task_discovery::{DiscoveredTasks, TaskDiscovery};
 use crate::types::{Task, TaskDefinitionFile, TaskDefinitionType, TaskFileStatus};
-#[allow(unused_imports)]
-use anyhow::anyhow;
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::path::{Path, PathBuf};

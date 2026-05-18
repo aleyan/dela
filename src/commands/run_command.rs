@@ -1,7 +1,6 @@
 use crate::runner::is_runner_available;
 use crate::runner::split_command_words;
 use crate::task_discovery;
-#[allow(unused_imports)]
 use anyhow::Context;
 use std::env;
 use std::process::{Command, Stdio};

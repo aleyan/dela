@@ -2,7 +2,6 @@ use crate::allowlist;
 use crate::config::preferred_allowlist_path;
 use crate::task_discovery;
 use crate::types::AllowScope;
-#[allow(unused_imports)]
 use anyhow::Context;
 use std::env;
 
