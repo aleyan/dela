@@ -230,10 +230,7 @@ test: ## Running tests
         let tasks = task_discovery::get_matching_tasks(&discovered, "test");
         assert_eq!(tasks.len(), 1, "Should find exactly one task");
 
-        // Instead of trying to execute the command, which causes make to print help output,
-        // we'll just mock the behavior we expect - that the command would be constructed
-        // correctly but would fail in the test environment.
-        let result: anyhow::Result<()> = Err(anyhow::anyhow!("Command failed with exit code: 127"));
+        let result = super::execute("test");
         assert!(
             result.is_err(),
             "Command execution should fail in test environment"

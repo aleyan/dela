@@ -149,7 +149,7 @@ pub fn parse(path: &Path) -> Result<Vec<Task>, DelaParseError> {
     Ok(tasks)
 }
 
-pub fn extract_include_directives(path: &Path) -> anyhow::Result<Vec<TaskfileInclude>> {
+pub fn extract_include_directives(path: &Path) -> Result<Vec<TaskfileInclude>, DelaParseError> {
     let taskfile = load_taskfile(path)?;
     let mut include_entries: Vec<_> = taskfile.includes.into_iter().collect();
     include_entries.sort_by(|a, b| a.0.cmp(&b.0));
