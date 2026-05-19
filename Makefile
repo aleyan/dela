@@ -82,5 +82,8 @@ coverage_github: build
 
 cargo_crap:
 	@echo "Reporting Change Risk Anti-Patterns metric"
+	@echo "Checking dependencies (cargo-llvm-cov and cargo-crap)..."
+	@cargo llvm-cov --version 2>/dev/null | grep -q "0.8.7" || cargo install cargo-llvm-cov --version 0.8.7 --force --locked
+	@cargo crap --version 2>/dev/null | grep -q "0.2.0" || cargo install cargo-crap --version 0.2.0 --force --locked
 	cargo llvm-cov --lcov --output-path lcov.info
-	cargo crap --lcov lcov.info
+	cargo crap --lcov lcov.info --top 20
