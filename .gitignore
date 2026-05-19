@@ -8,3 +8,4 @@ tests/task_definitions/build/*
 .cursor
 /scratch
 release_notes.md
+lcov.info

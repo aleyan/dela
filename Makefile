@@ -79,3 +79,8 @@ test_long:
 coverage_github: build
 	@echo "Running parsing coverage over top github repos..."
 	uv run --script scripts/dela_coverage_git_refs.py --dela-bin ./target/debug/dela
+
+cargo_crap:
+	@echo "Reporting Change Risk Anti-Patterns metric"
+	cargo llvm-cov --lcov --output-path lcov.info
+	cargo crap --lcov lcov.info
