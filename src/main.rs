@@ -215,7 +215,7 @@ async fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::{run_command, Commands};
+    use super::{Commands, run_command};
     use std::io::Write;
     use tempfile::NamedTempFile;
 

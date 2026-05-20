@@ -143,6 +143,7 @@ impl DiscoveredTaskDefinitions {
             .push(definition);
     }
 
+    #[allow(dead_code)]
     pub fn get(&self, definition_type: &TaskDefinitionType) -> Option<&TaskDefinitionFile> {
         self.files.get(definition_type).and_then(|v| v.first())
     }
@@ -255,8 +256,6 @@ impl TaskRunner {
         }
     }
 }
-
-
 
 /// Represents the scope of user approval
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

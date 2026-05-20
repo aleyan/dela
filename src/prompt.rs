@@ -321,9 +321,9 @@ mod tests {
 
     #[test]
     fn test_ui_rendering() {
-        use ratatui::backend::TestBackend;
-        use ratatui::Terminal;
         use crate::types::{Task, TaskDefinitionType, TaskRunner};
+        use ratatui::Terminal;
+        use ratatui::backend::TestBackend;
         use std::path::PathBuf;
 
         let backend = TestBackend::new(80, 20);
@@ -342,7 +342,10 @@ mod tests {
         };
 
         let options = vec![
-            ("Allow once (this time only)", AllowDecision::Allow(AllowScope::Once)),
+            (
+                "Allow once (this time only)",
+                AllowDecision::Allow(AllowScope::Once),
+            ),
             ("Deny (don't run this task)", AllowDecision::Deny),
         ];
 
