@@ -345,21 +345,16 @@ Advanced MCP features for better editor integration and real-time feedback.
 
 ## Technical Debt & Code Cleanup (Phase 11)
 
-**Issue 1: `DiscoveredTaskDefinitions` OCP Violation & Data Drift**
 - [ ] **[DTKT-202]** Refactor `DiscoveredTaskDefinitions` to use a grouped map collection (`BTreeMap<TaskDefinitionType, Vec<TaskDefinitionFile>>`) instead of hardcoded fields. This preserves predictable output ordering while robustly capturing multiple definitions per parser (e.g., included Makefiles or workspace-local `turbo.json` configs).
 - [ ] **[DTKT-203]** Migrate all dependent discovery and output layers to iterate dynamically over the new collection, allowing new parsers (e.g., TravisCi, CMake, Justfile) to correctly store their statuses.
 
-**Issue 2: Copy-Paste Formatting Boilerplate in `list.rs`**
 - [ ] **[DTKT-204]** Consolidate the 100+ lines of duplicated `TaskFileStatus` match formatting blocks in `src/commands/list.rs` into a single loop mapping over the refactored `DiscoveredTaskDefinitions`.
 
-**Issue 3: `test_println!` Macro Abuse (Untestable I/O)**
 - [ ] **[DTKT-205]** Deprecate the hacky `test_println!` macro and abstract CLI formatting: Inject a `&mut dyn std::io::Write` interface (or an abstract output buffer) across commands.
 - [ ] **[DTKT-206]** Update tests in `list.rs` to pass a mock buffer and write explicit assertions against the output strings instead of discarding stdout.
 
-**Issue 4: Monolithic God Files**
 - [ ] **[DTKT-207]** Abstract the ~350-line `task_start` routing function and other large handlers inside `mcp/server.rs` into discrete `handlers/` modules. Move their respective inline tests to the bottom of these new handler files to keep them bundled with the logic.
 
-**Issue 5: `.unwrap()` Remediation & Testing Robustness**
 - [ ] **[DTKT-208]** Enable `#![warn(clippy::unwrap_used)]` or set up a linter block for `.unwrap()` across the project.
 - [ ] **[DTKT-209]** Audit and replace `.unwrap()` usage in production code (`src/`), ensuring all paths bubble up robust `Result` types.
 - [ ] **[DTKT-210]** Refactor the most brittle test blocks to return `anyhow::Result<()>` and use idiomatic `assert!(matches!(...))` rather than panicking on `None` or `Err`.
