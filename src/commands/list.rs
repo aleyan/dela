@@ -35,7 +35,11 @@ pub fn execute(verbose: bool, color: &str) -> anyhow::Result<()> {
         test_println!("Task definition files:");
         for (_def_type, files) in discovered.definitions.iter() {
             for file in files {
-                let file_name = file.path.file_name().unwrap_or_default().to_string_lossy();
+                let file_name = file
+                    .path
+                    .strip_prefix(&current_dir)
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_else(|_| file.path.to_string_lossy().to_string());
                 match &file.status {
                     TaskFileStatus::Parsed => {
                         test_println!("  {} {}: Found and parsed", "✓".green(), file_name);
@@ -944,11 +948,27 @@ mod tests {
         );
     }
 
+    struct CwdGuard {
+        old_dir: Option<PathBuf>,
+    }
+
+    impl Drop for CwdGuard {
+        fn drop(&mut self) {
+            if let Some(ref dir) = self.old_dir {
+                let _ = std::env::set_current_dir(dir);
+            }
+            reset_to_real_environment();
+        }
+    }
+
     #[test]
     #[serial]
     fn test_execute_command_success() {
         let (temp_dir, _home_dir) = setup_test_env();
         let original_dir = std::env::current_dir().ok();
+        let _guard = CwdGuard {
+            old_dir: original_dir,
+        };
 
         // Change current directory to temp_dir
         std::env::set_current_dir(temp_dir.path()).unwrap();
@@ -960,11 +980,5 @@ mod tests {
         // Run execute
         let result = execute(true, "never");
         assert!(result.is_ok());
-
-        // Restore original directory if it was valid
-        if let Some(dir) = original_dir {
-            let _ = std::env::set_current_dir(dir);
-        }
-        reset_to_real_environment();
     }
 }

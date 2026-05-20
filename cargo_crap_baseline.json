@@ -27,20 +27,20 @@
       "crap": 182.0
     },
     {
-      "file": "./src/commands/list.rs",
-      "function": "execute",
-      "line": 22,
-      "cyclomatic": 43.0,
-      "coverage": 69.12751677852349,
-      "crap": 97.40660179464678
-    },
-    {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::task_start",
       "line": 414,
       "cyclomatic": 43.0,
       "coverage": 69.86899563318777,
       "crap": 93.57987320997631
+    },
+    {
+      "file": "./src/commands/list.rs",
+      "function": "execute",
+      "line": 22,
+      "cyclomatic": 43.0,
+      "coverage": 69.93464052287581,
+      "crap": 93.25000551433072
     },
     {
       "file": "./src/prompt.rs",
@@ -221,7 +221,7 @@
     {
       "file": "./src/commands/list.rs",
       "function": "format_task_entry",
-      "line": 231,
+      "line": 235,
       "cyclomatic": 15.0,
       "coverage": 83.33333333333334,
       "crap": 16.041666666666664
@@ -1069,7 +1069,7 @@
     {
       "file": "./src/commands/list.rs",
       "function": "format_task_entry_with_source",
-      "line": 320,
+      "line": 324,
       "cyclomatic": 3.0,
       "coverage": 100.0,
       "crap": 3.0
@@ -1077,7 +1077,7 @@
     {
       "file": "./src/commands/list.rs",
       "function": "task_source_label",
-      "line": 333,
+      "line": 337,
       "cyclomatic": 3.0,
       "coverage": 100.0,
       "crap": 3.0
@@ -1125,7 +1125,7 @@
     {
       "file": "./src/commands/list.rs",
       "function": "format_definition_path_for_display",
-      "line": 347,
+      "line": 351,
       "cyclomatic": 2.0,
       "coverage": 80.0,
       "crap": 2.032
@@ -1141,7 +1141,7 @@
     {
       "file": "./src/commands/list.rs",
       "function": "format_runner_path_for_display",
-      "line": 355,
+      "line": 359,
       "cyclomatic": 2.0,
       "coverage": 85.71428571428571,
       "crap": 2.011661807580175
