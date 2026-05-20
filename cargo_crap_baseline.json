@@ -85,10 +85,10 @@
     {
       "file": "./src/parsers/parse_pyproject_toml.rs",
       "function": "parse",
-      "line": 7,
-      "cyclomatic": 29.0,
-      "coverage": 93.75,
-      "crap": 29.205322265625
+      "line": 6,
+      "cyclomatic": 22.0,
+      "coverage": 94.44444444444444,
+      "crap": 22.08299039780521
     },
     {
       "file": "./src/composed_paths.rs",
@@ -281,14 +281,6 @@
       "cyclomatic": 13.0,
       "coverage": 100.0,
       "crap": 13.0
-    },
-    {
-      "file": "./src/runners/runners_pyproject_toml.rs",
-      "function": "detect_package_manager",
-      "line": 21,
-      "cyclomatic": 11.0,
-      "coverage": 77.41935483870968,
-      "crap": 12.393138867443188
     },
     {
       "file": "./src/parsers/parse_makefile.rs",
@@ -577,6 +569,14 @@
       "cyclomatic": 6.0,
       "coverage": 75.0,
       "crap": 6.5625
+    },
+    {
+      "file": "./src/runners/runners_pyproject_toml.rs",
+      "function": "detect_package_manager",
+      "line": 21,
+      "cyclomatic": 6.0,
+      "coverage": 80.76923076923077,
+      "crap": 6.256030951297223
     },
     {
       "file": "./src/allowlist.rs",

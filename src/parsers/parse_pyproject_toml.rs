@@ -1,5 +1,4 @@
 use crate::parsers::errors::DelaParseError;
-use crate::task_shadowing::check_path_executable;
 use crate::types::{Task, TaskDefinitionType, TaskRunner};
 use std::path::Path;
 
@@ -15,7 +14,6 @@ pub fn parse(path: &Path) -> Result<Vec<Task>, DelaParseError> {
     if let Some(project) = toml.get("project")
         && let Some(scripts) = project.get("scripts")
         && let Some(scripts_table) = scripts.as_table()
-        && (cfg!(test) || check_path_executable("uv").is_some())
     {
         for (name, cmd) in scripts_table {
             let description = cmd.as_str().map(|s| format!("python script: {}", s));
@@ -46,26 +44,20 @@ pub fn parse(path: &Path) -> Result<Vec<Task>, DelaParseError> {
         if let Some(scripts) = poetry.get("scripts")
             && let Some(scripts_table) = scripts.as_table()
         {
-            let poetry_lock_exists = path
-                .parent()
-                .map(|dir| dir.join("poetry.lock").exists())
-                .unwrap_or(false);
-            if poetry_lock_exists && (cfg!(test) || check_path_executable("poetry").is_some()) {
-                for (name, cmd) in scripts_table {
-                    let description = cmd.as_str().map(|s| format!("python script: {}", s));
+            for (name, cmd) in scripts_table {
+                let description = cmd.as_str().map(|s| format!("python script: {}", s));
 
-                    tasks.push(Task {
-                        name: name.clone(),
-                        file_path: path.to_path_buf(),
-                        definition_path: None,
-                        definition_type: TaskDefinitionType::PyprojectToml,
-                        runner: TaskRunner::PythonPoetry,
-                        source_name: name.clone(),
-                        description,
-                        shadowed_by: None,
-                        disambiguated_name: None,
-                    });
-                }
+                tasks.push(Task {
+                    name: name.clone(),
+                    file_path: path.to_path_buf(),
+                    definition_path: None,
+                    definition_type: TaskDefinitionType::PyprojectToml,
+                    runner: TaskRunner::PythonPoetry,
+                    source_name: name.clone(),
+                    description,
+                    shadowed_by: None,
+                    disambiguated_name: None,
+                });
             }
         }
     }
@@ -79,8 +71,7 @@ pub fn parse(path: &Path) -> Result<Vec<Task>, DelaParseError> {
             inner.as_table()
         } else {
             poe_section.as_table()
-        } && (cfg!(test) || check_path_executable("poe").is_some())
-        {
+        } {
             for (name, task_def) in tasks_table {
                 let description = match task_def {
                     toml::Value::String(cmd) => Some(format!("command: {}", cmd)),
@@ -118,6 +109,7 @@ pub fn parse(path: &Path) -> Result<Vec<Task>, DelaParseError> {
 mod tests {
     use super::*;
     use crate::task_shadowing::{enable_mock, mock_executable, reset_mock};
+    use serial_test::serial;
     use std::fs::File;
     use std::io::Write;
     use tempfile::TempDir;
@@ -312,5 +304,50 @@ lint = { shell = "flake8" }
         );
 
         reset_mock();
+    }
+
+    #[test]
+    #[serial]
+    fn test_parse_without_executables() {
+        let temp_dir = TempDir::new().unwrap();
+        let pyproject_path = temp_dir.path().join("pyproject.toml");
+
+        // Clear mock to ensure no executables are mock-installed
+        reset_mock();
+
+        let content = r#"
+[project]
+name = "test-project"
+
+[project.scripts]
+uv-task = "pytest"
+
+[tool.poetry]
+name = "test-project"
+
+[tool.poetry.scripts]
+poetry-task = "pytest"
+
+[tool.poe.tasks]
+poe-task = "pytest"
+"#;
+
+        File::create(&pyproject_path)
+            .unwrap()
+            .write_all(content.as_bytes())
+            .unwrap();
+
+        let tasks = parse(&pyproject_path).unwrap();
+
+        assert_eq!(tasks.len(), 3);
+
+        let uv_task = tasks.iter().find(|t| t.name == "uv-task").unwrap();
+        assert_eq!(uv_task.runner, TaskRunner::PythonUv);
+
+        let poetry_task = tasks.iter().find(|t| t.name == "poetry-task").unwrap();
+        assert_eq!(poetry_task.runner, TaskRunner::PythonPoetry);
+
+        let poe_task = tasks.iter().find(|t| t.name == "poe-task").unwrap();
+        assert_eq!(poe_task.runner, TaskRunner::PythonPoe);
     }
 }
