@@ -109,7 +109,7 @@
     {
       "file": "./src/types.rs",
       "function": "TaskRunner::get_command",
-      "line": 192,
+      "line": 205,
       "cyclomatic": 21.0,
       "coverage": 100.0,
       "crap": 21.0
@@ -165,7 +165,7 @@
     {
       "file": "./src/types.rs",
       "function": "TaskRunner::short_name",
-      "line": 235,
+      "line": 248,
       "cyclomatic": 19.0,
       "coverage": 95.23809523809523,
       "crap": 19.038980671633734
@@ -239,8 +239,8 @@
       "function": "evaluate_task_against_allowlist",
       "line": 75,
       "cyclomatic": 14.0,
-      "coverage": 95.65217391304348,
-      "crap": 14.016109147694584
+      "coverage": 100.0,
+      "crap": 14.0
     },
     {
       "file": "./src/mcp/server.rs",
@@ -1204,8 +1204,16 @@
     },
     {
       "file": "./src/types.rs",
+      "function": "DiscoveredTaskDefinitions::get_all",
+      "line": 154,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0
+    },
+    {
+      "file": "./src/types.rs",
       "function": "deserialize_path",
-      "line": 298,
+      "line": 309,
       "cyclomatic": 2.0,
       "coverage": 100.0,
       "crap": 2.0
@@ -1684,8 +1692,16 @@
     },
     {
       "file": "./src/types.rs",
-      "function": "DiscoveredTaskDefinitions::get",
-      "line": 146,
+      "function": "DiscoveredTaskDefinitions::get_first",
+      "line": 148,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/types.rs",
+      "function": "DiscoveredTaskDefinitions::iter",
+      "line": 159,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -1693,7 +1709,7 @@
     {
       "file": "./src/types.rs",
       "function": "Task::definition_path",
-      "line": 180,
+      "line": 193,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -1701,7 +1717,7 @@
     {
       "file": "./src/types.rs",
       "function": "Task::allowlist_path",
-      "line": 185,
+      "line": 198,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -1709,7 +1725,7 @@
     {
       "file": "./src/types.rs",
       "function": "serialize_path",
-      "line": 291,
+      "line": 302,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
