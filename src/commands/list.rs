@@ -10,7 +10,9 @@ use std::path::Path;
 
 #[cfg(test)]
 macro_rules! test_println {
-    ($($arg:tt)*) => {};
+    ($($arg:tt)*) => {
+        let _ = format_args!($($arg)*);
+    };
 }
 #[cfg(not(test))]
 macro_rules! test_println {

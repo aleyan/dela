@@ -5,18 +5,10 @@
     {
       "file": "./src/commands/list.rs",
       "function": "execute",
-      "line": 20,
-      "cyclomatic": 72.0,
+      "line": 22,
+      "cyclomatic": 43.0,
       "coverage": 0.0,
-      "crap": 5256.0
-    },
-    {
-      "file": "./src/commands/mcp.rs",
-      "function": "execute",
-      "line": 243,
-      "cyclomatic": 19.0,
-      "coverage": 0.0,
-      "crap": 380.0
+      "crap": 1892.0
     },
     {
       "file": "./src/mcp/job_manager.rs",
@@ -25,6 +17,14 @@
       "cyclomatic": 29.0,
       "coverage": 24.691358024691358,
       "crap": 388.19513360843445
+    },
+    {
+      "file": "./src/commands/mcp.rs",
+      "function": "execute",
+      "line": 243,
+      "cyclomatic": 19.0,
+      "coverage": 0.0,
+      "crap": 380.0
     },
     {
       "file": "./src/mcp/server.rs",
@@ -109,7 +109,7 @@
     {
       "file": "./src/types.rs",
       "function": "TaskRunner::get_command",
-      "line": 199,
+      "line": 192,
       "cyclomatic": 21.0,
       "coverage": 100.0,
       "crap": 21.0
@@ -165,7 +165,7 @@
     {
       "file": "./src/types.rs",
       "function": "TaskRunner::short_name",
-      "line": 242,
+      "line": 235,
       "cyclomatic": 19.0,
       "coverage": 95.23809523809523,
       "crap": 19.038980671633734
@@ -221,7 +221,7 @@
     {
       "file": "./src/commands/list.rs",
       "function": "format_task_entry",
-      "line": 356,
+      "line": 231,
       "cyclomatic": 15.0,
       "coverage": 83.33333333333334,
       "crap": 16.041666666666664
@@ -233,14 +233,6 @@
       "cyclomatic": 15.0,
       "coverage": 92.3076923076923,
       "crap": 15.10241238051889
-    },
-    {
-      "file": "./src/task_discovery/support.rs",
-      "function": "set_definition",
-      "line": 12,
-      "cyclomatic": 14.0,
-      "coverage": 87.5,
-      "crap": 14.3828125
     },
     {
       "file": "./src/allowlist.rs",
@@ -925,7 +917,7 @@
     {
       "file": "./src/commands/list.rs",
       "function": "format_task_entry_with_source",
-      "line": 445,
+      "line": 320,
       "cyclomatic": 3.0,
       "coverage": 87.5,
       "crap": 3.017578125
@@ -1077,7 +1069,7 @@
     {
       "file": "./src/commands/list.rs",
       "function": "task_source_label",
-      "line": 458,
+      "line": 333,
       "cyclomatic": 3.0,
       "coverage": 100.0,
       "crap": 3.0
@@ -1125,7 +1117,7 @@
     {
       "file": "./src/commands/list.rs",
       "function": "format_definition_path_for_display",
-      "line": 472,
+      "line": 347,
       "cyclomatic": 2.0,
       "coverage": 80.0,
       "crap": 2.032
@@ -1141,7 +1133,7 @@
     {
       "file": "./src/commands/list.rs",
       "function": "format_runner_path_for_display",
-      "line": 480,
+      "line": 355,
       "cyclomatic": 2.0,
       "coverage": 85.71428571428571,
       "crap": 2.011661807580175
@@ -1205,7 +1197,7 @@
     {
       "file": "./src/types.rs",
       "function": "deserialize_path",
-      "line": 315,
+      "line": 298,
       "cyclomatic": 2.0,
       "coverage": 100.0,
       "crap": 2.0
@@ -1605,7 +1597,7 @@
     {
       "file": "./src/task_discovery.rs",
       "function": "discover_tasks",
-      "line": 67,
+      "line": 51,
       "cyclomatic": 2.0,
       "coverage": 100.0,
       "crap": 2.0
@@ -1692,8 +1684,24 @@
     },
     {
       "file": "./src/types.rs",
+      "function": "DiscoveredTaskDefinitions::insert",
+      "line": 139,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/types.rs",
+      "function": "DiscoveredTaskDefinitions::get",
+      "line": 146,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/types.rs",
       "function": "Task::definition_path",
-      "line": 187,
+      "line": 180,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -1701,7 +1709,7 @@
     {
       "file": "./src/types.rs",
       "function": "Task::allowlist_path",
-      "line": 192,
+      "line": 185,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -1709,7 +1717,7 @@
     {
       "file": "./src/types.rs",
       "function": "serialize_path",
-      "line": 308,
+      "line": 291,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -1796,8 +1804,16 @@
     },
     {
       "file": "./src/task_discovery/support.rs",
+      "function": "set_definition",
+      "line": 12,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/task_discovery/support.rs",
       "function": "handle_discovery_error",
-      "line": 36,
+      "line": 16,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -1805,7 +1821,7 @@
     {
       "file": "./src/task_discovery/support.rs",
       "function": "handle_discovery_success",
-      "line": 57,
+      "line": 37,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -2309,7 +2325,7 @@
     {
       "file": "./src/task_discovery.rs",
       "function": "DiscoveredTasks::new",
-      "line": 52,
+      "line": 36,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -2317,7 +2333,7 @@
     {
       "file": "./src/task_discovery.rs",
       "function": "DiscoveredTasks::add_task",
-      "line": 57,
+      "line": 41,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
