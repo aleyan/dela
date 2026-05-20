@@ -71,8 +71,7 @@ pub fn parse(path: &Path) -> Result<Vec<Task>, DelaParseError> {
             inner.as_table()
         } else {
             poe_section.as_table()
-        }
-        {
+        } {
             for (name, task_def) in tasks_table {
                 let description = match task_def {
                     toml::Value::String(cmd) => Some(format!("command: {}", cmd)),
