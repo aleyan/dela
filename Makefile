@@ -9,6 +9,7 @@ VERBOSE ?= 0
 -include .env
 
 include make/release.mk
+include make/crap.mk
 
 build:
 	@echo "Building dela..."
@@ -79,11 +80,3 @@ test_long:
 coverage_github: build
 	@echo "Running parsing coverage over top github repos..."
 	uv run --script scripts/dela_coverage_git_refs.py --dela-bin ./target/debug/dela
-
-cargo_crap:
-	@echo "Reporting Change Risk Anti-Patterns metric"
-	@echo "Checking dependencies (cargo-llvm-cov and cargo-crap)..."
-	@cargo llvm-cov --version 2>/dev/null | grep -q "0.8.7" || cargo install cargo-llvm-cov --version 0.8.7 --force --locked
-	@cargo crap --version 2>/dev/null | grep -q "0.2.0" || cargo install cargo-crap --version 0.2.0 --force --locked
-	cargo llvm-cov --lcov --output-path lcov.info
-	cargo crap --lcov lcov.info --top 20

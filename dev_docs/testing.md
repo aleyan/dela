@@ -56,3 +56,6 @@ Each shell type (bash, fish, zsh, pwsh) has its own Dockerfile in the `tests/doc
    - Proper file permissions and ownership
 
 The `docker_noinit` container provides a clean environment for testing dela without any shell initialization, ensuring dela works correctly even without shell-specific configurations.
+
+## Change Risk Anti-Patterns (CRAP)
+There is a crap metric baseline in `cargo_crap_baseline.json`. Run `make crap_check` to make sure that you are not increasing the untested complexity of the code. If that crap increase is too high, refactor the code, otherwise update the baseline with `make crap_update`.
