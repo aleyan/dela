@@ -19,24 +19,6 @@ pub fn parse(path: &Path) -> anyhow::Result<Vec<Task>> {
 /// Detect which Python package manager to use based on lock files and available commands
 #[allow(dead_code)]
 pub fn detect_package_manager(dir: &Path) -> Option<TaskRunner> {
-    // Check for available package managers
-    let has_poetry = check_path_executable("poetry").is_some();
-    let has_uv = check_path_executable("uv").is_some();
-    let has_poe = check_path_executable("poe").is_some();
-
-    #[cfg(test)]
-    eprintln!(
-        "detect_package_manager debug: poetry={}, uv={}, poe={}",
-        has_poetry, has_uv, has_poe
-    );
-
-    // If no package managers are available, return None
-    if !has_poetry && !has_uv && !has_poe {
-        #[cfg(test)]
-        eprintln!("detect_package_manager debug: no package managers available");
-        return None;
-    }
-
     // Check for lock files first
     let poetry_lock_exists = dir.join("poetry.lock").exists();
     let uv_lock_exists = dir.join("uv.lock").exists();
@@ -47,20 +29,27 @@ pub fn detect_package_manager(dir: &Path) -> Option<TaskRunner> {
         poetry_lock_exists, uv_lock_exists
     );
 
-    if poetry_lock_exists && has_poetry {
+    if poetry_lock_exists {
         #[cfg(test)]
         eprintln!("detect_package_manager debug: selecting poetry due to lock file");
         return Some(TaskRunner::PythonPoetry);
     }
-    if uv_lock_exists && has_uv {
+    if uv_lock_exists {
         #[cfg(test)]
         eprintln!("detect_package_manager debug: selecting uv due to lock file");
         return Some(TaskRunner::PythonUv);
     }
 
-    // If no lock files, use preferred order
+    // Check for available package managers if no lock files exist
+    let has_poetry = check_path_executable("poetry").is_some();
+    let has_uv = check_path_executable("uv").is_some();
+    let has_poe = check_path_executable("poe").is_some();
+
     #[cfg(test)]
-    eprintln!("detect_package_manager debug: no lock files found, using preferred order");
+    eprintln!(
+        "detect_package_manager debug: poetry={}, uv={}, poe={}",
+        has_poetry, has_uv, has_poe
+    );
 
     if has_poetry {
         Some(TaskRunner::PythonPoetry)
@@ -193,6 +182,38 @@ mod tests {
 
         let result = detect_package_manager(temp_dir.path());
         assert_eq!(result, Some(TaskRunner::PythonPoetry));
+
+        reset_to_real_environment();
+    }
+
+    #[test]
+    #[serial]
+    fn test_detect_package_manager_with_poetry_lock_but_no_executable() {
+        let temp_dir = TempDir::new().unwrap();
+        create_poetry_lock(temp_dir.path());
+
+        // Set up test environment with NO executables
+        let env = TestEnvironment::new();
+        set_test_environment(env);
+
+        let result = detect_package_manager(temp_dir.path());
+        assert_eq!(result, Some(TaskRunner::PythonPoetry));
+
+        reset_to_real_environment();
+    }
+
+    #[test]
+    #[serial]
+    fn test_detect_package_manager_with_uv_lock_but_no_executable() {
+        let temp_dir = TempDir::new().unwrap();
+        create_uv_lock(temp_dir.path());
+
+        // Set up test environment with NO executables
+        let env = TestEnvironment::new();
+        set_test_environment(env);
+
+        let result = detect_package_manager(temp_dir.path());
+        assert_eq!(result, Some(TaskRunner::PythonUv));
 
         reset_to_real_environment();
     }
