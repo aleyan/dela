@@ -104,7 +104,7 @@ fn discover_github_actions_tasks(
     }
 
     if !all_tasks.is_empty() {
-        discovered.definitions.github_actions = Some(TaskDefinitionFile {
+        discovered.definitions.insert(TaskDefinitionFile {
             path: workflows_parent,
             definition_type: TaskDefinitionType::GitHubActions,
             status: TaskFileStatus::Parsed,

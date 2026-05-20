@@ -10,27 +10,7 @@ pub(crate) fn apply_shadowing(tasks: &mut [Task]) {
 }
 
 pub(crate) fn set_definition(discovered: &mut DiscoveredTasks, definition: TaskDefinitionFile) {
-    match definition.definition_type {
-        TaskDefinitionType::Makefile => discovered.definitions.makefile = Some(definition),
-        TaskDefinitionType::PackageJson => discovered.definitions.package_json = Some(definition),
-        TaskDefinitionType::PyprojectToml => {
-            discovered.definitions.pyproject_toml = Some(definition)
-        }
-        TaskDefinitionType::Taskfile => discovered.definitions.taskfile = Some(definition),
-        TaskDefinitionType::TurboJson => discovered.definitions.turbo_json = Some(definition),
-        TaskDefinitionType::MavenPom => discovered.definitions.maven_pom = Some(definition),
-        TaskDefinitionType::Gradle => discovered.definitions.gradle = Some(definition),
-        TaskDefinitionType::GitHubActions => {
-            discovered.definitions.github_actions = Some(definition)
-        }
-        TaskDefinitionType::DockerCompose => {
-            discovered.definitions.docker_compose = Some(definition)
-        }
-        TaskDefinitionType::TravisCi => discovered.definitions.travis_ci = Some(definition),
-        TaskDefinitionType::CMake => discovered.definitions.cmake = Some(definition),
-        TaskDefinitionType::Justfile => discovered.definitions.justfile = Some(definition),
-        _ => {}
-    }
+    discovered.definitions.insert(definition);
 }
 
 pub(crate) fn handle_discovery_error(

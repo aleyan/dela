@@ -159,11 +159,8 @@ enum Commands {
     },
 }
 
-#[tokio::main]
-async fn main() {
-    let cli = Cli::parse();
-
-    let result = match cli.command {
+async fn run_command(command: Commands) -> anyhow::Result<()> {
+    match command {
         Commands::Mcp {
             cwd,
             init_cursor,
@@ -194,7 +191,14 @@ async fn main() {
             }
         }
         Commands::AllowCommand { task, allow } => commands::allow_command::execute(&task, allow),
-    };
+    }
+}
+
+#[tokio::main]
+async fn main() {
+    let cli = Cli::parse();
+
+    let result = run_command(cli.command).await;
 
     if let Err(err) = result {
         if err
@@ -211,6 +215,7 @@ async fn main() {
 
 #[cfg(test)]
 mod tests {
+    use super::{Commands, run_command};
     use std::io::Write;
     use tempfile::NamedTempFile;
 
@@ -253,5 +258,12 @@ mod tests {
             lines[1], "Error: Failed to execute task",
             "Regular error should have 'Error:' prefix"
         );
+    }
+
+    #[tokio::test]
+    async fn test_run_command_get_command_empty() {
+        let result = run_command(Commands::GetCommand { args: vec![] }).await;
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().to_string(), "No task name provided");
     }
 }

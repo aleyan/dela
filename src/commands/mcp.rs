@@ -487,4 +487,53 @@ mod tests {
             home.join(".claude-code/settings.json")
         );
     }
+
+    struct TestEnvGuard {
+        old_dir: Option<std::path::PathBuf>,
+        old_home: Option<String>,
+    }
+
+    impl Drop for TestEnvGuard {
+        fn drop(&mut self) {
+            if let Some(ref dir) = self.old_dir {
+                let _ = std::env::set_current_dir(dir);
+            }
+            if let Some(ref home) = self.old_home {
+                unsafe {
+                    std::env::set_var("HOME", home);
+                }
+            } else {
+                unsafe {
+                    std::env::remove_var("HOME");
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_execute_init_cursor() {
+        let temp_dir = TempDir::new().unwrap();
+        // Save the old HOME env var and original CWD inside RAII guard
+        let _guard = TestEnvGuard {
+            old_dir: std::env::current_dir().ok(),
+            old_home: std::env::var("HOME").ok(),
+        };
+
+        // Change current directory to temp_dir
+        std::env::set_current_dir(temp_dir.path()).unwrap();
+
+        unsafe {
+            std::env::set_var("HOME", temp_dir.path());
+        }
+
+        let result = execute(".".to_string(), true, false, false, false, false).await;
+        if let Err(ref e) = result {
+            panic!("execute failed with error: {:?}", e);
+        }
+        assert!(result.is_ok());
+
+        let expected_path = temp_dir.path().join(".cursor/mcp.json");
+        assert!(expected_path.exists());
+    }
 }

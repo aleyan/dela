@@ -11,7 +11,7 @@ pub enum ShadowType {
 }
 
 /// Different types of task definition files supported by dela
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TaskDefinitionType {
     /// Makefile
     Makefile,
@@ -130,29 +130,35 @@ pub struct TaskDefinitionFile {
 }
 
 /// Collection of discovered task definition files
-#[derive(Debug, Default)]
-#[allow(dead_code)]
+#[derive(Debug, Clone, Default)]
 pub struct DiscoveredTaskDefinitions {
-    /// Makefile if found
-    pub makefile: Option<TaskDefinitionFile>,
-    /// package.json if found
-    pub package_json: Option<TaskDefinitionFile>,
-    /// pyproject.toml if found
-    pub pyproject_toml: Option<TaskDefinitionFile>,
-    /// Taskfile.yml if found
-    pub taskfile: Option<TaskDefinitionFile>,
-    /// turbo.json if found
-    pub turbo_json: Option<TaskDefinitionFile>,
-    /// Maven pom.xml if found
-    pub maven_pom: Option<TaskDefinitionFile>,
-    /// Gradle build files (build.gradle, build.gradle.kts) if found
-    pub gradle: Option<TaskDefinitionFile>,
-    /// GitHub Actions workflow files if found
-    pub github_actions: Option<TaskDefinitionFile>,
-    /// Docker Compose files if found
-    pub docker_compose: Option<TaskDefinitionFile>,
-    /// Justfile if found
-    pub justfile: Option<TaskDefinitionFile>,
+    files: std::collections::BTreeMap<TaskDefinitionType, Vec<TaskDefinitionFile>>,
+}
+
+impl DiscoveredTaskDefinitions {
+    pub fn insert(&mut self, definition: TaskDefinitionFile) {
+        self.files
+            .entry(definition.definition_type.clone())
+            .or_default()
+            .push(definition);
+    }
+
+    /// Returns the first definition file for a given type, if any.
+    #[allow(dead_code)]
+    pub fn get_first(&self, definition_type: &TaskDefinitionType) -> Option<&TaskDefinitionFile> {
+        self.files.get(definition_type).and_then(|v| v.first())
+    }
+
+    /// Returns all definition files for a given type, if any.
+    #[allow(dead_code)]
+    pub fn get_all(&self, definition_type: &TaskDefinitionType) -> Option<&[TaskDefinitionFile]> {
+        self.files.get(definition_type).map(|v| v.as_slice())
+    }
+
+    /// Iterates over all (type, files) entries.
+    pub fn iter(&self) -> impl Iterator<Item = (&TaskDefinitionType, &[TaskDefinitionFile])> {
+        self.files.iter().map(|(k, v)| (k, v.as_slice()))
+    }
 }
 
 /// Represents a discovered task that can be executed
@@ -263,18 +269,6 @@ impl TaskRunner {
     }
 }
 
-/// Result of task discovery in a directory
-#[derive(Debug, Default)]
-#[allow(dead_code)]
-pub struct DiscoveredTasks {
-    /// All tasks found, grouped by name
-    pub tasks: Vec<Task>,
-    /// Any errors encountered during discovery
-    pub errors: Vec<String>,
-    /// Information about discovered task definition files
-    pub definitions: DiscoveredTaskDefinitions,
-}
-
 /// Represents the scope of user approval
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum AllowScope {
@@ -325,4 +319,55 @@ where
 pub struct Allowlist {
     #[serde(default)]
     pub entries: Vec<AllowlistEntry>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_discovered_task_definitions_get_all() {
+        let mut defs = DiscoveredTaskDefinitions::default();
+
+        // 1. Assert get_all returns None on empty
+        assert!(defs.get_all(&TaskDefinitionType::Makefile).is_none());
+
+        // 2. Add multiple definitions sharing the same key, and some unique ones
+        let makefile1 = TaskDefinitionFile {
+            path: PathBuf::from("path/to/Makefile1"),
+            definition_type: TaskDefinitionType::Makefile,
+            status: TaskFileStatus::Parsed,
+        };
+        let makefile2 = TaskDefinitionFile {
+            path: PathBuf::from("path/to/Makefile2"),
+            definition_type: TaskDefinitionType::Makefile,
+            status: TaskFileStatus::NotFound,
+        };
+        let package_json = TaskDefinitionFile {
+            path: PathBuf::from("path/to/package.json"),
+            definition_type: TaskDefinitionType::PackageJson,
+            status: TaskFileStatus::NotImplemented,
+        };
+
+        defs.insert(makefile1.clone());
+        defs.insert(makefile2.clone());
+        defs.insert(package_json.clone());
+
+        // 3. Assert get_all returns the multiple files under the same key
+        let makefiles = defs.get_all(&TaskDefinitionType::Makefile).unwrap();
+        assert_eq!(makefiles.len(), 2);
+        assert_eq!(makefiles[0].path, makefile1.path);
+        assert_eq!(makefiles[0].status, makefile1.status);
+        assert_eq!(makefiles[1].path, makefile2.path);
+        assert_eq!(makefiles[1].status, makefile2.status);
+
+        // 4. Assert get_all returns the single file under its key
+        let package_jsons = defs.get_all(&TaskDefinitionType::PackageJson).unwrap();
+        assert_eq!(package_jsons.len(), 1);
+        assert_eq!(package_jsons[0].path, package_json.path);
+        assert_eq!(package_jsons[0].status, package_json.status);
+
+        // 5. Assert get_all returns None for query on non-inserted key
+        assert!(defs.get_all(&TaskDefinitionType::PyprojectToml).is_none());
+    }
 }

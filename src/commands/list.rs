@@ -10,7 +10,9 @@ use std::path::Path;
 
 #[cfg(test)]
 macro_rules! test_println {
-    ($($arg:tt)*) => {};
+    ($($arg:tt)*) => {
+        let _ = format_args!($($arg)*);
+    };
 }
 #[cfg(not(test))]
 macro_rules! test_println {
@@ -31,156 +33,33 @@ pub fn execute(verbose: bool, color: &str) -> anyhow::Result<()> {
     // Only show task definition files status in verbose mode
     if verbose {
         test_println!("Task definition files:");
-        if let Some(makefile) = &discovered.definitions.makefile {
-            match &makefile.status {
-                TaskFileStatus::Parsed => {
-                    test_println!("  {} Makefile: Found and parsed", "✓".green());
-                }
-                TaskFileStatus::NotImplemented => {
-                    test_println!(
-                        "  {} Makefile: Found but parsing not yet implemented",
-                        "!".yellow()
-                    );
-                }
-                TaskFileStatus::ParseError(_e) => {
-                    test_println!("  {} Makefile: Error parsing: {}", "✗".red(), _e);
-                }
-                TaskFileStatus::NotReadable(_e) => {
-                    test_println!("  {} Makefile: Not readable: {}", "✗".red(), _e);
-                }
-                TaskFileStatus::NotFound => {
-                    test_println!("  {} Makefile: Not found", "-".dimmed());
-                }
-            }
-        }
-        if let Some(package_json) = &discovered.definitions.package_json {
-            match &package_json.status {
-                TaskFileStatus::Parsed => {
-                    test_println!("  {} package.json: Found and parsed", "✓".green());
-                }
-                TaskFileStatus::NotImplemented => {
-                    test_println!(
-                        "  {} package.json: Found but parsing not yet implemented",
-                        "!".yellow()
-                    );
-                }
-                TaskFileStatus::ParseError(_e) => {
-                    test_println!("  {} package.json: Error parsing: {}", "✗".red(), _e);
-                }
-                TaskFileStatus::NotReadable(_e) => {
-                    test_println!("  {} package.json: Not readable: {}", "✗".red(), _e);
-                }
-                TaskFileStatus::NotFound => {
-                    test_println!("  {} package.json: Not found", "-".dimmed());
-                }
-            }
-        }
-        if let Some(pyproject_toml) = &discovered.definitions.pyproject_toml {
-            match &pyproject_toml.status {
-                TaskFileStatus::Parsed => {
-                    test_println!("  {} pyproject.toml: Found and parsed", "✓".green());
-                }
-                TaskFileStatus::NotImplemented => {
-                    test_println!(
-                        "  {} pyproject.toml: Found but parsing not yet implemented",
-                        "!".yellow()
-                    );
-                }
-                TaskFileStatus::ParseError(_e) => {
-                    test_println!("  {} pyproject.toml: Error parsing: {}", "✗".red(), _e);
-                }
-                TaskFileStatus::NotReadable(_e) => {
-                    test_println!("  {} pyproject.toml: Not readable: {}", "✗".red(), _e);
-                }
-                TaskFileStatus::NotFound => {
-                    test_println!("  {} pyproject.toml: Not found", "-".dimmed());
-                }
-            }
-        }
-        if let Some(turbo_json) = &discovered.definitions.turbo_json {
-            match &turbo_json.status {
-                TaskFileStatus::Parsed => {
-                    test_println!("  {} turbo.json: Found and parsed", "✓".green());
-                }
-                TaskFileStatus::NotImplemented => {
-                    test_println!(
-                        "  {} turbo.json: Found but parsing not yet implemented",
-                        "!".yellow()
-                    );
-                }
-                TaskFileStatus::ParseError(_e) => {
-                    test_println!("  {} turbo.json: Error parsing: {}", "✗".red(), _e);
-                }
-                TaskFileStatus::NotReadable(_e) => {
-                    test_println!("  {} turbo.json: Not readable: {}", "✗".red(), _e);
-                }
-                TaskFileStatus::NotFound => {
-                    test_println!("  {} turbo.json: Not found", "-".dimmed());
-                }
-            }
-        }
-        if let Some(maven_pom) = &discovered.definitions.maven_pom {
-            match &maven_pom.status {
-                TaskFileStatus::Parsed => {
-                    test_println!("  {} pom.xml: Found and parsed", "✓".green());
-                }
-                TaskFileStatus::NotImplemented => {
-                    test_println!(
-                        "  {} pom.xml: Found but parsing not yet implemented",
-                        "!".yellow()
-                    );
-                }
-                TaskFileStatus::ParseError(_e) => {
-                    test_println!("  {} pom.xml: Error parsing: {}", "✗".red(), _e);
-                }
-                TaskFileStatus::NotReadable(_e) => {
-                    test_println!("  {} pom.xml: Not readable: {}", "✗".red(), _e);
-                }
-                TaskFileStatus::NotFound => {
-                    test_println!("  {} pom.xml: Not found", "-".dimmed());
-                }
-            }
-        }
-        if let Some(gradle) = &discovered.definitions.gradle {
-            match &gradle.status {
-                TaskFileStatus::Parsed => {
-                    let _file_name = gradle
-                        .path
-                        .file_name()
-                        .unwrap_or_default()
-                        .to_string_lossy();
-                    test_println!("  {} {}: Found and parsed", "✓".green(), _file_name);
-                }
-                TaskFileStatus::NotImplemented => {
-                    let _file_name = gradle
-                        .path
-                        .file_name()
-                        .unwrap_or_default()
-                        .to_string_lossy();
-                    test_println!(
-                        "  {} {}: Found but parsing not yet implemented",
-                        "!".yellow(),
-                        _file_name
-                    );
-                }
-                TaskFileStatus::ParseError(_e) => {
-                    let _file_name = gradle
-                        .path
-                        .file_name()
-                        .unwrap_or_default()
-                        .to_string_lossy();
-                    test_println!("  {} {}: Error parsing: {}", "✗".red(), _file_name, _e);
-                }
-                TaskFileStatus::NotReadable(_e) => {
-                    let _file_name = gradle
-                        .path
-                        .file_name()
-                        .unwrap_or_default()
-                        .to_string_lossy();
-                    test_println!("  {} {}: Not readable: {}", "✗".red(), _file_name, _e);
-                }
-                TaskFileStatus::NotFound => {
-                    test_println!("  {} Gradle build file: Not found", "-".dimmed());
+        for (_def_type, files) in discovered.definitions.iter() {
+            for file in files {
+                let file_name = file
+                    .path
+                    .strip_prefix(&current_dir)
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_else(|_| file.path.to_string_lossy().to_string());
+                match &file.status {
+                    TaskFileStatus::Parsed => {
+                        test_println!("  {} {}: Found and parsed", "✓".green(), file_name);
+                    }
+                    TaskFileStatus::NotImplemented => {
+                        test_println!(
+                            "  {} {}: Found but parsing not yet implemented",
+                            "!".yellow(),
+                            file_name
+                        );
+                    }
+                    TaskFileStatus::ParseError(e) => {
+                        test_println!("  {} {}: Error parsing: {}", "✗".red(), file_name, e);
+                    }
+                    TaskFileStatus::NotReadable(e) => {
+                        test_println!("  {} {}: Not readable: {}", "✗".red(), file_name, e);
+                    }
+                    TaskFileStatus::NotFound => {
+                        test_println!("  {} {}: Not found", "-".dimmed(), file_name);
+                    }
                 }
             }
         }
@@ -1067,5 +946,39 @@ mod tests {
             task_source_label(&included_task, Some(runner_path), current_dir),
             Some("mk/common.mk".to_string())
         );
+    }
+
+    struct CwdGuard {
+        old_dir: Option<PathBuf>,
+    }
+
+    impl Drop for CwdGuard {
+        fn drop(&mut self) {
+            if let Some(ref dir) = self.old_dir {
+                let _ = std::env::set_current_dir(dir);
+            }
+            reset_to_real_environment();
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn test_execute_command_success() {
+        let (temp_dir, _home_dir) = setup_test_env();
+        let original_dir = std::env::current_dir().ok();
+        let _guard = CwdGuard {
+            old_dir: original_dir,
+        };
+
+        // Change current directory to temp_dir
+        std::env::set_current_dir(temp_dir.path()).unwrap();
+
+        // Create a dummy Makefile
+        let makefile_path = temp_dir.path().join("Makefile");
+        std::fs::write(&makefile_path, "build:\n\techo 'building'\n").unwrap();
+
+        // Run execute
+        let result = execute(true, "never");
+        assert!(result.is_ok());
     }
 }

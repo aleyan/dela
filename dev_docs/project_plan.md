@@ -345,10 +345,10 @@ Advanced MCP features for better editor integration and real-time feedback.
 
 ## Technical Debt & Code Cleanup (Phase 11)
 
-- [ ] **[DTKT-202]** Refactor `DiscoveredTaskDefinitions` to use a grouped map collection (`BTreeMap<TaskDefinitionType, Vec<TaskDefinitionFile>>`) instead of hardcoded fields. This preserves predictable output ordering while robustly capturing multiple definitions per parser (e.g., included Makefiles or workspace-local `turbo.json` configs).
-- [ ] **[DTKT-203]** Migrate all dependent discovery and output layers to iterate dynamically over the new collection, allowing new parsers (e.g., TravisCi, CMake, Justfile) to correctly store their statuses.
+- [x] **[DTKT-202]** Refactor `DiscoveredTaskDefinitions` to use a grouped map collection (`BTreeMap<TaskDefinitionType, Vec<TaskDefinitionFile>>`) instead of hardcoded fields. This preserves predictable output ordering while robustly capturing multiple definitions per parser (e.g., included Makefiles or workspace-local `turbo.json` configs).
+- [x] **[DTKT-203]** Migrate all dependent discovery and output layers to iterate dynamically over the new collection, allowing new parsers (e.g., TravisCi, CMake, Justfile) to correctly store their statuses.
 
-- [ ] **[DTKT-204]** Consolidate the 100+ lines of duplicated `TaskFileStatus` match formatting blocks in `src/commands/list.rs` into a single loop mapping over the refactored `DiscoveredTaskDefinitions`.
+- [x] **[DTKT-204]** Consolidate the 100+ lines of duplicated `TaskFileStatus` match formatting blocks in `src/commands/list.rs` into a single loop mapping over the refactored `DiscoveredTaskDefinitions`.
 
 - [ ] **[DTKT-205]** Deprecate the hacky `test_println!` macro and abstract CLI formatting: Inject a `&mut dyn std::io::Write` interface (or an abstract output buffer) across commands.
 - [ ] **[DTKT-206]** Update tests in `list.rs` to pass a mock buffer and write explicit assertions against the output strings instead of discarding stdout.
