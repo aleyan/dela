@@ -18,6 +18,8 @@ Comments should explain why something is done, not what is done. Prefer no or fe
 
 When working on feature, do a git diff against main, and make sure that no unnecessary or temporary code snuck in.
 
+Always run unit tests (`cargo test`) and lint/formatting verification (`make lint`) before completing work or handing off.
+
 ## Error Handling
 
 For error handling, avoid stringly-typed errors and instead define domain-specific, strongly-typed error enums using the `thiserror` crate for internal library logic. At the application boundaries (like CLI commands), use `anyhow::Result<T>` to provide ergonomic context and robust error reporting. The `?` operator should be used to seamlessly convert the strongly-typed internal errors into `anyhow` errors as they propagate up.

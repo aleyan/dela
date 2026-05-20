@@ -1,7 +1,9 @@
 ## Unit Testing
 
 ### Running tests
-   - Run with: `cargo test --lib`
+   - Run with: `make tests`
+   - Always verify that all unit tests pass by running `make tests` before completing work or handing off.
+   - Run integration tests with `make tests_integration` if you changed anything related to shell interactions or are adding a new task runner.
 
 ### Mocking
 When logic depends on the presence of a task runner, always mock it, otherwise
