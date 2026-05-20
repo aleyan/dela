@@ -132,7 +132,7 @@ pub struct TaskDefinitionFile {
 /// Collection of discovered task definition files
 #[derive(Debug, Clone, Default)]
 pub struct DiscoveredTaskDefinitions {
-    pub files: std::collections::BTreeMap<TaskDefinitionType, Vec<TaskDefinitionFile>>,
+    files: std::collections::BTreeMap<TaskDefinitionType, Vec<TaskDefinitionFile>>,
 }
 
 impl DiscoveredTaskDefinitions {
@@ -143,9 +143,21 @@ impl DiscoveredTaskDefinitions {
             .push(definition);
     }
 
+    /// Returns the first definition file for a given type, if any.
     #[allow(dead_code)]
-    pub fn get(&self, definition_type: &TaskDefinitionType) -> Option<&TaskDefinitionFile> {
+    pub fn get_first(&self, definition_type: &TaskDefinitionType) -> Option<&TaskDefinitionFile> {
         self.files.get(definition_type).and_then(|v| v.first())
+    }
+
+    /// Returns all definition files for a given type, if any.
+    #[allow(dead_code)]
+    pub fn get_all(&self, definition_type: &TaskDefinitionType) -> Option<&[TaskDefinitionFile]> {
+        self.files.get(definition_type).map(|v| v.as_slice())
+    }
+
+    /// Iterates over all (type, files) entries.
+    pub fn iter(&self) -> impl Iterator<Item = (&TaskDefinitionType, &[TaskDefinitionFile])> {
+        self.files.iter().map(|(k, v)| (k, v.as_slice()))
     }
 }
 

@@ -196,7 +196,7 @@ mod tests {
         assert!(matches!(
             discovered
                 .definitions
-                .get(&TaskDefinitionType::Makefile)
+                .get_first(&TaskDefinitionType::Makefile)
                 .unwrap()
                 .status,
             TaskFileStatus::NotFound
@@ -206,7 +206,7 @@ mod tests {
         assert!(matches!(
             discovered
                 .definitions
-                .get(&TaskDefinitionType::PackageJson)
+                .get_first(&TaskDefinitionType::PackageJson)
                 .unwrap()
                 .status,
             TaskFileStatus::NotFound
@@ -216,7 +216,7 @@ mod tests {
         assert!(matches!(
             discovered
                 .definitions
-                .get(&TaskDefinitionType::PyprojectToml)
+                .get_first(&TaskDefinitionType::PyprojectToml)
                 .unwrap()
                 .status,
             TaskFileStatus::NotFound
@@ -225,7 +225,7 @@ mod tests {
         assert!(matches!(
             discovered
                 .definitions
-                .get(&TaskDefinitionType::TurboJson)
+                .get_first(&TaskDefinitionType::TurboJson)
                 .unwrap()
                 .status,
             TaskFileStatus::NotFound
@@ -254,7 +254,7 @@ test:
         // Check Makefile status
         let makefile_def = discovered
             .definitions
-            .get(&TaskDefinitionType::Makefile)
+            .get_first(&TaskDefinitionType::Makefile)
             .unwrap();
         assert!(matches!(makefile_def.status, TaskFileStatus::Parsed));
         assert_eq!(makefile_def.path, temp_dir.path().join("Makefile"));
@@ -288,7 +288,7 @@ test:
         assert!(matches!(
             discovered
                 .definitions
-                .get(&TaskDefinitionType::Makefile)
+                .get_first(&TaskDefinitionType::Makefile)
                 .unwrap()
                 .status,
             TaskFileStatus::Parsed
@@ -296,7 +296,7 @@ test:
         assert_eq!(
             discovered
                 .definitions
-                .get(&TaskDefinitionType::Makefile)
+                .get_first(&TaskDefinitionType::Makefile)
                 .unwrap()
                 .path,
             temp_dir.path().join("makefile")
@@ -323,7 +323,7 @@ test:
         assert!(matches!(
             discovered
                 .definitions
-                .get(&TaskDefinitionType::Makefile)
+                .get_first(&TaskDefinitionType::Makefile)
                 .unwrap()
                 .status,
             TaskFileStatus::Parsed
@@ -331,7 +331,7 @@ test:
         assert_eq!(
             discovered
                 .definitions
-                .get(&TaskDefinitionType::Makefile)
+                .get_first(&TaskDefinitionType::Makefile)
                 .unwrap()
                 .path,
             temp_dir.path().join("GNUmakefile")
@@ -364,7 +364,7 @@ test:
         assert_eq!(
             discovered
                 .definitions
-                .get(&TaskDefinitionType::Makefile)
+                .get_first(&TaskDefinitionType::Makefile)
                 .unwrap()
                 .path,
             temp_dir.path().join("GNUmakefile")
@@ -417,7 +417,7 @@ test:
         assert!(matches!(
             discovered
                 .definitions
-                .get(&TaskDefinitionType::Makefile)
+                .get_first(&TaskDefinitionType::Makefile)
                 .unwrap()
                 .status,
             TaskFileStatus::Parsed
@@ -525,7 +525,7 @@ build:
         assert!(matches!(
             discovered
                 .definitions
-                .get(&TaskDefinitionType::Makefile)
+                .get_first(&TaskDefinitionType::Makefile)
                 .unwrap()
                 .status,
             TaskFileStatus::Parsed
@@ -562,7 +562,7 @@ test:
         assert!(matches!(
             discovered
                 .definitions
-                .get(&TaskDefinitionType::Makefile)
+                .get_first(&TaskDefinitionType::Makefile)
                 .unwrap()
                 .status,
             TaskFileStatus::Parsed
@@ -589,7 +589,7 @@ build:
         assert!(matches!(
             discovered
                 .definitions
-                .get(&TaskDefinitionType::Makefile)
+                .get_first(&TaskDefinitionType::Makefile)
                 .unwrap()
                 .status,
             TaskFileStatus::Parsed
@@ -622,7 +622,7 @@ build:
         assert!(matches!(
             discovered
                 .definitions
-                .get(&TaskDefinitionType::Makefile)
+                .get_first(&TaskDefinitionType::Makefile)
                 .unwrap()
                 .status,
             TaskFileStatus::Parsed
@@ -661,7 +661,7 @@ include mk/valid.mk"#,
         assert!(matches!(
             discovered
                 .definitions
-                .get(&TaskDefinitionType::Makefile)
+                .get_first(&TaskDefinitionType::Makefile)
                 .unwrap()
                 .status,
             TaskFileStatus::Parsed
@@ -716,7 +716,7 @@ include mk/valid.mk"#,
         assert_eq!(
             discovered
                 .definitions
-                .get(&TaskDefinitionType::TurboJson)
+                .get_first(&TaskDefinitionType::TurboJson)
                 .unwrap()
                 .status,
             TaskFileStatus::Parsed
@@ -917,7 +917,7 @@ include mk/valid.mk"#,
         assert!(matches!(
             discovered
                 .definitions
-                .get(&TaskDefinitionType::Makefile)
+                .get_first(&TaskDefinitionType::Makefile)
                 .unwrap()
                 .status,
             TaskFileStatus::ParseError(_)
@@ -939,7 +939,7 @@ include mk/valid.mk"#,
         assert!(matches!(
             discovered
                 .definitions
-                .get(&TaskDefinitionType::PyprojectToml)
+                .get_first(&TaskDefinitionType::PyprojectToml)
                 .unwrap()
                 .status,
             TaskFileStatus::ParseError(_)
@@ -977,7 +977,7 @@ include mk/valid.mk"#,
         // Check package.json status
         let package_json_def = discovered
             .definitions
-            .get(&TaskDefinitionType::PackageJson)
+            .get_first(&TaskDefinitionType::PackageJson)
             .unwrap();
         assert_eq!(package_json_def.status, TaskFileStatus::Parsed);
 
@@ -1017,7 +1017,7 @@ include mk/valid.mk"#,
         // Check package.json status shows parse error
         let package_json_def = discovered
             .definitions
-            .get(&TaskDefinitionType::PackageJson)
+            .get_first(&TaskDefinitionType::PackageJson)
             .unwrap();
         assert!(matches!(
             package_json_def.status,
@@ -1056,7 +1056,7 @@ serve = "uvicorn main:app --reload"
         // Check pyproject.toml status
         let pyproject_def = discovered
             .definitions
-            .get(&TaskDefinitionType::PyprojectToml)
+            .get_first(&TaskDefinitionType::PyprojectToml)
             .unwrap();
         assert_eq!(pyproject_def.status, TaskFileStatus::Parsed);
 
@@ -1106,7 +1106,7 @@ lint = "flake8"
         // Check pyproject.toml status
         let pyproject_def = discovered
             .definitions
-            .get(&TaskDefinitionType::PyprojectToml)
+            .get_first(&TaskDefinitionType::PyprojectToml)
             .unwrap();
         assert_eq!(pyproject_def.status, TaskFileStatus::Parsed);
 
@@ -1196,7 +1196,7 @@ serve = "python -m http.server"
         assert!(matches!(
             discovered
                 .definitions
-                .get(&TaskDefinitionType::Makefile)
+                .get_first(&TaskDefinitionType::Makefile)
                 .unwrap()
                 .status,
             TaskFileStatus::Parsed
@@ -1204,7 +1204,7 @@ serve = "python -m http.server"
         assert!(matches!(
             discovered
                 .definitions
-                .get(&TaskDefinitionType::PackageJson)
+                .get_first(&TaskDefinitionType::PackageJson)
                 .unwrap()
                 .status,
             TaskFileStatus::Parsed
@@ -1212,7 +1212,7 @@ serve = "python -m http.server"
         assert!(matches!(
             discovered
                 .definitions
-                .get(&TaskDefinitionType::PyprojectToml)
+                .get_first(&TaskDefinitionType::PyprojectToml)
                 .unwrap()
                 .status,
             TaskFileStatus::Parsed
@@ -1462,7 +1462,7 @@ tasks:
         // Check Taskfile.yml status
         let taskfile_def = discovered
             .definitions
-            .get(&TaskDefinitionType::Taskfile)
+            .get_first(&TaskDefinitionType::Taskfile)
             .unwrap();
         assert_eq!(taskfile_def.status, TaskFileStatus::Parsed);
 
@@ -1540,7 +1540,7 @@ tasks:
         assert!(matches!(
             discovered
                 .definitions
-                .get(&TaskDefinitionType::Taskfile)
+                .get_first(&TaskDefinitionType::Taskfile)
                 .unwrap()
                 .status,
             TaskFileStatus::Parsed
@@ -1609,7 +1609,7 @@ tasks:
         assert!(matches!(
             discovered
                 .definitions
-                .get(&TaskDefinitionType::Taskfile)
+                .get_first(&TaskDefinitionType::Taskfile)
                 .unwrap()
                 .status,
             TaskFileStatus::Parsed
@@ -1668,7 +1668,7 @@ tasks:
         assert!(matches!(
             discovered
                 .definitions
-                .get(&TaskDefinitionType::Taskfile)
+                .get_first(&TaskDefinitionType::Taskfile)
                 .unwrap()
                 .status,
             TaskFileStatus::ParseError(_)
@@ -1761,13 +1761,13 @@ tasks:
         assert!(
             discovered
                 .definitions
-                .get(&TaskDefinitionType::MavenPom)
+                .get_first(&TaskDefinitionType::MavenPom)
                 .is_some()
         );
         assert_eq!(
             discovered
                 .definitions
-                .get(&TaskDefinitionType::MavenPom)
+                .get_first(&TaskDefinitionType::MavenPom)
                 .unwrap()
                 .status,
             TaskFileStatus::Parsed
@@ -1944,7 +1944,7 @@ jobs:
         assert!(matches!(
             discovered
                 .definitions
-                .get(&TaskDefinitionType::GitHubActions)
+                .get_first(&TaskDefinitionType::GitHubActions)
                 .unwrap()
                 .status,
             TaskFileStatus::Parsed
@@ -2489,7 +2489,7 @@ tasks:
         // Check that the taskfile status is Parsed
         let taskfile_def = discovered
             .definitions
-            .get(&TaskDefinitionType::Taskfile)
+            .get_first(&TaskDefinitionType::Taskfile)
             .unwrap();
         assert_eq!(taskfile_def.status, TaskFileStatus::Parsed);
 
@@ -2511,7 +2511,7 @@ tasks:
         // Check that the taskfile status is Parsed
         let taskfile_def = discovered
             .definitions
-            .get(&TaskDefinitionType::Taskfile)
+            .get_first(&TaskDefinitionType::Taskfile)
             .unwrap();
         assert_eq!(taskfile_def.status, TaskFileStatus::Parsed);
 
@@ -2558,7 +2558,7 @@ services:
         // Check that the docker-compose status is Parsed
         let docker_compose_def = discovered
             .definitions
-            .get(&TaskDefinitionType::DockerCompose)
+            .get_first(&TaskDefinitionType::DockerCompose)
             .unwrap();
         assert_eq!(docker_compose_def.status, TaskFileStatus::Parsed);
         assert_eq!(docker_compose_def.path, docker_compose_path);
@@ -2616,7 +2616,7 @@ services: {}
         // Check that the docker-compose status is Parsed
         let docker_compose_def = discovered
             .definitions
-            .get(&TaskDefinitionType::DockerCompose)
+            .get_first(&TaskDefinitionType::DockerCompose)
             .unwrap();
         assert_eq!(docker_compose_def.status, TaskFileStatus::Parsed);
 
@@ -2637,7 +2637,7 @@ services: {}
         // Check that the docker-compose status is NotFound
         let docker_compose_def = discovered
             .definitions
-            .get(&TaskDefinitionType::DockerCompose)
+            .get_first(&TaskDefinitionType::DockerCompose)
             .unwrap();
         assert_eq!(docker_compose_def.status, TaskFileStatus::NotFound);
 
@@ -2666,7 +2666,7 @@ services:
         // Check that the docker-compose status is Parsed
         let docker_compose_def = discovered
             .definitions
-            .get(&TaskDefinitionType::DockerCompose)
+            .get_first(&TaskDefinitionType::DockerCompose)
             .unwrap();
         assert_eq!(docker_compose_def.status, TaskFileStatus::Parsed);
         assert_eq!(docker_compose_def.path, temp_dir.path().join("compose.yml"));
@@ -2705,7 +2705,7 @@ services:
         // Check that the higher priority file is used
         let docker_compose_def = discovered
             .definitions
-            .get(&TaskDefinitionType::DockerCompose)
+            .get_first(&TaskDefinitionType::DockerCompose)
             .unwrap();
         assert_eq!(docker_compose_def.status, TaskFileStatus::Parsed);
         assert_eq!(
@@ -2751,7 +2751,7 @@ jobs:
         // Check that the travis-ci status is Parsed
         let travis_def = discovered
             .definitions
-            .get(&TaskDefinitionType::TravisCi)
+            .get_first(&TaskDefinitionType::TravisCi)
             .unwrap();
         assert_eq!(travis_def.status, TaskFileStatus::Parsed);
         assert_eq!(travis_def.path, travis_path);
@@ -2803,7 +2803,7 @@ matrix:
         // Check that the travis-ci status is Parsed
         let travis_def = discovered
             .definitions
-            .get(&TaskDefinitionType::TravisCi)
+            .get_first(&TaskDefinitionType::TravisCi)
             .unwrap();
         assert_eq!(travis_def.status, TaskFileStatus::Parsed);
 
@@ -2878,7 +2878,7 @@ script:
         // Check that the travis-ci status is Parsed
         let travis_def = discovered
             .definitions
-            .get(&TaskDefinitionType::TravisCi)
+            .get_first(&TaskDefinitionType::TravisCi)
             .unwrap();
         assert_eq!(travis_def.status, TaskFileStatus::Parsed);
 
@@ -2905,7 +2905,7 @@ script:
         // Check that the travis-ci status is NotFound
         let travis_def = discovered
             .definitions
-            .get(&TaskDefinitionType::TravisCi)
+            .get_first(&TaskDefinitionType::TravisCi)
             .unwrap();
         assert_eq!(travis_def.status, TaskFileStatus::NotFound);
 
@@ -2954,12 +2954,12 @@ add_custom_target(build-all
         assert!(
             discovered
                 .definitions
-                .get(&TaskDefinitionType::CMake)
+                .get_first(&TaskDefinitionType::CMake)
                 .is_some()
         );
         let cmake_def = discovered
             .definitions
-            .get(&TaskDefinitionType::CMake)
+            .get_first(&TaskDefinitionType::CMake)
             .unwrap();
         assert_eq!(cmake_def.path, cmake_path);
         assert_eq!(cmake_def.definition_type, TaskDefinitionType::CMake);
@@ -2974,7 +2974,7 @@ add_custom_target(build-all
 
         let cmake_def = discovered
             .definitions
-            .get(&TaskDefinitionType::CMake)
+            .get_first(&TaskDefinitionType::CMake)
             .unwrap();
         assert_eq!(cmake_def.path, temp_dir.path().join("CMakeLists.txt"));
         assert_eq!(cmake_def.definition_type, TaskDefinitionType::CMake);
@@ -3015,12 +3015,12 @@ test: # Run tests
         assert!(
             discovered
                 .definitions
-                .get(&TaskDefinitionType::Justfile)
+                .get_first(&TaskDefinitionType::Justfile)
                 .is_some()
         );
         let justfile_def = discovered
             .definitions
-            .get(&TaskDefinitionType::Justfile)
+            .get_first(&TaskDefinitionType::Justfile)
             .unwrap();
         assert_eq!(justfile_def.path, justfile_path);
         assert_eq!(justfile_def.definition_type, TaskDefinitionType::Justfile);
@@ -3062,12 +3062,12 @@ test: # Run tests
         assert!(
             discovered
                 .definitions
-                .get(&TaskDefinitionType::Justfile)
+                .get_first(&TaskDefinitionType::Justfile)
                 .is_some()
         );
         let justfile_def = discovered
             .definitions
-            .get(&TaskDefinitionType::Justfile)
+            .get_first(&TaskDefinitionType::Justfile)
             .unwrap();
         // The path should match what was actually found by the discovery function
         // On case-insensitive filesystems, this will be "Justfile"
@@ -3110,12 +3110,12 @@ test: # Run tests
         assert!(
             discovered
                 .definitions
-                .get(&TaskDefinitionType::Justfile)
+                .get_first(&TaskDefinitionType::Justfile)
                 .is_some()
         );
         let justfile_def = discovered
             .definitions
-            .get(&TaskDefinitionType::Justfile)
+            .get_first(&TaskDefinitionType::Justfile)
             .unwrap();
         // Should find the dot justfile since Justfile and justfile don't exist in this directory
         assert_eq!(justfile_def.path, justfile_dot_path);
@@ -3155,12 +3155,12 @@ build: # Build the project
         assert!(
             discovered
                 .definitions
-                .get(&TaskDefinitionType::Justfile)
+                .get_first(&TaskDefinitionType::Justfile)
                 .is_some()
         );
         let justfile_def = discovered
             .definitions
-            .get(&TaskDefinitionType::Justfile)
+            .get_first(&TaskDefinitionType::Justfile)
             .unwrap();
         assert_eq!(justfile_def.path, justfile_path);
         assert!(matches!(justfile_def.status, TaskFileStatus::Parsed));
@@ -3179,12 +3179,12 @@ build: # Build the project
         assert!(
             discovered
                 .definitions
-                .get(&TaskDefinitionType::Justfile)
+                .get_first(&TaskDefinitionType::Justfile)
                 .is_some()
         );
         let justfile_def = discovered
             .definitions
-            .get(&TaskDefinitionType::Justfile)
+            .get_first(&TaskDefinitionType::Justfile)
             .unwrap();
         // The path should match what was actually found by the discovery function
         // On case-insensitive filesystems, this will be "Justfile"
@@ -3208,12 +3208,12 @@ build: # Build the project
         assert!(
             discovered
                 .definitions
-                .get(&TaskDefinitionType::Justfile)
+                .get_first(&TaskDefinitionType::Justfile)
                 .is_some()
         );
         let justfile_def = discovered
             .definitions
-            .get(&TaskDefinitionType::Justfile)
+            .get_first(&TaskDefinitionType::Justfile)
             .unwrap();
         assert_eq!(justfile_def.path, justfile_dot_path);
         assert!(matches!(justfile_def.status, TaskFileStatus::Parsed));
@@ -3228,12 +3228,12 @@ build: # Build the project
         assert!(
             discovered
                 .definitions
-                .get(&TaskDefinitionType::Justfile)
+                .get_first(&TaskDefinitionType::Justfile)
                 .is_some()
         );
         let justfile_def = discovered
             .definitions
-            .get(&TaskDefinitionType::Justfile)
+            .get_first(&TaskDefinitionType::Justfile)
             .unwrap();
         assert_eq!(justfile_def.path, dir4.join("Justfile")); // Should use default path
         assert!(matches!(justfile_def.status, TaskFileStatus::NotFound));

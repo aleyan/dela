@@ -33,7 +33,7 @@ pub fn execute(verbose: bool, color: &str) -> anyhow::Result<()> {
     // Only show task definition files status in verbose mode
     if verbose {
         test_println!("Task definition files:");
-        for files in discovered.definitions.files.values() {
+        for (_def_type, files) in discovered.definitions.iter() {
             for file in files {
                 let file_name = file.path.file_name().unwrap_or_default().to_string_lossy();
                 match &file.status {
