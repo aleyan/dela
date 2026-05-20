@@ -13,7 +13,7 @@ crap_run: _crap_deps
 crap_check: _crap_deps
 	@echo "Checking CRAP against baseline..."
 	cargo llvm-cov --lcov --output-path lcov.info
-	cargo crap --lcov lcov.info --baseline cargo_crap_baseline.json --fail-regression
+	cargo crap --lcov lcov.info --baseline cargo_crap_baseline.json --fail-regression --format pr-comment
 
 crap_update: _crap_deps
 	@echo "Updating CRAP baseline..."
