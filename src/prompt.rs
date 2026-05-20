@@ -318,4 +318,48 @@ mod tests {
         assert!(result.is_err());
         assert_eq!(result.unwrap_err().to_string(), "Invalid selection index");
     }
+
+    #[test]
+    fn test_ui_rendering() {
+        use ratatui::backend::TestBackend;
+        use ratatui::Terminal;
+        use crate::types::{Task, TaskDefinitionType, TaskRunner};
+        use std::path::PathBuf;
+
+        let backend = TestBackend::new(80, 20);
+        let mut terminal = Terminal::new(backend).unwrap();
+
+        let task = Task {
+            name: "test-task".to_string(),
+            file_path: PathBuf::from("Makefile"),
+            definition_path: None,
+            definition_type: TaskDefinitionType::Makefile,
+            runner: TaskRunner::Make,
+            source_name: "test-task".to_string(),
+            description: Some("Run unit tests".to_string()),
+            shadowed_by: None,
+            disambiguated_name: None,
+        };
+
+        let options = vec![
+            ("Allow once (this time only)", AllowDecision::Allow(AllowScope::Once)),
+            ("Deny (don't run this task)", AllowDecision::Deny),
+        ];
+
+        terminal.draw(|f| ui(f, &task, &options, 0)).unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let contents = (0..20)
+            .map(|y| {
+                (0..80)
+                    .map(|x| buffer[(x as u16, y as u16)].symbol().to_string())
+                    .collect::<String>()
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        assert!(contents.contains("test-task"));
+        assert!(contents.contains("Allow once"));
+        assert!(contents.contains("Deny"));
+    }
 }

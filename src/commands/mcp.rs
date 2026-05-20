@@ -487,4 +487,45 @@ mod tests {
             home.join(".claude-code/settings.json")
         );
     }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_execute_init_cursor() {
+        let temp_dir = TempDir::new().unwrap();
+        // Save the old HOME env var
+        let old_home = std::env::var("HOME").ok();
+        let original_dir = std::env::current_dir().ok();
+
+        // Change current directory to temp_dir
+        std::env::set_current_dir(temp_dir.path()).unwrap();
+
+        unsafe {
+            std::env::set_var("HOME", temp_dir.path());
+        }
+
+        let result = execute(".".to_string(), true, false, false, false, false).await;
+        if let Err(ref e) = result {
+            panic!("execute failed with error: {:?}", e);
+        }
+        assert!(result.is_ok());
+
+        let expected_path = temp_dir.path().join(".cursor/mcp.json");
+        assert!(expected_path.exists());
+
+        // Restore original directory if it was valid
+        if let Some(dir) = original_dir {
+            let _ = std::env::set_current_dir(dir);
+        }
+
+        // Restore the old HOME
+        if let Some(home) = old_home {
+            unsafe {
+                std::env::set_var("HOME", home);
+            }
+        } else {
+            unsafe {
+                std::env::remove_var("HOME");
+            }
+        }
+    }
 }

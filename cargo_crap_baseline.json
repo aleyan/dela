@@ -3,28 +3,12 @@
   "version": "0.2.0",
   "entries": [
     {
-      "file": "./src/commands/list.rs",
-      "function": "execute",
-      "line": 22,
-      "cyclomatic": 43.0,
-      "coverage": 0.0,
-      "crap": 1892.0
-    },
-    {
       "file": "./src/mcp/job_manager.rs",
       "function": "JobManager::stop_job_graceful",
       "line": 439,
       "cyclomatic": 29.0,
       "coverage": 24.691358024691358,
       "crap": 388.19513360843445
-    },
-    {
-      "file": "./src/commands/mcp.rs",
-      "function": "execute",
-      "line": 243,
-      "cyclomatic": 19.0,
-      "coverage": 0.0,
-      "crap": 380.0
     },
     {
       "file": "./src/mcp/server.rs",
@@ -43,12 +27,12 @@
       "crap": 182.0
     },
     {
-      "file": "./src/main.rs",
-      "function": "main",
-      "line": 163,
-      "cyclomatic": 11.0,
-      "coverage": 0.0,
-      "crap": 132.0
+      "file": "./src/commands/list.rs",
+      "function": "execute",
+      "line": 22,
+      "cyclomatic": 43.0,
+      "coverage": 69.12751677852349,
+      "crap": 97.40660179464678
     },
     {
       "file": "./src/mcp/server.rs",
@@ -65,6 +49,22 @@
       "cyclomatic": 11.0,
       "coverage": 27.27272727272727,
       "crap": 57.54545454545455
+    },
+    {
+      "file": "./src/commands/mcp.rs",
+      "function": "execute",
+      "line": 243,
+      "cyclomatic": 19.0,
+      "coverage": 55.55555555555556,
+      "crap": 50.692729766803836
+    },
+    {
+      "file": "./src/main.rs",
+      "function": "run_command",
+      "line": 162,
+      "cyclomatic": 9.0,
+      "coverage": 22.22222222222222,
+      "crap": 47.111111111111114
     },
     {
       "file": "./src/mcp/job_manager.rs",
@@ -297,6 +297,14 @@
       "cyclomatic": 12.0,
       "coverage": 95.0,
       "crap": 12.018
+    },
+    {
+      "file": "./src/main.rs",
+      "function": "main",
+      "line": 198,
+      "cyclomatic": 3.0,
+      "coverage": 0.0,
+      "crap": 12.0
     },
     {
       "file": "./src/parsers/parse_makefile.rs",
@@ -915,14 +923,6 @@
       "crap": 3.0236172044774285
     },
     {
-      "file": "./src/commands/list.rs",
-      "function": "format_task_entry_with_source",
-      "line": 320,
-      "cyclomatic": 3.0,
-      "coverage": 87.5,
-      "crap": 3.017578125
-    },
-    {
       "file": "./src/task_discovery/turbo.rs",
       "function": "resolve_turbo_extends_entry",
       "line": 238,
@@ -1062,6 +1062,14 @@
       "file": "./src/allowlist.rs",
       "function": "check_task_allowed_with_scope",
       "line": 189,
+      "cyclomatic": 3.0,
+      "coverage": 100.0,
+      "crap": 3.0
+    },
+    {
+      "file": "./src/commands/list.rs",
+      "function": "format_task_entry_with_source",
+      "line": 320,
       "cyclomatic": 3.0,
       "coverage": 100.0,
       "crap": 3.0
@@ -1587,14 +1595,6 @@
       "crap": 2.0
     },
     {
-      "file": "./src/prompt.rs",
-      "function": "ui",
-      "line": 169,
-      "cyclomatic": 1.0,
-      "coverage": 0.0,
-      "crap": 2.0
-    },
-    {
       "file": "./src/task_discovery.rs",
       "function": "discover_tasks",
       "line": 51,
@@ -1606,14 +1606,6 @@
       "file": "./src/commands/run.rs",
       "function": "execute",
       "line": 3,
-      "cyclomatic": 1.0,
-      "coverage": 0.0,
-      "crap": 2.0
-    },
-    {
-      "file": "./src/commands/mcp.rs",
-      "function": "generate_config",
-      "line": 237,
       "cyclomatic": 1.0,
       "coverage": 0.0,
       "crap": 2.0
@@ -2323,6 +2315,14 @@
       "crap": 1.0
     },
     {
+      "file": "./src/prompt.rs",
+      "function": "ui",
+      "line": 169,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
       "file": "./src/task_discovery.rs",
       "function": "DiscoveredTasks::new",
       "line": 36,
@@ -2334,6 +2334,14 @@
       "file": "./src/task_discovery.rs",
       "function": "DiscoveredTasks::add_task",
       "line": 41,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/commands/mcp.rs",
+      "function": "generate_config",
+      "line": 237,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0

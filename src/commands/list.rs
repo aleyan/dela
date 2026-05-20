@@ -943,4 +943,28 @@ mod tests {
             Some("mk/common.mk".to_string())
         );
     }
+
+    #[test]
+    #[serial]
+    fn test_execute_command_success() {
+        let (temp_dir, _home_dir) = setup_test_env();
+        let original_dir = std::env::current_dir().ok();
+
+        // Change current directory to temp_dir
+        std::env::set_current_dir(temp_dir.path()).unwrap();
+
+        // Create a dummy Makefile
+        let makefile_path = temp_dir.path().join("Makefile");
+        std::fs::write(&makefile_path, "build:\n\techo 'building'\n").unwrap();
+
+        // Run execute
+        let result = execute(true, "never");
+        assert!(result.is_ok());
+
+        // Restore original directory if it was valid
+        if let Some(dir) = original_dir {
+            let _ = std::env::set_current_dir(dir);
+        }
+        reset_to_real_environment();
+    }
 }
