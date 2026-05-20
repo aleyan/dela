@@ -40,7 +40,7 @@ fn discover_justfile_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> anyh
             }
         }
     } else {
-        discovered.definitions.justfile = Some(TaskDefinitionFile {
+        discovered.definitions.insert(TaskDefinitionFile {
             path: default_path,
             definition_type: TaskDefinitionType::Justfile,
             status: TaskFileStatus::NotFound,

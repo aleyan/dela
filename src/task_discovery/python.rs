@@ -16,7 +16,7 @@ fn discover_python_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> anyhow
     let pyproject_toml = dir.join("pyproject.toml");
 
     if !pyproject_toml.exists() {
-        discovered.definitions.pyproject_toml = Some(TaskDefinitionFile {
+        discovered.definitions.insert(TaskDefinitionFile {
             path: pyproject_toml,
             definition_type: TaskDefinitionType::PyprojectToml,
             status: TaskFileStatus::NotFound,

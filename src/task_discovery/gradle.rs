@@ -61,7 +61,7 @@ fn discover_gradle_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> anyhow
         };
     }
 
-    discovered.definitions.gradle = Some(TaskDefinitionFile {
+    discovered.definitions.insert(TaskDefinitionFile {
         path: build_gradle_path,
         definition_type: TaskDefinitionType::Gradle,
         status: TaskFileStatus::NotFound,

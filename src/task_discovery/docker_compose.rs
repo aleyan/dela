@@ -19,7 +19,7 @@ fn discover_docker_compose_tasks(
     let docker_compose_files = parse_docker_compose::find_docker_compose_files(dir);
 
     if docker_compose_files.is_empty() {
-        discovered.definitions.docker_compose = Some(TaskDefinitionFile {
+        discovered.definitions.insert(TaskDefinitionFile {
             path: dir.join("docker-compose.yml"),
             definition_type: TaskDefinitionType::DockerCompose,
             status: TaskFileStatus::NotFound,

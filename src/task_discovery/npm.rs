@@ -16,7 +16,7 @@ fn discover_npm_tasks(dir: &Path, discovered: &mut DiscoveredTasks) -> anyhow::R
     let package_json = dir.join("package.json");
 
     if !package_json.exists() {
-        discovered.definitions.package_json = Some(TaskDefinitionFile {
+        discovered.definitions.insert(TaskDefinitionFile {
             path: package_json,
             definition_type: TaskDefinitionType::PackageJson,
             status: TaskFileStatus::NotFound,

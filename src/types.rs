@@ -11,7 +11,7 @@ pub enum ShadowType {
 }
 
 /// Different types of task definition files supported by dela
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TaskDefinitionType {
     /// Makefile
     Makefile,
@@ -130,29 +130,22 @@ pub struct TaskDefinitionFile {
 }
 
 /// Collection of discovered task definition files
-#[derive(Debug, Default)]
-#[allow(dead_code)]
+#[derive(Debug, Clone, Default)]
 pub struct DiscoveredTaskDefinitions {
-    /// Makefile if found
-    pub makefile: Option<TaskDefinitionFile>,
-    /// package.json if found
-    pub package_json: Option<TaskDefinitionFile>,
-    /// pyproject.toml if found
-    pub pyproject_toml: Option<TaskDefinitionFile>,
-    /// Taskfile.yml if found
-    pub taskfile: Option<TaskDefinitionFile>,
-    /// turbo.json if found
-    pub turbo_json: Option<TaskDefinitionFile>,
-    /// Maven pom.xml if found
-    pub maven_pom: Option<TaskDefinitionFile>,
-    /// Gradle build files (build.gradle, build.gradle.kts) if found
-    pub gradle: Option<TaskDefinitionFile>,
-    /// GitHub Actions workflow files if found
-    pub github_actions: Option<TaskDefinitionFile>,
-    /// Docker Compose files if found
-    pub docker_compose: Option<TaskDefinitionFile>,
-    /// Justfile if found
-    pub justfile: Option<TaskDefinitionFile>,
+    pub files: std::collections::BTreeMap<TaskDefinitionType, Vec<TaskDefinitionFile>>,
+}
+
+impl DiscoveredTaskDefinitions {
+    pub fn insert(&mut self, definition: TaskDefinitionFile) {
+        self.files
+            .entry(definition.definition_type.clone())
+            .or_default()
+            .push(definition);
+    }
+
+    pub fn get(&self, definition_type: &TaskDefinitionType) -> Option<&TaskDefinitionFile> {
+        self.files.get(definition_type).and_then(|v| v.first())
+    }
 }
 
 /// Represents a discovered task that can be executed
@@ -263,17 +256,7 @@ impl TaskRunner {
     }
 }
 
-/// Result of task discovery in a directory
-#[derive(Debug, Default)]
-#[allow(dead_code)]
-pub struct DiscoveredTasks {
-    /// All tasks found, grouped by name
-    pub tasks: Vec<Task>,
-    /// Any errors encountered during discovery
-    pub errors: Vec<String>,
-    /// Information about discovered task definition files
-    pub definitions: DiscoveredTaskDefinitions,
-}
+
 
 /// Represents the scope of user approval
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
