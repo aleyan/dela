@@ -9,6 +9,7 @@ VERBOSE ?= 0
 -include .env
 
 include make/release.mk
+include make/crap.mk
 
 build:
 	@echo "Building dela..."
