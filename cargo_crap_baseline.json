@@ -1204,14 +1204,6 @@
     },
     {
       "file": "./src/types.rs",
-      "function": "DiscoveredTaskDefinitions::get_all",
-      "line": 154,
-      "cyclomatic": 1.0,
-      "coverage": 0.0,
-      "crap": 2.0
-    },
-    {
-      "file": "./src/types.rs",
       "function": "deserialize_path",
       "line": 309,
       "cyclomatic": 2.0,
@@ -1694,6 +1686,14 @@
       "file": "./src/types.rs",
       "function": "DiscoveredTaskDefinitions::get_first",
       "line": 148,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/types.rs",
+      "function": "DiscoveredTaskDefinitions::get_all",
+      "line": 154,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0

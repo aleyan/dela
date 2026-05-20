@@ -320,3 +320,54 @@ pub struct Allowlist {
     #[serde(default)]
     pub entries: Vec<AllowlistEntry>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_discovered_task_definitions_get_all() {
+        let mut defs = DiscoveredTaskDefinitions::default();
+
+        // 1. Assert get_all returns None on empty
+        assert!(defs.get_all(&TaskDefinitionType::Makefile).is_none());
+
+        // 2. Add multiple definitions sharing the same key, and some unique ones
+        let makefile1 = TaskDefinitionFile {
+            path: PathBuf::from("path/to/Makefile1"),
+            definition_type: TaskDefinitionType::Makefile,
+            status: TaskFileStatus::Parsed,
+        };
+        let makefile2 = TaskDefinitionFile {
+            path: PathBuf::from("path/to/Makefile2"),
+            definition_type: TaskDefinitionType::Makefile,
+            status: TaskFileStatus::NotFound,
+        };
+        let package_json = TaskDefinitionFile {
+            path: PathBuf::from("path/to/package.json"),
+            definition_type: TaskDefinitionType::PackageJson,
+            status: TaskFileStatus::NotImplemented,
+        };
+
+        defs.insert(makefile1.clone());
+        defs.insert(makefile2.clone());
+        defs.insert(package_json.clone());
+
+        // 3. Assert get_all returns the multiple files under the same key
+        let makefiles = defs.get_all(&TaskDefinitionType::Makefile).unwrap();
+        assert_eq!(makefiles.len(), 2);
+        assert_eq!(makefiles[0].path, makefile1.path);
+        assert_eq!(makefiles[0].status, makefile1.status);
+        assert_eq!(makefiles[1].path, makefile2.path);
+        assert_eq!(makefiles[1].status, makefile2.status);
+
+        // 4. Assert get_all returns the single file under its key
+        let package_jsons = defs.get_all(&TaskDefinitionType::PackageJson).unwrap();
+        assert_eq!(package_jsons.len(), 1);
+        assert_eq!(package_jsons[0].path, package_json.path);
+        assert_eq!(package_jsons[0].status, package_json.status);
+
+        // 5. Assert get_all returns None for query on non-inserted key
+        assert!(defs.get_all(&TaskDefinitionType::PyprojectToml).is_none());
+    }
+}
