@@ -130,7 +130,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [x] [DTKT-31] Support "Allow once," "Allow this task," "Allow file," "Allow directory," and "Deny."
   - [x] [DTKT-32] Persist decisions in the allowlist.
   - [ ] [DTKT-33] Have `dela run` take an optional `--allow` flag to allow a task without prompting.
-  - [ ] [DTKT-109] Implement `dela allow` command to add allowlist entries.
+  - [x] [DTKT-109] Implement `dela allow` command to add allowlist entries.
   - [ ] [DTKT-110] Implement `dela deny` command to add denylist entries.
   - [ ] [DTKT-111] Implement `dela run --allow-once` command to run a command once.
 
