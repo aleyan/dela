@@ -139,6 +139,16 @@ enum Commands {
         task: String,
     },
 
+    /// Allow a specific task to run
+    ///
+    /// This adds the task to the allowlist at the Task scope.
+    ///
+    /// Example: dela allow build
+    Allow {
+        /// Name of the task to allow
+        task: String,
+    },
+
     // Internal commands (hidden from help by default)
     #[command(name = "configure-shell", hide = true)]
     ConfigureShell,
@@ -183,6 +193,7 @@ async fn run_command(command: Commands) -> anyhow::Result<()> {
         Commands::ConfigureShell => commands::configure_shell::execute(),
         Commands::List { verbose, color } => commands::list::execute(verbose, &color),
         Commands::Run { task } => commands::run::execute(&task),
+        Commands::Allow { task } => commands::allow::execute(&task),
         Commands::GetCommand { args } => {
             if args.is_empty() {
                 Err(anyhow::anyhow!("No task name provided"))

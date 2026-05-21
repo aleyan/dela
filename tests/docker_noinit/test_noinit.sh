@@ -838,6 +838,56 @@ else
     exit 1
 fi
 
+# Test 31: Test 'dela allow' command functionality
+echo "\nTest 31: Testing 'dela allow' command functionality"
+echo "Initial allowlist contents:"
+cat /home/testuser/.config/dela/allowlist.toml
+
+# Test dela allow on a single valid task
+dela allow print-args >/dev/null 2>&1 || {
+    echo "${RED}✗ dela allow print-args failed${NC}"
+    exit 1
+}
+
+# Verify print-args was added to the allowlist with Task scope in an entry-aware way
+if python3 -c '
+import sys
+content = open("/home/testuser/.config/dela/allowlist.toml").read()
+for entry in content.split("[[entries]]"):
+    if "print-args" in entry and "scope = \"Task\"" in entry:
+        sys.exit(0)
+sys.exit(1)
+'; then
+    echo "${GREEN}✓ print-args task was added to allowlist with Task scope via dela allow command${NC}"
+else
+    echo "${RED}✗ print-args task was not added to allowlist with Task scope via dela allow command${NC}"
+    exit 1
+fi
+
+# Verify dela allow fails for nonexistent task
+if dela allow nonexistent >/dev/null 2>&1; then
+    echo "${RED}✗ dela allow nonexistent succeeded but should have failed${NC}"
+    exit 1
+else
+    echo "${GREEN}✓ dela allow nonexistent failed as expected${NC}"
+fi
+
+# We have duplicate_test.json and duplicate_test.mk still present in the directory.
+# So 'test' is ambiguous.
+if dela allow test >/dev/null 2>&1; then
+    echo "${RED}✗ dela allow test (ambiguous) succeeded but should have failed${NC}"
+    exit 1
+else
+    echo "${GREEN}✓ dela allow test (ambiguous) failed as expected${NC}"
+fi
+
+# But dela allow test-m (disambiguated name) should succeed!
+dela allow test-m >/dev/null 2>&1 || {
+    echo "${RED}✗ dela allow test-m (disambiguated name) failed${NC}"
+    exit 1
+}
+echo "${GREEN}✓ dela allow test-m (disambiguated name) succeeded as expected${NC}"
+
 # Clean up test files
 rm -f duplicate_test.json duplicate_test.mk list_output.txt list_output_long.txt
 

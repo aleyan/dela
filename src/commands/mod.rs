@@ -1,3 +1,4 @@
+pub mod allow;
 pub mod allow_command;
 pub mod configure_shell;
 pub mod get_command;
