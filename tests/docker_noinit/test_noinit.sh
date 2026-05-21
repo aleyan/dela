@@ -888,6 +888,59 @@ dela allow test-m >/dev/null 2>&1 || {
 }
 echo "${GREEN}✓ dela allow test-m (disambiguated name) succeeded as expected${NC}"
 
+# Test 32: Test 'dela deny' command functionality
+echo "\nTest 32: Testing 'dela deny' command functionality"
+
+# Deny a single valid task
+dela deny another-task >/dev/null 2>&1 || {
+    echo "${RED}✗ dela deny another-task failed${NC}"
+    exit 1
+}
+
+# Verify Makefile was added to the allowlist with Deny scope in an entry-aware way
+if python3 -c '
+import sys
+content = open("/home/testuser/.config/dela/allowlist.toml").read()
+for entry in content.split("[[entries]]"):
+    if "Makefile" in entry and "scope = \"Deny\"" in entry:
+        sys.exit(0)
+sys.exit(1)
+'; then
+    echo "${GREEN}✓ Makefile was added to allowlist with Deny scope via dela deny command${NC}"
+else
+    echo "${RED}✗ Makefile was not added to allowlist with Deny scope via dela deny command${NC}"
+    exit 1
+fi
+
+# Now running any task from Makefile should fail because the Makefile is denied.
+# We can verify that dela allow-command on 'another-task' fails and outputs a denial message.
+output=$(dela allow-command another-task 2>&1 || true)
+if echo "$output" | grep -q "was denied by the allowlist"; then
+    echo "${GREEN}✓ Task from denied Makefile was blocked as expected${NC}"
+else
+    echo "${RED}✗ Task from denied Makefile was not blocked${NC}"
+    echo "Output: $output"
+    exit 1
+fi
+
+# Verify dela deny fails for nonexistent task
+if dela deny nonexistent >/dev/null 2>&1; then
+    echo "${RED}✗ dela deny nonexistent succeeded but should have failed${NC}"
+    exit 1
+else
+    echo "${GREEN}✓ dela deny nonexistent failed as expected${NC}"
+fi
+
+# Verify dela deny fails for ambiguous tasks
+# We have duplicate_test.json and duplicate_test.mk still present in the directory.
+# So 'test' is ambiguous.
+if dela deny test >/dev/null 2>&1; then
+    echo "${RED}✗ dela deny test (ambiguous) succeeded but should have failed${NC}"
+    exit 1
+else
+    echo "${GREEN}✓ dela deny test (ambiguous) failed as expected${NC}"
+fi
+
 # Clean up test files
 rm -f duplicate_test.json duplicate_test.mk list_output.txt list_output_long.txt
 

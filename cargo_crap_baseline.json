@@ -7,8 +7,8 @@
       "function": "JobManager::stop_job_graceful",
       "line": 439,
       "cyclomatic": 29.0,
-      "coverage": 24.691358024691358,
-      "crap": 388.19513360843445
+      "coverage": 34.5679012345679,
+      "crap": 264.5963446553804
     },
     {
       "file": "./src/mcp/server.rs",
@@ -45,10 +45,10 @@
     {
       "file": "./src/main.rs",
       "function": "run_command",
-      "line": 172,
-      "cyclomatic": 10.0,
-      "coverage": 21.428571428571427,
-      "crap": 58.505830903790084
+      "line": 182,
+      "cyclomatic": 11.0,
+      "coverage": 20.689655172413794,
+      "crap": 71.36356554184265
     },
     {
       "file": "./src/prompt.rs",
@@ -293,7 +293,7 @@
     {
       "file": "./src/main.rs",
       "function": "main",
-      "line": 209,
+      "line": 220,
       "cyclomatic": 3.0,
       "coverage": 0.0,
       "crap": 12.0
@@ -676,6 +676,14 @@
     },
     {
       "file": "./src/commands/allow.rs",
+      "function": "execute",
+      "line": 7,
+      "cyclomatic": 6.0,
+      "coverage": 100.0,
+      "crap": 6.0
+    },
+    {
+      "file": "./src/commands/deny.rs",
       "function": "execute",
       "line": 7,
       "cyclomatic": 6.0,
