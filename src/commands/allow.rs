@@ -49,6 +49,41 @@ mod tests {
     use std::io::Write;
     use tempfile::TempDir;
 
+    struct TestEnvGuard {
+        project_dir: TempDir,
+        home_dir: TempDir,
+    }
+
+    impl TestEnvGuard {
+        fn new() -> Self {
+            let (project_dir, home_dir) = setup_test_env();
+            Self {
+                project_dir,
+                home_dir,
+            }
+        }
+
+        fn new_uninitialized() -> Self {
+            // Create a temp dir for HOME but don't create the dela config directory
+            let home_dir = TempDir::new().expect("Failed to create temp HOME directory");
+
+            // Set up test environment with the temp directory as HOME
+            let test_env = TestEnvironment::new().with_home(home_dir.path().to_string_lossy());
+            set_test_environment(test_env);
+
+            Self {
+                project_dir: TempDir::new().expect("Failed to create temp directory"),
+                home_dir,
+            }
+        }
+    }
+
+    impl Drop for TestEnvGuard {
+        fn drop(&mut self) {
+            reset_to_real_environment();
+        }
+    }
+
     fn setup_test_env() -> (TempDir, TempDir) {
         // Create a temp dir for the project
         let project_dir = TempDir::new().expect("Failed to create temp directory");
@@ -84,26 +119,24 @@ test: ## Running tests
     #[test]
     #[serial]
     fn test_execute_allow_single_task() {
-        let (project_dir, home_dir) = setup_test_env();
-        env::set_current_dir(&project_dir).expect("Failed to change directory");
+        let guard = TestEnvGuard::new();
+        env::set_current_dir(&guard.project_dir).expect("Failed to change directory");
 
         let result = execute("test");
         assert!(result.is_ok(), "Should succeed for a single task");
 
         // Verify it was added to the allowlist
         let allowlist_content =
-            fs::read_to_string(preferred_allowlist_path_for(home_dir.path())).unwrap();
+            fs::read_to_string(preferred_allowlist_path_for(guard.home_dir.path())).unwrap();
         assert!(allowlist_content.contains("test"));
         assert!(allowlist_content.contains("scope = \"Task\""));
-
-        reset_to_real_environment();
     }
 
     #[test]
     #[serial]
     fn test_execute_allow_no_task() {
-        let (project_dir, _home_dir) = setup_test_env();
-        env::set_current_dir(&project_dir).expect("Failed to change directory");
+        let guard = TestEnvGuard::new();
+        env::set_current_dir(&guard.project_dir).expect("Failed to change directory");
 
         let result = execute("nonexistent");
         assert!(result.is_err(), "Should fail for nonexistent task");
@@ -111,31 +144,21 @@ test: ## Running tests
             result.unwrap_err().to_string(),
             "dela: command or task not found: nonexistent"
         );
-
-        reset_to_real_environment();
     }
 
     #[test]
     #[serial]
     fn test_execute_allow_uninitialized() {
-        // Create a temp dir for HOME but don't create the dela config directory
-        let home_dir = TempDir::new().expect("Failed to create temp HOME directory");
-
-        // Set up test environment with the temp directory as HOME
-        let test_env = TestEnvironment::new().with_home(home_dir.path().to_string_lossy());
-        set_test_environment(test_env);
-
-        // Create a temp dir for the project
-        let project_dir = TempDir::new().expect("Failed to create temp directory");
-        env::set_current_dir(&project_dir).expect("Failed to change directory");
+        let guard = TestEnvGuard::new_uninitialized();
+        env::set_current_dir(&guard.project_dir).expect("Failed to change directory");
 
         // Create a test Makefile
         let makefile_content = "
 test: ## Running tests
 \t@echo Testing...
 ";
-        let mut makefile =
-            File::create(project_dir.path().join("Makefile")).expect("Failed to create Makefile");
+        let mut makefile = File::create(guard.project_dir.path().join("Makefile"))
+            .expect("Failed to create Makefile");
         makefile
             .write_all(makefile_content.as_bytes())
             .expect("Failed to write Makefile");
@@ -146,15 +169,13 @@ test: ## Running tests
             result.unwrap_err().to_string(),
             "Dela is not initialized. Please run 'dela init' first."
         );
-
-        reset_to_real_environment();
     }
 
     #[test]
     #[serial]
     fn test_execute_allow_disambiguated() {
-        let (project_dir, home_dir) = setup_test_env();
-        env::set_current_dir(&project_dir).expect("Failed to change directory");
+        let guard = TestEnvGuard::new();
+        env::set_current_dir(&guard.project_dir).expect("Failed to change directory");
 
         // Create a package.json with the same task name
         let package_json_content = r#"{
@@ -164,13 +185,13 @@ test: ## Running tests
             }
         }"#;
 
-        File::create(project_dir.path().join("package.json"))
+        File::create(guard.project_dir.path().join("package.json"))
             .unwrap()
             .write_all(package_json_content.as_bytes())
             .unwrap();
 
         // Create package-lock.json to ensure npm is detected
-        File::create(project_dir.path().join("package-lock.json"))
+        File::create(guard.project_dir.path().join("package-lock.json"))
             .unwrap()
             .write_all(b"{}")
             .unwrap();
@@ -190,10 +211,8 @@ test: ## Running tests
         assert!(result.is_ok(), "Should succeed with disambiguated name");
 
         let allowlist_content =
-            fs::read_to_string(preferred_allowlist_path_for(home_dir.path())).unwrap();
+            fs::read_to_string(preferred_allowlist_path_for(guard.home_dir.path())).unwrap();
         assert!(allowlist_content.contains("test")); // Note: allowlist uses original task name
         assert!(allowlist_content.contains("scope = \"Task\""));
-
-        reset_to_real_environment();
     }
 }

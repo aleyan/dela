@@ -850,10 +850,10 @@ dela allow print-args >/dev/null 2>&1 || {
 }
 
 # Verify print-args was added to the allowlist with Task scope
-if grep -q "print-args" /home/testuser/.config/dela/allowlist.toml; then
-    echo "${GREEN}✓ print-args task was added to allowlist via dela allow command${NC}"
+if grep -B 2 "print-args" /home/testuser/.config/dela/allowlist.toml | grep -q 'scope = "Task"'; then
+    echo "${GREEN}✓ print-args task was added to allowlist with Task scope via dela allow command${NC}"
 else
-    echo "${RED}✗ print-args task was not added to allowlist via dela allow command${NC}"
+    echo "${RED}✗ print-args task was not added to allowlist with Task scope via dela allow command${NC}"
     exit 1
 fi
 
