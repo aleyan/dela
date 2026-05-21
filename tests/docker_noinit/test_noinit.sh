@@ -849,8 +849,15 @@ dela allow print-args >/dev/null 2>&1 || {
     exit 1
 }
 
-# Verify print-args was added to the allowlist with Task scope
-if grep -B 2 "print-args" /home/testuser/.config/dela/allowlist.toml | grep -q 'scope = "Task"'; then
+# Verify print-args was added to the allowlist with Task scope in an entry-aware way
+if python3 -c '
+import sys
+content = open("/home/testuser/.config/dela/allowlist.toml").read()
+for entry in content.split("[[entries]]"):
+    if "print-args" in entry and "scope = \"Task\"" in entry:
+        sys.exit(0)
+sys.exit(1)
+'; then
     echo "${GREEN}✓ print-args task was added to allowlist with Task scope via dela allow command${NC}"
 else
     echo "${RED}✗ print-args task was not added to allowlist with Task scope via dela allow command${NC}"
