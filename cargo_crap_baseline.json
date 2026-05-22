@@ -7,8 +7,8 @@
       "function": "JobManager::stop_job_graceful",
       "line": 439,
       "cyclomatic": 29.0,
-      "coverage": 34.5679012345679,
-      "crap": 264.5963446553804
+      "coverage": 24.691358024691358,
+      "crap": 388.19513360843445
     },
     {
       "file": "./src/mcp/server.rs",
@@ -239,8 +239,8 @@
       "function": "evaluate_task_against_allowlist",
       "line": 75,
       "cyclomatic": 14.0,
-      "coverage": 95.65217391304348,
-      "crap": 14.016109147694584
+      "coverage": 100.0,
+      "crap": 14.0
     },
     {
       "file": "./src/mcp/server.rs",

@@ -52,18 +52,22 @@ mod tests {
     struct TestEnvGuard {
         project_dir: TempDir,
         home_dir: TempDir,
+        original_cwd: std::path::PathBuf,
     }
 
     impl TestEnvGuard {
         fn new() -> Self {
+            let original_cwd = env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
             let (project_dir, home_dir) = setup_test_env();
             Self {
                 project_dir,
                 home_dir,
+                original_cwd,
             }
         }
 
         fn new_uninitialized() -> Self {
+            let original_cwd = env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
             // Create a temp dir for HOME but don't create the dela config directory
             let home_dir = TempDir::new().expect("Failed to create temp HOME directory");
 
@@ -74,12 +78,14 @@ mod tests {
             Self {
                 project_dir: TempDir::new().expect("Failed to create temp directory"),
                 home_dir,
+                original_cwd,
             }
         }
     }
 
     impl Drop for TestEnvGuard {
         fn drop(&mut self) {
+            let _ = env::set_current_dir(&self.original_cwd);
             reset_to_real_environment();
         }
     }
