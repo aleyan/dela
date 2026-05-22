@@ -131,10 +131,11 @@ test: ## Running tests
         let result = execute("test");
         assert!(result.is_ok(), "Should succeed for a single task");
 
-        // Verify it was added to the allowlist with Deny scope
+        // Verify it was added to the allowlist with Deny scope and task name
         let allowlist_content =
             fs::read_to_string(preferred_allowlist_path_for(guard.home_dir.path())).unwrap();
         assert!(allowlist_content.contains("scope = \"Deny\""));
+        assert!(allowlist_content.contains("tasks = [\"test\"]"));
     }
 
     #[test]
@@ -218,5 +219,6 @@ test: ## Running tests
         let allowlist_content =
             fs::read_to_string(preferred_allowlist_path_for(guard.home_dir.path())).unwrap();
         assert!(allowlist_content.contains("scope = \"Deny\""));
+        assert!(allowlist_content.contains("tasks = [\"test\"]"));
     }
 }

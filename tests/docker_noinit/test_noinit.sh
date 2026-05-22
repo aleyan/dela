@@ -897,30 +897,39 @@ dela deny another-task >/dev/null 2>&1 || {
     exit 1
 }
 
-# Verify Makefile was added to the allowlist with Deny scope in an entry-aware way
+# Verify Makefile was added to the allowlist with Deny scope and task name in an entry-aware way
 if python3 -c '
 import sys
 content = open("/home/testuser/.config/dela/allowlist.toml").read()
 for entry in content.split("[[entries]]"):
-    if "Makefile" in entry and "scope = \"Deny\"" in entry:
+    if "Makefile" in entry and "scope = \"Deny\"" in entry and "tasks = [\"another-task\"]" in entry:
         sys.exit(0)
 sys.exit(1)
 '; then
-    echo "${GREEN}✓ Makefile was added to allowlist with Deny scope via dela deny command${NC}"
+    echo "${GREEN}✓ Makefile was added to allowlist with Deny scope and tasks = [\"another-task\"] via dela deny command${NC}"
 else
-    echo "${RED}✗ Makefile was not added to allowlist with Deny scope via dela deny command${NC}"
+    echo "${RED}✗ Makefile was not added to allowlist with Deny scope and tasks = [\"another-task\"] via dela deny command${NC}"
     exit 1
 fi
 
-# Now running any task from Makefile should fail because the Makefile is denied.
+# Now running the denied task another-task should fail because it is denied.
 # We can verify that dela allow-command on 'another-task' fails and outputs a denial message.
 output=$(dela allow-command another-task 2>&1 || true)
 if echo "$output" | grep -q "was denied by the allowlist"; then
-    echo "${GREEN}✓ Task from denied Makefile was blocked as expected${NC}"
+    echo "${GREEN}✓ Denied task another-task was blocked as expected${NC}"
 else
-    echo "${RED}✗ Task from denied Makefile was not blocked${NC}"
+    echo "${RED}✗ Denied task another-task was not blocked${NC}"
     echo "Output: $output"
     exit 1
+fi
+
+# Verify that another task from the same Makefile (like print-args) is NOT blocked as denied
+output_other=$(dela allow-command print-args 2>&1 || true)
+if echo "$output_other" | grep -q "was denied by the allowlist"; then
+    echo "${RED}✗ Other task print-args in the same Makefile was blocked as denied, but it should not be${NC}"
+    exit 1
+else
+    echo "${GREEN}✓ Other task print-args in the same Makefile was not blocked as denied${NC}"
 fi
 
 # Verify dela deny fails for nonexistent task
