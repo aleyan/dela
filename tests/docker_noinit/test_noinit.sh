@@ -888,6 +888,79 @@ dela allow test-m >/dev/null 2>&1 || {
 }
 echo "${GREEN}✓ dela allow test-m (disambiguated name) succeeded as expected${NC}"
 
+# Test 32: Test 'dela deny' command functionality
+echo "\nTest 32: Testing 'dela deny' command functionality"
+
+# Deny a single valid task
+dela deny another-task >/dev/null 2>&1 || {
+    echo "${RED}✗ dela deny another-task failed${NC}"
+    exit 1
+}
+
+# Verify Makefile was added to the allowlist with Deny scope and task name in an entry-aware way
+if python3 -c '
+import sys
+content = open("/home/testuser/.config/dela/allowlist.toml").read()
+for entry in content.split("[[entries]]"):
+    if "Makefile" in entry and "scope = \"Deny\"" in entry and "tasks = [\"another-task\"]" in entry:
+        sys.exit(0)
+sys.exit(1)
+'; then
+    echo "${GREEN}✓ Makefile was added to allowlist with Deny scope and tasks = [\"another-task\"] via dela deny command${NC}"
+else
+    echo "${RED}✗ Makefile was not added to allowlist with Deny scope and tasks = [\"another-task\"] via dela deny command${NC}"
+    exit 1
+fi
+
+# Now running the denied task another-task should fail because it is denied.
+# We can verify that dela allow-command on 'another-task' fails and outputs a denial message.
+exit_code=0
+output=$(dela allow-command another-task 2>&1) || exit_code=$?
+if [ $exit_code -eq 0 ]; then
+    echo "${RED}✗ Denied task another-task did not fail (exited with 0)${NC}"
+    exit 1
+fi
+if echo "$output" | grep -q "was denied by the allowlist"; then
+    echo "${GREEN}✓ Denied task another-task was blocked as expected (exit code: $exit_code)${NC}"
+else
+    echo "${RED}✗ Denied task another-task was not blocked with the expected message${NC}"
+    echo "Output: $output"
+    exit 1
+fi
+
+# Verify that another task from the same Makefile (like print-args) is NOT blocked as denied
+exit_code_other=0
+output_other=$(dela allow-command print-args 2>&1) || exit_code_other=$?
+if [ $exit_code_other -ne 0 ]; then
+    echo "${RED}✗ Allowed task print-args failed with exit code $exit_code_other${NC}"
+    echo "Output: $output_other"
+    exit 1
+fi
+if echo "$output_other" | grep -q "was denied by the allowlist"; then
+    echo "${RED}✗ Other task print-args in the same Makefile was blocked as denied, but it should not be${NC}"
+    exit 1
+else
+    echo "${GREEN}✓ Other task print-args in the same Makefile was not blocked as denied (exit code: $exit_code_other)${NC}"
+fi
+
+# Verify dela deny fails for nonexistent task
+if dela deny nonexistent >/dev/null 2>&1; then
+    echo "${RED}✗ dela deny nonexistent succeeded but should have failed${NC}"
+    exit 1
+else
+    echo "${GREEN}✓ dela deny nonexistent failed as expected${NC}"
+fi
+
+# Verify dela deny fails for ambiguous tasks
+# We have duplicate_test.json and duplicate_test.mk still present in the directory.
+# So 'test' is ambiguous.
+if dela deny test >/dev/null 2>&1; then
+    echo "${RED}✗ dela deny test (ambiguous) succeeded but should have failed${NC}"
+    exit 1
+else
+    echo "${GREEN}✓ dela deny test (ambiguous) failed as expected${NC}"
+fi
+
 # Clean up test files
 rm -f duplicate_test.json duplicate_test.mk list_output.txt list_output_long.txt
 

@@ -1,6 +1,7 @@
 pub mod allow;
 pub mod allow_command;
 pub mod configure_shell;
+pub mod deny;
 pub mod get_command;
 pub mod init;
 pub mod list;

@@ -45,10 +45,10 @@
     {
       "file": "./src/main.rs",
       "function": "run_command",
-      "line": 172,
-      "cyclomatic": 10.0,
-      "coverage": 21.428571428571427,
-      "crap": 58.505830903790084
+      "line": 182,
+      "cyclomatic": 11.0,
+      "coverage": 20.689655172413794,
+      "crap": 71.36356554184265
     },
     {
       "file": "./src/prompt.rs",
@@ -181,7 +181,7 @@
     {
       "file": "./src/allowlist.rs",
       "function": "check_task_allowed",
-      "line": 144,
+      "line": 148,
       "cyclomatic": 12.0,
       "coverage": 66.66666666666666,
       "crap": 17.333333333333343
@@ -201,6 +201,14 @@
       "cyclomatic": 14.0,
       "coverage": 75.0,
       "crap": 17.0625
+    },
+    {
+      "file": "./src/allowlist.rs",
+      "function": "evaluate_task_against_allowlist",
+      "line": 75,
+      "cyclomatic": 17.0,
+      "coverage": 100.0,
+      "crap": 17.0
     },
     {
       "file": "./src/commands/allow_command.rs",
@@ -233,14 +241,6 @@
       "cyclomatic": 15.0,
       "coverage": 92.3076923076923,
       "crap": 15.10241238051889
-    },
-    {
-      "file": "./src/allowlist.rs",
-      "function": "evaluate_task_against_allowlist",
-      "line": 75,
-      "cyclomatic": 14.0,
-      "coverage": 95.65217391304348,
-      "crap": 14.016109147694584
     },
     {
       "file": "./src/mcp/server.rs",
@@ -293,7 +293,7 @@
     {
       "file": "./src/main.rs",
       "function": "main",
-      "line": 209,
+      "line": 220,
       "cyclomatic": 3.0,
       "coverage": 0.0,
       "crap": 12.0
@@ -683,6 +683,14 @@
       "crap": 6.0
     },
     {
+      "file": "./src/commands/deny.rs",
+      "function": "execute",
+      "line": 7,
+      "cyclomatic": 6.0,
+      "coverage": 100.0,
+      "crap": 6.0
+    },
+    {
       "file": "./src/commands/mcp.rs",
       "function": "Editor::config_path",
       "line": 56,
@@ -757,7 +765,7 @@
     {
       "file": "./src/allowlist.rs",
       "function": "is_task_allowed",
-      "line": 132,
+      "line": 136,
       "cyclomatic": 5.0,
       "coverage": 100.0,
       "crap": 5.0
@@ -1068,8 +1076,16 @@
     },
     {
       "file": "./src/allowlist.rs",
+      "function": "allowlist_entry_for_task",
+      "line": 119,
+      "cyclomatic": 3.0,
+      "coverage": 100.0,
+      "crap": 3.0
+    },
+    {
+      "file": "./src/allowlist.rs",
       "function": "check_task_allowed_with_scope",
-      "line": 189,
+      "line": 193,
       "cyclomatic": 3.0,
       "coverage": 100.0,
       "crap": 3.0
@@ -1590,14 +1606,6 @@
       "file": "./src/allowlist.rs",
       "function": "path_matches",
       "line": 57,
-      "cyclomatic": 2.0,
-      "coverage": 100.0,
-      "crap": 2.0
-    },
-    {
-      "file": "./src/allowlist.rs",
-      "function": "allowlist_entry_for_task",
-      "line": 115,
       "cyclomatic": 2.0,
       "coverage": 100.0,
       "crap": 2.0

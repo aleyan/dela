@@ -3,7 +3,7 @@ use crate::task_discovery;
 use crate::types::AllowScope;
 use std::env;
 
-/// Executes the 'dela allow' command to add a specific task to the allowlist.
+/// Executes the 'dela deny' command to add a specific task definition file to the denylist.
 pub fn execute(task_name: &str) -> anyhow::Result<()> {
     let current_dir = env::current_dir()
         .map_err(|e| anyhow::anyhow!("Failed to get current directory: {}", e))?;
@@ -19,9 +19,9 @@ pub fn execute(task_name: &str) -> anyhow::Result<()> {
         )),
         1 => {
             let task = matching_tasks[0];
-            allowlist::check_task_allowed_with_scope(task, AllowScope::Task)?;
+            allowlist::check_task_allowed_with_scope(task, AllowScope::Deny)?;
             println!(
-                "Added task '{}' ({}) to allowlist.",
+                "Denied task '{}' ({}) in allowlist.",
                 task.name,
                 task.runner.short_name()
             );
@@ -124,23 +124,23 @@ test: ## Running tests
 
     #[test]
     #[serial]
-    fn test_execute_allow_single_task() {
+    fn test_execute_deny_single_task() {
         let guard = TestEnvGuard::new();
         env::set_current_dir(&guard.project_dir).expect("Failed to change directory");
 
         let result = execute("test");
         assert!(result.is_ok(), "Should succeed for a single task");
 
-        // Verify it was added to the allowlist
+        // Verify it was added to the allowlist with Deny scope and task name
         let allowlist_content =
             fs::read_to_string(preferred_allowlist_path_for(guard.home_dir.path())).unwrap();
-        assert!(allowlist_content.contains("test"));
-        assert!(allowlist_content.contains("scope = \"Task\""));
+        assert!(allowlist_content.contains("scope = \"Deny\""));
+        assert!(allowlist_content.contains("tasks = [\"test\"]"));
     }
 
     #[test]
     #[serial]
-    fn test_execute_allow_no_task() {
+    fn test_execute_deny_no_task() {
         let guard = TestEnvGuard::new();
         env::set_current_dir(&guard.project_dir).expect("Failed to change directory");
 
@@ -154,7 +154,7 @@ test: ## Running tests
 
     #[test]
     #[serial]
-    fn test_execute_allow_uninitialized() {
+    fn test_execute_deny_uninitialized() {
         let guard = TestEnvGuard::new_uninitialized();
         env::set_current_dir(&guard.project_dir).expect("Failed to change directory");
 
@@ -179,7 +179,7 @@ test: ## Running tests
 
     #[test]
     #[serial]
-    fn test_execute_allow_disambiguated() {
+    fn test_execute_deny_disambiguated() {
         let guard = TestEnvGuard::new();
         env::set_current_dir(&guard.project_dir).expect("Failed to change directory");
 
@@ -218,7 +218,7 @@ test: ## Running tests
 
         let allowlist_content =
             fs::read_to_string(preferred_allowlist_path_for(guard.home_dir.path())).unwrap();
-        assert!(allowlist_content.contains("test")); // Note: allowlist uses original task name
-        assert!(allowlist_content.contains("scope = \"Task\""));
+        assert!(allowlist_content.contains("scope = \"Deny\""));
+        assert!(allowlist_content.contains("tasks = [\"test\"]"));
     }
 }

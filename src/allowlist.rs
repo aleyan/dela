@@ -77,10 +77,14 @@ pub fn evaluate_task_against_allowlist(task: &Task, allowlist: &Allowlist) -> Al
 
     // First pass: Check for deny entries (highest precedence)
     for entry in &allowlist.entries {
-        if let AllowScope::Deny = entry.scope
-            && path_matches(task_path, &entry.path, true)
-        {
-            return AllowlistMatch::Denied;
+        if let AllowScope::Deny = entry.scope {
+            if let Some(ref tasks) = entry.tasks {
+                if path_matches(task_path, &entry.path, false) && tasks.contains(&task.name) {
+                    return AllowlistMatch::Denied;
+                }
+            } else if path_matches(task_path, &entry.path, true) {
+                return AllowlistMatch::Denied;
+            }
         }
     }
 
@@ -113,7 +117,7 @@ pub fn evaluate_task_against_allowlist(task: &Task, allowlist: &Allowlist) -> Al
 }
 
 pub fn allowlist_entry_for_task(task: &Task, scope: AllowScope) -> AllowlistEntry {
-    let tasks = if scope == AllowScope::Task {
+    let tasks = if scope == AllowScope::Task || scope == AllowScope::Deny {
         Some(vec![task.name.clone()])
     } else {
         None
@@ -427,6 +431,36 @@ mod tests {
 
         // Task should be denied
         assert_eq!(is_task_allowed(&task).unwrap(), (false, true));
+
+        drop(temp_dir);
+        reset_to_real_environment();
+    }
+
+    #[test]
+    #[serial]
+    fn test_is_task_allowed_deny_task_scope() {
+        let (temp_dir, task) = setup_test_env();
+
+        // Create allowlist with deny scope for specific task
+        let mut allowlist = Allowlist::default();
+        let entry = AllowlistEntry {
+            path: PathBuf::from("Makefile"),
+            scope: AllowScope::Deny,
+            tasks: Some(vec!["test-task".to_string()]),
+        };
+        allowlist.entries.push(entry);
+        save_allowlist(&allowlist).unwrap();
+
+        // Task should be denied
+        assert_eq!(is_task_allowed(&task).unwrap(), (false, true));
+
+        // A different task should NOT be denied
+        let other_task = create_test_task("other-task", PathBuf::from("Makefile"));
+        assert_eq!(is_task_allowed(&other_task).unwrap(), (false, false));
+
+        // A task from a different Makefile should NOT be denied
+        let other_path_task = create_test_task("test-task", PathBuf::from("other/Makefile"));
+        assert_eq!(is_task_allowed(&other_path_task).unwrap(), (false, false));
 
         drop(temp_dir);
         reset_to_real_environment();
