@@ -61,9 +61,15 @@ Or use `dela run` for subshell execution:
 $ dela run build
 ```
 
+
+### Allowlist.toml
+The allowlist is a TOML file located at `~/.config/dela/allowlist.toml`. It stores allow and deny rules at folder, file, and task level. It gets updated when you either run a task in a new folder for the first time, or when you run `dela allow <task>` and `dela deny <task>` commands explicitly.
+
 ## MCP Server
 
 Dela includes an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that allows AI assistants and editors to discover and execute tasks programmatically.
+
+The mcp executed tasks need to be already on the allowlist. The mcp server respects the allowlist, but does not give agents tools to modify it. 
 
 ### Setting Up MCP in Your Editor
 

@@ -207,8 +207,8 @@
       "function": "evaluate_task_against_allowlist",
       "line": 75,
       "cyclomatic": 17.0,
-      "coverage": 100.0,
-      "crap": 17.0
+      "coverage": 96.42857142857143,
+      "crap": 17.013165087463555
     },
     {
       "file": "./src/commands/allow_command.rs",
@@ -771,6 +771,14 @@
       "crap": 5.0
     },
     {
+      "file": "./src/commands/mod.rs",
+      "function": "gate_non_interactive",
+      "line": 18,
+      "cyclomatic": 4.0,
+      "coverage": 70.0,
+      "crap": 4.432
+    },
+    {
       "file": "./src/task_discovery/turbo.rs",
       "function": "build_turbo_package_config_index",
       "line": 348,
@@ -1102,6 +1110,14 @@
       "file": "./src/commands/list.rs",
       "function": "task_source_label",
       "line": 337,
+      "cyclomatic": 3.0,
+      "coverage": 100.0,
+      "crap": 3.0
+    },
+    {
+      "file": "./src/commands/mod.rs",
+      "function": "should_block",
+      "line": 14,
       "cyclomatic": 3.0,
       "coverage": 100.0,
       "crap": 3.0
