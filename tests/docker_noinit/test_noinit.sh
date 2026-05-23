@@ -840,12 +840,11 @@ fi
 
 # Test 31: Test 'dela allow' command functionality
 echo "\nTest 31: Testing 'dela allow' command functionality"
-export DELA_FORCE_INTERACTIVE=1
 echo "Initial allowlist contents:"
 cat /home/testuser/.config/dela/allowlist.toml
 
 # Test dela allow on a single valid task
-dela allow print-args >/dev/null 2>&1 || {
+script -qc "dela allow print-args" /dev/null >/dev/null 2>&1 || {
     echo "${RED}✗ dela allow print-args failed${NC}"
     exit 1
 }
@@ -866,7 +865,7 @@ else
 fi
 
 # Verify dela allow fails for nonexistent task
-if dela allow nonexistent >/dev/null 2>&1; then
+if script -qc "dela allow nonexistent" /dev/null >/dev/null 2>&1; then
     echo "${RED}✗ dela allow nonexistent succeeded but should have failed${NC}"
     exit 1
 else
@@ -875,7 +874,7 @@ fi
 
 # We have duplicate_test.json and duplicate_test.mk still present in the directory.
 # So 'test' is ambiguous.
-if dela allow test >/dev/null 2>&1; then
+if script -qc "dela allow test" /dev/null >/dev/null 2>&1; then
     echo "${RED}✗ dela allow test (ambiguous) succeeded but should have failed${NC}"
     exit 1
 else
@@ -883,7 +882,7 @@ else
 fi
 
 # But dela allow test-m (disambiguated name) should succeed!
-dela allow test-m >/dev/null 2>&1 || {
+script -qc "dela allow test-m" /dev/null >/dev/null 2>&1 || {
     echo "${RED}✗ dela allow test-m (disambiguated name) failed${NC}"
     exit 1
 }
@@ -893,7 +892,7 @@ echo "${GREEN}✓ dela allow test-m (disambiguated name) succeeded as expected${
 echo "\nTest 32: Testing 'dela deny' command functionality"
 
 # Deny a single valid task
-dela deny another-task >/dev/null 2>&1 || {
+script -qc "dela deny another-task" /dev/null >/dev/null 2>&1 || {
     echo "${RED}✗ dela deny another-task failed${NC}"
     exit 1
 }
@@ -945,7 +944,7 @@ else
 fi
 
 # Verify dela deny fails for nonexistent task
-if dela deny nonexistent >/dev/null 2>&1; then
+if script -qc "dela deny nonexistent" /dev/null >/dev/null 2>&1; then
     echo "${RED}✗ dela deny nonexistent succeeded but should have failed${NC}"
     exit 1
 else
@@ -955,7 +954,7 @@ fi
 # Verify dela deny fails for ambiguous tasks
 # We have duplicate_test.json and duplicate_test.mk still present in the directory.
 # So 'test' is ambiguous.
-if dela deny test >/dev/null 2>&1; then
+if script -qc "dela deny test" /dev/null >/dev/null 2>&1; then
     echo "${RED}✗ dela deny test (ambiguous) succeeded but should have failed${NC}"
     exit 1
 else
@@ -964,7 +963,6 @@ fi
 
 # Test 33: Test non-interactive blocking of 'dela allow' and 'dela deny'
 echo "\nTest 33: Testing non-interactive blocking of 'dela allow' and 'dela deny'"
-unset DELA_FORCE_INTERACTIVE
 
 # Running dela allow should get blocked and print the error to stderr
 exit_code=0

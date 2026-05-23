@@ -16,7 +16,8 @@ RUN apk add --no-cache \
     npm \
     maven \
     gradle \
-    docker-cli && \
+    docker-cli \
+    util-linux && \
     apk add --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/v3.21/community go-task
 
 # symlink go-task to task

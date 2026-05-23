@@ -223,13 +223,11 @@ async fn main() {
     let result = run_command(cli.command).await;
 
     if let Err(err) = result {
-        if err
-            .to_string()
-            .starts_with("dela: command or task not found")
-        {
-            eprintln!("{}", err);
+        let msg = err.to_string();
+        if msg.starts_with("dela: command or task not found") || msg.starts_with("'dela ") {
+            eprintln!("{}", msg);
         } else {
-            eprintln!("Error: {}", err);
+            eprintln!("Error: {}", msg);
         }
         std::process::exit(1);
     }

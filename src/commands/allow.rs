@@ -5,8 +5,11 @@ use std::env;
 
 /// Executes the 'dela allow' command to add a specific task to the allowlist.
 pub fn execute(task_name: &str) -> anyhow::Result<()> {
-    super::gate_non_interactive("dela allow");
+    super::gate_non_interactive("dela allow")?;
+    execute_inner(task_name)
+}
 
+fn execute_inner(task_name: &str) -> anyhow::Result<()> {
     let current_dir = env::current_dir()
         .map_err(|e| anyhow::anyhow!("Failed to get current directory: {}", e))?;
     let discovered = task_discovery::discover_tasks(&current_dir);
@@ -59,9 +62,6 @@ mod tests {
 
     impl TestEnvGuard {
         fn new() -> Self {
-            unsafe {
-                std::env::set_var("DELA_FORCE_INTERACTIVE", "1");
-            }
             let original_cwd = env::current_dir().unwrap_or_else(|_| std::env::temp_dir());
             let (project_dir, home_dir) = setup_test_env();
             Self {
@@ -72,9 +72,6 @@ mod tests {
         }
 
         fn new_uninitialized() -> Self {
-            unsafe {
-                std::env::set_var("DELA_FORCE_INTERACTIVE", "1");
-            }
             let original_cwd = env::current_dir().unwrap_or_else(|_| std::env::temp_dir());
             // Create a temp dir for HOME but don't create the dela config directory
             let home_dir = TempDir::new().expect("Failed to create temp HOME directory");
@@ -93,9 +90,6 @@ mod tests {
 
     impl Drop for TestEnvGuard {
         fn drop(&mut self) {
-            unsafe {
-                std::env::remove_var("DELA_FORCE_INTERACTIVE");
-            }
             let _ = env::set_current_dir(&self.original_cwd);
             reset_to_real_environment();
         }
@@ -139,7 +133,7 @@ test: ## Running tests
         let guard = TestEnvGuard::new();
         env::set_current_dir(&guard.project_dir).expect("Failed to change directory");
 
-        let result = execute("test");
+        let result = execute_inner("test");
         assert!(result.is_ok(), "Should succeed for a single task");
 
         // Verify it was added to the allowlist
@@ -155,7 +149,7 @@ test: ## Running tests
         let guard = TestEnvGuard::new();
         env::set_current_dir(&guard.project_dir).expect("Failed to change directory");
 
-        let result = execute("nonexistent");
+        let result = execute_inner("nonexistent");
         assert!(result.is_err(), "Should fail for nonexistent task");
         assert_eq!(
             result.unwrap_err().to_string(),
@@ -180,7 +174,7 @@ test: ## Running tests
             .write_all(makefile_content.as_bytes())
             .expect("Failed to write Makefile");
 
-        let result = execute("test");
+        let result = execute_inner("test");
         assert!(result.is_err(), "Should fail when dela is not initialized");
         assert_eq!(
             result.unwrap_err().to_string(),
@@ -214,7 +208,7 @@ test: ## Running tests
             .unwrap();
 
         // Ambiguous task name 'test' should fail
-        let result = execute("test");
+        let result = execute_inner("test");
         assert!(result.is_err(), "Should fail for ambiguous task name");
         assert!(
             result
@@ -224,7 +218,7 @@ test: ## Running tests
         );
 
         // Suffixed/disambiguated task name should succeed
-        let result = execute("test-m");
+        let result = execute_inner("test-m");
         assert!(result.is_ok(), "Should succeed with disambiguated name");
 
         let allowlist_content =
