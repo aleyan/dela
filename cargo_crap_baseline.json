@@ -147,6 +147,14 @@
       "crap": 20.0
     },
     {
+      "file": "./src/main.rs",
+      "function": "main",
+      "line": 220,
+      "cyclomatic": 4.0,
+      "coverage": 0.0,
+      "crap": 20.0
+    },
+    {
       "file": "./src/task_discovery/github_actions.rs",
       "function": "discover_github_actions_tasks",
       "line": 17,
@@ -289,14 +297,6 @@
       "cyclomatic": 12.0,
       "coverage": 95.0,
       "crap": 12.018
-    },
-    {
-      "file": "./src/main.rs",
-      "function": "main",
-      "line": 220,
-      "cyclomatic": 3.0,
-      "coverage": 0.0,
-      "crap": 12.0
     },
     {
       "file": "./src/parsers/parse_makefile.rs",
@@ -678,6 +678,14 @@
       "file": "./src/commands/allow.rs",
       "function": "execute",
       "line": 7,
+      "cyclomatic": 2.0,
+      "coverage": 0.0,
+      "crap": 6.0
+    },
+    {
+      "file": "./src/commands/allow.rs",
+      "function": "execute_inner",
+      "line": 12,
       "cyclomatic": 6.0,
       "coverage": 100.0,
       "crap": 6.0
@@ -686,6 +694,14 @@
       "file": "./src/commands/deny.rs",
       "function": "execute",
       "line": 7,
+      "cyclomatic": 2.0,
+      "coverage": 0.0,
+      "crap": 6.0
+    },
+    {
+      "file": "./src/commands/deny.rs",
+      "function": "execute_inner",
+      "line": 12,
       "cyclomatic": 6.0,
       "coverage": 100.0,
       "crap": 6.0
@@ -921,6 +937,14 @@
       "cyclomatic": 4.0,
       "coverage": 100.0,
       "crap": 4.0
+    },
+    {
+      "file": "./src/commands/mod.rs",
+      "function": "gate_non_interactive",
+      "line": 16,
+      "cyclomatic": 3.0,
+      "coverage": 75.0,
+      "crap": 3.140625
     },
     {
       "file": "./src/mcp/server.rs",

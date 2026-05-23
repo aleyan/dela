@@ -844,7 +844,7 @@ echo "Initial allowlist contents:"
 cat /home/testuser/.config/dela/allowlist.toml
 
 # Test dela allow on a single valid task
-dela allow print-args >/dev/null 2>&1 || {
+script -eqc "dela allow print-args" /dev/null >/dev/null 2>&1 || {
     echo "${RED}✗ dela allow print-args failed${NC}"
     exit 1
 }
@@ -865,7 +865,7 @@ else
 fi
 
 # Verify dela allow fails for nonexistent task
-if dela allow nonexistent >/dev/null 2>&1; then
+if script -eqc "dela allow nonexistent" /dev/null >/dev/null 2>&1; then
     echo "${RED}✗ dela allow nonexistent succeeded but should have failed${NC}"
     exit 1
 else
@@ -874,7 +874,7 @@ fi
 
 # We have duplicate_test.json and duplicate_test.mk still present in the directory.
 # So 'test' is ambiguous.
-if dela allow test >/dev/null 2>&1; then
+if script -eqc "dela allow test" /dev/null >/dev/null 2>&1; then
     echo "${RED}✗ dela allow test (ambiguous) succeeded but should have failed${NC}"
     exit 1
 else
@@ -882,7 +882,7 @@ else
 fi
 
 # But dela allow test-m (disambiguated name) should succeed!
-dela allow test-m >/dev/null 2>&1 || {
+script -eqc "dela allow test-m" /dev/null >/dev/null 2>&1 || {
     echo "${RED}✗ dela allow test-m (disambiguated name) failed${NC}"
     exit 1
 }
@@ -892,7 +892,7 @@ echo "${GREEN}✓ dela allow test-m (disambiguated name) succeeded as expected${
 echo "\nTest 32: Testing 'dela deny' command functionality"
 
 # Deny a single valid task
-dela deny another-task >/dev/null 2>&1 || {
+script -eqc "dela deny another-task" /dev/null >/dev/null 2>&1 || {
     echo "${RED}✗ dela deny another-task failed${NC}"
     exit 1
 }
@@ -944,7 +944,7 @@ else
 fi
 
 # Verify dela deny fails for nonexistent task
-if dela deny nonexistent >/dev/null 2>&1; then
+if script -eqc "dela deny nonexistent" /dev/null >/dev/null 2>&1; then
     echo "${RED}✗ dela deny nonexistent succeeded but should have failed${NC}"
     exit 1
 else
@@ -954,14 +954,48 @@ fi
 # Verify dela deny fails for ambiguous tasks
 # We have duplicate_test.json and duplicate_test.mk still present in the directory.
 # So 'test' is ambiguous.
-if dela deny test >/dev/null 2>&1; then
+if script -eqc "dela deny test" /dev/null >/dev/null 2>&1; then
     echo "${RED}✗ dela deny test (ambiguous) succeeded but should have failed${NC}"
     exit 1
 else
     echo "${GREEN}✓ dela deny test (ambiguous) failed as expected${NC}"
 fi
 
+# Test 33: Test non-interactive blocking of 'dela allow' and 'dela deny'
+echo "\nTest 33: Testing non-interactive blocking of 'dela allow' and 'dela deny'"
+
+# Running dela allow should get blocked and print the error to stderr
+exit_code=0
+output=$(dela allow print-args 2>&1) || exit_code=$?
+if [ $exit_code -eq 0 ]; then
+    echo "${RED}✗ dela allow print-args did not fail in non-interactive session${NC}"
+    exit 1
+fi
+if echo "$output" | grep -q "'dela allow' should only be run by human users directly, and not by scripts or agents."; then
+    echo "${GREEN}✓ dela allow was blocked in non-interactive session as expected${NC}"
+else
+    echo "${RED}✗ dela allow was not blocked with the expected message${NC}"
+    echo "Output: $output"
+    exit 1
+fi
+
+# Running dela deny should get blocked and print the error to stderr
+exit_code=0
+output=$(dela deny print-args 2>&1) || exit_code=$?
+if [ $exit_code -eq 0 ]; then
+    echo "${RED}✗ dela deny print-args did not fail in non-interactive session${NC}"
+    exit 1
+fi
+if echo "$output" | grep -q "'dela deny' should only be run by human users directly, and not by scripts or agents."; then
+    echo "${GREEN}✓ dela deny was blocked in non-interactive session as expected${NC}"
+else
+    echo "${RED}✗ dela deny was not blocked with the expected message${NC}"
+    echo "Output: $output"
+    exit 1
+fi
+
 # Clean up test files
 rm -f duplicate_test.json duplicate_test.mk list_output.txt list_output_long.txt
 
 echo "\n${GREEN}All non-init tests completed successfully!${NC}"
+
