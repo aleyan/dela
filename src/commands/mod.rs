@@ -23,3 +23,19 @@ pub(crate) fn gate_non_interactive(command_name: &str) -> anyhow::Result<()> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_gate_non_interactive_in_test_env() {
+        let result = gate_non_interactive("dela allow");
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "'dela allow' should only be run by human users directly, and not by scripts or agents."
+        );
+    }
+}
+
