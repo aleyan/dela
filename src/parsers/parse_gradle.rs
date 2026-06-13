@@ -315,10 +315,16 @@ application {
         assert_eq!(custom_task.description, Some("A custom task".to_string()));
 
         let double_quote_task = tasks.iter().find(|t| t.name == "doubleQuoteTask").unwrap();
-        assert_eq!(double_quote_task.description, Some("A double quote task description".to_string()));
+        assert_eq!(
+            double_quote_task.description,
+            Some("A double quote task description".to_string())
+        );
 
         let another_task = tasks.iter().find(|t| t.name == "anotherTask").unwrap();
-        assert_eq!(another_task.description, Some("Custom Gradle task".to_string()));
+        assert_eq!(
+            another_task.description,
+            Some("Custom Gradle task".to_string())
+        );
     }
 
     #[test]
@@ -382,6 +388,9 @@ application {
 
         // Verify Kotlin description
         let copy_docs = tasks.iter().find(|t| t.name == "copyDocs").unwrap();
-        assert_eq!(copy_docs.description, Some("Some copy task description".to_string()));
+        assert_eq!(
+            copy_docs.description,
+            Some("Some copy task description".to_string())
+        );
     }
 }

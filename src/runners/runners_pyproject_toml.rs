@@ -263,5 +263,3 @@ mod tests {
         reset_to_real_environment();
     }
 }
-
-
