@@ -217,4 +217,51 @@ mod tests {
 
         reset_to_real_environment();
     }
+
+    #[test]
+    #[serial]
+    fn test_detect_package_manager_with_poe() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Reset and enable mock system
+        reset_mock();
+        enable_mock();
+
+        // Set up test environment with poe only
+        let env = TestEnvironment::new().with_executable("poe");
+        set_test_environment(env);
+
+        // Mock poe being available
+        mock_executable("poe");
+
+        let result = detect_package_manager(temp_dir.path());
+        assert_eq!(result, Some(TaskRunner::PythonPoe));
+
+        // Clean up
+        reset_mock();
+        reset_to_real_environment();
+    }
+
+    #[test]
+    #[serial]
+    fn test_detect_package_manager_none() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Reset and enable mock system
+        reset_mock();
+        enable_mock();
+
+        // Set up test environment with NO executables
+        let env = TestEnvironment::new();
+        set_test_environment(env);
+
+        let result = detect_package_manager(temp_dir.path());
+        assert_eq!(result, None);
+
+        // Clean up
+        reset_mock();
+        reset_to_real_environment();
+    }
 }
+
+
