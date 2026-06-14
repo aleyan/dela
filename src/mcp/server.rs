@@ -1,7 +1,7 @@
 use super::allowlist::McpAllowlistEvaluator;
 use super::dto::{
-    ListTasksArgs, StartResultDto, TaskDto, TaskOutputArgs, TaskStartArgs, TaskStatusArgs,
-    TaskStopArgs,
+    ListTasksArgs, OutputChunkDto, StartResultDto, TaskDto, TaskOutputArgs, TaskStartArgs,
+    TaskStatusArgs, TaskStopArgs,
 };
 use super::errors::DelaError;
 use super::job_manager::{JobManager, JobMetadata, JobState};
@@ -210,7 +210,12 @@ impl DelaMcpServer {
         }
     }
 
-    fn append_initial_output(output: &mut String, stream: &str, line: &str) {
+    fn append_initial_output(
+        output: &mut String,
+        chunks: &mut Vec<OutputChunkDto>,
+        stream: &str,
+        line: &str,
+    ) {
         match stream {
             "stderr" => {
                 if !output.contains("STDERR:") {
@@ -228,6 +233,11 @@ impl DelaMcpServer {
         }
 
         output.push_str(line);
+
+        match stream {
+            "stderr" => chunks.push(OutputChunkDto::stderr(line.to_string())),
+            _ => chunks.push(OutputChunkDto::stdout(line.to_string())),
+        }
     }
 
     async fn flush_output_notification_batch(
@@ -538,6 +548,7 @@ impl DelaMcpServer {
             args.wait_for_exit_seconds,
         )?);
         let initial_output = Arc::new(tokio::sync::Mutex::new(String::new()));
+        let initial_output_chunks = Arc::new(tokio::sync::Mutex::new(Vec::new()));
         let peer_clone = self.peer.clone();
 
         // Create channels for output streaming
@@ -590,6 +601,7 @@ impl DelaMcpServer {
 
         // Collect initial output for ~1 second while also streaming to logging
         let initial_output_clone = initial_output.clone();
+        let initial_output_chunks_clone = initial_output_chunks.clone();
         let peer_for_initial = peer_clone.clone();
         let pid_u32 = pid as u32;
 
@@ -624,7 +636,13 @@ impl DelaMcpServer {
                             Some(line) => {
                                 {
                                     let mut output = initial_output_clone.lock().await;
-                                    DelaMcpServer::append_initial_output(&mut output, "stdout", &line);
+                                    let mut chunks = initial_output_chunks_clone.lock().await;
+                                    DelaMcpServer::append_initial_output(
+                                        &mut output,
+                                        &mut chunks,
+                                        "stdout",
+                                        &line,
+                                    );
                                 }
                                 stdout_batch.add_line(&line);
                                 if stdout_batch.should_flush() {
@@ -652,7 +670,13 @@ impl DelaMcpServer {
                             Some(line) => {
                                 {
                                     let mut output = initial_output_clone.lock().await;
-                                    DelaMcpServer::append_initial_output(&mut output, "stderr", &line);
+                                    let mut chunks = initial_output_chunks_clone.lock().await;
+                                    DelaMcpServer::append_initial_output(
+                                        &mut output,
+                                        &mut chunks,
+                                        "stderr",
+                                        &line,
+                                    );
                                 }
                                 stderr_batch.add_line(&line);
                                 if stderr_batch.should_flush() {
@@ -756,6 +780,7 @@ impl DelaMcpServer {
 
             let exit_code = exit_status.code();
             let output = initial_output.lock().await.clone();
+            let output_chunks = initial_output_chunks.lock().await.clone();
 
             // Wait for reader tasks to finish
             if let Some(task) = stdout_task {
@@ -811,7 +836,8 @@ impl DelaMcpServer {
                 state: "exited".to_string(),
                 pid: None,
                 exit_code,
-                initial_output: output,
+                output: output_chunks.clone(),
+                initial_output: output_chunks,
             };
 
             return Ok(CallToolResult::success(vec![
@@ -821,6 +847,7 @@ impl DelaMcpServer {
 
         // Process is still running - set up background monitoring
         let output = initial_output.lock().await.clone();
+        let output_chunks = initial_output_chunks.lock().await.clone();
 
         // Create job metadata
         let metadata = JobMetadata {
@@ -1022,7 +1049,8 @@ impl DelaMcpServer {
             state: "running".to_string(),
             pid: Some(pid),
             exit_code: None,
-            initial_output: output,
+            output: output_chunks.clone(),
+            initial_output: output_chunks,
         };
 
         Ok(CallToolResult::success(vec![
@@ -3346,7 +3374,7 @@ add_custom_target(build-all COMMENT "Build everything")
         let script_path = temp_dir.path().join("waited_task.sh");
         std::fs::write(
             &script_path,
-            "#!/bin/bash\necho 'Starting...'\nsleep 2\necho 'Finished within wait window'\n",
+            "#!/bin/bash\necho 'Starting...'\necho 'Warning on stderr' >&2\nsleep 2\necho 'Finished within wait window'\n",
         )
         .unwrap();
         std::fs::set_permissions(&script_path, std::fs::Permissions::from_mode(0o755)).unwrap();
@@ -3383,12 +3411,20 @@ add_custom_target(build-all COMMENT "Build everything")
         assert_eq!(json["state"], "exited");
         assert_eq!(json["exit_code"], 0);
         assert!(json.get("pid").is_none());
-        assert!(
-            json["initial_output"]
-                .as_str()
-                .unwrap()
-                .contains("Finished within wait window")
-        );
+        let output_chunks = json["output"].as_array().unwrap();
+        assert!(output_chunks.iter().any(|chunk| {
+            chunk
+                .get("stdout")
+                .and_then(|text| text.as_str())
+                .is_some_and(|text| text.contains("Finished within wait window"))
+        }));
+        assert!(output_chunks.iter().any(|chunk| {
+            chunk
+                .get("stderr")
+                .and_then(|text| text.as_str())
+                .is_some_and(|text| text.contains("Warning on stderr"))
+        }));
+        assert_eq!(json["initial_output"], json["output"]);
 
         let status_result = server.status().await.unwrap();
         let status_json = match &status_result.content[0].raw {
@@ -3484,12 +3520,14 @@ add_custom_target(build-all COMMENT "Build everything")
 
         assert_eq!(json["state"], "running");
         let pid = json["pid"].as_i64().unwrap() as u32;
-        assert!(
-            json["initial_output"]
-                .as_str()
-                .unwrap()
-                .contains("Starting...")
-        );
+        let output_chunks = json["output"].as_array().unwrap();
+        assert!(output_chunks.iter().any(|chunk| {
+            chunk
+                .get("stdout")
+                .and_then(|text| text.as_str())
+                .is_some_and(|text| text.contains("Starting..."))
+        }));
+        assert_eq!(json["initial_output"], json["output"]);
 
         let status_result = server.status().await.unwrap();
         let status_json = match &status_result.content[0].raw {

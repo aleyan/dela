@@ -168,6 +168,22 @@ def logging_notifications(notifications):
     return [n for n in notifications if n.get("method") == "notifications/message"]
 
 
+def output_text(payload, stream=None, field="output"):
+    chunks = payload.get(field)
+    assert_condition(isinstance(chunks, list), f"payload missing structured {field}", payload)
+
+    texts = []
+    for chunk in chunks:
+        assert_condition(isinstance(chunk, dict), "output chunk should be an object", payload)
+        assert_condition(len(chunk) == 1, "output chunk should have exactly one stream key", payload)
+        key, value = next(iter(chunk.items()))
+        assert_condition(key in {"stdout", "stderr"}, "output chunk has unknown stream key", payload)
+        assert_condition(isinstance(value, str), "output chunk value should be text", payload)
+        if stream is None or key == stream:
+            texts.append(value)
+    return "".join(texts)
+
+
 def test_initialize_instructions():
     print("Test 1: initialize advertises bounded wait and logging")
     process, init_response = start_mcp_process()
@@ -265,8 +281,9 @@ def test_task_start_quick_exit():
         assert_condition(payload["state"] == "exited", "quick task should exit", payload)
         assert_condition(payload.get("pid") is None, "quick exit should not report pid", payload)
         assert_condition(payload.get("exit_code") == 0, "quick exit should report exit_code 0", payload)
+        assert_condition(payload["initial_output"] == payload["output"], "initial_output should match output", payload)
         assert_condition(
-            "Test task executed successfully" in payload["initial_output"],
+            "Test task executed successfully" in output_text(payload, "stdout"),
             "quick exit missing task output",
             payload,
         )
@@ -304,7 +321,8 @@ def test_task_start_args_and_spaces():
         payload = parse_tool_result(response)
         assert_condition(payload["state"] == "exited", "print-args should exit", payload)
         assert_condition(payload.get("exit_code") == 0, "print-args should exit successfully", payload)
-        output = payload["initial_output"]
+        assert_condition(payload["initial_output"] == payload["output"], "initial_output should match output", payload)
+        output = output_text(payload)
         assert_condition("value with spaces" in output, "missing spaced arg in output", payload)
         print("✓ task_start preserves passed arguments")
         return True
@@ -361,13 +379,14 @@ def test_bounded_wait_completion():
         assert_condition(payload["state"] == "exited", "bounded wait should complete task", payload)
         assert_condition(payload.get("exit_code") == 0, "bounded wait should return exit_code 0", payload)
         assert_condition(payload.get("pid") is None, "bounded wait completion should not return pid", payload)
+        assert_condition(payload["initial_output"] == payload["output"], "initial_output should match output", payload)
         assert_condition(
-            "Starting long-running task..." in payload["initial_output"],
+            "Starting long-running task..." in output_text(payload, "stdout"),
             "missing initial stdout from bounded wait task",
             payload,
         )
         assert_condition(
-            "Long-running task completed successfully" in payload["initial_output"],
+            "Long-running task completed successfully" in output_text(payload, "stdout"),
             "missing completion stdout from bounded wait task",
             payload,
         )
@@ -423,7 +442,12 @@ def test_running_lifecycle_and_stop():
         pid = start_payload.get("pid")
         assert_condition(isinstance(pid, int) and pid > 0, "running task should expose pid", start_payload)
         assert_condition(
-            "Starting long-running task..." in start_payload["initial_output"],
+            start_payload["initial_output"] == start_payload["output"],
+            "initial_output should match output",
+            start_payload,
+        )
+        assert_condition(
+            "Starting long-running task..." in output_text(start_payload, "stdout"),
             "running task missing initial output",
             start_payload,
         )

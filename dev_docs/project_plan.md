@@ -287,8 +287,8 @@ Implement the minimal surface so editors can start using MCP immediately for dis
 - [x] **[DTKT-162]** Implement `list_tasks` enrichment: compute command, test runner availability, and allowlist flag
 - [x] **[DTKT-163]** Implement **task_start (quick)**:
   - Spawn the task, capture stdout/stderr up to **1s**
-  - If exits ≤1s → return `{ state: "exited", exit_code, initial_output }`
-  - If still running → return `{ state: "running", pid, initial_output }` **but do not persist/manage background yet** (documented limitation)
+  - If exits ≤1s → return `{ state: "exited", exit_code, output }`
+  - If still running → return `{ state: "running", pid, output }` **but do not persist/manage background yet** (documented limitation)
 - [x] **[DTKT-164]** Implement **status** that returns an **empty array** in Quick phase (documented that background processes are unsupported yet)
 - [x] **[DTKT-165]** Error taxonomy for **NotAllowlisted**, **RunnerUnavailable**, **TaskNotFound**
 - [x] **[DTKT-166]** Unit tests for `list_tasks` enrichment and `task_start` quick path
@@ -323,6 +323,7 @@ Advanced MCP features for better editor integration and real-time feedback.
 
 **High Priority:**
 - [x] **[DTKT-177]** MCP **logging notifications** for real-time output streaming (tracing + subscriber)
+- [x] **[DTKT-201]** Add stream-aware `task_start` output chunks for both `output` and `initial_output`
 - [x] **[DTKT-186]** **Editor config generation** - generate `.cursor/mcp.json` or similar config files via `dela mcp --init-cursor`
 
 **Medium Priority:**

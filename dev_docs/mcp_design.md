@@ -84,7 +84,7 @@ Libraries and their roles:
 - **PID-centric**: Each started task is a real OS child process with a PID.
 - **Default capture window**: `task_start` collects stdout/stderr for up to **1 second** by default.
   - If the child exits in ≤1s → return `{ state: "exited", exit_code, output }`.
-  - If still running after 1s → background it and return `{ state: "running", pid, initial_output }`.
+  - If still running after 1s → background it and return `{ state: "running", pid, output }`.
 - **Bounded wait execution**: callers can pass `task_start(wait_for_exit_seconds=N)` to extend
   that wait window for short/medium tasks like tests and builds. If the task exits within the
   requested window, `task_start` returns final status and captured output in one round trip. If it
@@ -127,11 +127,18 @@ pub struct TaskStartArgs {
 }
 
 #[derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+pub struct OutputChunkDto {
+  pub stdout: Option<String>,  // present for stdout chunks
+  pub stderr: Option<String>,  // present for stderr chunks
+}
+
+#[derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub struct StartResultDto {
   pub state: String,            // "exited"|"running"|"failed"
   pub pid: Option<i32>,         // present if running
   pub exit_code: Option<i32>,   // present if exited/failed
-  pub initial_output: String,   // combined stdout+stderr captured before returning
+  pub output: Vec<OutputChunkDto>, // stream-aware chunks captured before returning
+  pub initial_output: Vec<OutputChunkDto>, // same stream-aware chunks, kept under the historical field name
 }
 
 // Note: RunningTaskDto, TaskStatusArgs, TaskOutputArgs, TaskStopArgs are Phase 2
@@ -214,7 +221,7 @@ pub struct TaskOutputArgs {
   "content": [
     {
       "type": "text",
-      "text": "{\"state\": \"exited\", \"exit_code\": 0, \"initial_output\": \"Test task executed successfully\\n\"}"
+      "text": "{\"state\":\"exited\",\"exit_code\":0,\"output\":[{\"stdout\":\"Test task executed successfully\\n\"}],\"initial_output\":[{\"stdout\":\"Test task executed successfully\\n\"}]}"
     }
   ]
 }
@@ -225,7 +232,7 @@ pub struct TaskOutputArgs {
   "content": [
     {
       "type": "text",
-      "text": "{\"state\": \"running\", \"pid\": 12345, \"initial_output\": \"Starting long-running task...\\n\"}"
+      "text": "{\"state\":\"running\",\"pid\":12345,\"output\":[{\"stdout\":\"Starting long-running task...\\n\"}],\"initial_output\":[{\"stdout\":\"Starting long-running task...\\n\"}]}"
     }
   ]
 }
