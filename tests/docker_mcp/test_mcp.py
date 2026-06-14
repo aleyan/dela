@@ -281,7 +281,7 @@ def test_task_start_quick_exit():
         assert_condition(payload["state"] == "exited", "quick task should exit", payload)
         assert_condition(payload.get("pid") is None, "quick exit should not report pid", payload)
         assert_condition(payload.get("exit_code") == 0, "quick exit should report exit_code 0", payload)
-        assert_condition(payload["initial_output"] == payload["output"], "initial_output should match output", payload)
+        assert_condition("initial_output" not in payload, "quick exit should not return initial_output", payload)
         assert_condition(
             "Test task executed successfully" in output_text(payload, "stdout"),
             "quick exit missing task output",
@@ -321,7 +321,7 @@ def test_task_start_args_and_spaces():
         payload = parse_tool_result(response)
         assert_condition(payload["state"] == "exited", "print-args should exit", payload)
         assert_condition(payload.get("exit_code") == 0, "print-args should exit successfully", payload)
-        assert_condition(payload["initial_output"] == payload["output"], "initial_output should match output", payload)
+        assert_condition("initial_output" not in payload, "print-args should not return initial_output", payload)
         output = output_text(payload)
         assert_condition("value with spaces" in output, "missing spaced arg in output", payload)
         print("✓ task_start preserves passed arguments")
@@ -379,7 +379,7 @@ def test_bounded_wait_completion():
         assert_condition(payload["state"] == "exited", "bounded wait should complete task", payload)
         assert_condition(payload.get("exit_code") == 0, "bounded wait should return exit_code 0", payload)
         assert_condition(payload.get("pid") is None, "bounded wait completion should not return pid", payload)
-        assert_condition(payload["initial_output"] == payload["output"], "initial_output should match output", payload)
+        assert_condition("initial_output" not in payload, "bounded wait should not return initial_output", payload)
         assert_condition(
             "Starting long-running task..." in output_text(payload, "stdout"),
             "missing initial stdout from bounded wait task",
@@ -441,11 +441,7 @@ def test_running_lifecycle_and_stop():
         assert_condition(start_payload["state"] == "running", "default start should background task", start_payload)
         pid = start_payload.get("pid")
         assert_condition(isinstance(pid, int) and pid > 0, "running task should expose pid", start_payload)
-        assert_condition(
-            start_payload["initial_output"] == start_payload["output"],
-            "initial_output should match output",
-            start_payload,
-        )
+        assert_condition("initial_output" not in start_payload, "running task should not return initial_output", start_payload)
         assert_condition(
             "Starting long-running task..." in output_text(start_payload, "stdout"),
             "running task missing initial output",
@@ -481,11 +477,33 @@ def test_running_lifecycle_and_stop():
         )
         output_payload = parse_tool_result(output_response)
         assert_condition(output_payload["pid"] == pid, "task_output pid mismatch", output_payload)
-        assert_condition(output_payload["lines"], "task_output should contain captured lines", output_payload)
+        assert_condition("lines" not in output_payload, "task_output should not return legacy lines", output_payload)
+        assert_condition(output_payload["output"], "task_output should contain captured output chunks", output_payload)
+        assert_condition(output_payload["offset"] >= 0, "task_output should report offset", output_payload)
+        assert_condition(output_payload["next_offset"] >= output_payload["offset"], "task_output should report next offset", output_payload)
+        assert_condition(
+            "Starting long-running task..." in output_text(output_payload, "stdout"),
+            "task_output should contain structured stdout chunks",
+            output_payload,
+        )
+
+        offset_response, _ = send_request(
+            process,
+            tool_request(15, "task_output", {"pid": pid, "offset": output_payload["offset"], "lines": 1}),
+        )
+        offset_payload = parse_tool_result(offset_response)
+        assert_condition("lines" not in offset_payload, "offset task_output should not return legacy lines", offset_payload)
+        assert_condition(len(offset_payload["output"]) == 1, "offset task_output should return requested chunk count", offset_payload)
+        assert_condition(offset_payload["offset"] == output_payload["offset"], "offset task_output should honor offset", offset_payload)
+        assert_condition(
+            offset_payload["next_offset"] == offset_payload["offset"] + 1,
+            "offset task_output should advance next_offset",
+            offset_payload,
+        )
 
         stop_response, _ = send_request(
             process,
-            tool_request(15, "task_stop", {"pid": pid, "grace_period": 2}),
+            tool_request(16, "task_stop", {"pid": pid, "grace_period": 2}),
             timeout_seconds=10,
         )
         stop_payload = parse_tool_result(stop_response)
@@ -496,7 +514,7 @@ def test_running_lifecycle_and_stop():
             stop_payload,
         )
 
-        status_after_stop, _ = send_request(process, tool_request(16, "status"))
+        status_after_stop, _ = send_request(process, tool_request(17, "status"))
         running_after_stop = parse_tool_result(status_after_stop)["running"]
         assert_condition(
             all(job.get("pid") != pid for job in running_after_stop),
@@ -515,13 +533,13 @@ def test_nonexistent_job_tools():
     try:
         output_response, _ = send_request(
             process,
-            tool_request(17, "task_output", {"pid": 99999, "lines": 10, "show_truncation": True}),
+            tool_request(18, "task_output", {"pid": 99999, "lines": 10, "show_truncation": True}),
         )
         assert_condition("error" in output_response, "task_output should error for bad pid", output_response)
 
         stop_response, _ = send_request(
             process,
-            tool_request(18, "task_stop", {"pid": 99999, "grace_period": 1}),
+            tool_request(19, "task_stop", {"pid": 99999, "grace_period": 1}),
         )
         assert_condition("error" in stop_response, "task_stop should error for bad pid", stop_response)
         print("✓ nonexistent-job tools return MCP errors")

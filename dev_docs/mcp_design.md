@@ -27,6 +27,11 @@ per response/notification.
 
 # Dela MCP — Revised Design (First-Principles)
 
+## API Evolution
+
+Expose the best current MCP shape. Do not keep superseded fields for compatibility; coding agents start fresh sessions and do not build long-lived programs against this API.
+
+
 ## Scope (tool surface)
 
 This redesign narrows each tool to a single, clear responsibility and aligns with how editors/agents actually consume MCP. All names are stable and self-descriptive.
@@ -44,7 +49,7 @@ This redesign narrows each tool to a single, clear responsibility and aligns wit
 - **status** → Return a list of **all running tasks** (across all names) with PIDs and minimal status.
 - **task_start** → Start a task by **unique_name** with optional args/env/cwd. If it **finishes within 1s**, return its full output and exit status. If it **does not finish in 1s**, background it, return `running` with PID and any output captured during that first second.
 - **task_status** → Return status for instances of a given **unique_name**. There may be multiple PIDs if the same task was started with different arguments. The wire format includes state, elapsed time, and completion metadata (`exit_code`, `completed_at`) so clients do not need to infer outcomes from notifications alone.
-- **task_output** → Return the **last N lines** of output for a **PID** (with a default N). Supports simple paging via an optional `from` byte cursor (future).
+- **task_output** → Return stream-aware output chunks for a **PID**. Defaults to the last N retained chunks and supports simple paging with `offset` plus `lines`.
 - **task_stop** → Stop a running task by **PID** (TERM with grace, then KILL on timeout).
 - 
 ⸻
@@ -89,7 +94,7 @@ Libraries and their roles:
   that wait window for short/medium tasks like tests and builds. If the task exits within the
   requested window, `task_start` returns final status and captured output in one round trip. If it
   is still running when the window expires, MCP backgrounds it and returns `running` with the PID.
-- **Output ring buffer**: Per-PID bounded buffer (default 1000 lines, 5 MB). `task_output` returns last N lines. Future paging via `from` byte cursor.
+- **Output ring buffer**: Per-PID bounded buffer (default 10,000 lines, 5 MB). `task_output` returns stream-aware chunks and supports retained-buffer paging with `offset` plus `lines`.
 - **Lifecycle**: `task_stop` sends SIGTERM, waits grace (default 5s), then SIGKILL. Background jobs are GC'd after a TTL (configurable).
 - **Real-time streaming**: Task output is streamed via MCP logging notifications. Clients can subscribe to `notifications/message` to receive output as it happens.
 
@@ -138,14 +143,11 @@ pub struct StartResultDto {
   pub pid: Option<i32>,         // present if running
   pub exit_code: Option<i32>,   // present if exited/failed
   pub output: Vec<OutputChunkDto>, // stream-aware chunks captured before returning
-  pub initial_output: Vec<OutputChunkDto>, // same stream-aware chunks, kept under the historical field name
 }
 
-// Note: RunningTaskDto, TaskStatusArgs, TaskOutputArgs, TaskStopArgs are Phase 2
-// and not yet implemented in the current version.
 ```
 
-Planned DTO enrichments for client ergonomics:
+Additional DTOs:
 
 ```rust
 pub struct TaskStatusJobDto {
@@ -160,8 +162,8 @@ pub struct TaskStatusJobDto {
 pub struct TaskOutputArgs {
   pub pid: u32,
   pub lines: Option<usize>,
+  pub offset: Option<usize>,       // zero-based offset into the retained output buffer
   pub show_truncation: Option<bool>,
-  pub from: Option<u64>,           // future cursor for incremental paging
 }
 ```
 
@@ -221,7 +223,7 @@ pub struct TaskOutputArgs {
   "content": [
     {
       "type": "text",
-      "text": "{\"state\":\"exited\",\"exit_code\":0,\"output\":[{\"stdout\":\"Test task executed successfully\\n\"}],\"initial_output\":[{\"stdout\":\"Test task executed successfully\\n\"}]}"
+      "text": "{\"state\":\"exited\",\"exit_code\":0,\"output\":[{\"stdout\":\"Test task executed successfully\\n\"}]}"
     }
   ]
 }
@@ -232,7 +234,7 @@ pub struct TaskOutputArgs {
   "content": [
     {
       "type": "text",
-      "text": "{\"state\":\"running\",\"pid\":12345,\"output\":[{\"stdout\":\"Starting long-running task...\\n\"}],\"initial_output\":[{\"stdout\":\"Starting long-running task...\\n\"}]}"
+      "text": "{\"state\":\"running\",\"pid\":12345,\"output\":[{\"stdout\":\"Starting long-running task...\\n\"}]}"
     }
   ]
 }
@@ -374,16 +376,16 @@ polling clients can determine completion without depending on logging notificati
   "content": [
     {
       "type": "text",
-      "text": "{\"pid\": 12345, \"lines\": [\"Building...\", \"Compiling...\"], \"total_lines\": 2, \"total_bytes\": 25, \"truncated\": false, \"buffer_full\": false}"
+      "text": "{\"pid\":12345,\"output\":[{\"stdout\":\"Building...\"},{\"stderr\":\"warning: slow compile\"}],\"offset\":0,\"next_offset\":2,\"total_lines\":2,\"total_bytes\":33,\"truncated\":false,\"buffer_full\":false}"
     }
   ]
 }
 ```
-**Planned paging form**
+**Offset paging form**
 ```json
-{ "pid": 12345, "from": 4096, "lines": 100 }
+{ "pid": 12345, "offset": 1000, "lines": 500 }
 ```
-Cursor-based paging lets clients fetch only new output instead of repeatedly re-reading a tail and diffing it client-side.
+Offset paging lets clients read a specific window from the currently retained buffer. For example, `offset: 1000, lines: 500` returns up to 500 chunks starting at retained chunk offset 1000. Responses include `next_offset` for the next request.
 
 ### 6) task_stop
 **Args**
@@ -407,7 +409,7 @@ Cursor-based paging lets clients fetch only new output instead of repeatedly re-
 ## Resources (Optional / Future)
 - We can keep a conservative tool-only design. If needed for streaming or snapshots later:
   - `job://<pid>` → JSON status snapshot
-  - `joblog://<pid>?from=<u64>` → chunked logs paging
+  - `joblog://<pid>?offset=<usize>` → chunked logs paging
 
 ## Client Ergonomics Roadmap
 
@@ -415,7 +417,7 @@ These are not required for the minimal MCP surface, but they materially improve 
 
 - **Bounded wait on start**: implemented via `task_start(wait_for_exit_seconds=...)` to avoid poll loops for common commands like tests and builds.
 - **Completion metadata in `task_status`**: implemented so clients can read `exit_code` and `completed_at` directly from polling responses.
-- **Incremental log paging**: add `from` cursors to `task_output` or `joblog://` resources.
+- **Incremental log paging**: implemented for `task_output` with `offset` plus `lines`; resources can mirror this later if needed.
 - **Discovery caching**: cache task discovery for hot paths such as repeated `list_tasks` calls.
 - **Workspace-aware editor config generation**: allow generated MCP configs to pre-bind `cwd`,
   prefer absolute `dela` binary paths when useful, and reduce post-generation manual edits.
@@ -467,19 +469,19 @@ impl ServerHandler for DelaMcpServer {
 - Validates task exists and is allowlisted
 - Checks runner availability
 - Captures output for first second, then backgrounds if still running
-- Returns `StartResultDto` with state, PID, exit code, and initial output
-- Future ergonomic extension: support bounded waiting for completion in the same call
+- Returns `StartResultDto` with state, PID, exit code, and captured output
+- Supports bounded waiting for completion in the same call via `wait_for_exit_seconds`
 
 **task_status** - Returns status for running instances of a specific task
 - Filters jobs by unique_name
 - Returns all PIDs associated with that task name
 - Includes state (running/exited/failed), elapsed_seconds, command, args, `exit_code`, and `completed_at`
 
-**task_output** - Returns the last N lines of output for a running task
+**task_output** - Returns stream-aware output chunks for a running task
 - Default 200 lines, configurable via `lines` parameter
+- Optional `offset` returns a window from the currently retained buffer
 - Supports `show_truncation` flag to indicate if output was truncated
-- Per-PID ring buffer (1000 lines, 5MB max)
-- Planned enrichment: support cursor-based paging via `from`
+- Per-PID ring buffer (10,000 lines, 5MB max)
 
 **task_stop** - Stops a running task by PID
 - Sends SIGTERM with configurable grace period (default 5s)
@@ -495,7 +497,7 @@ impl ServerHandler for DelaMcpServer {
 - Spawn via `tokio::process::Command` with stdin closed; capture stdout/stderr
 - First-second capture using `tokio::time::timeout` around a pump loop
 - Per-PID ring buffer (VecDeque) with configurable limits:
-  - Max 1000 lines per job
+  - Max 10,000 lines per job
   - Max 5MB output per job
 - Job metadata includes: started_at (internal), elapsed_seconds (wire), completed_at (wire for finished jobs), command, unique_name, source_name, args, cwd, file_path
 - Background monitoring task updates job state on child exit
@@ -507,7 +509,7 @@ impl ServerHandler for DelaMcpServer {
 - **Deny by default**: Tasks not explicitly allowlisted are rejected with `NotAllowlisted` error
 - **Allowlist path**: Reads from `~/.config/dela/allowlist.toml` (same as CLI)
 - **Output limits**:
-  - Ring buffer: 1000 lines, 5MB max per job
+  - Ring buffer: 10,000 lines, 5MB max per job
   - Per-message chunk: 8KB max
 - **Concurrency**: Max 50 concurrent jobs (configurable), rejects beyond limit
 - **Path policy**: Tasks execute with `cwd` under server root (no upward traversal)

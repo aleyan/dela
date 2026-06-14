@@ -4,7 +4,7 @@ use super::dto::{
     TaskStatusArgs, TaskStopArgs,
 };
 use super::errors::DelaError;
-use super::job_manager::{JobManager, JobMetadata, JobState};
+use super::job_manager::{JobManager, JobMetadata, JobState, OutputLine};
 use crate::runner::{is_runner_available_for_mcp, split_command_words};
 use crate::task_discovery;
 use chrono::SecondsFormat;
@@ -210,34 +210,41 @@ impl DelaMcpServer {
         }
     }
 
-    fn append_initial_output(
-        output: &mut String,
-        chunks: &mut Vec<OutputChunkDto>,
-        stream: &str,
-        line: &str,
-    ) {
-        match stream {
-            "stderr" => {
-                if !output.contains("STDERR:") {
-                    if !output.is_empty() {
-                        output.push('\n');
-                    }
-                    output.push_str("STDERR:\n");
-                }
-            }
-            _ => {
-                if output.is_empty() {
-                    output.push_str("STDOUT:\n");
-                }
-            }
-        }
-
-        output.push_str(line);
-
+    fn append_output_chunk(chunks: &mut Vec<OutputChunkDto>, stream: &str, line: &str) {
         match stream {
             "stderr" => chunks.push(OutputChunkDto::stderr(line.to_string())),
             _ => chunks.push(OutputChunkDto::stdout(line.to_string())),
         }
+    }
+
+    async fn add_job_output_chunks(
+        job_manager: &JobManager,
+        pid: u32,
+        chunks: &[OutputChunkDto],
+    ) -> anyhow::Result<()> {
+        for chunk in chunks {
+            if let Some(text) = &chunk.stdout {
+                job_manager
+                    .add_job_output_chunk(pid, "stdout", text.clone())
+                    .await?;
+            }
+            if let Some(text) = &chunk.stderr {
+                job_manager
+                    .add_job_output_chunk(pid, "stderr", text.clone())
+                    .await?;
+            }
+        }
+        Ok(())
+    }
+
+    fn output_entries_to_json(entries: &[OutputLine]) -> Vec<serde_json::Value> {
+        entries
+            .iter()
+            .map(|entry| match entry.stream.as_str() {
+                "stderr" => serde_json::json!({ "stderr": entry.text }),
+                _ => serde_json::json!({ "stdout": entry.text }),
+            })
+            .collect()
     }
 
     async fn flush_output_notification_batch(
@@ -547,8 +554,7 @@ impl DelaMcpServer {
         let capture_duration = Duration::from_secs(Self::resolve_wait_for_exit_seconds(
             args.wait_for_exit_seconds,
         )?);
-        let initial_output = Arc::new(tokio::sync::Mutex::new(String::new()));
-        let initial_output_chunks = Arc::new(tokio::sync::Mutex::new(Vec::new()));
+        let captured_output_chunks = Arc::new(tokio::sync::Mutex::new(Vec::new()));
         let peer_clone = self.peer.clone();
 
         // Create channels for output streaming
@@ -600,8 +606,7 @@ impl DelaMcpServer {
         };
 
         // Collect initial output for ~1 second while also streaming to logging
-        let initial_output_clone = initial_output.clone();
-        let initial_output_chunks_clone = initial_output_chunks.clone();
+        let captured_output_chunks_clone = captured_output_chunks.clone();
         let peer_for_initial = peer_clone.clone();
         let pid_u32 = pid as u32;
 
@@ -635,14 +640,8 @@ impl DelaMcpServer {
                         match line {
                             Some(line) => {
                                 {
-                                    let mut output = initial_output_clone.lock().await;
-                                    let mut chunks = initial_output_chunks_clone.lock().await;
-                                    DelaMcpServer::append_initial_output(
-                                        &mut output,
-                                        &mut chunks,
-                                        "stdout",
-                                        &line,
-                                    );
+                                    let mut chunks = captured_output_chunks_clone.lock().await;
+                                    DelaMcpServer::append_output_chunk(&mut chunks, "stdout", &line);
                                 }
                                 stdout_batch.add_line(&line);
                                 if stdout_batch.should_flush() {
@@ -669,14 +668,8 @@ impl DelaMcpServer {
                         match line {
                             Some(line) => {
                                 {
-                                    let mut output = initial_output_clone.lock().await;
-                                    let mut chunks = initial_output_chunks_clone.lock().await;
-                                    DelaMcpServer::append_initial_output(
-                                        &mut output,
-                                        &mut chunks,
-                                        "stderr",
-                                        &line,
-                                    );
+                                    let mut chunks = captured_output_chunks_clone.lock().await;
+                                    DelaMcpServer::append_output_chunk(&mut chunks, "stderr", &line);
                                 }
                                 stderr_batch.add_line(&line);
                                 if stderr_batch.should_flush() {
@@ -779,8 +772,7 @@ impl DelaMcpServer {
             })?;
 
             let exit_code = exit_status.code();
-            let output = initial_output.lock().await.clone();
-            let output_chunks = initial_output_chunks.lock().await.clone();
+            let output_chunks = captured_output_chunks.lock().await.clone();
 
             // Wait for reader tasks to finish
             if let Some(task) = stdout_task {
@@ -814,10 +806,8 @@ impl DelaMcpServer {
                 })?;
 
             // Add output to the job record
-            if !output.is_empty() {
-                let _ = self
-                    .job_manager
-                    .add_job_output(pid as u32, output.clone())
+            if !output_chunks.is_empty() {
+                let _ = Self::add_job_output_chunks(&self.job_manager, pid as u32, &output_chunks)
                     .await;
             }
 
@@ -836,8 +826,7 @@ impl DelaMcpServer {
                 state: "exited".to_string(),
                 pid: None,
                 exit_code,
-                output: output_chunks.clone(),
-                initial_output: output_chunks,
+                output: output_chunks,
             };
 
             return Ok(CallToolResult::success(vec![
@@ -846,8 +835,7 @@ impl DelaMcpServer {
         }
 
         // Process is still running - set up background monitoring
-        let output = initial_output.lock().await.clone();
-        let output_chunks = initial_output_chunks.lock().await.clone();
+        let output_chunks = captured_output_chunks.lock().await.clone();
 
         // Create job metadata
         let metadata = JobMetadata {
@@ -873,9 +861,8 @@ impl DelaMcpServer {
             })?;
 
         // Add initial output to the job
-        if !output.is_empty() {
-            self.job_manager
-                .add_job_output(pid as u32, output.clone())
+        if !output_chunks.is_empty() {
+            Self::add_job_output_chunks(&self.job_manager, pid as u32, &output_chunks)
                 .await
                 .map_err(|e| {
                     DelaError::internal_error(
@@ -917,7 +904,9 @@ impl DelaMcpServer {
                     }, if !stdout_done => {
                         match line {
                             Some(line) => {
-                                let _ = job_manager.add_job_output(pid_u32, line.clone()).await;
+                                let _ = job_manager
+                                    .add_job_output_chunk(pid_u32, "stdout", line.clone())
+                                    .await;
                                 stdout_batch.add_line(&line);
                                 if stdout_batch.should_flush() {
                                     DelaMcpServer::flush_output_notification_batch(
@@ -948,7 +937,9 @@ impl DelaMcpServer {
                     }, if !stderr_done => {
                         match line {
                             Some(line) => {
-                                let _ = job_manager.add_job_output(pid_u32, line.clone()).await;
+                                let _ = job_manager
+                                    .add_job_output_chunk(pid_u32, "stderr", line.clone())
+                                    .await;
                                 stderr_batch.add_line(&line);
                                 if stderr_batch.should_flush() {
                                     DelaMcpServer::flush_output_notification_batch(
@@ -1049,8 +1040,7 @@ impl DelaMcpServer {
             state: "running".to_string(),
             pid: Some(pid),
             exit_code: None,
-            output: output_chunks.clone(),
-            initial_output: output_chunks,
+            output: output_chunks,
         };
 
         Ok(CallToolResult::success(vec![
@@ -1101,7 +1091,7 @@ impl DelaMcpServer {
         ]))
     }
 
-    #[tool(description = "Tail last N lines for a PID")]
+    #[tool(description = "Read output chunks for a PID")]
     pub async fn task_output(
         &self,
         Parameters(args): Parameters<TaskOutputArgs>,
@@ -1113,19 +1103,27 @@ impl DelaMcpServer {
             .ok_or_else(|| DelaError::task_not_found(format!("Job with PID {}", args.pid)))?;
 
         let requested_lines = args.lines.unwrap_or(200);
-        let lines = job.get_output_lines(Some(requested_lines));
         let total_lines = job.output_buffer.len();
+        let offset = args
+            .offset
+            .unwrap_or_else(|| total_lines.saturating_sub(requested_lines))
+            .min(total_lines);
+        let output_entries = job.get_output_entries_from(offset, requested_lines);
+        let returned_lines = output_entries.len();
+        let next_offset = offset + returned_lines;
+        let output = Self::output_entries_to_json(&output_entries);
         let total_bytes = job.output_buffer.total_bytes();
 
-        // Check if output was truncated
-        let is_truncated = total_lines > requested_lines;
         let buffer_full = job.output_buffer.is_full();
+        let is_truncated = offset > 0 || next_offset < total_lines || buffer_full;
 
         // Apply per-message chunk size limit (8KB default)
         const MAX_CHUNK_SIZE: usize = 8 * 1024; // 8KB
         let mut response = serde_json::json!({
             "pid": job.pid,
-            "lines": lines,
+            "output": output,
+            "offset": offset,
+            "next_offset": next_offset,
             "total_lines": total_lines,
             "total_bytes": total_bytes,
             "truncated": is_truncated,
@@ -1136,7 +1134,7 @@ impl DelaMcpServer {
         if args.show_truncation.unwrap_or(false) {
             response["truncation_info"] = serde_json::json!({
                 "requested_lines": requested_lines,
-                "returned_lines": lines.len(),
+                "returned_lines": returned_lines,
                 "is_truncated": is_truncated,
                 "buffer_full": buffer_full,
                 "buffer_capacity": job.output_buffer.capacity()
@@ -1147,45 +1145,52 @@ impl DelaMcpServer {
         let response_json = serde_json::to_string(&response).unwrap_or_default();
         if response_json.len() > MAX_CHUNK_SIZE {
             // Truncate the response to fit within chunk size limit
-            let truncated_lines = if lines.len() > 1 {
+            let truncated_entries = if output_entries.len() > 1 {
                 // Try to fit as many lines as possible within the limit
-                let mut truncated_lines = Vec::new();
+                let mut truncated_entries = Vec::new();
                 let mut current_size = 0;
 
-                for line in &lines {
-                    let line_json = serde_json::to_string(line).unwrap_or_default();
-                    if current_size + line_json.len() + 100 < MAX_CHUNK_SIZE {
+                for entry in &output_entries {
+                    let entry_json = serde_json::to_string(
+                        &Self::output_entries_to_json(std::slice::from_ref(entry))[0],
+                    )
+                    .unwrap_or_default();
+                    if current_size + entry_json.len() + 100 < MAX_CHUNK_SIZE {
                         // 100 bytes buffer for JSON structure
-                        truncated_lines.push(line.clone());
-                        current_size += line_json.len();
+                        truncated_entries.push(entry.clone());
+                        current_size += entry_json.len();
                     } else {
                         break;
                     }
                 }
 
-                if truncated_lines.is_empty() && !lines.is_empty() {
+                if truncated_entries.is_empty() && !output_entries.is_empty() {
                     // If even one line is too big, truncate it
-                    let first_line = &lines[0];
-                    let mut truncated_line = first_line.clone();
+                    let first_entry = &output_entries[0];
+                    let mut truncated_line = first_entry.text.clone();
                     if truncated_line.len() > MAX_CHUNK_SIZE - 200 {
                         // 200 bytes buffer
                         truncated_line.truncate(MAX_CHUNK_SIZE - 200);
                         truncated_line.push_str("... [truncated]");
                     }
-                    truncated_lines.push(truncated_line);
+                    truncated_entries
+                        .push(OutputLine::new(first_entry.stream.clone(), truncated_line));
                 }
 
-                truncated_lines
+                truncated_entries
             } else {
-                lines
+                output_entries
             };
 
-            response["lines"] = serde_json::Value::Array(
-                truncated_lines
-                    .into_iter()
-                    .map(serde_json::Value::String)
-                    .collect(),
-            );
+            response["output"] =
+                serde_json::Value::Array(Self::output_entries_to_json(&truncated_entries));
+            response["next_offset"] = serde_json::Value::Number(serde_json::Number::from(
+                offset + truncated_entries.len(),
+            ));
+            if args.show_truncation.unwrap_or(false) {
+                response["truncation_info"]["returned_lines"] =
+                    serde_json::Value::Number(serde_json::Number::from(truncated_entries.len()));
+            }
             response["chunk_truncated"] = serde_json::Value::Bool(true);
             response["max_chunk_size"] =
                 serde_json::Value::Number(serde_json::Number::from(MAX_CHUNK_SIZE));
@@ -1587,6 +1592,22 @@ impl ServerHandler for DelaMcpServer {
             "lines".to_string(),
             serde_json::Value::Object(task_output_lines_prop),
         );
+        let mut task_output_offset_prop = Map::new();
+        task_output_offset_prop.insert(
+            "type".to_string(),
+            serde_json::Value::String("integer".to_string()),
+        );
+        task_output_offset_prop.insert(
+            "description".to_string(),
+            serde_json::Value::String(
+                "Zero-based offset into the currently retained output buffer. If omitted, returns the tail."
+                    .to_string(),
+            ),
+        );
+        task_output_properties.insert(
+            "offset".to_string(),
+            serde_json::Value::Object(task_output_offset_prop),
+        );
         let mut task_output_truncation_prop = Map::new();
         task_output_truncation_prop.insert(
             "type".to_string(),
@@ -1749,6 +1770,7 @@ mod tests {
         let output_args = TaskOutputArgs {
             pid: 12345,
             lines: Some(10),
+            offset: None,
             show_truncation: None,
         };
         let stop_args = TaskStopArgs {
@@ -2135,10 +2157,16 @@ mod tests {
             .add_job_output(pid, "Line 1\nLine 2\nLine 3\n".to_string())
             .await
             .unwrap();
+        server
+            .job_manager
+            .add_job_output_chunk(pid, "stderr", "Warning 1\n".to_string())
+            .await
+            .unwrap();
 
         let args = TaskOutputArgs {
             pid,
             lines: Some(2),
+            offset: None,
             show_truncation: None,
         };
 
@@ -2153,11 +2181,17 @@ mod tests {
                 let json: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
                 let obj = json.as_object().unwrap();
                 assert_eq!(obj["pid"], pid);
-                assert!(obj["lines"].is_array());
-                assert_eq!(obj["total_lines"], 3);
+                assert!(!obj.contains_key("lines"));
+                assert!(obj["output"].is_array());
+                assert_eq!(obj["offset"], 2);
+                assert_eq!(obj["next_offset"], 4);
+                assert_eq!(obj["total_lines"], 4);
                 assert!(obj["total_bytes"].is_number());
-                assert_eq!(obj["truncated"], true); // We requested 2 lines but have 3
+                assert_eq!(obj["truncated"], true); // We requested 2 lines but have 4
                 assert!(obj["buffer_full"].is_boolean());
+                let output = obj["output"].as_array().unwrap();
+                assert_eq!(output.len(), 2);
+                assert_eq!(output[1]["stderr"], "Warning 1");
             }
             _ => panic!("Expected text content with JSON"),
         }
@@ -2205,6 +2239,7 @@ mod tests {
         let args = TaskOutputArgs {
             pid,
             lines: Some(3),
+            offset: None,
             show_truncation: Some(true),
         };
 
@@ -2219,7 +2254,10 @@ mod tests {
                 let json: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
                 let obj = json.as_object().unwrap();
                 assert_eq!(obj["pid"], pid);
-                assert!(obj["lines"].is_array());
+                assert!(!obj.contains_key("lines"));
+                assert!(obj["output"].is_array());
+                assert_eq!(obj["offset"], 2);
+                assert_eq!(obj["next_offset"], 5);
                 assert_eq!(obj["total_lines"], 5);
                 assert_eq!(obj["truncated"], true);
 
@@ -2230,6 +2268,73 @@ mod tests {
                 assert_eq!(truncation_info["returned_lines"], 3);
                 assert_eq!(truncation_info["is_truncated"], true);
                 assert!(truncation_info["buffer_capacity"].is_number());
+            }
+            _ => panic!("Expected text content with JSON"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_task_output_with_offset_window() {
+        // Arrange
+        let temp_dir = std::env::temp_dir();
+        let server = DelaMcpServer::new(temp_dir);
+
+        let metadata = JobMetadata {
+            started_at: std::time::Instant::now(),
+            unique_name: "test-task".to_string(),
+            source_name: "test".to_string(),
+            args: None,
+            env: None,
+            cwd: None,
+            command: "echo test".to_string(),
+            file_path: PathBuf::from("Makefile"),
+        };
+
+        let mut cmd = tokio::process::Command::new("echo");
+        cmd.arg("test");
+        cmd.stdout(std::process::Stdio::piped());
+        cmd.stderr(std::process::Stdio::piped());
+        let child = cmd.spawn().unwrap();
+        let pid = child.id().unwrap();
+
+        server
+            .job_manager
+            .start_job(pid, metadata, child)
+            .await
+            .unwrap();
+
+        server
+            .job_manager
+            .add_job_output(pid, "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n".to_string())
+            .await
+            .unwrap();
+
+        let args = TaskOutputArgs {
+            pid,
+            lines: Some(2),
+            offset: Some(1),
+            show_truncation: Some(true),
+        };
+
+        // Act
+        let result = server.task_output(Parameters(args)).await.unwrap();
+
+        // Assert
+        let content = &result.content[0];
+        match &content.raw {
+            RawContent::Text(text_content) => {
+                let json: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
+                let obj = json.as_object().unwrap();
+                let output = obj["output"].as_array().unwrap();
+                assert!(!obj.contains_key("lines"));
+                assert_eq!(output.len(), 2);
+                assert_eq!(output[0]["stdout"], "Line 2");
+                assert_eq!(output[1]["stdout"], "Line 3");
+                assert_eq!(obj["offset"], 1);
+                assert_eq!(obj["next_offset"], 3);
+                assert_eq!(obj["total_lines"], 5);
+                assert_eq!(obj["truncated"], true);
+                assert_eq!(obj["truncation_info"]["returned_lines"], 2);
             }
             _ => panic!("Expected text content with JSON"),
         }
@@ -2277,6 +2382,7 @@ mod tests {
         let args = TaskOutputArgs {
             pid,
             lines: Some(5), // Request more lines than available
+            offset: None,
             show_truncation: Some(true),
         };
 
@@ -2291,7 +2397,10 @@ mod tests {
                 let json: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
                 let obj = json.as_object().unwrap();
                 assert_eq!(obj["pid"], pid);
-                assert!(obj["lines"].is_array());
+                assert!(!obj.contains_key("lines"));
+                assert!(obj["output"].is_array());
+                assert_eq!(obj["offset"], 0);
+                assert_eq!(obj["next_offset"], 2);
                 assert_eq!(obj["total_lines"], 2);
                 assert_eq!(obj["truncated"], false); // No truncation since we have fewer lines than requested
 
@@ -2315,6 +2424,7 @@ mod tests {
         let args = TaskOutputArgs {
             pid: 99999, // Non-existent PID
             lines: Some(10),
+            offset: None,
             show_truncation: None,
         };
 
@@ -2507,7 +2617,7 @@ mod tests {
         // Create a job manager with very low concurrency limit for testing
         let config = crate::mcp::job_manager::JobManagerConfig {
             max_concurrent_jobs: 2,
-            max_output_lines_per_job: 1000,
+            max_output_lines_per_job: 10_000,
             max_output_bytes_per_job: 5 * 1024 * 1024,
             job_ttl_seconds: 3600,
             gc_interval_seconds: 300,
@@ -2616,6 +2726,7 @@ mod tests {
         let args = TaskOutputArgs {
             pid,
             lines: Some(1),
+            offset: None,
             show_truncation: Some(true),
         };
 
@@ -2636,11 +2747,10 @@ mod tests {
                 assert!(obj.contains_key("max_chunk_size"));
                 assert_eq!(obj["max_chunk_size"], 8192); // 8KB
 
-                // Lines should be present (may or may not be truncated depending on implementation)
-                let lines = obj["lines"].as_array().unwrap();
-                assert_eq!(lines.len(), 1);
-                let line = lines[0].as_str().unwrap();
-                // The line should exist and be reasonable in size
+                assert!(!obj.contains_key("lines"));
+                let output = obj["output"].as_array().unwrap();
+                assert_eq!(output.len(), 1);
+                let line = output[0]["stdout"].as_str().unwrap();
                 assert!(!line.is_empty());
                 // The chunk truncation should be indicated in the response
                 assert!(obj.contains_key("chunk_truncated"));
@@ -3424,7 +3534,7 @@ add_custom_target(build-all COMMENT "Build everything")
                 .and_then(|text| text.as_str())
                 .is_some_and(|text| text.contains("Warning on stderr"))
         }));
-        assert_eq!(json["initial_output"], json["output"]);
+        assert!(json.get("initial_output").is_none());
 
         let status_result = server.status().await.unwrap();
         let status_json = match &status_result.content[0].raw {
@@ -3527,7 +3637,7 @@ add_custom_target(build-all COMMENT "Build everything")
                 .and_then(|text| text.as_str())
                 .is_some_and(|text| text.contains("Starting..."))
         }));
-        assert_eq!(json["initial_output"], json["output"]);
+        assert!(json.get("initial_output").is_none());
 
         let status_result = server.status().await.unwrap();
         let status_json = match &status_result.content[0].raw {
@@ -3967,6 +4077,7 @@ add_custom_target(build-all COMMENT "Build everything")
         let out_args = TaskOutputArgs {
             pid,
             lines: Some(10),
+            offset: None,
             show_truncation: Some(true),
         };
         let out_result = server.task_output(Parameters(out_args)).await.unwrap();
@@ -3976,11 +4087,17 @@ add_custom_target(build-all COMMENT "Build everything")
                 let output_json: serde_json::Value =
                     serde_json::from_str(&text_content.text).unwrap();
                 assert_eq!(output_json["pid"].as_i64().unwrap() as u32, pid);
-                let lines = output_json["lines"].as_array().unwrap();
+                assert!(output_json.get("lines").is_none());
+                let output = output_json["output"].as_array().unwrap();
                 // Expect initial lines present
-                let joined = lines
+                let joined = output
                     .iter()
-                    .filter_map(|v| v.as_str())
+                    .filter_map(|chunk| {
+                        chunk
+                            .get("stdout")
+                            .or_else(|| chunk.get("stderr"))
+                            .and_then(|text| text.as_str())
+                    })
                     .collect::<Vec<_>>()
                     .join("\n");
                 assert!(

@@ -308,6 +308,7 @@ Add PID management, output buffers, and controls.
 - [x] **[DTKT-172]** Complete `status` to list **all running PIDs** with minimal info
 - [x] **[DTKT-173]** Implement `task_status` (filter by unique_name, return many PIDs)
 - [x] **[DTKT-174]** Implement `task_output` **tail last N lines** (default 200); add truncation flag
+- [x] **[DTKT-202]** Add stream-aware `task_output.output` chunks and remove superseded `lines` responses
 - [x] **[DTKT-175]** Implement `task_stop` with **TERM + grace + KILL**
 - [x] **[DTKT-176]** Concurrency and safety limits (max concurrent jobs, per-message chunk cap)
 - [x] **[DTKT-179]** Integration tests for long-running jobs: start → status → output → stop
@@ -323,7 +324,7 @@ Advanced MCP features for better editor integration and real-time feedback.
 
 **High Priority:**
 - [x] **[DTKT-177]** MCP **logging notifications** for real-time output streaming (tracing + subscriber)
-- [x] **[DTKT-201]** Add stream-aware `task_start` output chunks for both `output` and `initial_output`
+- [x] **[DTKT-201]** Add stream-aware `task_start.output` chunks
 - [x] **[DTKT-186]** **Editor config generation** - generate `.cursor/mcp.json` or similar config files via `dela mcp --init-cursor`
 
 **Medium Priority:**
@@ -333,11 +334,11 @@ Advanced MCP features for better editor integration and real-time feedback.
 - [ ] **[DTKT-192]** **Robust editor config generation** - support JSONC-aware merges, optionally write absolute `dela` binary paths for GUI editor MCP configs, and add workspace-aware `cwd` generation modes
 - [x] **[DTKT-193]** **Bounded wait execution** - `task_start` now accepts `wait_for_exit_seconds`, extending the default 1-second wait window for short/medium tasks like tests and builds before falling back to background execution
 - [x] **[DTKT-194]** **Completion metadata in task_status** - `task_status` now includes `exit_code` for exited jobs and `completed_at` for exited/failed jobs so clients do not need to infer outcomes from notifications
-- [ ] **[DTKT-195]** **Cursor-based log paging** - support `task_output(from=...)` or equivalent incremental log fetches
+- [x] **[DTKT-195]** **Output window paging** - support `task_output(offset=..., lines=...)` incremental log fetches over the retained buffer
 - [ ] **[DTKT-196]** **MCP smoke test CLI** - provide `dela mcp --self-test` and/or `dela mcp --inspect-task <task>` for local MCP debugging without hand-written JSON-RPC
 
 **Lower Priority:**
-- [ ] **[DTKT-178]** MCP **Resources** `job://<pid>` for job state snapshots, `joblog://<pid>?from=…` for log paging
+- [ ] **[DTKT-178]** MCP **Resources** `job://<pid>` for job state snapshots, `joblog://<pid>?offset=...` for log paging
 - [ ] **[DTKT-181]** Task **stdin support** - allow sending input to running tasks via MCP
 - [ ] **[DTKT-184]** **Prompts** - implement MCP prompts for common workflows (e.g., "run tests", "build project")
 - [ ] **[DTKT-185]** **Sampling** - support MCP sampling for AI-assisted task selection

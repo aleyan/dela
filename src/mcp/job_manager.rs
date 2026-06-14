@@ -39,10 +39,30 @@ pub struct JobMetadata {
     pub file_path: PathBuf,
 }
 
+/// A single captured output line with its source stream.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OutputLine {
+    pub stream: String,
+    pub text: String,
+}
+
+impl OutputLine {
+    pub fn new(stream: impl Into<String>, text: impl Into<String>) -> Self {
+        Self {
+            stream: stream.into(),
+            text: text.into(),
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.text.len()
+    }
+}
+
 /// Ring buffer for storing job output
 #[derive(Debug, Clone)]
 pub struct RingBuffer {
-    buffer: VecDeque<String>,
+    buffer: VecDeque<OutputLine>,
     max_size: usize,
     total_bytes: usize,
     max_bytes: usize,
@@ -60,8 +80,9 @@ impl RingBuffer {
     }
 
     /// Add a line to the buffer, maintaining size limits
-    pub fn push_line(&mut self, line: String) {
-        let line_bytes = line.len();
+    pub fn push_line(&mut self, stream: impl Into<String>, line: String) {
+        let entry = OutputLine::new(stream, line);
+        let line_bytes = entry.len();
 
         // Remove lines from the front if we exceed the line limit
         while self.buffer.len() >= self.max_size {
@@ -79,13 +100,14 @@ impl RingBuffer {
 
         // Add the new line if we have space
         if self.total_bytes + line_bytes <= self.max_bytes {
-            self.buffer.push_back(line);
+            self.buffer.push_back(entry);
             self.total_bytes += line_bytes;
         }
     }
 
-    /// Get the last N lines from the buffer
-    pub fn get_last_lines(&self, n: usize) -> Vec<String> {
+    /// Get the last N entries from the buffer
+    #[cfg(test)]
+    pub fn get_last_entries(&self, n: usize) -> Vec<OutputLine> {
         let start = if self.buffer.len() > n {
             self.buffer.len() - n
         } else {
@@ -95,9 +117,38 @@ impl RingBuffer {
         self.buffer.iter().skip(start).cloned().collect()
     }
 
-    /// Get all lines in the buffer
-    pub fn get_all_lines(&self) -> Vec<String> {
+    /// Get all entries in the buffer
+    #[cfg(test)]
+    pub fn get_all_entries(&self) -> Vec<OutputLine> {
         self.buffer.iter().cloned().collect()
+    }
+
+    /// Get entries from a zero-based offset into the retained buffer.
+    pub fn get_entries_from(&self, offset: usize, count: usize) -> Vec<OutputLine> {
+        self.buffer
+            .iter()
+            .skip(offset)
+            .take(count)
+            .cloned()
+            .collect()
+    }
+
+    /// Get the last N lines from the buffer
+    #[cfg(test)]
+    pub fn get_last_lines(&self, n: usize) -> Vec<String> {
+        self.get_last_entries(n)
+            .into_iter()
+            .map(|entry| entry.text)
+            .collect()
+    }
+
+    /// Get all lines in the buffer
+    #[cfg(test)]
+    pub fn get_all_lines(&self) -> Vec<String> {
+        self.get_all_entries()
+            .into_iter()
+            .map(|entry| entry.text)
+            .collect()
     }
 
     /// Get the total number of lines stored
@@ -180,15 +231,21 @@ impl Job {
     }
 
     /// Add output to the job's ring buffer
-    pub fn add_output(&mut self, output: String) {
+    pub fn add_output(&mut self, stream: &str, output: String) {
         // Split output into lines and add each line
         for line in output.lines() {
-            self.output_buffer.push_line(line.to_string());
+            self.output_buffer.push_line(stream, line.to_string());
         }
         self.touch();
     }
 
+    /// Get the job's output as stream-tagged lines from a retained-buffer offset.
+    pub fn get_output_entries_from(&self, offset: usize, count: usize) -> Vec<OutputLine> {
+        self.output_buffer.get_entries_from(offset, count)
+    }
+
     /// Get the job's output as lines
+    #[cfg(test)]
     pub fn get_output_lines(&self, max_lines: Option<usize>) -> Vec<String> {
         match max_lines {
             Some(n) => self.output_buffer.get_last_lines(n),
@@ -231,7 +288,7 @@ impl Default for JobManagerConfig {
     fn default() -> Self {
         Self {
             max_concurrent_jobs: 50,
-            max_output_lines_per_job: 1000,
+            max_output_lines_per_job: 10_000,
             max_output_bytes_per_job: 5 * 1024 * 1024, // 5MB
             job_ttl_seconds: 3600,                     // 1 hour
             gc_interval_seconds: 300,                  // 5 minutes
@@ -400,11 +457,22 @@ impl JobManager {
         }
     }
 
-    /// Add output to a job
+    /// Add stdout output to a job for tests that do not care about stream identity.
+    #[cfg(test)]
     pub async fn add_job_output(&self, pid: u32, output: String) -> anyhow::Result<()> {
+        self.add_job_output_chunk(pid, "stdout", output).await
+    }
+
+    /// Add stream-tagged output to a job.
+    pub async fn add_job_output_chunk(
+        &self,
+        pid: u32,
+        stream: &str,
+        output: String,
+    ) -> anyhow::Result<()> {
         let mut jobs = self.jobs.write().await;
         if let Some(job) = jobs.get_mut(&pid) {
-            job.add_output(output);
+            job.add_output(stream, output);
             Ok(())
         } else {
             Err(anyhow::anyhow!("Job with PID {} not found", pid))
@@ -724,21 +792,22 @@ mod tests {
     fn test_ring_buffer_basic() {
         let mut buffer = RingBuffer::new(3, 100);
 
-        buffer.push_line("line1".to_string());
-        buffer.push_line("line2".to_string());
-        buffer.push_line("line3".to_string());
+        buffer.push_line("stdout", "line1".to_string());
+        buffer.push_line("stderr", "line2".to_string());
+        buffer.push_line("stdout", "line3".to_string());
 
         assert_eq!(buffer.len(), 3);
         assert_eq!(buffer.get_all_lines(), vec!["line1", "line2", "line3"]);
+        assert_eq!(buffer.get_all_entries()[1].stream, "stderr");
     }
 
     #[test]
     fn test_ring_buffer_overflow() {
         let mut buffer = RingBuffer::new(2, 100);
 
-        buffer.push_line("line1".to_string());
-        buffer.push_line("line2".to_string());
-        buffer.push_line("line3".to_string());
+        buffer.push_line("stdout", "line1".to_string());
+        buffer.push_line("stdout", "line2".to_string());
+        buffer.push_line("stdout", "line3".to_string());
 
         assert_eq!(buffer.len(), 2);
         assert_eq!(buffer.get_all_lines(), vec!["line2", "line3"]);
@@ -749,7 +818,7 @@ mod tests {
         let mut buffer = RingBuffer::new(5, 100);
 
         for i in 1..=5 {
-            buffer.push_line(format!("line{}", i));
+            buffer.push_line("stdout", format!("line{}", i));
         }
 
         assert_eq!(buffer.get_last_lines(2), vec!["line4", "line5"]);

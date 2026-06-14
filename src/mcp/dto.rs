@@ -666,9 +666,6 @@ pub struct StartResultDto {
 
     /// Output chunks captured before returning, preserving stream identity.
     pub output: Vec<OutputChunkDto>,
-
-    /// Initial output chunks captured before returning, preserving stream identity.
-    pub initial_output: Vec<OutputChunkDto>,
 }
 
 /// Arguments for the task_status tool
@@ -687,6 +684,11 @@ pub struct TaskOutputArgs {
     /// Number of lines to return (default: 200)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub lines: Option<usize>,
+
+    /// Zero-based offset into the currently retained output buffer.
+    /// If omitted, returns the last `lines` entries.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub offset: Option<usize>,
 
     /// Whether the output was truncated due to buffer limits
     #[serde(skip_serializing_if = "Option::is_none")]
