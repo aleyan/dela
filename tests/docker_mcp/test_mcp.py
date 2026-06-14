@@ -177,8 +177,6 @@ def output_text(payload, stream=None, field="output"):
         assert_condition(isinstance(chunk, dict), "output chunk should be an object", payload)
         for key, value in chunk.items():
             assert_condition(key in {"stdout", "stderr"}, "output chunk has unknown stream key", payload)
-            if value is None:
-                continue
             assert_condition(isinstance(value, str), "output chunk value should be text", payload)
             if stream is None or key == stream:
                 texts.append(value)
@@ -556,7 +554,7 @@ def test_logging_severity_classification():
         response, notifications = send_request(
             process,
             tool_request(
-                19,
+                20,
                 "task_start",
                 {
                     "unique_name": "stderr-level-task",

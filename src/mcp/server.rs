@@ -21,7 +21,7 @@ use std::time::Instant;
 use tokio::io::{AsyncBufReadExt, BufReader, stdin, stdout};
 use tokio::process::Command;
 use tokio::sync::{OnceCell, RwLock};
-use tokio::time::{Duration, timeout};
+use tokio::time::Duration;
 
 const TASK_DISCOVERY_CACHE_TTL: Duration = Duration::from_secs(60);
 const DEFAULT_TASK_START_WAIT_SECONDS: u64 = 1;
@@ -761,12 +761,7 @@ impl DelaMcpServer {
             (stdout_rx, stderr_rx)
         });
 
-        // Wait for initial capture with timeout
-        let capture_result = timeout(
-            capture_duration + Duration::from_millis(100),
-            initial_capture,
-        )
-        .await;
+        let capture_result = initial_capture.await;
 
         // Check if process exited during initial capture
         let process_exited = child.try_wait().is_ok_and(|status| status.is_some());
@@ -894,8 +889,7 @@ impl DelaMcpServer {
 
         tokio::spawn(async move {
             // Get the receivers from initial capture (if available)
-            let (mut stdout_rx_opt, mut stderr_rx_opt) = if let Ok(Ok((rx1, rx2))) = capture_result
-            {
+            let (mut stdout_rx_opt, mut stderr_rx_opt) = if let Ok((rx1, rx2)) = capture_result {
                 (Some(rx1), Some(rx2))
             } else {
                 (None, None)
@@ -1736,7 +1730,7 @@ impl ServerHandler for DelaMcpServer {
             ),
             Tool::new_with_raw(
                 "task_output",
-                Some("Tail last N lines for a PID".into()),
+                Some("Read stream-aware output chunks with optional offset paging".into()),
                 task_output_schema,
             ),
             Tool::new_with_raw(
