@@ -175,12 +175,13 @@ def output_text(payload, stream=None, field="output"):
     texts = []
     for chunk in chunks:
         assert_condition(isinstance(chunk, dict), "output chunk should be an object", payload)
-        assert_condition(len(chunk) == 1, "output chunk should have exactly one stream key", payload)
-        key, value = next(iter(chunk.items()))
-        assert_condition(key in {"stdout", "stderr"}, "output chunk has unknown stream key", payload)
-        assert_condition(isinstance(value, str), "output chunk value should be text", payload)
-        if stream is None or key == stream:
-            texts.append(value)
+        for key, value in chunk.items():
+            assert_condition(key in {"stdout", "stderr"}, "output chunk has unknown stream key", payload)
+            if value is None:
+                continue
+            assert_condition(isinstance(value, str), "output chunk value should be text", payload)
+            if stream is None or key == stream:
+                texts.append(value)
     return "".join(texts)
 
 
