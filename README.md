@@ -100,7 +100,7 @@ Tool names are stable, and `list_tasks` exposes a stable wire format (including 
 | `status` | List all currently running background tasks |
 | `task_start` | Start a task by unique name with optional args/env/cwd |
 | `task_status` | Get status for running instances of a specific task |
-| `task_output` | Get the last N lines of output for a running task (by PID) |
+| `task_output` | Get stream-aware output chunks for a task by PID, with optional offset paging |
 | `task_stop` | Stop a running task by PID (SIGTERM + grace period + SIGKILL) |
 
 ### Security

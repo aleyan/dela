@@ -622,6 +622,34 @@ pub struct TaskStartArgs {
     pub wait_for_exit_seconds: Option<u64>,
 }
 
+/// One chunk of task output from a single stream.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct OutputChunkDto {
+    /// Stdout text captured for this chunk
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stdout: Option<String>,
+
+    /// Stderr text captured for this chunk
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stderr: Option<String>,
+}
+
+impl OutputChunkDto {
+    pub fn stdout(text: String) -> Self {
+        Self {
+            stdout: Some(text),
+            stderr: None,
+        }
+    }
+
+    pub fn stderr(text: String) -> Self {
+        Self {
+            stdout: None,
+            stderr: Some(text),
+        }
+    }
+}
+
 /// Result of starting a task
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct StartResultDto {
@@ -636,8 +664,8 @@ pub struct StartResultDto {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub exit_code: Option<i32>,
 
-    /// Combined stdout and stderr captured before returning
-    pub initial_output: String,
+    /// Output chunks captured before returning, preserving stream identity.
+    pub output: Vec<OutputChunkDto>,
 }
 
 /// Arguments for the task_status tool
@@ -656,6 +684,11 @@ pub struct TaskOutputArgs {
     /// Number of lines to return (default: 200)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub lines: Option<usize>,
+
+    /// Zero-based offset into the currently retained output buffer.
+    /// If omitted, returns the last `lines` entries.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub offset: Option<usize>,
 
     /// Whether the output was truncated due to buffer limits
     #[serde(skip_serializing_if = "Option::is_none")]
