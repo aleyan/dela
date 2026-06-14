@@ -247,6 +247,15 @@ impl DelaMcpServer {
             .collect()
     }
 
+    fn truncate_output_entry_for_chunk(entry: &OutputLine, max_chunk_size: usize) -> OutputLine {
+        let mut truncated_line = entry.text.clone();
+        if truncated_line.len() > max_chunk_size - 200 {
+            truncated_line.truncate(max_chunk_size - 200);
+            truncated_line.push_str("... [truncated]");
+        }
+        OutputLine::new(entry.stream.clone(), truncated_line)
+    }
+
     async fn flush_output_notification_batch(
         peer: &Arc<OnceCell<Peer<RoleServer>>>,
         pid: u32,
@@ -807,8 +816,14 @@ impl DelaMcpServer {
 
             // Add output to the job record
             if !output_chunks.is_empty() {
-                let _ = Self::add_job_output_chunks(&self.job_manager, pid as u32, &output_chunks)
-                    .await;
+                Self::add_job_output_chunks(&self.job_manager, pid as u32, &output_chunks)
+                    .await
+                    .map_err(|e| {
+                        DelaError::internal_error(
+                            format!("Failed to add completed task output: {}", e),
+                            Some("Job management error".to_string()),
+                        )
+                    })?;
             }
 
             // Send task completed event
@@ -904,9 +919,16 @@ impl DelaMcpServer {
                     }, if !stdout_done => {
                         match line {
                             Some(line) => {
-                                let _ = job_manager
+                                if let Err(error) = job_manager
                                     .add_job_output_chunk(pid_u32, "stdout", line.clone())
-                                    .await;
+                                    .await
+                                {
+                                    tracing::warn!(
+                                        pid = pid_u32,
+                                        error = %error,
+                                        "failed to persist stdout output chunk"
+                                    );
+                                }
                                 stdout_batch.add_line(&line);
                                 if stdout_batch.should_flush() {
                                     DelaMcpServer::flush_output_notification_batch(
@@ -937,9 +959,16 @@ impl DelaMcpServer {
                     }, if !stderr_done => {
                         match line {
                             Some(line) => {
-                                let _ = job_manager
+                                if let Err(error) = job_manager
                                     .add_job_output_chunk(pid_u32, "stderr", line.clone())
-                                    .await;
+                                    .await
+                                {
+                                    tracing::warn!(
+                                        pid = pid_u32,
+                                        error = %error,
+                                        "failed to persist stderr output chunk"
+                                    );
+                                }
                                 stderr_batch.add_line(&line);
                                 if stderr_batch.should_flush() {
                                     DelaMcpServer::flush_output_notification_batch(
@@ -1167,17 +1196,26 @@ impl DelaMcpServer {
                 if truncated_entries.is_empty() && !output_entries.is_empty() {
                     // If even one line is too big, truncate it
                     let first_entry = &output_entries[0];
-                    let mut truncated_line = first_entry.text.clone();
-                    if truncated_line.len() > MAX_CHUNK_SIZE - 200 {
-                        // 200 bytes buffer
-                        truncated_line.truncate(MAX_CHUNK_SIZE - 200);
-                        truncated_line.push_str("... [truncated]");
-                    }
-                    truncated_entries
-                        .push(OutputLine::new(first_entry.stream.clone(), truncated_line));
+                    truncated_entries.push(Self::truncate_output_entry_for_chunk(
+                        first_entry,
+                        MAX_CHUNK_SIZE,
+                    ));
                 }
 
                 truncated_entries
+            } else if let Some(first_entry) = output_entries.first() {
+                let entry_json = serde_json::to_string(
+                    &Self::output_entries_to_json(std::slice::from_ref(first_entry))[0],
+                )
+                .unwrap_or_default();
+                if entry_json.len() + 100 >= MAX_CHUNK_SIZE {
+                    vec![Self::truncate_output_entry_for_chunk(
+                        first_entry,
+                        MAX_CHUNK_SIZE,
+                    )]
+                } else {
+                    output_entries
+                }
             } else {
                 output_entries
             };
@@ -2752,6 +2790,8 @@ mod tests {
                 assert_eq!(output.len(), 1);
                 let line = output[0]["stdout"].as_str().unwrap();
                 assert!(!line.is_empty());
+                assert!(line.len() < 8192);
+                assert!(line.ends_with("... [truncated]"));
                 // The chunk truncation should be indicated in the response
                 assert!(obj.contains_key("chunk_truncated"));
             }

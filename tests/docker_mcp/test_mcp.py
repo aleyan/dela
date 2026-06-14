@@ -481,7 +481,7 @@ def test_running_lifecycle_and_stop():
         assert_condition("lines" not in output_payload, "task_output should not return legacy lines", output_payload)
         assert_condition(output_payload["output"], "task_output should contain captured output chunks", output_payload)
         assert_condition(output_payload["offset"] >= 0, "task_output should report offset", output_payload)
-        assert_condition(output_payload["next_offset"] >= output_payload["offset"], "task_output should report next offset", output_payload)
+        assert_condition(output_payload["next_offset"] > output_payload["offset"], "task_output should advance next offset", output_payload)
         assert_condition(
             "Starting long-running task..." in output_text(output_payload, "stdout"),
             "task_output should contain structured stdout chunks",
