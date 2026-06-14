@@ -369,4 +369,24 @@ mod tests {
 
         reset_to_real_environment();
     }
+
+    #[test]
+    #[serial]
+    fn test_add_shell_integration_error() {
+        let temp_dir = TempDir::new().unwrap();
+        setup_test_env("/bin/zsh", temp_dir.path()).unwrap();
+
+        // Pass a directory path as config_path to force a read error (EISDIR)
+        let config_path = temp_dir.path().to_path_buf();
+        let result = add_shell_integration(&config_path);
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Failed to read shell config")
+        );
+
+        reset_to_real_environment();
+    }
 }

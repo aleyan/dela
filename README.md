@@ -13,7 +13,7 @@ Dela is a task runner that provides discovery for task definitions in various fo
 Install `dela` from crates.io and initialize it to set up shell integration:
 
 ```sh
-$ cargo install dela
+$ cargo +1.93.0 install dela
 $ dela init
 ```
 

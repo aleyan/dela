@@ -159,16 +159,16 @@
       "function": "discover_github_actions_tasks",
       "line": 17,
       "cyclomatic": 19.0,
-      "coverage": 88.88888888888889,
-      "crap": 19.49519890260631
+      "coverage": 90.0,
+      "crap": 19.361
     },
     {
       "file": "./src/task_discovery/taskfile.rs",
       "function": "collect_taskfile_tasks_recursive",
       "line": 90,
       "cyclomatic": 19.0,
-      "coverage": 94.73684210526315,
-      "crap": 19.05263157894737
+      "coverage": 94.5945945945946,
+      "crap": 19.05701537914832
     },
     {
       "file": "./src/types.rs",
@@ -183,8 +183,8 @@
       "function": "execute",
       "line": 100,
       "cyclomatic": 18.0,
-      "coverage": 87.03703703703704,
-      "crap": 18.70576131687243
+      "coverage": 88.0,
+      "crap": 18.559872
     },
     {
       "file": "./src/allowlist.rs",
@@ -231,8 +231,8 @@
       "function": "add_shell_integration",
       "line": 50,
       "cyclomatic": 16.0,
-      "coverage": 87.87878787878788,
-      "crap": 16.45590895177672
+      "coverage": 93.75,
+      "crap": 16.0625
     },
     {
       "file": "./src/commands/list.rs",
@@ -355,25 +355,25 @@
       "crap": 10.885645167903563
     },
     {
-      "file": "./src/parsers/parse_gradle.rs",
-      "function": "extract_task_description",
-      "line": 132,
-      "cyclomatic": 10.0,
-      "coverage": 85.71428571428571,
-      "crap": 10.291545189504374
-    },
-    {
       "file": "./src/prompt.rs",
       "function": "prompt_for_task_fallback",
       "line": 68,
       "cyclomatic": 10.0,
-      "coverage": 90.32258064516128,
-      "crap": 10.090631398744588
+      "coverage": 90.0,
+      "crap": 10.1
     },
     {
       "file": "./src/parsers/parse_gradle.rs",
       "function": "extract_custom_tasks",
       "line": 63,
+      "cyclomatic": 10.0,
+      "coverage": 100.0,
+      "crap": 10.0
+    },
+    {
+      "file": "./src/parsers/parse_gradle.rs",
+      "function": "extract_task_description",
+      "line": 132,
       "cyclomatic": 10.0,
       "coverage": 100.0,
       "crap": 10.0
@@ -571,14 +571,6 @@
       "crap": 6.5625
     },
     {
-      "file": "./src/runners/runners_pyproject_toml.rs",
-      "function": "detect_package_manager",
-      "line": 21,
-      "cyclomatic": 6.0,
-      "coverage": 80.76923076923077,
-      "crap": 6.256030951297223
-    },
-    {
       "file": "./src/allowlist.rs",
       "function": "save_allowlist",
       "line": 40,
@@ -593,6 +585,14 @@
       "cyclomatic": 6.0,
       "coverage": 93.54838709677419,
       "crap": 6.009667349199423
+    },
+    {
+      "file": "./src/runners/runners_pyproject_toml.rs",
+      "function": "detect_package_manager",
+      "line": 21,
+      "cyclomatic": 6.0,
+      "coverage": 95.83333333333334,
+      "crap": 6.002604166666667
     },
     {
       "file": "./src/task_discovery/shell_scripts.rs",
@@ -939,14 +939,6 @@
       "crap": 4.0
     },
     {
-      "file": "./src/commands/mod.rs",
-      "function": "gate_non_interactive",
-      "line": 16,
-      "cyclomatic": 3.0,
-      "coverage": 75.0,
-      "crap": 3.140625
-    },
-    {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::send_log",
       "line": 201,
@@ -1126,6 +1118,14 @@
       "file": "./src/commands/list.rs",
       "function": "task_source_label",
       "line": 337,
+      "cyclomatic": 3.0,
+      "coverage": 100.0,
+      "crap": 3.0
+    },
+    {
+      "file": "./src/commands/mod.rs",
+      "function": "gate_non_interactive",
+      "line": 17,
       "cyclomatic": 3.0,
       "coverage": 100.0,
       "crap": 3.0

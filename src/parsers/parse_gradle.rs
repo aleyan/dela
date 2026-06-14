@@ -137,7 +137,7 @@ fn extract_task_description(content: &str, task_name: &str) -> Option<String> {
 
     // Look for task with description using single quotes
     if let Ok(regex) = Regex::new(&format!(
-        "{}.+?{}",
+        "(?s){}.+?{}",
         task_pattern, description_single_quote_pattern
     )) && let Some(caps) = regex.captures(content)
         && let Some(desc) = caps.get(1)
@@ -147,7 +147,7 @@ fn extract_task_description(content: &str, task_name: &str) -> Option<String> {
 
     // Look for task with description using double quotes
     if let Ok(regex) = Regex::new(&format!(
-        "{}.+?{}",
+        "(?s){}.+?{}",
         task_pattern, description_double_quote_pattern
     )) && let Some(caps) = regex.captures(content)
         && let Some(desc) = caps.get(1)
@@ -157,7 +157,7 @@ fn extract_task_description(content: &str, task_name: &str) -> Option<String> {
 
     // For Kotlin DSL, look for description with equals
     let kotlin_pattern = format!(
-        r#"tasks.*?"{}".+?description\s*=\s*"([^"]*)""#,
+        r#"(?s)tasks.*?"{}".+?description\s*=\s*"([^"]*)""#,
         regex::escape(task_name)
     );
     if let Ok(regex) = Regex::new(&kotlin_pattern)
@@ -274,6 +274,13 @@ task customTask {
     }
 }
 
+task doubleQuoteTask {
+    description "A double quote task description"
+    doLast {
+        println 'Hello'
+    }
+}
+
 task anotherTask(type: Copy) {
     from 'src'
     into 'build/copied'
@@ -300,12 +307,24 @@ application {
 
         // Check for custom tasks
         assert!(tasks.iter().any(|t| t.name == "customTask"));
+        assert!(tasks.iter().any(|t| t.name == "doubleQuoteTask"));
         assert!(tasks.iter().any(|t| t.name == "anotherTask"));
 
-        // Verify at least one custom task
+        // Verify custom task descriptions
         let custom_task = tasks.iter().find(|t| t.name == "customTask").unwrap();
-        assert_eq!(custom_task.definition_type, TaskDefinitionType::Gradle);
-        assert_eq!(custom_task.runner, TaskRunner::Gradle);
+        assert_eq!(custom_task.description, Some("A custom task".to_string()));
+
+        let double_quote_task = tasks.iter().find(|t| t.name == "doubleQuoteTask").unwrap();
+        assert_eq!(
+            double_quote_task.description,
+            Some("A double quote task description".to_string())
+        );
+
+        let another_task = tasks.iter().find(|t| t.name == "anotherTask").unwrap();
+        assert_eq!(
+            another_task.description,
+            Some("Custom Gradle task".to_string())
+        );
     }
 
     #[test]
@@ -330,6 +349,7 @@ dependencies {
 }
 
 tasks.register<Copy>("copyDocs") {
+    description = "Some copy task description"
     from("src/docs")
     into("build/docs")
 }
@@ -360,18 +380,17 @@ application {
         assert!(tasks.iter().any(|t| t.name == "test"));
 
         // Check for plugin tasks
-        // No longer checking for Spring Boot plugin tasks that may not be present
-        // assert!(tasks.iter().any(|t| t.name == "bootRun"));
-        // assert!(tasks.iter().any(|t| t.name == "bootJar"));
         assert!(tasks.iter().any(|t| t.name == "compileKotlin"));
 
         // Check for custom tasks
         assert!(tasks.iter().any(|t| t.name == "copyDocs"));
         assert!(tasks.iter().any(|t| t.name == "customKotlinTask"));
 
-        // Verify at least one custom task
-        let custom_task = tasks.iter().find(|t| t.name == "copyDocs").unwrap();
-        assert_eq!(custom_task.definition_type, TaskDefinitionType::Gradle);
-        assert_eq!(custom_task.runner, TaskRunner::Gradle);
+        // Verify Kotlin description
+        let copy_docs = tasks.iter().find(|t| t.name == "copyDocs").unwrap();
+        assert_eq!(
+            copy_docs.description,
+            Some("Some copy task description".to_string())
+        );
     }
 }

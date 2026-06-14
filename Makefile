@@ -1,6 +1,7 @@
 .PHONY: build tests tests_integration test_unit test_noinit test_mcp test_zsh test_bash test_fish test_pwsh run install
 
 SHELL := /bin/bash
+export RUSTUP_TOOLCHAIN=1.93.0
 
 # Default to non-verbose output
 VERBOSE ?= 0
