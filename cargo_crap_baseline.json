@@ -70,9 +70,9 @@
       "file": "./src/main.rs",
       "function": "run_command",
       "line": 198,
-      "cyclomatic": 20.0,
-      "coverage": 79.54545454545455,
-      "crap": 23.423178061607814
+      "cyclomatic": 21.0,
+      "coverage": 85.24590163934425,
+      "crap": 22.416369652085418
     },
     {
       "file": "./src/parsers/parse_pyproject_toml.rs",
@@ -141,7 +141,7 @@
     {
       "file": "./src/main.rs",
       "function": "main",
-      "line": 253,
+      "line": 271,
       "cyclomatic": 4.0,
       "coverage": 0.0,
       "crap": 20.0
@@ -223,8 +223,8 @@
       "function": "evaluate_task_against_allowlist",
       "line": 75,
       "cyclomatic": 17.0,
-      "coverage": 96.42857142857143,
-      "crap": 17.013165087463555
+      "coverage": 100.0,
+      "crap": 17.0
     },
     {
       "file": "./src/commands/allow_command.rs",

@@ -496,12 +496,17 @@ mod tests {
     fn test_cline_config_path_override() {
         let temp_dir = tempfile::TempDir::new().unwrap();
         let override_path = temp_dir.path().join("custom_cline_settings.json");
+        let old_cline_path = std::env::var("CLINE_MCP_SETTINGS_PATH").ok();
         unsafe {
             std::env::set_var("CLINE_MCP_SETTINGS_PATH", &override_path);
         }
         let config_path = Editor::Cline.config_path();
         unsafe {
-            std::env::remove_var("CLINE_MCP_SETTINGS_PATH");
+            if let Some(ref val) = old_cline_path {
+                std::env::set_var("CLINE_MCP_SETTINGS_PATH", val);
+            } else {
+                std::env::remove_var("CLINE_MCP_SETTINGS_PATH");
+            }
         }
         assert_eq!(config_path, override_path);
     }
@@ -563,11 +568,7 @@ mod tests {
             std::env::set_var("HOME", temp_dir.path());
         }
 
-        let result = execute(
-            ".".to_string(),
-            Some(Editor::Cursor),
-        )
-        .await;
+        let result = execute(".".to_string(), Some(Editor::Cursor)).await;
         if let Err(ref e) = result {
             panic!("execute failed with error: {:?}", e);
         }

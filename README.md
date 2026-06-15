@@ -72,6 +72,7 @@ Dela includes an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/
 The mcp executed tasks need to be already on the allowlist. The mcp server respects the allowlist, but does not give agents tools to modify it. 
 
 ### Setting Up MCP for your agent
+
 You need to have dela installed first and then run the command for your coding agent.
 
 ```sh

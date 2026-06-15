@@ -209,6 +209,24 @@ async fn run_command(command: Commands) -> anyhow::Result<()> {
             init_opencode,
             init_crush,
         } => {
+            let init_flags = [
+                init_cursor,
+                init_vscode,
+                init_codex,
+                init_gemini,
+                init_claude_code,
+                init_antigravity,
+                init_cline,
+                init_opencode,
+                init_crush,
+            ];
+            let init_count = init_flags.iter().filter(|&&x| x).count();
+            if init_count > 1 {
+                return Err(anyhow::anyhow!(
+                    "Only one --init-* flag can be specified at a time"
+                ));
+            }
+
             let init_editor = if init_cursor {
                 Some(commands::mcp::Editor::Cursor)
             } else if init_vscode {
@@ -377,6 +395,28 @@ mod tests {
             let result = run_command(cmd).await;
             assert!(result.is_ok());
         }
+    }
+
+    #[tokio::test]
+    async fn test_run_command_mcp_conflicting_flags() {
+        let cmd = Commands::Mcp {
+            cwd: ".".to_string(),
+            init_cursor: true,
+            init_vscode: true,
+            init_codex: false,
+            init_gemini: false,
+            init_claude_code: false,
+            init_antigravity: false,
+            init_cline: false,
+            init_opencode: false,
+            init_crush: false,
+        };
+        let result = run_command(cmd).await;
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "Only one --init-* flag can be specified at a time"
+        );
     }
 
     #[tokio::test]
