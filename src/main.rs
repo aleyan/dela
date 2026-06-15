@@ -98,6 +98,10 @@ enum Commands {
         /// Generate ~/.claude-code/settings.json for Claude Code
         #[arg(long)]
         init_claude_code: bool,
+
+        /// Generate ~/.gemini/antigravity-ide/mcp_config.json for Antigravity
+        #[arg(long)]
+        init_antigravity: bool,
     },
 
     /// Initialize dela and configure shell integration
@@ -188,6 +192,7 @@ async fn run_command(command: Commands) -> anyhow::Result<()> {
             init_codex,
             init_gemini,
             init_claude_code,
+            init_antigravity,
         } => {
             commands::mcp::execute(
                 cwd,
@@ -196,6 +201,7 @@ async fn run_command(command: Commands) -> anyhow::Result<()> {
                 init_codex,
                 init_gemini,
                 init_claude_code,
+                init_antigravity,
             )
             .await
         }

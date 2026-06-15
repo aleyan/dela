@@ -3,34 +3,13 @@ use anyhow::Context;
 use std::fs;
 use std::path::PathBuf;
 
-/// MCP config template for editors using mcpServers format (Cursor, Gemini CLI)
-const MCP_SERVERS_JSON_TEMPLATE: &str = r#"{
-  "mcpServers": {
-    "dela": {
-      "command": "dela",
-      "args": ["mcp"]
-    }
-  }
+fn dela_executable_path() -> String {
+    std::env::current_exe()
+        .ok()
+        .and_then(|p| p.canonicalize().ok())
+        .map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "dela".to_string())
 }
-"#;
-
-/// MCP config template for VSCode (.vscode/mcp.json)
-const VSCODE_CONFIG_TEMPLATE: &str = r#"{
-  "servers": {
-    "dela": {
-      "type": "stdio",
-      "command": "dela",
-      "args": ["mcp"]
-    }
-  }
-}
-"#;
-
-/// MCP config template for OpenAI Codex (~/.codex/config.toml)
-const CODEX_CONFIG_TEMPLATE: &str = r#"[mcp_servers.dela]
-command = "dela"
-args = ["mcp"]
-"#;
 
 /// Supported editors for MCP config generation
 #[derive(Debug, Clone, Copy)]
@@ -40,6 +19,7 @@ pub enum Editor {
     Codex,
     Gemini,
     ClaudeCode,
+    Antigravity,
 }
 
 impl Editor {
@@ -50,6 +30,7 @@ impl Editor {
             Editor::Codex => "OpenAI Codex",
             Editor::Gemini => "Gemini CLI",
             Editor::ClaudeCode => "Claude Code",
+            Editor::Antigravity => "Antigravity",
         }
     }
 
@@ -61,16 +42,7 @@ impl Editor {
             Editor::Codex => home.join(".codex/config.toml"),
             Editor::Gemini => home.join(".gemini/settings.json"),
             Editor::ClaudeCode => home.join(".claude-code/settings.json"),
-        }
-    }
-
-    fn template(&self) -> &'static str {
-        match self {
-            Editor::Cursor => MCP_SERVERS_JSON_TEMPLATE,
-            Editor::Vscode => VSCODE_CONFIG_TEMPLATE,
-            Editor::Codex => CODEX_CONFIG_TEMPLATE,
-            Editor::Gemini => MCP_SERVERS_JSON_TEMPLATE,
-            Editor::ClaudeCode => MCP_SERVERS_JSON_TEMPLATE,
+            Editor::Antigravity => home.join(".gemini/antigravity-ide/mcp_config.json"),
         }
     }
 
@@ -84,7 +56,7 @@ impl Editor {
     /// The top-level key under which MCP server entries live
     fn servers_key(&self) -> &'static str {
         match self {
-            Editor::Cursor | Editor::Gemini | Editor::ClaudeCode => "mcpServers",
+            Editor::Cursor | Editor::Gemini | Editor::ClaudeCode | Editor::Antigravity => "mcpServers",
             Editor::Vscode => "servers",
             Editor::Codex => "mcp_servers",
         }
@@ -92,14 +64,15 @@ impl Editor {
 
     /// The dela entry as a serde_json::Value (for JSON-based editors)
     fn dela_json_entry(&self) -> serde_json::Value {
+        let exe_path = dela_executable_path();
         match self {
             Editor::Vscode => serde_json::json!({
                 "type": "stdio",
-                "command": "dela",
+                "command": exe_path,
                 "args": ["mcp"]
             }),
             _ => serde_json::json!({
-                "command": "dela",
+                "command": exe_path,
                 "args": ["mcp"]
             }),
         }
@@ -108,8 +81,12 @@ impl Editor {
 
 /// Merge dela into an existing JSON config file (Cursor, VSCode, Gemini, Claude Code)
 fn merge_dela_into_json(editor: Editor, existing: &str) -> anyhow::Result<String> {
-    let mut root: serde_json::Value = serde_json::from_str(existing)
-        .map_err(|e| anyhow::anyhow!("Failed to parse config as JSON: {}", e))?;
+    let mut root: serde_json::Value = if existing.trim().is_empty() {
+        serde_json::json!({})
+    } else {
+        serde_json::from_str(existing)
+            .map_err(|e| anyhow::anyhow!("Failed to parse config as JSON: {}", e))?
+    };
 
     let obj = root
         .as_object_mut()
@@ -138,8 +115,12 @@ fn merge_dela_into_json(editor: Editor, existing: &str) -> anyhow::Result<String
 
 /// Merge dela into an existing TOML config file (Codex)
 fn merge_dela_into_toml(existing: &str) -> anyhow::Result<String> {
-    let mut table: toml::Table = toml::from_str(existing)
-        .map_err(|e| anyhow::anyhow!("Failed to parse config as TOML: {}", e))?;
+    let mut table: toml::Table = if existing.trim().is_empty() {
+        toml::Table::new()
+    } else {
+        toml::from_str(existing)
+            .map_err(|e| anyhow::anyhow!("Failed to parse config as TOML: {}", e))?
+    };
 
     if !table.contains_key("mcp_servers") {
         table.insert(
@@ -153,10 +134,11 @@ fn merge_dela_into_toml(existing: &str) -> anyhow::Result<String> {
         .and_then(|v| v.as_table_mut())
         .context("'mcp_servers' in config is not a table")?;
 
+    let exe_path = dela_executable_path();
     let mut dela = toml::map::Map::new();
     dela.insert(
         "command".to_string(),
-        toml::Value::String("dela".to_string()),
+        toml::Value::String(exe_path),
     );
     dela.insert(
         "args".to_string(),
@@ -220,8 +202,17 @@ fn generate_config_at(editor: Editor, config_path: &PathBuf) -> anyhow::Result<(
         return Ok(());
     }
 
-    // Write the config file
-    fs::write(config_path, editor.template())
+    // Write the config file using merge functions on empty config to generate absolute path
+    let initial_content = match editor {
+        Editor::Codex => "".to_string(),
+        _ => "{}".to_string(),
+    };
+    let content = match editor {
+        Editor::Codex => merge_dela_into_toml(&initial_content)?,
+        _ => merge_dela_into_json(editor, &initial_content)?,
+    };
+
+    fs::write(config_path, content)
         .map_err(|e| anyhow::anyhow!("Failed to write config file: {}", e))?;
 
     eprintln!(
@@ -247,6 +238,7 @@ pub async fn execute(
     init_codex: bool,
     init_gemini: bool,
     init_claude_code: bool,
+    init_antigravity: bool,
 ) -> anyhow::Result<()> {
     // Resolve the path relative to the current working directory
     let root_path = if cwd == "." {
@@ -257,7 +249,7 @@ pub async fn execute(
     };
 
     // Handle config generation flags
-    let has_init_flag = init_cursor || init_vscode || init_codex || init_gemini || init_claude_code;
+    let has_init_flag = init_cursor || init_vscode || init_codex || init_gemini || init_claude_code || init_antigravity;
 
     if has_init_flag {
         if init_cursor {
@@ -274,6 +266,9 @@ pub async fn execute(
         }
         if init_claude_code {
             generate_config(Editor::ClaudeCode)?;
+        }
+        if init_antigravity {
+            generate_config(Editor::Antigravity)?;
         }
         return Ok(());
     }
@@ -312,7 +307,8 @@ mod tests {
 
         let content = fs::read_to_string(&config_path).unwrap();
         assert!(content.contains("\"dela\""));
-        assert!(content.contains("\"command\": \"dela\""));
+        let expected_cmd = format!("\"command\": \"{}\"", dela_executable_path());
+        assert!(content.contains(&expected_cmd));
     }
 
     #[test]
@@ -327,6 +323,8 @@ mod tests {
         let content = fs::read_to_string(&config_path).unwrap();
         assert!(content.contains("\"servers\""));
         assert!(content.contains("\"type\": \"stdio\""));
+        let expected_cmd = format!("\"command\": \"{}\"", dela_executable_path());
+        assert!(content.contains(&expected_cmd));
     }
 
     #[test]
@@ -374,7 +372,8 @@ mod tests {
         assert!(content.contains("\"command\": \"other\""));
         // Adds dela
         assert!(content.contains("\"dela\""));
-        assert!(content.contains("\"command\": \"dela\""));
+        let expected_cmd = format!("\"command\": \"{}\"", dela_executable_path());
+        assert!(content.contains(&expected_cmd));
     }
 
     #[test]
@@ -407,7 +406,8 @@ mod tests {
         // Adds dela with VSCode-specific format
         assert!(content.contains("\"dela\""));
         assert!(content.contains("\"type\": \"stdio\""));
-        assert!(content.contains("\"command\": \"dela\""));
+        let expected_cmd = format!("\"command\": \"{}\"", dela_executable_path());
+        assert!(content.contains(&expected_cmd));
     }
 
     #[test]
@@ -450,7 +450,8 @@ mod tests {
         assert!(content.contains("other"));
         // Adds dela
         assert!(content.contains("[mcp_servers.dela]"));
-        assert!(content.contains("command = \"dela\""));
+        let expected_cmd = format!("command = \"{}\"", dela_executable_path());
+        assert!(content.contains(&expected_cmd));
     }
 
     #[test]
@@ -485,6 +486,10 @@ mod tests {
         assert_eq!(
             Editor::ClaudeCode.config_path(),
             home.join(".claude-code/settings.json")
+        );
+        assert_eq!(
+            Editor::Antigravity.config_path(),
+            home.join(".gemini/antigravity-ide/mcp_config.json")
         );
     }
 
@@ -527,7 +532,7 @@ mod tests {
             std::env::set_var("HOME", temp_dir.path());
         }
 
-        let result = execute(".".to_string(), true, false, false, false, false).await;
+        let result = execute(".".to_string(), true, false, false, false, false, false).await;
         if let Err(ref e) = result {
             panic!("execute failed with error: {:?}", e);
         }
