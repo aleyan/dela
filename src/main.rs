@@ -102,6 +102,18 @@ enum Commands {
         /// Generate ~/.gemini/antigravity-ide/mcp_config.json for Antigravity
         #[arg(long)]
         init_antigravity: bool,
+
+        /// Generate ~/.cline/data/settings/cline_mcp_settings.json for Cline
+        #[arg(long)]
+        init_cline: bool,
+
+        /// Generate ~/.config/opencode/opencode.json for OpenCode
+        #[arg(long)]
+        init_opencode: bool,
+
+        /// Generate ~/.config/crush/crush.json for Crush
+        #[arg(long)]
+        init_crush: bool,
     },
 
     /// Initialize dela and configure shell integration
@@ -193,6 +205,9 @@ async fn run_command(command: Commands) -> anyhow::Result<()> {
             init_gemini,
             init_claude_code,
             init_antigravity,
+            init_cline,
+            init_opencode,
+            init_crush,
         } => {
             commands::mcp::execute(
                 cwd,
@@ -202,6 +217,9 @@ async fn run_command(command: Commands) -> anyhow::Result<()> {
                 init_gemini,
                 init_claude_code,
                 init_antigravity,
+                init_cline,
+                init_opencode,
+                init_crush,
             )
             .await
         }

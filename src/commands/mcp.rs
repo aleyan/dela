@@ -20,6 +20,9 @@ pub enum Editor {
     Gemini,
     ClaudeCode,
     Antigravity,
+    Cline,
+    OpenCode,
+    Crush,
 }
 
 impl Editor {
@@ -31,6 +34,9 @@ impl Editor {
             Editor::Gemini => "Gemini CLI",
             Editor::ClaudeCode => "Claude Code",
             Editor::Antigravity => "Antigravity",
+            Editor::Cline => "Cline",
+            Editor::OpenCode => "OpenCode",
+            Editor::Crush => "Crush",
         }
     }
 
@@ -43,6 +49,11 @@ impl Editor {
             Editor::Gemini => home.join(".gemini/settings.json"),
             Editor::ClaudeCode => home.join(".claude-code/settings.json"),
             Editor::Antigravity => home.join(".gemini/antigravity-ide/mcp_config.json"),
+            Editor::Cline => std::env::var("CLINE_MCP_SETTINGS_PATH")
+                .map(PathBuf::from)
+                .unwrap_or_else(|_| home.join(".cline/data/settings/cline_mcp_settings.json")),
+            Editor::OpenCode => home.join(".config/opencode/opencode.json"),
+            Editor::Crush => home.join(".config/crush/crush.json"),
         }
     }
 
@@ -56,9 +67,10 @@ impl Editor {
     /// The top-level key under which MCP server entries live
     fn servers_key(&self) -> &'static str {
         match self {
-            Editor::Cursor | Editor::Gemini | Editor::ClaudeCode | Editor::Antigravity => "mcpServers",
+            Editor::Cursor | Editor::Gemini | Editor::ClaudeCode | Editor::Antigravity | Editor::Cline | Editor::Crush => "mcpServers",
             Editor::Vscode => "servers",
             Editor::Codex => "mcp_servers",
+            Editor::OpenCode => "mcp",
         }
     }
 
@@ -239,6 +251,9 @@ pub async fn execute(
     init_gemini: bool,
     init_claude_code: bool,
     init_antigravity: bool,
+    init_cline: bool,
+    init_opencode: bool,
+    init_crush: bool,
 ) -> anyhow::Result<()> {
     // Resolve the path relative to the current working directory
     let root_path = if cwd == "." {
@@ -249,7 +264,15 @@ pub async fn execute(
     };
 
     // Handle config generation flags
-    let has_init_flag = init_cursor || init_vscode || init_codex || init_gemini || init_claude_code || init_antigravity;
+    let has_init_flag = init_cursor
+        || init_vscode
+        || init_codex
+        || init_gemini
+        || init_claude_code
+        || init_antigravity
+        || init_cline
+        || init_opencode
+        || init_crush;
 
     if has_init_flag {
         if init_cursor {
@@ -269,6 +292,15 @@ pub async fn execute(
         }
         if init_antigravity {
             generate_config(Editor::Antigravity)?;
+        }
+        if init_cline {
+            generate_config(Editor::Cline)?;
+        }
+        if init_opencode {
+            generate_config(Editor::OpenCode)?;
+        }
+        if init_crush {
+            generate_config(Editor::Crush)?;
         }
         return Ok(());
     }
@@ -491,6 +523,33 @@ mod tests {
             Editor::Antigravity.config_path(),
             home.join(".gemini/antigravity-ide/mcp_config.json")
         );
+        assert_eq!(
+            Editor::Cline.config_path(),
+            home.join(".cline/data/settings/cline_mcp_settings.json")
+        );
+        assert_eq!(
+            Editor::OpenCode.config_path(),
+            home.join(".config/opencode/opencode.json")
+        );
+        assert_eq!(
+            Editor::Crush.config_path(),
+            home.join(".config/crush/crush.json")
+        );
+    }
+
+    #[test]
+    #[serial_test::serial]
+    fn test_cline_config_path_override() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let override_path = temp_dir.path().join("custom_cline_settings.json");
+        unsafe {
+            std::env::set_var("CLINE_MCP_SETTINGS_PATH", &override_path);
+        }
+        let config_path = Editor::Cline.config_path();
+        unsafe {
+            std::env::remove_var("CLINE_MCP_SETTINGS_PATH");
+        }
+        assert_eq!(config_path, override_path);
     }
 
     struct TestEnvGuard {
@@ -532,7 +591,19 @@ mod tests {
             std::env::set_var("HOME", temp_dir.path());
         }
 
-        let result = execute(".".to_string(), true, false, false, false, false, false).await;
+        let result = execute(
+            ".".to_string(),
+            true,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+        )
+        .await;
         if let Err(ref e) = result {
             panic!("execute failed with error: {:?}", e);
         }
