@@ -209,19 +209,28 @@ async fn run_command(command: Commands) -> anyhow::Result<()> {
             init_opencode,
             init_crush,
         } => {
-            commands::mcp::execute(
-                cwd,
-                init_cursor,
-                init_vscode,
-                init_codex,
-                init_gemini,
-                init_claude_code,
-                init_antigravity,
-                init_cline,
-                init_opencode,
-                init_crush,
-            )
-            .await
+            let init_editor = if init_cursor {
+                Some(commands::mcp::Editor::Cursor)
+            } else if init_vscode {
+                Some(commands::mcp::Editor::Vscode)
+            } else if init_codex {
+                Some(commands::mcp::Editor::Codex)
+            } else if init_gemini {
+                Some(commands::mcp::Editor::Gemini)
+            } else if init_claude_code {
+                Some(commands::mcp::Editor::ClaudeCode)
+            } else if init_antigravity {
+                Some(commands::mcp::Editor::Antigravity)
+            } else if init_cline {
+                Some(commands::mcp::Editor::Cline)
+            } else if init_opencode {
+                Some(commands::mcp::Editor::OpenCode)
+            } else if init_crush {
+                Some(commands::mcp::Editor::Crush)
+            } else {
+                None
+            };
+            commands::mcp::execute(cwd, init_editor).await
         }
         Commands::Init => commands::init::execute(),
         Commands::ConfigureShell => commands::configure_shell::execute(),
@@ -302,6 +311,72 @@ mod tests {
             lines[1], "Error: Failed to execute task",
             "Regular error should have 'Error:' prefix"
         );
+    }
+
+    struct TestEnvGuard {
+        old_dir: Option<std::path::PathBuf>,
+        old_home: Option<String>,
+    }
+
+    impl Drop for TestEnvGuard {
+        fn drop(&mut self) {
+            if let Some(ref dir) = self.old_dir {
+                let _ = std::env::set_current_dir(dir);
+            }
+            if let Some(ref home) = self.old_home {
+                unsafe {
+                    std::env::set_var("HOME", home);
+                }
+            } else {
+                unsafe {
+                    std::env::remove_var("HOME");
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_run_command_mcp_all_flags() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let _guard = TestEnvGuard {
+            old_dir: std::env::current_dir().ok(),
+            old_home: std::env::var("HOME").ok(),
+        };
+        std::env::set_current_dir(temp_dir.path()).unwrap();
+        unsafe {
+            std::env::set_var("HOME", temp_dir.path());
+        }
+
+        // Test each flag to ensure the match arm is evaluated and runs generate_config
+        let flags = vec![
+            (true, false, false, false, false, false, false, false, false), // Cursor
+            (false, true, false, false, false, false, false, false, false), // Vscode
+            (false, false, true, false, false, false, false, false, false), // Codex
+            (false, false, false, true, false, false, false, false, false), // Gemini
+            (false, false, false, false, true, false, false, false, false), // ClaudeCode
+            (false, false, false, false, false, true, false, false, false), // Antigravity
+            (false, false, false, false, false, false, true, false, false), // Cline
+            (false, false, false, false, false, false, false, true, false), // OpenCode
+            (false, false, false, false, false, false, false, false, true), // Crush
+        ];
+
+        for f in flags {
+            let cmd = Commands::Mcp {
+                cwd: ".".to_string(),
+                init_cursor: f.0,
+                init_vscode: f.1,
+                init_codex: f.2,
+                init_gemini: f.3,
+                init_claude_code: f.4,
+                init_antigravity: f.5,
+                init_cline: f.6,
+                init_opencode: f.7,
+                init_crush: f.8,
+            };
+            let result = run_command(cmd).await;
+            assert!(result.is_ok());
+        }
     }
 
     #[tokio::test]

@@ -67,7 +67,12 @@ impl Editor {
     /// The top-level key under which MCP server entries live
     fn servers_key(&self) -> &'static str {
         match self {
-            Editor::Cursor | Editor::Gemini | Editor::ClaudeCode | Editor::Antigravity | Editor::Cline | Editor::Crush => "mcpServers",
+            Editor::Cursor
+            | Editor::Gemini
+            | Editor::ClaudeCode
+            | Editor::Antigravity
+            | Editor::Cline
+            | Editor::Crush => "mcpServers",
             Editor::Vscode => "servers",
             Editor::Codex => "mcp_servers",
             Editor::OpenCode => "mcp",
@@ -148,10 +153,7 @@ fn merge_dela_into_toml(existing: &str) -> anyhow::Result<String> {
 
     let exe_path = dela_executable_path();
     let mut dela = toml::map::Map::new();
-    dela.insert(
-        "command".to_string(),
-        toml::Value::String(exe_path),
-    );
+    dela.insert("command".to_string(), toml::Value::String(exe_path));
     dela.insert(
         "args".to_string(),
         toml::Value::Array(vec![toml::Value::String("mcp".to_string())]),
@@ -243,18 +245,7 @@ fn generate_config(editor: Editor) -> anyhow::Result<()> {
 }
 
 /// Execute the MCP command
-pub async fn execute(
-    cwd: String,
-    init_cursor: bool,
-    init_vscode: bool,
-    init_codex: bool,
-    init_gemini: bool,
-    init_claude_code: bool,
-    init_antigravity: bool,
-    init_cline: bool,
-    init_opencode: bool,
-    init_crush: bool,
-) -> anyhow::Result<()> {
+pub async fn execute(cwd: String, init_editor: Option<Editor>) -> anyhow::Result<()> {
     // Resolve the path relative to the current working directory
     let root_path = if cwd == "." {
         std::env::current_dir()
@@ -263,45 +254,8 @@ pub async fn execute(
         PathBuf::from(&cwd)
     };
 
-    // Handle config generation flags
-    let has_init_flag = init_cursor
-        || init_vscode
-        || init_codex
-        || init_gemini
-        || init_claude_code
-        || init_antigravity
-        || init_cline
-        || init_opencode
-        || init_crush;
-
-    if has_init_flag {
-        if init_cursor {
-            generate_config(Editor::Cursor)?;
-        }
-        if init_vscode {
-            generate_config(Editor::Vscode)?;
-        }
-        if init_codex {
-            generate_config(Editor::Codex)?;
-        }
-        if init_gemini {
-            generate_config(Editor::Gemini)?;
-        }
-        if init_claude_code {
-            generate_config(Editor::ClaudeCode)?;
-        }
-        if init_antigravity {
-            generate_config(Editor::Antigravity)?;
-        }
-        if init_cline {
-            generate_config(Editor::Cline)?;
-        }
-        if init_opencode {
-            generate_config(Editor::OpenCode)?;
-        }
-        if init_crush {
-            generate_config(Editor::Crush)?;
-        }
+    if let Some(editor) = init_editor {
+        generate_config(editor)?;
         return Ok(());
     }
 
@@ -574,6 +528,24 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_editor_names_exhaustive() {
+        for editor in &[
+            Editor::Cursor,
+            Editor::Vscode,
+            Editor::Codex,
+            Editor::Gemini,
+            Editor::ClaudeCode,
+            Editor::Antigravity,
+            Editor::Cline,
+            Editor::OpenCode,
+            Editor::Crush,
+        ] {
+            let name = editor.name();
+            assert!(!name.is_empty());
+        }
+    }
+
     #[tokio::test]
     #[serial_test::serial]
     async fn test_execute_init_cursor() {
@@ -593,15 +565,7 @@ mod tests {
 
         let result = execute(
             ".".to_string(),
-            true,
-            false,
-            false,
-            false,
-            false,
-            false,
-            false,
-            false,
-            false,
+            Some(Editor::Cursor),
         )
         .await;
         if let Err(ref e) = result {
