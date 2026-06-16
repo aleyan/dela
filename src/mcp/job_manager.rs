@@ -529,6 +529,13 @@ impl JobManager {
             self.stop_managed_job(pid, process, grace_period_seconds)
                 .await
         } else {
+            let is_tracked = {
+                let jobs = self.jobs.read().await;
+                jobs.contains_key(&pid)
+            };
+            if !is_tracked {
+                return Err(anyhow::anyhow!("Job with PID {} not found", pid));
+            }
             self.stop_unmanaged_job_fallback(pid, grace_period_seconds)
                 .await
         }
@@ -610,8 +617,9 @@ impl JobManager {
                             Ok(StopResult::Forced)
                         }
                         Err(nix::errno::Errno::ESRCH) => {
-                            self.update_job_exited(pid, 0).await;
-                            Ok(StopResult::Graceful(0))
+                            let exit_status = process.wait().await.ok().and_then(|s| s.code()).unwrap_or(0);
+                            self.update_job_exited(pid, exit_status).await;
+                            Ok(StopResult::Graceful(exit_status))
                         }
                         Err(e) => {
                             self.update_job_failed(pid, format!("Failed to send SIGKILL: {}", e))
@@ -1136,7 +1144,15 @@ mod tests {
     async fn test_stop_job_graceful_fallback() {
         let manager = JobManager::new();
 
-        let pid = 999999;
+        let mut child = tokio::process::Command::new("true")
+            .spawn()
+            .unwrap();
+        let pid = child.id().unwrap();
+        
+        // Wait for it to exit so it's fully reaped and no longer a zombie.
+        // This gives us a safe PID that is guaranteed to be dead and return ESRCH.
+        let _ = child.wait().await;
+
         let metadata = JobMetadata {
             started_at: Instant::now(),
             unique_name: "test-fallback".to_string(),
@@ -1144,7 +1160,7 @@ mod tests {
             args: None,
             env: None,
             cwd: None,
-            command: "nonexistent".to_string(),
+            command: "sleep 10".to_string(),
             file_path: PathBuf::from("Makefile"),
         };
 
@@ -1166,6 +1182,9 @@ mod tests {
             let job = manager.get_job(pid).await.unwrap();
             assert!(matches!(job.state, JobState::Failed(_)));
         }
+
+        let _ = child.kill().await;
+        let _ = child.wait().await;
     }
 
     #[tokio::test]

@@ -134,7 +134,13 @@ fn handle_key_code(code: KeyCode, selected: usize, options_len: usize) -> KeyAct
         KeyCode::End | KeyCode::Char('G') => KeyActionResult::Continue {
             new_selected: options_len.saturating_sub(1),
         },
-        KeyCode::Enter => KeyActionResult::Select(selected),
+        KeyCode::Enter => {
+            if options_len == 0 {
+                KeyActionResult::Ignore
+            } else {
+                KeyActionResult::Select(selected)
+            }
+        }
         _ => KeyActionResult::Ignore,
     }
 }

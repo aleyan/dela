@@ -1298,11 +1298,13 @@ fn parse_tool_args<T: serde::de::DeserializeOwned>(
     arguments: Option<serde_json::Map<String, serde_json::Value>>,
 ) -> Result<T, ErrorData> {
     serde_json::from_value(serde_json::Value::Object(arguments.unwrap_or_default())).map_err(|e| {
-        DelaError::internal_error(
-            format!("Invalid arguments: {}", e),
-            Some("Check argument format and types".to_string()),
-        )
-        .into()
+        ErrorData {
+            code: super::errors::DelaErrorCode::INVALID_PARAMS.into(),
+            message: std::borrow::Cow::Owned(format!("Invalid arguments: {}", e)),
+            data: Some(serde_json::Value::String(
+                "Check argument format and types".to_string(),
+            )),
+        }
     })
 }
 
@@ -4264,7 +4266,7 @@ add_custom_target(build-all COMMENT "Build everything")
         let res = server.call_tool(req, context).await;
         assert!(res.is_err());
         let err = res.unwrap_err();
-        assert_eq!(err.code.0, -32603);
+        assert_eq!(err.code.0, -32602);
         assert!(err.message.contains("Invalid arguments"));
     }
 
