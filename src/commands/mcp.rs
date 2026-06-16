@@ -40,7 +40,7 @@ impl Editor {
         }
     }
 
-    fn config_path(&self) -> PathBuf {
+    pub(crate) fn config_path(&self) -> PathBuf {
         let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("~"));
         match self {
             Editor::Cursor => home.join(".cursor/mcp.json"),

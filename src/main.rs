@@ -287,6 +287,7 @@ async fn main() {
 #[cfg(test)]
 mod tests {
     use super::{Commands, run_command};
+    use crate::commands::mcp::Editor;
     use std::io::Write;
     use tempfile::NamedTempFile;
 
@@ -368,32 +369,147 @@ mod tests {
 
         // Test each flag to ensure the match arm is evaluated and runs generate_config
         let flags = vec![
-            (true, false, false, false, false, false, false, false, false), // Cursor
-            (false, true, false, false, false, false, false, false, false), // Vscode
-            (false, false, true, false, false, false, false, false, false), // Codex
-            (false, false, false, true, false, false, false, false, false), // Gemini
-            (false, false, false, false, true, false, false, false, false), // ClaudeCode
-            (false, false, false, false, false, true, false, false, false), // Antigravity
-            (false, false, false, false, false, false, true, false, false), // Cline
-            (false, false, false, false, false, false, false, true, false), // OpenCode
-            (false, false, false, false, false, false, false, false, true), // Crush
+            (
+                Editor::Cursor,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+            ), // Cursor
+            (
+                Editor::Vscode,
+                false,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+            ), // Vscode
+            (
+                Editor::Codex,
+                false,
+                false,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+            ), // Codex
+            (
+                Editor::Gemini,
+                false,
+                false,
+                false,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+            ), // Gemini
+            (
+                Editor::ClaudeCode,
+                false,
+                false,
+                false,
+                false,
+                true,
+                false,
+                false,
+                false,
+                false,
+            ), // ClaudeCode
+            (
+                Editor::Antigravity,
+                false,
+                false,
+                false,
+                false,
+                false,
+                true,
+                false,
+                false,
+                false,
+            ), // Antigravity
+            (
+                Editor::Cline,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                true,
+                false,
+                false,
+            ), // Cline
+            (
+                Editor::OpenCode,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                true,
+                false,
+            ), // OpenCode
+            (
+                Editor::Crush,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                true,
+            ), // Crush
         ];
 
         for f in flags {
             let cmd = Commands::Mcp {
                 cwd: ".".to_string(),
-                init_cursor: f.0,
-                init_vscode: f.1,
-                init_codex: f.2,
-                init_gemini: f.3,
-                init_claude_code: f.4,
-                init_antigravity: f.5,
-                init_cline: f.6,
-                init_opencode: f.7,
-                init_crush: f.8,
+                init_cursor: f.1,
+                init_vscode: f.2,
+                init_codex: f.3,
+                init_gemini: f.4,
+                init_claude_code: f.5,
+                init_antigravity: f.6,
+                init_cline: f.7,
+                init_opencode: f.8,
+                init_crush: f.9,
             };
+
+            let expected_path = f.0.config_path();
+            if expected_path.exists() {
+                let _ = std::fs::remove_file(&expected_path);
+            }
+
             let result = run_command(cmd).await;
             assert!(result.is_ok());
+
+            assert!(
+                expected_path.exists(),
+                "Config path {:?} was not generated for {:?}",
+                expected_path,
+                f.0
+            );
+
+            // Clean up config file to ensure test isolation
+            let _ = std::fs::remove_file(&expected_path);
         }
     }
 
