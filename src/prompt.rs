@@ -103,6 +103,44 @@ fn prompt_for_task_fallback(task: &Task) -> anyhow::Result<AllowDecision> {
     }
 }
 
+#[derive(Debug, PartialEq, Clone)]
+enum KeyActionResult {
+    Continue { new_selected: usize },
+    Select(usize),
+    Cancel,
+    Ignore,
+}
+
+fn handle_key_code(code: KeyCode, selected: usize, options_len: usize) -> KeyActionResult {
+    match code {
+        KeyCode::Char('q') | KeyCode::Esc => KeyActionResult::Cancel,
+        KeyCode::Up | KeyCode::Char('k') => {
+            let new_selected = if selected == 0 {
+                options_len.saturating_sub(1)
+            } else {
+                selected - 1
+            };
+            KeyActionResult::Continue { new_selected }
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            let new_selected = if options_len == 0 {
+                0
+            } else {
+                (selected + 1) % options_len
+            };
+            KeyActionResult::Continue { new_selected }
+        }
+        KeyCode::Home | KeyCode::Char('g') => KeyActionResult::Continue { new_selected: 0 },
+        KeyCode::End | KeyCode::Char('G') => {
+            KeyActionResult::Continue {
+                new_selected: options_len.saturating_sub(1),
+            }
+        }
+        KeyCode::Enter => KeyActionResult::Select(selected),
+        _ => KeyActionResult::Ignore,
+    }
+}
+
 fn run_tui(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     task: &Task,
@@ -137,30 +175,17 @@ fn run_tui(
         if let Event::Key(key) =
             event::read().map_err(|e| anyhow::anyhow!("Failed to read event: {}", e))?
         {
-            match key.code {
-                KeyCode::Char('q') | KeyCode::Esc => {
+            match handle_key_code(key.code, selected, options.len()) {
+                KeyActionResult::Continue { new_selected } => {
+                    selected = new_selected;
+                }
+                KeyActionResult::Select(index) => {
+                    return Ok(options[index].1.clone());
+                }
+                KeyActionResult::Cancel => {
                     return Err(anyhow::anyhow!("User cancelled"));
                 }
-                KeyCode::Up | KeyCode::Char('k') => {
-                    selected = if selected == 0 {
-                        options.len() - 1
-                    } else {
-                        selected - 1
-                    };
-                }
-                KeyCode::Down | KeyCode::Char('j') => {
-                    selected = (selected + 1) % options.len();
-                }
-                KeyCode::Home | KeyCode::Char('g') => {
-                    selected = 0;
-                }
-                KeyCode::End | KeyCode::Char('G') => {
-                    selected = options.len() - 1;
-                }
-                KeyCode::Enter => {
-                    return Ok(options[selected].1.clone());
-                }
-                _ => {}
+                KeyActionResult::Ignore => {}
             }
         }
     }
@@ -364,5 +389,36 @@ mod tests {
         assert!(contents.contains("test-task"));
         assert!(contents.contains("Allow once"));
         assert!(contents.contains("Deny"));
+    }
+
+    #[test]
+    fn test_handle_key_code_cancel() {
+        assert_eq!(handle_key_code(KeyCode::Char('q'), 0, 5), KeyActionResult::Cancel);
+        assert_eq!(handle_key_code(KeyCode::Esc, 1, 5), KeyActionResult::Cancel);
+    }
+
+    #[test]
+    fn test_handle_key_code_navigation() {
+        // Up / k
+        assert_eq!(handle_key_code(KeyCode::Up, 1, 5), KeyActionResult::Continue { new_selected: 0 });
+        assert_eq!(handle_key_code(KeyCode::Char('k'), 0, 5), KeyActionResult::Continue { new_selected: 4 });
+
+        // Down / j
+        assert_eq!(handle_key_code(KeyCode::Down, 1, 5), KeyActionResult::Continue { new_selected: 2 });
+        assert_eq!(handle_key_code(KeyCode::Char('j'), 4, 5), KeyActionResult::Continue { new_selected: 0 });
+
+        // Home / g
+        assert_eq!(handle_key_code(KeyCode::Home, 3, 5), KeyActionResult::Continue { new_selected: 0 });
+        assert_eq!(handle_key_code(KeyCode::Char('g'), 3, 5), KeyActionResult::Continue { new_selected: 0 });
+
+        // End / G
+        assert_eq!(handle_key_code(KeyCode::End, 1, 5), KeyActionResult::Continue { new_selected: 4 });
+        assert_eq!(handle_key_code(KeyCode::Char('G'), 1, 5), KeyActionResult::Continue { new_selected: 4 });
+
+        // Enter
+        assert_eq!(handle_key_code(KeyCode::Enter, 2, 5), KeyActionResult::Select(2));
+
+        // Ignore
+        assert_eq!(handle_key_code(KeyCode::Char('x'), 2, 5), KeyActionResult::Ignore);
     }
 }

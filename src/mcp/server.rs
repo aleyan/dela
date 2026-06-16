@@ -146,6 +146,7 @@ struct CachedDiscoveredTasks {
 }
 
 /// MCP server for dela that exposes task management capabilities
+#[derive(Clone)]
 pub struct DelaMcpServer {
     root: PathBuf,
     allowlist_evaluator: McpAllowlistEvaluator,
@@ -4275,5 +4276,88 @@ add_custom_target(build-all COMMENT "Build everything")
 
         assert!(instructions.contains("wait_for_exit_seconds"));
         assert!(instructions.contains("default 1-second capture window"));
+    }
+
+    #[tokio::test]
+    async fn test_call_tool_all_cases() {
+        let temp_dir = std::env::temp_dir();
+        let server = DelaMcpServer::new(temp_dir);
+
+        let (server_transport, _client_transport) = tokio::io::duplex(4096);
+        let running_server = rmcp::service::serve_directly(server.clone(), server_transport, None);
+        let peer = running_server.peer().clone();
+
+        let context = RequestContext::new(RequestId::Number(1), peer);
+
+        // 1. Test status (no arguments)
+        let req = CallToolRequestParams::new("status");
+        let res = server.call_tool(req, context.clone()).await;
+        assert!(res.is_ok());
+
+        // 2. Test invalid tool name
+        let req = CallToolRequestParams::new("invalid_tool_name");
+        let res = server.call_tool(req, context.clone()).await;
+        assert!(res.is_err());
+
+        // 3. Test list_tasks (empty arguments is ok)
+        let req = CallToolRequestParams::new("list_tasks");
+        let res = server.call_tool(req, context.clone()).await;
+        assert!(res.is_ok());
+
+        // 4. Test task_status (valid arguments)
+        let mut args_map = serde_json::Map::new();
+        args_map.insert("unique_name".to_string(), serde_json::Value::String("nonexistent".to_string()));
+        let req = CallToolRequestParams::new("task_status").with_arguments(args_map);
+        let res = server.call_tool(req, context.clone()).await;
+        assert!(res.is_ok());
+
+        // 5. Test task_status (invalid arguments - should map_err)
+        let mut invalid_args_map = serde_json::Map::new();
+        invalid_args_map.insert("unique_name".to_string(), serde_json::Value::Bool(true));
+        let req = CallToolRequestParams::new("task_status").with_arguments(invalid_args_map);
+        let res = server.call_tool(req, context.clone()).await;
+        assert!(res.is_err());
+
+        // 6. Test task_output (valid pid but nonexistent job - returns error)
+        let mut args_map = serde_json::Map::new();
+        args_map.insert("pid".to_string(), serde_json::Value::Number(12345.into()));
+        let req = CallToolRequestParams::new("task_output").with_arguments(args_map);
+        let res = server.call_tool(req, context.clone()).await;
+        assert!(res.is_err());
+
+        // 7. Test task_output (invalid arguments - should map_err)
+        let mut invalid_args_map = serde_json::Map::new();
+        invalid_args_map.insert("pid".to_string(), serde_json::Value::String("not_a_number".to_string()));
+        let req = CallToolRequestParams::new("task_output").with_arguments(invalid_args_map);
+        let res = server.call_tool(req, context.clone()).await;
+        assert!(res.is_err());
+
+        // 8. Test task_stop (valid pid but nonexistent job - returns error)
+        let mut args_map = serde_json::Map::new();
+        args_map.insert("pid".to_string(), serde_json::Value::Number(12345.into()));
+        let req = CallToolRequestParams::new("task_stop").with_arguments(args_map);
+        let res = server.call_tool(req, context.clone()).await;
+        assert!(res.is_err());
+
+        // 9. Test task_stop (invalid arguments - should map_err)
+        let mut invalid_args_map = serde_json::Map::new();
+        invalid_args_map.insert("pid".to_string(), serde_json::Value::String("not_a_number".to_string()));
+        let req = CallToolRequestParams::new("task_stop").with_arguments(invalid_args_map);
+        let res = server.call_tool(req, context.clone()).await;
+        assert!(res.is_err());
+
+        // 10. Test task_start (nonexistent task - returns error)
+        let mut args_map = serde_json::Map::new();
+        args_map.insert("unique_name".to_string(), serde_json::Value::String("nonexistent".to_string()));
+        let req = CallToolRequestParams::new("task_start").with_arguments(args_map);
+        let res = server.call_tool(req, context.clone()).await;
+        assert!(res.is_err());
+
+        // 11. Test task_start (invalid arguments - should map_err)
+        let mut invalid_args_map = serde_json::Map::new();
+        invalid_args_map.insert("unique_name".to_string(), serde_json::Value::Bool(false));
+        let req = CallToolRequestParams::new("task_start").with_arguments(invalid_args_map);
+        let res = server.call_tool(req, context.clone()).await;
+        assert!(res.is_err());
     }
 }
