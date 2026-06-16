@@ -131,11 +131,9 @@ fn handle_key_code(code: KeyCode, selected: usize, options_len: usize) -> KeyAct
             KeyActionResult::Continue { new_selected }
         }
         KeyCode::Home | KeyCode::Char('g') => KeyActionResult::Continue { new_selected: 0 },
-        KeyCode::End | KeyCode::Char('G') => {
-            KeyActionResult::Continue {
-                new_selected: options_len.saturating_sub(1),
-            }
-        }
+        KeyCode::End | KeyCode::Char('G') => KeyActionResult::Continue {
+            new_selected: options_len.saturating_sub(1),
+        },
         KeyCode::Enter => KeyActionResult::Select(selected),
         _ => KeyActionResult::Ignore,
     }
@@ -393,32 +391,75 @@ mod tests {
 
     #[test]
     fn test_handle_key_code_cancel() {
-        assert_eq!(handle_key_code(KeyCode::Char('q'), 0, 5), KeyActionResult::Cancel);
+        assert_eq!(
+            handle_key_code(KeyCode::Char('q'), 0, 5),
+            KeyActionResult::Cancel
+        );
         assert_eq!(handle_key_code(KeyCode::Esc, 1, 5), KeyActionResult::Cancel);
     }
 
     #[test]
     fn test_handle_key_code_navigation() {
-        // Up / k
-        assert_eq!(handle_key_code(KeyCode::Up, 1, 5), KeyActionResult::Continue { new_selected: 0 });
-        assert_eq!(handle_key_code(KeyCode::Char('k'), 0, 5), KeyActionResult::Continue { new_selected: 4 });
+        assert_eq!(
+            handle_key_code(KeyCode::Up, 1, 5),
+            KeyActionResult::Continue { new_selected: 0 }
+        );
+        assert_eq!(
+            handle_key_code(KeyCode::Char('k'), 0, 5),
+            KeyActionResult::Continue { new_selected: 4 }
+        );
 
-        // Down / j
-        assert_eq!(handle_key_code(KeyCode::Down, 1, 5), KeyActionResult::Continue { new_selected: 2 });
-        assert_eq!(handle_key_code(KeyCode::Char('j'), 4, 5), KeyActionResult::Continue { new_selected: 0 });
+        assert_eq!(
+            handle_key_code(KeyCode::Down, 1, 5),
+            KeyActionResult::Continue { new_selected: 2 }
+        );
+        assert_eq!(
+            handle_key_code(KeyCode::Char('j'), 4, 5),
+            KeyActionResult::Continue { new_selected: 0 }
+        );
 
-        // Home / g
-        assert_eq!(handle_key_code(KeyCode::Home, 3, 5), KeyActionResult::Continue { new_selected: 0 });
-        assert_eq!(handle_key_code(KeyCode::Char('g'), 3, 5), KeyActionResult::Continue { new_selected: 0 });
+        assert_eq!(
+            handle_key_code(KeyCode::Home, 3, 5),
+            KeyActionResult::Continue { new_selected: 0 }
+        );
+        assert_eq!(
+            handle_key_code(KeyCode::Char('g'), 3, 5),
+            KeyActionResult::Continue { new_selected: 0 }
+        );
 
-        // End / G
-        assert_eq!(handle_key_code(KeyCode::End, 1, 5), KeyActionResult::Continue { new_selected: 4 });
-        assert_eq!(handle_key_code(KeyCode::Char('G'), 1, 5), KeyActionResult::Continue { new_selected: 4 });
+        assert_eq!(
+            handle_key_code(KeyCode::End, 1, 5),
+            KeyActionResult::Continue { new_selected: 4 }
+        );
+        assert_eq!(
+            handle_key_code(KeyCode::Char('G'), 1, 5),
+            KeyActionResult::Continue { new_selected: 4 }
+        );
 
-        // Enter
-        assert_eq!(handle_key_code(KeyCode::Enter, 2, 5), KeyActionResult::Select(2));
+        assert_eq!(
+            handle_key_code(KeyCode::Enter, 2, 5),
+            KeyActionResult::Select(2)
+        );
 
-        // Ignore
-        assert_eq!(handle_key_code(KeyCode::Char('x'), 2, 5), KeyActionResult::Ignore);
+        assert_eq!(
+            handle_key_code(KeyCode::Char('x'), 2, 5),
+            KeyActionResult::Ignore
+        );
+    }
+
+    #[test]
+    fn test_handle_key_code_empty_options() {
+        assert_eq!(
+            handle_key_code(KeyCode::Up, 0, 0),
+            KeyActionResult::Continue { new_selected: 0 }
+        );
+        assert_eq!(
+            handle_key_code(KeyCode::Down, 0, 0),
+            KeyActionResult::Continue { new_selected: 0 }
+        );
+        assert_eq!(
+            handle_key_code(KeyCode::End, 0, 0),
+            KeyActionResult::Continue { new_selected: 0 }
+        );
     }
 }

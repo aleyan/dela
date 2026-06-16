@@ -1294,6 +1294,18 @@ impl DelaMcpServer {
     }
 }
 
+fn parse_tool_args<T: serde::de::DeserializeOwned>(
+    arguments: Option<serde_json::Map<String, serde_json::Value>>,
+) -> Result<T, ErrorData> {
+    serde_json::from_value(serde_json::Value::Object(arguments.unwrap_or_default())).map_err(|e| {
+        DelaError::internal_error(
+            format!("Invalid arguments: {}", e),
+            Some("Check argument format and types".to_string()),
+        )
+        .into()
+    })
+}
+
 impl ServerHandler for DelaMcpServer {
     fn get_info(&self) -> ServerInfo {
         ServerInfo::new(
@@ -1335,15 +1347,7 @@ impl ServerHandler for DelaMcpServer {
     ) -> Result<CallToolResult, ErrorData> {
         match request.name.as_ref() {
             "list_tasks" => {
-                let args: ListTasksArgs = serde_json::from_value(serde_json::Value::Object(
-                    request.arguments.unwrap_or_default(),
-                ))
-                .map_err(|e| {
-                    DelaError::internal_error(
-                        format!("Invalid arguments: {}", e),
-                        Some("Check argument format and types".to_string()),
-                    )
-                })?;
+                let args: ListTasksArgs = parse_tool_args(request.arguments)?;
                 self.list_tasks(Parameters(args)).await
             }
             "status" => {
@@ -1351,51 +1355,19 @@ impl ServerHandler for DelaMcpServer {
                 self.status().await
             }
             "task_start" => {
-                let args: TaskStartArgs = serde_json::from_value(serde_json::Value::Object(
-                    request.arguments.unwrap_or_default(),
-                ))
-                .map_err(|e| {
-                    DelaError::internal_error(
-                        format!("Invalid arguments: {}", e),
-                        Some("Check argument format and types".to_string()),
-                    )
-                })?;
+                let args: TaskStartArgs = parse_tool_args(request.arguments)?;
                 self.task_start(Parameters(args)).await
             }
             "task_status" => {
-                let args: TaskStatusArgs = serde_json::from_value(serde_json::Value::Object(
-                    request.arguments.unwrap_or_default(),
-                ))
-                .map_err(|e| {
-                    DelaError::internal_error(
-                        format!("Invalid arguments: {}", e),
-                        Some("Check argument format and types".to_string()),
-                    )
-                })?;
+                let args: TaskStatusArgs = parse_tool_args(request.arguments)?;
                 self.task_status(Parameters(args)).await
             }
             "task_output" => {
-                let args: TaskOutputArgs = serde_json::from_value(serde_json::Value::Object(
-                    request.arguments.unwrap_or_default(),
-                ))
-                .map_err(|e| {
-                    DelaError::internal_error(
-                        format!("Invalid arguments: {}", e),
-                        Some("Check argument format and types".to_string()),
-                    )
-                })?;
+                let args: TaskOutputArgs = parse_tool_args(request.arguments)?;
                 self.task_output(Parameters(args)).await
             }
             "task_stop" => {
-                let args: TaskStopArgs = serde_json::from_value(serde_json::Value::Object(
-                    request.arguments.unwrap_or_default(),
-                ))
-                .map_err(|e| {
-                    DelaError::internal_error(
-                        format!("Invalid arguments: {}", e),
-                        Some("Check argument format and types".to_string()),
-                    )
-                })?;
+                let args: TaskStopArgs = parse_tool_args(request.arguments)?;
                 self.task_stop(Parameters(args)).await
             }
             _ => Err(DelaError::internal_error(
@@ -4279,85 +4251,123 @@ add_custom_target(build-all COMMENT "Build everything")
     }
 
     #[tokio::test]
-    async fn test_call_tool_all_cases() {
-        let temp_dir = std::env::temp_dir();
-        let server = DelaMcpServer::new(temp_dir);
-
+    async fn test_call_tool_invalid_args() {
+        let server = DelaMcpServer::new(std::env::temp_dir());
         let (server_transport, _client_transport) = tokio::io::duplex(4096);
         let running_server = rmcp::service::serve_directly(server.clone(), server_transport, None);
-        let peer = running_server.peer().clone();
+        let context = RequestContext::new(RequestId::Number(1), running_server.peer().clone());
 
-        let context = RequestContext::new(RequestId::Number(1), peer);
+        let mut invalid_args = serde_json::Map::new();
+        invalid_args.insert("runner".to_string(), serde_json::Value::Bool(true));
+        let req = CallToolRequestParams::new("list_tasks").with_arguments(invalid_args);
 
-        // 1. Test status (no arguments)
-        let req = CallToolRequestParams::new("status");
-        let res = server.call_tool(req, context.clone()).await;
-        assert!(res.is_ok());
-
-        // 2. Test invalid tool name
-        let req = CallToolRequestParams::new("invalid_tool_name");
-        let res = server.call_tool(req, context.clone()).await;
+        let res = server.call_tool(req, context).await;
         assert!(res.is_err());
+        let err = res.unwrap_err();
+        assert_eq!(err.code.0, -32603);
+        assert!(err.message.contains("Invalid arguments"));
+    }
 
-        // 3. Test list_tasks (empty arguments is ok)
+    #[tokio::test]
+    async fn test_call_tool_unknown_tool() {
+        let server = DelaMcpServer::new(std::env::temp_dir());
+        let (server_transport, _client_transport) = tokio::io::duplex(4096);
+        let running_server = rmcp::service::serve_directly(server.clone(), server_transport, None);
+        let context = RequestContext::new(RequestId::Number(1), running_server.peer().clone());
+
+        let req = CallToolRequestParams::new("nonexistent_tool");
+        let res = server.call_tool(req, context).await;
+        assert!(res.is_err());
+        let err = res.unwrap_err();
+        assert_eq!(err.code.0, -32603);
+        assert!(err.message.contains("Tool not found: nonexistent_tool"));
+    }
+
+    #[tokio::test]
+    async fn test_call_tool_dispatch_list_tasks() {
+        let server = DelaMcpServer::new(std::env::temp_dir());
+        let (server_transport, _client_transport) = tokio::io::duplex(4096);
+        let running_server = rmcp::service::serve_directly(server.clone(), server_transport, None);
+        let context = RequestContext::new(RequestId::Number(1), running_server.peer().clone());
+
         let req = CallToolRequestParams::new("list_tasks");
-        let res = server.call_tool(req, context.clone()).await;
+        let res = server.call_tool(req, context).await;
         assert!(res.is_ok());
+    }
 
-        // 4. Test task_status (valid arguments)
-        let mut args_map = serde_json::Map::new();
-        args_map.insert("unique_name".to_string(), serde_json::Value::String("nonexistent".to_string()));
-        let req = CallToolRequestParams::new("task_status").with_arguments(args_map);
-        let res = server.call_tool(req, context.clone()).await;
+    #[tokio::test]
+    async fn test_call_tool_dispatch_status() {
+        let server = DelaMcpServer::new(std::env::temp_dir());
+        let (server_transport, _client_transport) = tokio::io::duplex(4096);
+        let running_server = rmcp::service::serve_directly(server.clone(), server_transport, None);
+        let context = RequestContext::new(RequestId::Number(1), running_server.peer().clone());
+
+        let req = CallToolRequestParams::new("status");
+        let res = server.call_tool(req, context).await;
         assert!(res.is_ok());
+    }
 
-        // 5. Test task_status (invalid arguments - should map_err)
-        let mut invalid_args_map = serde_json::Map::new();
-        invalid_args_map.insert("unique_name".to_string(), serde_json::Value::Bool(true));
-        let req = CallToolRequestParams::new("task_status").with_arguments(invalid_args_map);
-        let res = server.call_tool(req, context.clone()).await;
-        assert!(res.is_err());
+    #[tokio::test]
+    async fn test_call_tool_dispatch_task_status() {
+        let server = DelaMcpServer::new(std::env::temp_dir());
+        let (server_transport, _client_transport) = tokio::io::duplex(4096);
+        let running_server = rmcp::service::serve_directly(server.clone(), server_transport, None);
+        let context = RequestContext::new(RequestId::Number(1), running_server.peer().clone());
 
-        // 6. Test task_output (valid pid but nonexistent job - returns error)
-        let mut args_map = serde_json::Map::new();
-        args_map.insert("pid".to_string(), serde_json::Value::Number(12345.into()));
-        let req = CallToolRequestParams::new("task_output").with_arguments(args_map);
-        let res = server.call_tool(req, context.clone()).await;
-        assert!(res.is_err());
+        let mut args = serde_json::Map::new();
+        args.insert(
+            "unique_name".to_string(),
+            serde_json::Value::String("nonexistent".to_string()),
+        );
+        let req = CallToolRequestParams::new("task_status").with_arguments(args);
+        let res = server.call_tool(req, context).await;
+        assert!(res.is_ok());
+    }
 
-        // 7. Test task_output (invalid arguments - should map_err)
-        let mut invalid_args_map = serde_json::Map::new();
-        invalid_args_map.insert("pid".to_string(), serde_json::Value::String("not_a_number".to_string()));
-        let req = CallToolRequestParams::new("task_output").with_arguments(invalid_args_map);
-        let res = server.call_tool(req, context.clone()).await;
-        assert!(res.is_err());
+    #[tokio::test]
+    async fn test_call_tool_dispatch_task_output() {
+        let server = DelaMcpServer::new(std::env::temp_dir());
+        let (server_transport, _client_transport) = tokio::io::duplex(4096);
+        let running_server = rmcp::service::serve_directly(server.clone(), server_transport, None);
+        let context = RequestContext::new(RequestId::Number(1), running_server.peer().clone());
 
-        // 8. Test task_stop (valid pid but nonexistent job - returns error)
-        let mut args_map = serde_json::Map::new();
-        args_map.insert("pid".to_string(), serde_json::Value::Number(12345.into()));
-        let req = CallToolRequestParams::new("task_stop").with_arguments(args_map);
-        let res = server.call_tool(req, context.clone()).await;
+        let mut args = serde_json::Map::new();
+        args.insert("pid".to_string(), serde_json::Value::Number(12345.into()));
+        let req = CallToolRequestParams::new("task_output").with_arguments(args);
+        let res = server.call_tool(req, context).await;
         assert!(res.is_err());
+    }
 
-        // 9. Test task_stop (invalid arguments - should map_err)
-        let mut invalid_args_map = serde_json::Map::new();
-        invalid_args_map.insert("pid".to_string(), serde_json::Value::String("not_a_number".to_string()));
-        let req = CallToolRequestParams::new("task_stop").with_arguments(invalid_args_map);
-        let res = server.call_tool(req, context.clone()).await;
-        assert!(res.is_err());
+    #[tokio::test]
+    async fn test_call_tool_dispatch_task_stop() {
+        let server = DelaMcpServer::new(std::env::temp_dir());
+        let (server_transport, _client_transport) = tokio::io::duplex(4096);
+        let running_server = rmcp::service::serve_directly(server.clone(), server_transport, None);
+        let context = RequestContext::new(RequestId::Number(1), running_server.peer().clone());
 
-        // 10. Test task_start (nonexistent task - returns error)
-        let mut args_map = serde_json::Map::new();
-        args_map.insert("unique_name".to_string(), serde_json::Value::String("nonexistent".to_string()));
-        let req = CallToolRequestParams::new("task_start").with_arguments(args_map);
-        let res = server.call_tool(req, context.clone()).await;
+        let mut args = serde_json::Map::new();
+        args.insert("pid".to_string(), serde_json::Value::Number(12345.into()));
+        let req = CallToolRequestParams::new("task_stop").with_arguments(args);
+        let res = server.call_tool(req, context).await;
         assert!(res.is_err());
+    }
 
-        // 11. Test task_start (invalid arguments - should map_err)
-        let mut invalid_args_map = serde_json::Map::new();
-        invalid_args_map.insert("unique_name".to_string(), serde_json::Value::Bool(false));
-        let req = CallToolRequestParams::new("task_start").with_arguments(invalid_args_map);
-        let res = server.call_tool(req, context.clone()).await;
+    #[tokio::test]
+    async fn test_call_tool_dispatch_task_start() {
+        let server = DelaMcpServer::new(std::env::temp_dir());
+        let (server_transport, _client_transport) = tokio::io::duplex(4096);
+        let running_server = rmcp::service::serve_directly(server.clone(), server_transport, None);
+        let context = RequestContext::new(RequestId::Number(1), running_server.peer().clone());
+
+        let mut args = serde_json::Map::new();
+        args.insert(
+            "unique_name".to_string(),
+            serde_json::Value::String("nonexistent".to_string()),
+        );
+        let req = CallToolRequestParams::new("task_start").with_arguments(args);
+        let res = server.call_tool(req, context).await;
         assert!(res.is_err());
+        let err = res.unwrap_err();
+        assert_eq!(err.code.0, -32012); // TASK_NOT_FOUND
     }
 }

@@ -457,6 +457,18 @@ impl JobManager {
         }
     }
 
+    async fn update_job_exited(&self, pid: u32, exit_code: i32) {
+        let _ = self
+            .update_job_state(pid, JobState::Exited(exit_code))
+            .await;
+    }
+
+    async fn update_job_failed(&self, pid: u32, error_message: String) {
+        let _ = self
+            .update_job_state(pid, JobState::Failed(error_message))
+            .await;
+    }
+
     /// Add stdout output to a job for tests that do not care about stream identity.
     #[cfg(test)]
     pub async fn add_job_output(&self, pid: u32, output: String) -> anyhow::Result<()> {
@@ -509,11 +521,16 @@ impl JobManager {
         pid: u32,
         grace_period_seconds: u64,
     ) -> anyhow::Result<StopResult> {
-        let mut processes = self.processes.write().await;
-        if let Some(process) = processes.remove(&pid) {
-            self.stop_managed_job(pid, process, grace_period_seconds).await
+        let maybe_process = {
+            let mut processes = self.processes.write().await;
+            processes.remove(&pid)
+        };
+        if let Some(process) = maybe_process {
+            self.stop_managed_job(pid, process, grace_period_seconds)
+                .await
         } else {
-            self.stop_unmanaged_job_fallback(pid, grace_period_seconds).await
+            self.stop_unmanaged_job_fallback(pid, grace_period_seconds)
+                .await
         }
     }
 
@@ -537,17 +554,12 @@ impl JobManager {
                         anyhow::anyhow!("Process already exited but wait failed: {}", e)
                     })?;
                     let exit_code = exit_status.code().unwrap_or(0);
-                    let mut jobs = self.jobs.write().await;
-                    if let Some(job) = jobs.get_mut(&pid) {
-                        job.mark_exited(exit_code);
-                    }
+                    self.update_job_exited(pid, exit_code).await;
                     return Ok(StopResult::Graceful(exit_code));
                 }
                 Err(e) => {
-                    let mut jobs = self.jobs.write().await;
-                    if let Some(job) = jobs.get_mut(&pid) {
-                        job.mark_failed(format!("Failed to send SIGTERM: {}", e));
-                    }
+                    self.update_job_failed(pid, format!("Failed to send SIGTERM: {}", e))
+                        .await;
                     return Ok(StopResult::Failed(format!("Failed to send SIGTERM: {}", e)));
                 }
             }
@@ -555,10 +567,8 @@ impl JobManager {
         #[cfg(not(unix))]
         {
             if let Err(e) = process.kill().await {
-                let mut jobs = self.jobs.write().await;
-                if let Some(job) = jobs.get_mut(&pid) {
-                    job.mark_failed(format!("Failed to stop process: {}", e));
-                }
+                self.update_job_failed(pid, format!("Failed to stop process: {}", e))
+                    .await;
                 return Ok(StopResult::Failed(format!("Failed to stop process: {}", e)));
             }
         }
@@ -571,18 +581,13 @@ impl JobManager {
             Ok(Ok(exit_status)) => {
                 // Process exited gracefully
                 let exit_code = exit_status.code().unwrap_or(-1);
-                let mut jobs = self.jobs.write().await;
-                if let Some(job) = jobs.get_mut(&pid) {
-                    job.mark_exited(exit_code);
-                }
+                self.update_job_exited(pid, exit_code).await;
                 Ok(StopResult::Graceful(exit_code))
             }
             Ok(Err(e)) => {
                 // Process wait failed
-                let mut jobs = self.jobs.write().await;
-                if let Some(job) = jobs.get_mut(&pid) {
-                    job.mark_failed(format!("Process wait failed: {}", e));
-                }
+                self.update_job_failed(pid, format!("Process wait failed: {}", e))
+                    .await;
                 Ok(StopResult::Failed(format!("Process wait failed: {}", e)))
             }
             Err(_) => {
@@ -595,40 +600,35 @@ impl JobManager {
                     let result = signal::kill(Pid::from_raw(pid as i32), Signal::SIGKILL);
                     match result {
                         Ok(()) => {
-                            // Update job state to stopped
-                            let mut jobs = self.jobs.write().await;
-                            if let Some(job) = jobs.get_mut(&pid) {
-                                job.mark_failed(
-                                    "Stopped with SIGKILL after grace period".to_string(),
-                                );
-                            }
+                            // Wait/reap the child process to prevent zombie processes
+                            let _ = process.wait().await;
+                            self.update_job_failed(
+                                pid,
+                                "Stopped with SIGKILL after grace period".to_string(),
+                            )
+                            .await;
                             Ok(StopResult::Forced)
                         }
                         Err(nix::errno::Errno::ESRCH) => {
-                            // Process already exited - this is actually success
-                            let mut jobs = self.jobs.write().await;
-                            if let Some(job) = jobs.get_mut(&pid) {
-                                job.mark_exited(0); // Process already exited gracefully
-                            }
-                            Ok(StopResult::Graceful(0)) // Treat as graceful exit
+                            self.update_job_exited(pid, 0).await;
+                            Ok(StopResult::Graceful(0))
                         }
                         Err(e) => {
-                            // Other signal errors
-                            let mut jobs = self.jobs.write().await;
-                            if let Some(job) = jobs.get_mut(&pid) {
-                                job.mark_failed(format!("Failed to send SIGKILL: {}", e));
-                            }
+                            self.update_job_failed(pid, format!("Failed to send SIGKILL: {}", e))
+                                .await;
                             Ok(StopResult::Failed(format!("Failed to send SIGKILL: {}", e)))
                         }
                     }
                 }
                 #[cfg(not(unix))]
                 {
-                    // On non-Unix systems, we can't send signals, so just mark as failed
-                    let mut jobs = self.jobs.write().await;
-                    if let Some(job) = jobs.get_mut(&pid) {
-                        job.mark_failed("SIGKILL not supported on this platform".to_string());
-                    }
+                    let _ = process.kill().await;
+                    let _ = process.wait().await;
+                    self.update_job_failed(
+                        pid,
+                        "SIGKILL not supported on this platform".to_string(),
+                    )
+                    .await;
                     Ok(StopResult::Failed(
                         "SIGKILL not supported on this platform".to_string(),
                     ))
@@ -659,43 +659,36 @@ impl JobManager {
 
             match kill_result {
                 Ok(()) => {
-                    // Mark job as forced stop
-                    let mut jobs = self.jobs.write().await;
-                    if let Some(job) = jobs.get_mut(&pid) {
-                        job.mark_failed("Stopped with SIGKILL (fallback)".to_string());
-                    }
+                    self.update_job_failed(pid, "Stopped with SIGKILL (fallback)".to_string())
+                        .await;
                     Ok(StopResult::Forced)
                 }
                 Err(nix::errno::Errno::ESRCH) => {
-                    // Process already exited - this is actually success
-                    let mut jobs = self.jobs.write().await;
-                    if let Some(job) = jobs.get_mut(&pid) {
-                        job.mark_exited(0); // Process already exited gracefully
-                    }
-                    Ok(StopResult::Graceful(0)) // Treat as graceful exit
+                    self.update_job_exited(pid, 0).await;
+                    Ok(StopResult::Graceful(0))
                 }
                 Err(e) => {
-                    let mut jobs = self.jobs.write().await;
-                    if let Some(job) = jobs.get_mut(&pid) {
-                        job.mark_failed(format!("Failed to send SIGKILL (fallback): {}", e));
-                    }
+                    self.update_job_failed(
+                        pid,
+                        format!("Failed to send SIGKILL (fallback): {}", e),
+                    )
+                    .await;
                     Ok(StopResult::Failed(format!("Failed to send SIGKILL: {}", e)))
                 }
             }
         }
         #[cfg(not(unix))]
         {
-            // On non-Unix systems, we can't send signals, so just mark as failed
-            let mut jobs = self.jobs.write().await;
-            if let Some(job) = jobs.get_mut(&pid) {
-                job.mark_failed("Signal handling not supported on this platform".to_string());
-            }
+            self.update_job_failed(
+                pid,
+                "Signal handling not supported on this platform".to_string(),
+            )
+            .await;
             Ok(StopResult::Failed(
                 "Signal handling not supported on this platform".to_string(),
             ))
         }
     }
-
 
     /// Remove a job
     #[allow(dead_code)]
@@ -1131,6 +1124,12 @@ mod tests {
             stop_result,
             StopResult::Graceful(_) | StopResult::Forced
         ));
+        let job = manager.get_job(pid).await.unwrap();
+        assert!(!job.is_running());
+        assert!(matches!(
+            job.state,
+            JobState::Exited(_) | JobState::Failed(_)
+        ));
     }
 
     #[tokio::test]
@@ -1151,22 +1150,22 @@ mod tests {
 
         {
             let mut jobs = manager.jobs.write().await;
-            jobs.insert(
-                pid,
-                Job::new(
-                    pid,
-                    metadata,
-                    10,
-                    1000,
-                ),
-            );
+            jobs.insert(pid, Job::new(pid, metadata, 10, 1000));
         }
 
         let stop_result = manager.stop_job_graceful(pid, 1).await.unwrap();
         #[cfg(unix)]
-        assert_eq!(stop_result, StopResult::Graceful(0));
+        {
+            assert_eq!(stop_result, StopResult::Graceful(0));
+            let job = manager.get_job(pid).await.unwrap();
+            assert_eq!(job.state, JobState::Exited(0));
+        }
         #[cfg(not(unix))]
-        assert!(matches!(stop_result, StopResult::Failed(_)));
+        {
+            assert!(matches!(stop_result, StopResult::Failed(_)));
+            let job = manager.get_job(pid).await.unwrap();
+            assert!(matches!(job.state, JobState::Failed(_)));
+        }
     }
 
     #[tokio::test]
@@ -1175,7 +1174,9 @@ mod tests {
 
         let mut cmd = Command::new("python3");
         cmd.arg("-c");
-        cmd.arg("import signal, time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(10)");
+        cmd.arg(
+            "import signal, time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(10)",
+        );
         let child = cmd.spawn().unwrap();
         let pid = child.id().unwrap();
 
@@ -1196,9 +1197,20 @@ mod tests {
 
         let stop_result = manager.stop_job_graceful(pid, 1).await.unwrap();
         #[cfg(unix)]
-        assert_eq!(stop_result, StopResult::Forced);
+        {
+            assert_eq!(stop_result, StopResult::Forced);
+            let job = manager.get_job(pid).await.unwrap();
+            assert!(matches!(job.state, JobState::Failed(_)));
+        }
         #[cfg(not(unix))]
-        assert!(matches!(stop_result, StopResult::Failed(_) | StopResult::Graceful(_)));
+        {
+            assert!(matches!(
+                stop_result,
+                StopResult::Failed(_) | StopResult::Graceful(_)
+            ));
+            let job = manager.get_job(pid).await.unwrap();
+            assert!(!job.is_running());
+        }
     }
 
     #[tokio::test]
@@ -1226,5 +1238,7 @@ mod tests {
 
         let stop_result = manager.stop_job_graceful(pid, 1).await.unwrap();
         assert!(matches!(stop_result, StopResult::Graceful(_)));
+        let job = manager.get_job(pid).await.unwrap();
+        assert!(!job.is_running());
     }
 }
