@@ -408,7 +408,9 @@ impl JobManager {
         }
         let elapsed_at_completion = match state {
             JobState::Running => None,
-            JobState::Exited(_) | JobState::Failed(_) | JobState::Signaled(_) => Some(metadata.started_at.elapsed()),
+            JobState::Exited(_) | JobState::Failed(_) | JobState::Signaled(_) => {
+                Some(metadata.started_at.elapsed())
+            }
         };
         jobs.insert(
             pid,
@@ -417,7 +419,9 @@ impl JobManager {
                 metadata,
                 completed_at: match state {
                     JobState::Running => None,
-                    JobState::Exited(_) | JobState::Failed(_) | JobState::Signaled(_) => Some(Utc::now()),
+                    JobState::Exited(_) | JobState::Failed(_) | JobState::Signaled(_) => {
+                        Some(Utc::now())
+                    }
                 },
                 elapsed_at_completion,
                 state,
@@ -480,9 +484,7 @@ impl JobManager {
     }
 
     async fn update_job_signaled(&self, pid: u32, signal: i32) {
-        let _ = self
-            .update_job_state(pid, JobState::Signaled(signal))
-            .await;
+        let _ = self.update_job_state(pid, JobState::Signaled(signal)).await;
     }
 
     async fn update_job_failed(&self, pid: u32, error_message: String) {
@@ -1190,11 +1192,9 @@ mod tests {
     async fn test_stop_job_graceful_fallback() {
         let manager = JobManager::new();
 
-        let mut child = tokio::process::Command::new("true")
-            .spawn()
-            .unwrap();
+        let mut child = tokio::process::Command::new("true").spawn().unwrap();
         let pid = child.id().unwrap();
-        
+
         // Wait for it to exit so it's fully reaped and no longer a zombie.
         // This gives us a safe PID that is guaranteed to be dead and return ESRCH.
         let _ = child.wait().await;
