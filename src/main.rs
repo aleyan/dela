@@ -98,6 +98,22 @@ enum Commands {
         /// Generate ~/.claude-code/settings.json for Claude Code
         #[arg(long)]
         init_claude_code: bool,
+
+        /// Generate ~/.gemini/antigravity-ide/mcp_config.json for Antigravity
+        #[arg(long)]
+        init_antigravity: bool,
+
+        /// Generate ~/.cline/data/settings/cline_mcp_settings.json for Cline
+        #[arg(long)]
+        init_cline: bool,
+
+        /// Generate ~/.config/opencode/opencode.json for OpenCode
+        #[arg(long)]
+        init_opencode: bool,
+
+        /// Generate ~/.config/crush/crush.json for Crush
+        #[arg(long)]
+        init_crush: bool,
     },
 
     /// Initialize dela and configure shell integration
@@ -188,16 +204,51 @@ async fn run_command(command: Commands) -> anyhow::Result<()> {
             init_codex,
             init_gemini,
             init_claude_code,
+            init_antigravity,
+            init_cline,
+            init_opencode,
+            init_crush,
         } => {
-            commands::mcp::execute(
-                cwd,
+            let init_flags = [
                 init_cursor,
                 init_vscode,
                 init_codex,
                 init_gemini,
                 init_claude_code,
-            )
-            .await
+                init_antigravity,
+                init_cline,
+                init_opencode,
+                init_crush,
+            ];
+            let init_count = init_flags.iter().filter(|&&x| x).count();
+            if init_count > 1 {
+                return Err(anyhow::anyhow!(
+                    "Only one --init-* flag can be specified at a time"
+                ));
+            }
+
+            let init_editor = if init_cursor {
+                Some(commands::mcp::Editor::Cursor)
+            } else if init_vscode {
+                Some(commands::mcp::Editor::Vscode)
+            } else if init_codex {
+                Some(commands::mcp::Editor::Codex)
+            } else if init_gemini {
+                Some(commands::mcp::Editor::Gemini)
+            } else if init_claude_code {
+                Some(commands::mcp::Editor::ClaudeCode)
+            } else if init_antigravity {
+                Some(commands::mcp::Editor::Antigravity)
+            } else if init_cline {
+                Some(commands::mcp::Editor::Cline)
+            } else if init_opencode {
+                Some(commands::mcp::Editor::OpenCode)
+            } else if init_crush {
+                Some(commands::mcp::Editor::Crush)
+            } else {
+                None
+            };
+            commands::mcp::execute(cwd, init_editor).await
         }
         Commands::Init => commands::init::execute(),
         Commands::ConfigureShell => commands::configure_shell::execute(),
@@ -236,6 +287,7 @@ async fn main() {
 #[cfg(test)]
 mod tests {
     use super::{Commands, run_command};
+    use crate::commands::mcp::Editor;
     use std::io::Write;
     use tempfile::NamedTempFile;
 
@@ -277,6 +329,209 @@ mod tests {
         assert_eq!(
             lines[1], "Error: Failed to execute task",
             "Regular error should have 'Error:' prefix"
+        );
+    }
+
+    struct TestEnvGuard {
+        old_dir: Option<std::path::PathBuf>,
+        old_home: Option<String>,
+    }
+
+    impl Drop for TestEnvGuard {
+        fn drop(&mut self) {
+            if let Some(ref dir) = self.old_dir {
+                let _ = std::env::set_current_dir(dir);
+            }
+            if let Some(ref home) = self.old_home {
+                unsafe {
+                    std::env::set_var("HOME", home);
+                }
+            } else {
+                unsafe {
+                    std::env::remove_var("HOME");
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_run_command_mcp_all_flags() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let _guard = TestEnvGuard {
+            old_dir: std::env::current_dir().ok(),
+            old_home: std::env::var("HOME").ok(),
+        };
+        std::env::set_current_dir(temp_dir.path()).unwrap();
+        unsafe {
+            std::env::set_var("HOME", temp_dir.path());
+        }
+
+        // Test each flag to ensure the match arm is evaluated and runs generate_config
+        let flags = vec![
+            (
+                Editor::Cursor,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+            ), // Cursor
+            (
+                Editor::Vscode,
+                false,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+            ), // Vscode
+            (
+                Editor::Codex,
+                false,
+                false,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+            ), // Codex
+            (
+                Editor::Gemini,
+                false,
+                false,
+                false,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+            ), // Gemini
+            (
+                Editor::ClaudeCode,
+                false,
+                false,
+                false,
+                false,
+                true,
+                false,
+                false,
+                false,
+                false,
+            ), // ClaudeCode
+            (
+                Editor::Antigravity,
+                false,
+                false,
+                false,
+                false,
+                false,
+                true,
+                false,
+                false,
+                false,
+            ), // Antigravity
+            (
+                Editor::Cline,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                true,
+                false,
+                false,
+            ), // Cline
+            (
+                Editor::OpenCode,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                true,
+                false,
+            ), // OpenCode
+            (
+                Editor::Crush,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                true,
+            ), // Crush
+        ];
+
+        for f in flags {
+            let cmd = Commands::Mcp {
+                cwd: ".".to_string(),
+                init_cursor: f.1,
+                init_vscode: f.2,
+                init_codex: f.3,
+                init_gemini: f.4,
+                init_claude_code: f.5,
+                init_antigravity: f.6,
+                init_cline: f.7,
+                init_opencode: f.8,
+                init_crush: f.9,
+            };
+
+            let expected_path = f.0.config_path();
+            if expected_path.exists() {
+                let _ = std::fs::remove_file(&expected_path);
+            }
+
+            let result = run_command(cmd).await;
+            assert!(result.is_ok());
+
+            assert!(
+                expected_path.exists(),
+                "Config path {:?} was not generated for {:?}",
+                expected_path,
+                f.0
+            );
+
+            // Clean up config file to ensure test isolation
+            let _ = std::fs::remove_file(&expected_path);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_run_command_mcp_conflicting_flags() {
+        let cmd = Commands::Mcp {
+            cwd: ".".to_string(),
+            init_cursor: true,
+            init_vscode: true,
+            init_codex: false,
+            init_gemini: false,
+            init_claude_code: false,
+            init_antigravity: false,
+            init_cline: false,
+            init_opencode: false,
+            init_crush: false,
+        };
+        let result = run_command(cmd).await;
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "Only one --init-* flag can be specified at a time"
         );
     }
 

@@ -71,14 +71,20 @@ Dela includes an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/
 
 The mcp executed tasks need to be already on the allowlist. The mcp server respects the allowlist, but does not give agents tools to modify it. 
 
-### Setting Up MCP in Your Editor
+### Setting Up MCP for your agent
+
+You need to have dela installed first and then run the command for your coding agent.
 
 ```sh
 $ dela mcp --init-cursor       # Cursor: ~/.cursor/mcp.json
 $ dela mcp --init-vscode       # VSCode: ~/.vscode/mcp.json
 $ dela mcp --init-codex        # OpenAI Codex: ~/.codex/config.toml
 $ dela mcp --init-gemini       # Gemini CLI: ~/.gemini/settings.json
+$ dela mcp --init-antigravity  # Antigravity: ~/.gemini/antigravity-ide/mcp_config.json
 $ dela mcp --init-claude-code  # Claude Code: ~/.claude-code/settings.json
+$ dela mcp --init-cline        # Cline: ~/.cline/data/settings/cline_mcp_settings.json (override with CLINE_MCP_SETTINGS_PATH)
+$ dela mcp --init-opencode     # OpenCode: ~/.config/opencode/opencode.json
+$ dela mcp --init-crush        # Crush: ~/.config/crush/crush.json
 ```
 
 ### Starting the MCP Server Manually
