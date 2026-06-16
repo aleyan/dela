@@ -772,11 +772,10 @@ impl DelaMcpServer {
             let exit_status = child.wait().await.map_err(|e| {
                 DelaError::internal_error(
                     format!("Failed to wait for process: {}", e),
-                    Some("Process may have terminated unexpectedly".to_string()),
+                    Some("Process management error".to_string()),
                 )
             })?;
 
-            let exit_code = exit_status.code();
             let output_chunks = captured_output_chunks.lock().await.clone();
 
             // Wait for reader tasks to finish
@@ -799,9 +798,20 @@ impl DelaMcpServer {
                 file_path: task.definition_path().to_path_buf(),
             };
 
-            let exit_state = JobState::Exited(exit_code.unwrap_or(-1));
+            let mut exit_code = exit_status.code();
+            let mut signal = None;
+            let mut exit_state = JobState::Exited(exit_code.unwrap_or(-1));
+            #[cfg(unix)]
+            {
+                use std::os::unix::process::ExitStatusExt;
+                if let Some(sig) = exit_status.signal() {
+                    signal = Some(sig);
+                    exit_code = None;
+                    exit_state = JobState::Signaled(sig);
+                }
+            }
             self.job_manager
-                .record_completed_job(pid as u32, metadata, exit_state)
+                .record_completed_job(pid as u32, metadata, exit_state.clone())
                 .await
                 .map_err(|e| {
                     DelaError::internal_error(
@@ -834,9 +844,13 @@ impl DelaMcpServer {
             .await;
 
             let start_result = StartResultDto {
-                state: "exited".to_string(),
-                pid: None,
+                state: match exit_state {
+                    JobState::Signaled(_) => "signaled".to_string(),
+                    _ => "exited".to_string(),
+                },
+                pid: Some(pid as i32),
                 exit_code,
+                signal,
                 output: output_chunks,
             };
 
@@ -1029,13 +1043,25 @@ impl DelaMcpServer {
             // Wait for process to exit
             if let Some(mut process) = job_manager.processes.write().await.remove(&pid_u32) {
                 let exit_result = process.wait().await;
-                let (state, exit_code) = match exit_result {
+                let (state, exit_code, signal) = match exit_result {
                     Ok(status) => {
-                        let code = status.code().unwrap_or(-1);
-                        (JobState::Exited(code), Some(code))
+                        let mut state = JobState::Exited(status.code().unwrap_or(-1));
+                        let mut exit_code = status.code();
+                        let mut signal = None;
+                        #[cfg(unix)]
+                        {
+                            use std::os::unix::process::ExitStatusExt;
+                            if let Some(sig) = status.signal() {
+                                state = JobState::Signaled(sig);
+                                signal = Some(sig);
+                                exit_code = None;
+                            }
+                        }
+                        (state, exit_code, signal)
                     }
                     Err(e) => (
                         JobState::Failed(format!("Process wait failed: {}", e)),
+                        None,
                         None,
                     ),
                 };
@@ -1052,6 +1078,7 @@ impl DelaMcpServer {
                                 "event": "exited",
                                 "pid": pid_u32,
                                 "exit_code": exit_code,
+                                "signal": signal,
                                 "task": task_name
                             }),
                         })
@@ -1062,8 +1089,9 @@ impl DelaMcpServer {
 
         let start_result = StartResultDto {
             state: "running".to_string(),
-            pid: Some(pid),
+            pid: Some(pid as i32),
             exit_code: None,
+            signal: None,
             output: output_chunks,
         };
 
@@ -1081,13 +1109,32 @@ impl DelaMcpServer {
         let job_statuses: Vec<serde_json::Value> = jobs
             .into_iter()
             .map(|job| {
-                let (state, exit_code) = match &job.state {
-                    JobState::Running => ("running", None),
-                    JobState::Exited(code) => ("exited", Some(*code)),
-                    JobState::Failed(_) => ("failed", None),
-                };
-                let completed_at = job
-                    .completed_at
+                let mut status = "running";
+                let mut exit_code = None;
+                let mut signal = None;
+                let mut completed_at = None;
+                let mut error = None;
+
+                match &job.state {
+                    JobState::Running => {}
+                    JobState::Exited(code) => {
+                        status = "exited";
+                        exit_code = Some(*code);
+                        completed_at = job.completed_at;
+                    }
+                    JobState::Signaled(sig) => {
+                        status = "signaled";
+                        signal = Some(*sig);
+                        completed_at = job.completed_at;
+                    }
+                    JobState::Failed(msg) => {
+                        status = "failed";
+                        error = Some(msg.clone());
+                        completed_at = job.completed_at;
+                    }
+                }
+
+                let completed_at_str = completed_at
                     .as_ref()
                     .map(|timestamp| timestamp.to_rfc3339_opts(SecondsFormat::Secs, true));
 
@@ -1095,10 +1142,12 @@ impl DelaMcpServer {
                     "pid": job.pid,
                     "unique_name": job.metadata.unique_name,
                     "source_name": job.metadata.source_name,
-                    "state": state,
-                    "elapsed_seconds": job.age().as_secs(),
+                    "state": status,
+                    "error": error,
                     "exit_code": exit_code,
-                    "completed_at": completed_at,
+                    "signal": signal,
+                    "elapsed_seconds": job.age().as_secs(),
+                    "completed_at": completed_at_str,
                     "command": job.metadata.command,
                     "file_path": job.metadata.file_path.to_string_lossy(),
                     "args": job.metadata.args,
@@ -1138,8 +1187,11 @@ impl DelaMcpServer {
         let output = Self::output_entries_to_json(&output_entries);
         let total_bytes = job.output_buffer.total_bytes();
 
+        let has_more = next_offset < total_lines;
+        let dropped_lines = job.output_buffer.dropped_lines;
+
         let buffer_full = job.output_buffer.is_full();
-        let is_truncated = offset > 0 || next_offset < total_lines || buffer_full;
+        let is_truncated = has_more || dropped_lines > 0 || buffer_full;
 
         // Apply per-message chunk size limit (8KB default)
         const MAX_CHUNK_SIZE: usize = 8 * 1024; // 8KB
@@ -1150,9 +1202,16 @@ impl DelaMcpServer {
             "next_offset": next_offset,
             "total_lines": total_lines,
             "total_bytes": total_bytes,
-            "truncated": is_truncated,
-            "buffer_full": buffer_full
+            "buffer_full": buffer_full,
         });
+
+        if has_more {
+            response["has_more_lines"] = serde_json::Value::Bool(true);
+        }
+        
+        if dropped_lines > 0 {
+            response["dropped_lines"] = serde_json::Value::Number(serde_json::Number::from(dropped_lines));
+        }
 
         // Add truncation details if requested
         if args.show_truncation.unwrap_or(false) {
@@ -1268,18 +1327,31 @@ impl DelaMcpServer {
             })?;
 
         // Determine the response based on how the job was stopped
-        let (status, message) = match stop_result {
-            crate::mcp::job_manager::StopResult::Graceful(exit_code) => (
+        let (status, message, exit_code, signal) = match stop_result {
+            crate::mcp::job_manager::StopResult::Graceful(code) => (
                 "graceful",
-                format!("Process stopped gracefully with exit code {}", exit_code),
+                format!("Process stopped gracefully with exit code {}", code),
+                Some(code),
+                None,
+            ),
+            crate::mcp::job_manager::StopResult::Signaled(sig) => (
+                "signaled",
+                format!("Process stopped by signal {}", sig),
+                None,
+                Some(sig),
             ),
             crate::mcp::job_manager::StopResult::Forced => (
                 "killed",
                 "Process was force-killed after grace period".to_string(),
+                None,
+                None,
             ),
-            crate::mcp::job_manager::StopResult::Failed(reason) => {
-                ("failed", format!("Failed to stop process: {}", reason))
-            }
+            crate::mcp::job_manager::StopResult::Failed(reason) => (
+                "failed",
+                format!("Failed to stop process: {}", reason),
+                None,
+                None,
+            ),
         };
 
         Ok(CallToolResult::success(vec![
@@ -1287,6 +1359,8 @@ impl DelaMcpServer {
                 "pid": args.pid,
                 "status": status,
                 "message": message,
+                "exit_code": exit_code,
+                "signal": signal,
                 "grace_period_used": grace_period
             }))
             .expect("Failed to serialize JSON"),
@@ -2194,7 +2268,7 @@ mod tests {
                 assert_eq!(obj["next_offset"], 4);
                 assert_eq!(obj["total_lines"], 4);
                 assert!(obj["total_bytes"].is_number());
-                assert_eq!(obj["truncated"], true); // We requested 2 lines but have 4
+                assert!(obj.get("has_more_lines").is_none()); // We requested 2 lines out of 4, so offset is 2 and next_offset is 4 == total_lines
                 assert!(obj["buffer_full"].is_boolean());
                 let output = obj["output"].as_array().unwrap();
                 assert_eq!(output.len(), 2);
@@ -2266,14 +2340,14 @@ mod tests {
                 assert_eq!(obj["offset"], 2);
                 assert_eq!(obj["next_offset"], 5);
                 assert_eq!(obj["total_lines"], 5);
-                assert_eq!(obj["truncated"], true);
+                assert!(obj.get("has_more_lines").is_none());
 
                 // Check truncation info is present
                 assert!(obj.contains_key("truncation_info"));
                 let truncation_info = &obj["truncation_info"];
                 assert_eq!(truncation_info["requested_lines"], 3);
                 assert_eq!(truncation_info["returned_lines"], 3);
-                assert_eq!(truncation_info["is_truncated"], true);
+                assert_eq!(truncation_info["is_truncated"], false);
                 assert!(truncation_info["buffer_capacity"].is_number());
             }
             _ => panic!("Expected text content with JSON"),
@@ -2340,7 +2414,7 @@ mod tests {
                 assert_eq!(obj["offset"], 1);
                 assert_eq!(obj["next_offset"], 3);
                 assert_eq!(obj["total_lines"], 5);
-                assert_eq!(obj["truncated"], true);
+                assert_eq!(obj["has_more_lines"], true);
                 assert_eq!(obj["truncation_info"]["returned_lines"], 2);
             }
             _ => panic!("Expected text content with JSON"),
@@ -2409,7 +2483,7 @@ mod tests {
                 assert_eq!(obj["offset"], 0);
                 assert_eq!(obj["next_offset"], 2);
                 assert_eq!(obj["total_lines"], 2);
-                assert_eq!(obj["truncated"], false); // No truncation since we have fewer lines than requested
+                assert!(obj.get("has_more_lines").is_none()); // No truncation since we have fewer lines than requested
 
                 // Check truncation info is present
                 assert!(obj.contains_key("truncation_info"));
@@ -3529,7 +3603,7 @@ add_custom_target(build-all COMMENT "Build everything")
 
         assert_eq!(json["state"], "exited");
         assert_eq!(json["exit_code"], 0);
-        assert!(json.get("pid").is_none());
+        assert!(json.get("pid").is_some());
         let output_chunks = json["output"].as_array().unwrap();
         assert!(output_chunks.iter().any(|chunk| {
             chunk

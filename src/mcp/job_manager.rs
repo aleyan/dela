@@ -11,6 +11,8 @@ use tokio::sync::RwLock;
 pub enum StopResult {
     /// Process stopped gracefully with exit code
     Graceful(i32),
+    /// Process stopped by signal
+    Signaled(i32),
     /// Process was force-killed after grace period
     Forced,
     /// Stop operation failed
@@ -22,6 +24,7 @@ pub enum StopResult {
 pub enum JobState {
     Running,
     Exited(i32),    // exit code
+    Signaled(i32),  // signal number
     Failed(String), // error message
 }
 
@@ -66,6 +69,7 @@ pub struct RingBuffer {
     max_size: usize,
     total_bytes: usize,
     max_bytes: usize,
+    pub dropped_lines: usize,
 }
 
 impl RingBuffer {
@@ -76,6 +80,7 @@ impl RingBuffer {
             max_size: max_lines,
             total_bytes: 0,
             max_bytes,
+            dropped_lines: 0,
         }
     }
 
@@ -88,6 +93,7 @@ impl RingBuffer {
         while self.buffer.len() >= self.max_size {
             if let Some(removed) = self.buffer.pop_front() {
                 self.total_bytes = self.total_bytes.saturating_sub(removed.len());
+                self.dropped_lines += 1;
             }
         }
 
@@ -95,6 +101,7 @@ impl RingBuffer {
         while self.total_bytes + line_bytes > self.max_bytes && !self.buffer.is_empty() {
             if let Some(removed) = self.buffer.pop_front() {
                 self.total_bytes = self.total_bytes.saturating_sub(removed.len());
+                self.dropped_lines += 1;
             }
         }
 
@@ -218,6 +225,14 @@ impl Job {
     pub fn mark_exited(&mut self, exit_code: i32) {
         self.elapsed_at_completion = Some(self.metadata.started_at.elapsed());
         self.state = JobState::Exited(exit_code);
+        self.completed_at = Some(Utc::now());
+        self.touch();
+    }
+
+    /// Mark the job as exited by a signal
+    pub fn mark_signaled(&mut self, signal: i32) {
+        self.elapsed_at_completion = Some(self.metadata.started_at.elapsed());
+        self.state = JobState::Signaled(signal);
         self.completed_at = Some(Utc::now());
         self.touch();
     }
@@ -393,7 +408,7 @@ impl JobManager {
         }
         let elapsed_at_completion = match state {
             JobState::Running => None,
-            JobState::Exited(_) | JobState::Failed(_) => Some(metadata.started_at.elapsed()),
+            JobState::Exited(_) | JobState::Failed(_) | JobState::Signaled(_) => Some(metadata.started_at.elapsed()),
         };
         jobs.insert(
             pid,
@@ -402,7 +417,7 @@ impl JobManager {
                 metadata,
                 completed_at: match state {
                     JobState::Running => None,
-                    JobState::Exited(_) | JobState::Failed(_) => Some(Utc::now()),
+                    JobState::Exited(_) | JobState::Failed(_) | JobState::Signaled(_) => Some(Utc::now()),
                 },
                 elapsed_at_completion,
                 state,
@@ -449,6 +464,7 @@ impl JobManager {
                     job.touch();
                 }
                 JobState::Exited(exit_code) => job.mark_exited(exit_code),
+                JobState::Signaled(signal) => job.mark_signaled(signal),
                 JobState::Failed(error) => job.mark_failed(error),
             }
             Ok(())
@@ -460,6 +476,12 @@ impl JobManager {
     async fn update_job_exited(&self, pid: u32, exit_code: i32) {
         let _ = self
             .update_job_state(pid, JobState::Exited(exit_code))
+            .await;
+    }
+
+    async fn update_job_signaled(&self, pid: u32, signal: i32) {
+        let _ = self
+            .update_job_state(pid, JobState::Signaled(signal))
             .await;
     }
 
@@ -560,6 +582,11 @@ impl JobManager {
                     let exit_status = process.wait().await.map_err(|e| {
                         anyhow::anyhow!("Process already exited but wait failed: {}", e)
                     })?;
+                    use std::os::unix::process::ExitStatusExt;
+                    if let Some(sig) = exit_status.signal() {
+                        self.update_job_signaled(pid, sig).await;
+                        return Ok(StopResult::Signaled(sig));
+                    }
                     let exit_code = exit_status.code().unwrap_or(0);
                     self.update_job_exited(pid, exit_code).await;
                     return Ok(StopResult::Graceful(exit_code));
@@ -587,6 +614,14 @@ impl JobManager {
         match wait_result {
             Ok(Ok(exit_status)) => {
                 // Process exited gracefully
+                #[cfg(unix)]
+                {
+                    use std::os::unix::process::ExitStatusExt;
+                    if let Some(sig) = exit_status.signal() {
+                        self.update_job_signaled(pid, sig).await;
+                        return Ok(StopResult::Signaled(sig));
+                    }
+                }
                 let exit_code = exit_status.code().unwrap_or(-1);
                 self.update_job_exited(pid, exit_code).await;
                 Ok(StopResult::Graceful(exit_code))
@@ -617,9 +652,19 @@ impl JobManager {
                             Ok(StopResult::Forced)
                         }
                         Err(nix::errno::Errno::ESRCH) => {
-                            let exit_status = process.wait().await.ok().and_then(|s| s.code()).unwrap_or(0);
-                            self.update_job_exited(pid, exit_status).await;
-                            Ok(StopResult::Graceful(exit_status))
+                            let exit_status = process.wait().await.ok();
+                            if let Some(status) = exit_status {
+                                use std::os::unix::process::ExitStatusExt;
+                                if let Some(sig) = status.signal() {
+                                    self.update_job_signaled(pid, sig).await;
+                                    return Ok(StopResult::Signaled(sig));
+                                }
+                                let code = status.code().unwrap_or(0);
+                                self.update_job_exited(pid, code).await;
+                                return Ok(StopResult::Graceful(code));
+                            }
+                            self.update_job_exited(pid, 0).await;
+                            Ok(StopResult::Graceful(0))
                         }
                         Err(e) => {
                             self.update_job_failed(pid, format!("Failed to send SIGKILL: {}", e))
@@ -778,6 +823,7 @@ impl JobManager {
             match job.state {
                 JobState::Running => running += 1,
                 JobState::Exited(_) => exited += 1,
+                JobState::Signaled(_) => exited += 1, // Treat signaled as exited for summary
                 JobState::Failed(_) => failed += 1,
             }
         }
@@ -1130,13 +1176,13 @@ mod tests {
         let stop_result = manager.stop_job_graceful(pid, 1).await.unwrap();
         assert!(matches!(
             stop_result,
-            StopResult::Graceful(_) | StopResult::Forced
+            StopResult::Graceful(_) | StopResult::Forced | StopResult::Signaled(_)
         ));
         let job = manager.get_job(pid).await.unwrap();
         assert!(!job.is_running());
         assert!(matches!(
             job.state,
-            JobState::Exited(_) | JobState::Failed(_)
+            JobState::Exited(_) | JobState::Failed(_) | JobState::Signaled(_)
         ));
     }
 
