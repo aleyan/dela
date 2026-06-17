@@ -99,7 +99,7 @@ enum Commands {
         #[arg(long)]
         init_claude_code: bool,
 
-        /// Generate ~/.gemini/antigravity-ide/mcp_config.json for Antigravity
+        /// Generate ~/.gemini/config/mcp_config.json for Antigravity
         #[arg(long)]
         init_antigravity: bool,
 

@@ -598,7 +598,8 @@ impl DelaMcpServer {
             }
         }
 
-        if let Some(mut process) = job_manager.processes.write().await.remove(&pid_u32) {
+        let process_opt = job_manager.processes.write().await.remove(&pid_u32);
+        if let Some(mut process) = process_opt {
             let exit_result = process.wait().await;
             let (state, exit_code, signal) = match exit_result {
                 Ok(status) => {

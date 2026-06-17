@@ -48,7 +48,7 @@ impl Editor {
             Editor::Codex => home.join(".codex/config.toml"),
             Editor::Gemini => home.join(".gemini/settings.json"),
             Editor::ClaudeCode => home.join(".claude-code/settings.json"),
-            Editor::Antigravity => home.join(".gemini/antigravity-ide/mcp_config.json"),
+            Editor::Antigravity => home.join(".gemini/config/mcp_config.json"),
             Editor::Cline => std::env::var("CLINE_MCP_SETTINGS_PATH")
                 .map(PathBuf::from)
                 .unwrap_or_else(|_| home.join(".cline/data/settings/cline_mcp_settings.json")),
@@ -475,7 +475,7 @@ mod tests {
         );
         assert_eq!(
             Editor::Antigravity.config_path(),
-            home.join(".gemini/antigravity-ide/mcp_config.json")
+            home.join(".gemini/config/mcp_config.json")
         );
         assert_eq!(
             Editor::Cline.config_path(),
