@@ -146,6 +146,7 @@ struct CachedDiscoveredTasks {
 }
 
 /// MCP server for dela that exposes task management capabilities
+#[derive(Clone)]
 pub struct DelaMcpServer {
     root: PathBuf,
     allowlist_evaluator: McpAllowlistEvaluator,
@@ -434,6 +435,215 @@ impl DelaMcpServer {
         ]))
     }
 
+    async fn run_initial_capture(
+        peer: std::sync::Arc<tokio::sync::OnceCell<rmcp::service::Peer<rmcp::service::RoleServer>>>,
+        pid_u32: u32,
+        capture_duration: Duration,
+        mut stdout_rx: tokio::sync::mpsc::Receiver<String>,
+        mut stderr_rx: tokio::sync::mpsc::Receiver<String>,
+        captured_output_chunks: Arc<tokio::sync::Mutex<Vec<crate::mcp::dto::OutputChunkDto>>>,
+    ) -> (
+        tokio::sync::mpsc::Receiver<String>,
+        tokio::sync::mpsc::Receiver<String>,
+    ) {
+        let deadline = std::time::Instant::now() + capture_duration;
+        let mut stdout_done = false;
+        let mut stderr_done = false;
+        let mut stdout_batch = OutputNotificationBatch::new("stdout");
+        let mut stderr_batch = OutputNotificationBatch::new("stderr");
+
+        loop {
+            let now = std::time::Instant::now();
+            if now >= deadline {
+                Self::flush_output_notification_batch(&peer, pid_u32, &mut stdout_batch).await;
+                Self::flush_output_notification_batch(&peer, pid_u32, &mut stderr_batch).await;
+                break;
+            }
+
+            tokio::select! {
+                line = stdout_rx.recv(), if !stdout_done => {
+                    match line {
+                        Some(line) => {
+                            {
+                                let mut chunks = captured_output_chunks.lock().await;
+                                Self::append_output_chunk(&mut chunks, "stdout", &line);
+                            }
+                            stdout_batch.add_line(&line);
+                            if stdout_batch.should_flush() {
+                                Self::flush_output_notification_batch(&peer, pid_u32, &mut stdout_batch).await;
+                            }
+                        }
+                        None => {
+                            stdout_done = true;
+                            Self::flush_output_notification_batch(&peer, pid_u32, &mut stdout_batch).await;
+                        }
+                    }
+                }
+                line = stderr_rx.recv(), if !stderr_done => {
+                    match line {
+                        Some(line) => {
+                            {
+                                let mut chunks = captured_output_chunks.lock().await;
+                                Self::append_output_chunk(&mut chunks, "stderr", &line);
+                            }
+                            stderr_batch.add_line(&line);
+                            if stderr_batch.should_flush() {
+                                Self::flush_output_notification_batch(&peer, pid_u32, &mut stderr_batch).await;
+                            }
+                        }
+                        None => {
+                            stderr_done = true;
+                            Self::flush_output_notification_batch(&peer, pid_u32, &mut stderr_batch).await;
+                        }
+                    }
+                }
+                _ = tokio::time::sleep_until(Self::output_flush_timer_deadline(stdout_batch.flush_due_at(), deadline)), if !stdout_batch.is_empty() => {
+                    Self::flush_output_notification_batch(&peer, pid_u32, &mut stdout_batch).await;
+                }
+                _ = tokio::time::sleep_until(Self::output_flush_timer_deadline(stderr_batch.flush_due_at(), deadline)), if !stderr_batch.is_empty() => {
+                    Self::flush_output_notification_batch(&peer, pid_u32, &mut stderr_batch).await;
+                }
+                _ = tokio::time::sleep_until(tokio::time::Instant::from_std(deadline)) => {
+                    Self::flush_output_notification_batch(&peer, pid_u32, &mut stdout_batch).await;
+                    Self::flush_output_notification_batch(&peer, pid_u32, &mut stderr_batch).await;
+                    break;
+                }
+            }
+
+            if stdout_done && stderr_done {
+                Self::flush_output_notification_batch(&peer, pid_u32, &mut stdout_batch).await;
+                Self::flush_output_notification_batch(&peer, pid_u32, &mut stderr_batch).await;
+                break;
+            }
+        }
+
+        (stdout_rx, stderr_rx)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    async fn run_background_monitoring(
+        peer: std::sync::Arc<tokio::sync::OnceCell<rmcp::service::Peer<rmcp::service::RoleServer>>>,
+        pid_u32: u32,
+        task_name: String,
+        mut stdout_rx_opt: Option<tokio::sync::mpsc::Receiver<String>>,
+        mut stderr_rx_opt: Option<tokio::sync::mpsc::Receiver<String>>,
+        job_manager: crate::mcp::job_manager::JobManager,
+    ) {
+        let mut stdout_batch = OutputNotificationBatch::new("stdout");
+        let mut stderr_batch = OutputNotificationBatch::new("stderr");
+        let idle_deadline_fallback = Instant::now() + Duration::from_secs(24 * 60 * 60);
+
+        loop {
+            let stdout_done = stdout_rx_opt.is_none();
+            let stderr_done = stderr_rx_opt.is_none();
+
+            tokio::select! {
+                line = async {
+                    if let Some(ref mut rx) = stdout_rx_opt {
+                        rx.recv().await
+                    } else {
+                        std::future::pending::<Option<String>>().await
+                    }
+                }, if !stdout_done => {
+                    match line {
+                        Some(line) => {
+                            if let Err(error) = job_manager.add_job_output_chunk(pid_u32, "stdout", line.clone()).await {
+                                tracing::warn!(pid = pid_u32, error = %error, "failed to persist stdout output chunk");
+                            }
+                            stdout_batch.add_line(&line);
+                            if stdout_batch.should_flush() {
+                                Self::flush_output_notification_batch(&peer, pid_u32, &mut stdout_batch).await;
+                            }
+                        }
+                        None => {
+                            stdout_rx_opt = None;
+                            Self::flush_output_notification_batch(&peer, pid_u32, &mut stdout_batch).await;
+                        }
+                    }
+                }
+                line = async {
+                    if let Some(ref mut rx) = stderr_rx_opt {
+                        rx.recv().await
+                    } else {
+                        std::future::pending::<Option<String>>().await
+                    }
+                }, if !stderr_done => {
+                    match line {
+                        Some(line) => {
+                            if let Err(error) = job_manager.add_job_output_chunk(pid_u32, "stderr", line.clone()).await {
+                                tracing::warn!(pid = pid_u32, error = %error, "failed to persist stderr output chunk");
+                            }
+                            stderr_batch.add_line(&line);
+                            if stderr_batch.should_flush() {
+                                Self::flush_output_notification_batch(&peer, pid_u32, &mut stderr_batch).await;
+                            }
+                        }
+                        None => {
+                            stderr_rx_opt = None;
+                            Self::flush_output_notification_batch(&peer, pid_u32, &mut stderr_batch).await;
+                        }
+                    }
+                }
+                _ = tokio::time::sleep_until(Self::output_flush_timer_deadline(stdout_batch.flush_due_at(), idle_deadline_fallback)), if !stdout_batch.is_empty() => {
+                    Self::flush_output_notification_batch(&peer, pid_u32, &mut stdout_batch).await;
+                }
+                _ = tokio::time::sleep_until(Self::output_flush_timer_deadline(stderr_batch.flush_due_at(), idle_deadline_fallback)), if !stderr_batch.is_empty() => {
+                    Self::flush_output_notification_batch(&peer, pid_u32, &mut stderr_batch).await;
+                }
+                else => {
+                    Self::flush_output_notification_batch(&peer, pid_u32, &mut stdout_batch).await;
+                    Self::flush_output_notification_batch(&peer, pid_u32, &mut stderr_batch).await;
+                    break;
+                }
+            }
+        }
+
+        let process_opt = job_manager.processes.write().await.remove(&pid_u32);
+        if let Some(mut process) = process_opt {
+            let exit_result = process.wait().await;
+            let (state, exit_code, signal) = match exit_result {
+                Ok(status) => {
+                    let mut state = JobState::Exited(status.code().unwrap_or(-1));
+                    let mut exit_code = status.code();
+                    let mut signal = None;
+                    #[cfg(unix)]
+                    {
+                        use std::os::unix::process::ExitStatusExt;
+                        if let Some(sig) = status.signal() {
+                            state = JobState::Signaled(sig);
+                            signal = Some(sig);
+                            exit_code = None;
+                        }
+                    }
+                    (state, exit_code, signal)
+                }
+                Err(e) => (
+                    JobState::Failed(format!("Process wait failed: {}", e)),
+                    None,
+                    None,
+                ),
+            };
+
+            let _ = job_manager.update_job_state(pid_u32, state).await;
+
+            if let Some(peer_ref) = peer.get() {
+                let _ = peer_ref
+                    .notify_logging_message(rmcp::model::LoggingMessageNotificationParam {
+                        level: LoggingLevel::Notice,
+                        logger: Some(format!("task:{}", pid_u32)),
+                        data: serde_json::json!({
+                            "event": "exited",
+                            "pid": pid_u32,
+                            "exit_code": exit_code,
+                            "signal": signal,
+                            "task": task_name
+                        }),
+                    })
+                    .await;
+            }
+        }
+    }
+
     #[tool(
         description = "Start a task (default 1s capture, optional bounded wait, then background)"
     )]
@@ -567,8 +777,8 @@ impl DelaMcpServer {
         let peer_clone = self.peer.clone();
 
         // Create channels for output streaming
-        let (stdout_tx, mut stdout_rx) = tokio::sync::mpsc::channel::<String>(100);
-        let (stderr_tx, mut stderr_rx) = tokio::sync::mpsc::channel::<String>(100);
+        let (stdout_tx, stdout_rx) = tokio::sync::mpsc::channel::<String>(100);
+        let (stderr_tx, stderr_rx) = tokio::sync::mpsc::channel::<String>(100);
 
         // Spawn stdout reader task
         let stdout_task = if let Some(stdout) = stdout_handle {
@@ -619,147 +829,14 @@ impl DelaMcpServer {
         let peer_for_initial = peer_clone.clone();
         let pid_u32 = pid as u32;
 
-        let initial_capture = tokio::spawn(async move {
-            let deadline = std::time::Instant::now() + capture_duration;
-            let mut stdout_done = false;
-            let mut stderr_done = false;
-            let mut stdout_batch = OutputNotificationBatch::new("stdout");
-            let mut stderr_batch = OutputNotificationBatch::new("stderr");
-
-            loop {
-                let now = std::time::Instant::now();
-                if now >= deadline {
-                    DelaMcpServer::flush_output_notification_batch(
-                        &peer_for_initial,
-                        pid_u32,
-                        &mut stdout_batch,
-                    )
-                    .await;
-                    DelaMcpServer::flush_output_notification_batch(
-                        &peer_for_initial,
-                        pid_u32,
-                        &mut stderr_batch,
-                    )
-                    .await;
-                    break;
-                }
-
-                tokio::select! {
-                    line = stdout_rx.recv(), if !stdout_done => {
-                        match line {
-                            Some(line) => {
-                                {
-                                    let mut chunks = captured_output_chunks_clone.lock().await;
-                                    DelaMcpServer::append_output_chunk(&mut chunks, "stdout", &line);
-                                }
-                                stdout_batch.add_line(&line);
-                                if stdout_batch.should_flush() {
-                                    DelaMcpServer::flush_output_notification_batch(
-                                        &peer_for_initial,
-                                        pid_u32,
-                                        &mut stdout_batch,
-                                    )
-                                    .await;
-                                }
-                            }
-                            None => {
-                                stdout_done = true;
-                                DelaMcpServer::flush_output_notification_batch(
-                                    &peer_for_initial,
-                                    pid_u32,
-                                    &mut stdout_batch,
-                                )
-                                .await;
-                            }
-                        }
-                    }
-                    line = stderr_rx.recv(), if !stderr_done => {
-                        match line {
-                            Some(line) => {
-                                {
-                                    let mut chunks = captured_output_chunks_clone.lock().await;
-                                    DelaMcpServer::append_output_chunk(&mut chunks, "stderr", &line);
-                                }
-                                stderr_batch.add_line(&line);
-                                if stderr_batch.should_flush() {
-                                    DelaMcpServer::flush_output_notification_batch(
-                                        &peer_for_initial,
-                                        pid_u32,
-                                        &mut stderr_batch,
-                                    )
-                                    .await;
-                                }
-                            }
-                            None => {
-                                stderr_done = true;
-                                DelaMcpServer::flush_output_notification_batch(
-                                    &peer_for_initial,
-                                    pid_u32,
-                                    &mut stderr_batch,
-                                )
-                                .await;
-                            }
-                        }
-                    }
-                    _ = tokio::time::sleep_until(DelaMcpServer::output_flush_timer_deadline(
-                        stdout_batch.flush_due_at(),
-                        deadline,
-                    )), if !stdout_batch.is_empty() => {
-                        DelaMcpServer::flush_output_notification_batch(
-                            &peer_for_initial,
-                            pid_u32,
-                            &mut stdout_batch,
-                        )
-                        .await;
-                    }
-                    _ = tokio::time::sleep_until(DelaMcpServer::output_flush_timer_deadline(
-                        stderr_batch.flush_due_at(),
-                        deadline,
-                    )), if !stderr_batch.is_empty() => {
-                        DelaMcpServer::flush_output_notification_batch(
-                            &peer_for_initial,
-                            pid_u32,
-                            &mut stderr_batch,
-                        )
-                        .await;
-                    }
-                    _ = tokio::time::sleep_until(tokio::time::Instant::from_std(deadline)) => {
-                        DelaMcpServer::flush_output_notification_batch(
-                            &peer_for_initial,
-                            pid_u32,
-                            &mut stdout_batch,
-                        )
-                        .await;
-                        DelaMcpServer::flush_output_notification_batch(
-                            &peer_for_initial,
-                            pid_u32,
-                            &mut stderr_batch,
-                        )
-                        .await;
-                        break;
-                    }
-                }
-
-                if stdout_done && stderr_done {
-                    DelaMcpServer::flush_output_notification_batch(
-                        &peer_for_initial,
-                        pid_u32,
-                        &mut stdout_batch,
-                    )
-                    .await;
-                    DelaMcpServer::flush_output_notification_batch(
-                        &peer_for_initial,
-                        pid_u32,
-                        &mut stderr_batch,
-                    )
-                    .await;
-                    break;
-                }
-            }
-
-            // Return the receivers for continued streaming
-            (stdout_rx, stderr_rx)
-        });
+        let initial_capture = tokio::spawn(Self::run_initial_capture(
+            peer_for_initial,
+            pid_u32,
+            capture_duration,
+            stdout_rx,
+            stderr_rx,
+            captured_output_chunks_clone,
+        ));
 
         let capture_result = initial_capture.await;
 
@@ -771,11 +848,10 @@ impl DelaMcpServer {
             let exit_status = child.wait().await.map_err(|e| {
                 DelaError::internal_error(
                     format!("Failed to wait for process: {}", e),
-                    Some("Process may have terminated unexpectedly".to_string()),
+                    Some("Process management error".to_string()),
                 )
             })?;
 
-            let exit_code = exit_status.code();
             let output_chunks = captured_output_chunks.lock().await.clone();
 
             // Wait for reader tasks to finish
@@ -798,9 +874,20 @@ impl DelaMcpServer {
                 file_path: task.definition_path().to_path_buf(),
             };
 
-            let exit_state = JobState::Exited(exit_code.unwrap_or(-1));
+            let mut exit_code = exit_status.code();
+            let mut signal = None;
+            let mut exit_state = JobState::Exited(exit_code.unwrap_or(-1));
+            #[cfg(unix)]
+            {
+                use std::os::unix::process::ExitStatusExt;
+                if let Some(sig) = exit_status.signal() {
+                    signal = Some(sig);
+                    exit_code = None;
+                    exit_state = JobState::Signaled(sig);
+                }
+            }
             self.job_manager
-                .record_completed_job(pid as u32, metadata, exit_state)
+                .record_completed_job(pid as u32, metadata, exit_state.clone())
                 .await
                 .map_err(|e| {
                     DelaError::internal_error(
@@ -833,9 +920,13 @@ impl DelaMcpServer {
             .await;
 
             let start_result = StartResultDto {
-                state: "exited".to_string(),
+                state: match exit_state {
+                    JobState::Signaled(_) => "signaled".to_string(),
+                    _ => "exited".to_string(),
+                },
                 pid: None,
                 exit_code,
+                signal,
                 output: output_chunks,
             };
 
@@ -887,182 +978,26 @@ impl DelaMcpServer {
         let peer_for_monitor = peer_clone;
         let task_name = args.unique_name.clone();
 
-        tokio::spawn(async move {
-            // Get the receivers from initial capture (if available)
-            let (mut stdout_rx_opt, mut stderr_rx_opt) = if let Ok((rx1, rx2)) = capture_result {
-                (Some(rx1), Some(rx2))
-            } else {
-                (None, None)
-            };
-            let mut stdout_batch = OutputNotificationBatch::new("stdout");
-            let mut stderr_batch = OutputNotificationBatch::new("stderr");
-            let idle_deadline_fallback = Instant::now() + Duration::from_secs(24 * 60 * 60);
+        let (stdout_rx_opt, stderr_rx_opt) = if let Ok((rx1, rx2)) = capture_result {
+            (Some(rx1), Some(rx2))
+        } else {
+            (None, None)
+        };
 
-            // Continue reading output and streaming
-            loop {
-                let stdout_done = stdout_rx_opt.is_none();
-                let stderr_done = stderr_rx_opt.is_none();
-
-                tokio::select! {
-                    line = async {
-                        if let Some(ref mut rx) = stdout_rx_opt {
-                            rx.recv().await
-                        } else {
-                            std::future::pending::<Option<String>>().await
-                        }
-                    }, if !stdout_done => {
-                        match line {
-                            Some(line) => {
-                                if let Err(error) = job_manager
-                                    .add_job_output_chunk(pid_u32, "stdout", line.clone())
-                                    .await
-                                {
-                                    tracing::warn!(
-                                        pid = pid_u32,
-                                        error = %error,
-                                        "failed to persist stdout output chunk"
-                                    );
-                                }
-                                stdout_batch.add_line(&line);
-                                if stdout_batch.should_flush() {
-                                    DelaMcpServer::flush_output_notification_batch(
-                                        &peer_for_monitor,
-                                        pid_u32,
-                                        &mut stdout_batch,
-                                    )
-                                    .await;
-                                }
-                            }
-                            None => {
-                                stdout_rx_opt = None;
-                                DelaMcpServer::flush_output_notification_batch(
-                                    &peer_for_monitor,
-                                    pid_u32,
-                                    &mut stdout_batch,
-                                )
-                                .await;
-                            }
-                        }
-                    }
-                    line = async {
-                        if let Some(ref mut rx) = stderr_rx_opt {
-                            rx.recv().await
-                        } else {
-                            std::future::pending::<Option<String>>().await
-                        }
-                    }, if !stderr_done => {
-                        match line {
-                            Some(line) => {
-                                if let Err(error) = job_manager
-                                    .add_job_output_chunk(pid_u32, "stderr", line.clone())
-                                    .await
-                                {
-                                    tracing::warn!(
-                                        pid = pid_u32,
-                                        error = %error,
-                                        "failed to persist stderr output chunk"
-                                    );
-                                }
-                                stderr_batch.add_line(&line);
-                                if stderr_batch.should_flush() {
-                                    DelaMcpServer::flush_output_notification_batch(
-                                        &peer_for_monitor,
-                                        pid_u32,
-                                        &mut stderr_batch,
-                                    )
-                                    .await;
-                                }
-                            }
-                            None => {
-                                stderr_rx_opt = None;
-                                DelaMcpServer::flush_output_notification_batch(
-                                    &peer_for_monitor,
-                                    pid_u32,
-                                    &mut stderr_batch,
-                                )
-                                .await;
-                            }
-                        }
-                    }
-                    _ = tokio::time::sleep_until(DelaMcpServer::output_flush_timer_deadline(
-                        stdout_batch.flush_due_at(),
-                        idle_deadline_fallback,
-                    )), if !stdout_batch.is_empty() => {
-                        DelaMcpServer::flush_output_notification_batch(
-                            &peer_for_monitor,
-                            pid_u32,
-                            &mut stdout_batch,
-                        )
-                        .await;
-                    }
-                    _ = tokio::time::sleep_until(DelaMcpServer::output_flush_timer_deadline(
-                        stderr_batch.flush_due_at(),
-                        idle_deadline_fallback,
-                    )), if !stderr_batch.is_empty() => {
-                        DelaMcpServer::flush_output_notification_batch(
-                            &peer_for_monitor,
-                            pid_u32,
-                            &mut stderr_batch,
-                        )
-                        .await;
-                    }
-                    else => {
-                        // Both channels closed
-                        DelaMcpServer::flush_output_notification_batch(
-                            &peer_for_monitor,
-                            pid_u32,
-                            &mut stdout_batch,
-                        )
-                        .await;
-                        DelaMcpServer::flush_output_notification_batch(
-                            &peer_for_monitor,
-                            pid_u32,
-                            &mut stderr_batch,
-                        )
-                        .await;
-                        break;
-                    }
-                }
-            }
-
-            // Wait for process to exit
-            if let Some(mut process) = job_manager.processes.write().await.remove(&pid_u32) {
-                let exit_result = process.wait().await;
-                let (state, exit_code) = match exit_result {
-                    Ok(status) => {
-                        let code = status.code().unwrap_or(-1);
-                        (JobState::Exited(code), Some(code))
-                    }
-                    Err(e) => (
-                        JobState::Failed(format!("Process wait failed: {}", e)),
-                        None,
-                    ),
-                };
-
-                let _ = job_manager.update_job_state(pid_u32, state).await;
-
-                // Send task completed event
-                if let Some(peer) = peer_for_monitor.get() {
-                    let _ = peer
-                        .notify_logging_message(LoggingMessageNotificationParam {
-                            level: LoggingLevel::Notice,
-                            logger: Some(format!("task:{}", pid_u32)),
-                            data: serde_json::json!({
-                                "event": "exited",
-                                "pid": pid_u32,
-                                "exit_code": exit_code,
-                                "task": task_name
-                            }),
-                        })
-                        .await;
-                }
-            }
-        });
+        tokio::spawn(Self::run_background_monitoring(
+            peer_for_monitor,
+            pid_u32,
+            task_name,
+            stdout_rx_opt,
+            stderr_rx_opt,
+            job_manager,
+        ));
 
         let start_result = StartResultDto {
             state: "running".to_string(),
-            pid: Some(pid),
+            pid: Some(pid as i32),
             exit_code: None,
+            signal: None,
             output: output_chunks,
         };
 
@@ -1080,13 +1015,32 @@ impl DelaMcpServer {
         let job_statuses: Vec<serde_json::Value> = jobs
             .into_iter()
             .map(|job| {
-                let (state, exit_code) = match &job.state {
-                    JobState::Running => ("running", None),
-                    JobState::Exited(code) => ("exited", Some(*code)),
-                    JobState::Failed(_) => ("failed", None),
-                };
-                let completed_at = job
-                    .completed_at
+                let mut status = "running";
+                let mut exit_code = None;
+                let mut signal = None;
+                let mut completed_at = None;
+                let mut error = None;
+
+                match &job.state {
+                    JobState::Running => {}
+                    JobState::Exited(code) => {
+                        status = "exited";
+                        exit_code = Some(*code);
+                        completed_at = job.completed_at;
+                    }
+                    JobState::Signaled(sig) => {
+                        status = "signaled";
+                        signal = Some(*sig);
+                        completed_at = job.completed_at;
+                    }
+                    JobState::Failed(msg) => {
+                        status = "failed";
+                        error = Some(msg.clone());
+                        completed_at = job.completed_at;
+                    }
+                }
+
+                let completed_at_str = completed_at
                     .as_ref()
                     .map(|timestamp| timestamp.to_rfc3339_opts(SecondsFormat::Secs, true));
 
@@ -1094,10 +1048,12 @@ impl DelaMcpServer {
                     "pid": job.pid,
                     "unique_name": job.metadata.unique_name,
                     "source_name": job.metadata.source_name,
-                    "state": state,
-                    "elapsed_seconds": job.age().as_secs(),
+                    "state": status,
+                    "error": error,
                     "exit_code": exit_code,
-                    "completed_at": completed_at,
+                    "signal": signal,
+                    "elapsed_seconds": job.age().as_secs(),
+                    "completed_at": completed_at_str,
                     "command": job.metadata.command,
                     "file_path": job.metadata.file_path.to_string_lossy(),
                     "args": job.metadata.args,
@@ -1137,8 +1093,11 @@ impl DelaMcpServer {
         let output = Self::output_entries_to_json(&output_entries);
         let total_bytes = job.output_buffer.total_bytes();
 
+        let has_more = next_offset < total_lines;
+        let dropped_lines = job.output_buffer.dropped_lines;
+
         let buffer_full = job.output_buffer.is_full();
-        let is_truncated = offset > 0 || next_offset < total_lines || buffer_full;
+        let is_truncated = has_more || dropped_lines > 0 || buffer_full;
 
         // Apply per-message chunk size limit (8KB default)
         const MAX_CHUNK_SIZE: usize = 8 * 1024; // 8KB
@@ -1149,9 +1108,17 @@ impl DelaMcpServer {
             "next_offset": next_offset,
             "total_lines": total_lines,
             "total_bytes": total_bytes,
-            "truncated": is_truncated,
-            "buffer_full": buffer_full
+            "buffer_full": buffer_full,
         });
+
+        if has_more {
+            response["has_more_lines"] = serde_json::Value::Bool(true);
+        }
+
+        if dropped_lines > 0 {
+            response["dropped_lines"] =
+                serde_json::Value::Number(serde_json::Number::from(dropped_lines));
+        }
 
         // Add truncation details if requested
         if args.show_truncation.unwrap_or(false) {
@@ -1267,18 +1234,31 @@ impl DelaMcpServer {
             })?;
 
         // Determine the response based on how the job was stopped
-        let (status, message) = match stop_result {
-            crate::mcp::job_manager::StopResult::Graceful(exit_code) => (
+        let (status, message, exit_code, signal) = match stop_result {
+            crate::mcp::job_manager::StopResult::Graceful(code) => (
                 "graceful",
-                format!("Process stopped gracefully with exit code {}", exit_code),
+                format!("Process stopped gracefully with exit code {}", code),
+                Some(code),
+                None,
+            ),
+            crate::mcp::job_manager::StopResult::Signaled(sig) => (
+                "signaled",
+                format!("Process stopped by signal {}", sig),
+                None,
+                Some(sig),
             ),
             crate::mcp::job_manager::StopResult::Forced => (
                 "killed",
                 "Process was force-killed after grace period".to_string(),
+                None,
+                None,
             ),
-            crate::mcp::job_manager::StopResult::Failed(reason) => {
-                ("failed", format!("Failed to stop process: {}", reason))
-            }
+            crate::mcp::job_manager::StopResult::Failed(reason) => (
+                "failed",
+                format!("Failed to stop process: {}", reason),
+                None,
+                None,
+            ),
         };
 
         Ok(CallToolResult::success(vec![
@@ -1286,11 +1266,27 @@ impl DelaMcpServer {
                 "pid": args.pid,
                 "status": status,
                 "message": message,
+                "exit_code": exit_code,
+                "signal": signal,
                 "grace_period_used": grace_period
             }))
             .expect("Failed to serialize JSON"),
         ]))
     }
+}
+
+fn parse_tool_args<T: serde::de::DeserializeOwned>(
+    arguments: Option<serde_json::Map<String, serde_json::Value>>,
+) -> Result<T, ErrorData> {
+    serde_json::from_value(serde_json::Value::Object(arguments.unwrap_or_default())).map_err(|e| {
+        ErrorData {
+            code: super::errors::DelaErrorCode::INVALID_PARAMS.into(),
+            message: std::borrow::Cow::Owned(format!("Invalid arguments: {}", e)),
+            data: Some(serde_json::Value::String(
+                "Check argument format and types".to_string(),
+            )),
+        }
+    })
 }
 
 impl ServerHandler for DelaMcpServer {
@@ -1334,15 +1330,7 @@ impl ServerHandler for DelaMcpServer {
     ) -> Result<CallToolResult, ErrorData> {
         match request.name.as_ref() {
             "list_tasks" => {
-                let args: ListTasksArgs = serde_json::from_value(serde_json::Value::Object(
-                    request.arguments.unwrap_or_default(),
-                ))
-                .map_err(|e| {
-                    DelaError::internal_error(
-                        format!("Invalid arguments: {}", e),
-                        Some("Check argument format and types".to_string()),
-                    )
-                })?;
+                let args: ListTasksArgs = parse_tool_args(request.arguments)?;
                 self.list_tasks(Parameters(args)).await
             }
             "status" => {
@@ -1350,51 +1338,19 @@ impl ServerHandler for DelaMcpServer {
                 self.status().await
             }
             "task_start" => {
-                let args: TaskStartArgs = serde_json::from_value(serde_json::Value::Object(
-                    request.arguments.unwrap_or_default(),
-                ))
-                .map_err(|e| {
-                    DelaError::internal_error(
-                        format!("Invalid arguments: {}", e),
-                        Some("Check argument format and types".to_string()),
-                    )
-                })?;
+                let args: TaskStartArgs = parse_tool_args(request.arguments)?;
                 self.task_start(Parameters(args)).await
             }
             "task_status" => {
-                let args: TaskStatusArgs = serde_json::from_value(serde_json::Value::Object(
-                    request.arguments.unwrap_or_default(),
-                ))
-                .map_err(|e| {
-                    DelaError::internal_error(
-                        format!("Invalid arguments: {}", e),
-                        Some("Check argument format and types".to_string()),
-                    )
-                })?;
+                let args: TaskStatusArgs = parse_tool_args(request.arguments)?;
                 self.task_status(Parameters(args)).await
             }
             "task_output" => {
-                let args: TaskOutputArgs = serde_json::from_value(serde_json::Value::Object(
-                    request.arguments.unwrap_or_default(),
-                ))
-                .map_err(|e| {
-                    DelaError::internal_error(
-                        format!("Invalid arguments: {}", e),
-                        Some("Check argument format and types".to_string()),
-                    )
-                })?;
+                let args: TaskOutputArgs = parse_tool_args(request.arguments)?;
                 self.task_output(Parameters(args)).await
             }
             "task_stop" => {
-                let args: TaskStopArgs = serde_json::from_value(serde_json::Value::Object(
-                    request.arguments.unwrap_or_default(),
-                ))
-                .map_err(|e| {
-                    DelaError::internal_error(
-                        format!("Invalid arguments: {}", e),
-                        Some("Check argument format and types".to_string()),
-                    )
-                })?;
+                let args: TaskStopArgs = parse_tool_args(request.arguments)?;
                 self.task_stop(Parameters(args)).await
             }
             _ => Err(DelaError::internal_error(
@@ -2219,7 +2175,7 @@ mod tests {
                 assert_eq!(obj["next_offset"], 4);
                 assert_eq!(obj["total_lines"], 4);
                 assert!(obj["total_bytes"].is_number());
-                assert_eq!(obj["truncated"], true); // We requested 2 lines but have 4
+                assert!(obj.get("has_more_lines").is_none()); // We requested 2 lines out of 4, so offset is 2 and next_offset is 4 == total_lines
                 assert!(obj["buffer_full"].is_boolean());
                 let output = obj["output"].as_array().unwrap();
                 assert_eq!(output.len(), 2);
@@ -2291,14 +2247,14 @@ mod tests {
                 assert_eq!(obj["offset"], 2);
                 assert_eq!(obj["next_offset"], 5);
                 assert_eq!(obj["total_lines"], 5);
-                assert_eq!(obj["truncated"], true);
+                assert!(obj.get("has_more_lines").is_none());
 
                 // Check truncation info is present
                 assert!(obj.contains_key("truncation_info"));
                 let truncation_info = &obj["truncation_info"];
                 assert_eq!(truncation_info["requested_lines"], 3);
                 assert_eq!(truncation_info["returned_lines"], 3);
-                assert_eq!(truncation_info["is_truncated"], true);
+                assert_eq!(truncation_info["is_truncated"], false);
                 assert!(truncation_info["buffer_capacity"].is_number());
             }
             _ => panic!("Expected text content with JSON"),
@@ -2365,7 +2321,7 @@ mod tests {
                 assert_eq!(obj["offset"], 1);
                 assert_eq!(obj["next_offset"], 3);
                 assert_eq!(obj["total_lines"], 5);
-                assert_eq!(obj["truncated"], true);
+                assert_eq!(obj["has_more_lines"], true);
                 assert_eq!(obj["truncation_info"]["returned_lines"], 2);
             }
             _ => panic!("Expected text content with JSON"),
@@ -2434,7 +2390,7 @@ mod tests {
                 assert_eq!(obj["offset"], 0);
                 assert_eq!(obj["next_offset"], 2);
                 assert_eq!(obj["total_lines"], 2);
-                assert_eq!(obj["truncated"], false); // No truncation since we have fewer lines than requested
+                assert!(obj.get("has_more_lines").is_none()); // No truncation since we have fewer lines than requested
 
                 // Check truncation info is present
                 assert!(obj.contains_key("truncation_info"));
@@ -4275,5 +4231,126 @@ add_custom_target(build-all COMMENT "Build everything")
 
         assert!(instructions.contains("wait_for_exit_seconds"));
         assert!(instructions.contains("default 1-second capture window"));
+    }
+
+    #[tokio::test]
+    async fn test_call_tool_invalid_args() {
+        let server = DelaMcpServer::new(std::env::temp_dir());
+        let (server_transport, _client_transport) = tokio::io::duplex(4096);
+        let running_server = rmcp::service::serve_directly(server.clone(), server_transport, None);
+        let context = RequestContext::new(RequestId::Number(1), running_server.peer().clone());
+
+        let mut invalid_args = serde_json::Map::new();
+        invalid_args.insert("runner".to_string(), serde_json::Value::Bool(true));
+        let req = CallToolRequestParams::new("list_tasks").with_arguments(invalid_args);
+
+        let res = server.call_tool(req, context).await;
+        assert!(res.is_err());
+        let err = res.unwrap_err();
+        assert_eq!(err.code.0, -32602);
+        assert!(err.message.contains("Invalid arguments"));
+    }
+
+    #[tokio::test]
+    async fn test_call_tool_unknown_tool() {
+        let server = DelaMcpServer::new(std::env::temp_dir());
+        let (server_transport, _client_transport) = tokio::io::duplex(4096);
+        let running_server = rmcp::service::serve_directly(server.clone(), server_transport, None);
+        let context = RequestContext::new(RequestId::Number(1), running_server.peer().clone());
+
+        let req = CallToolRequestParams::new("nonexistent_tool");
+        let res = server.call_tool(req, context).await;
+        assert!(res.is_err());
+        let err = res.unwrap_err();
+        assert_eq!(err.code.0, -32603);
+        assert!(err.message.contains("Tool not found: nonexistent_tool"));
+    }
+
+    #[tokio::test]
+    async fn test_call_tool_dispatch_list_tasks() {
+        let server = DelaMcpServer::new(std::env::temp_dir());
+        let (server_transport, _client_transport) = tokio::io::duplex(4096);
+        let running_server = rmcp::service::serve_directly(server.clone(), server_transport, None);
+        let context = RequestContext::new(RequestId::Number(1), running_server.peer().clone());
+
+        let req = CallToolRequestParams::new("list_tasks");
+        let res = server.call_tool(req, context).await;
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_call_tool_dispatch_status() {
+        let server = DelaMcpServer::new(std::env::temp_dir());
+        let (server_transport, _client_transport) = tokio::io::duplex(4096);
+        let running_server = rmcp::service::serve_directly(server.clone(), server_transport, None);
+        let context = RequestContext::new(RequestId::Number(1), running_server.peer().clone());
+
+        let req = CallToolRequestParams::new("status");
+        let res = server.call_tool(req, context).await;
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_call_tool_dispatch_task_status() {
+        let server = DelaMcpServer::new(std::env::temp_dir());
+        let (server_transport, _client_transport) = tokio::io::duplex(4096);
+        let running_server = rmcp::service::serve_directly(server.clone(), server_transport, None);
+        let context = RequestContext::new(RequestId::Number(1), running_server.peer().clone());
+
+        let mut args = serde_json::Map::new();
+        args.insert(
+            "unique_name".to_string(),
+            serde_json::Value::String("nonexistent".to_string()),
+        );
+        let req = CallToolRequestParams::new("task_status").with_arguments(args);
+        let res = server.call_tool(req, context).await;
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_call_tool_dispatch_task_output() {
+        let server = DelaMcpServer::new(std::env::temp_dir());
+        let (server_transport, _client_transport) = tokio::io::duplex(4096);
+        let running_server = rmcp::service::serve_directly(server.clone(), server_transport, None);
+        let context = RequestContext::new(RequestId::Number(1), running_server.peer().clone());
+
+        let mut args = serde_json::Map::new();
+        args.insert("pid".to_string(), serde_json::Value::Number(12345.into()));
+        let req = CallToolRequestParams::new("task_output").with_arguments(args);
+        let res = server.call_tool(req, context).await;
+        assert!(res.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_call_tool_dispatch_task_stop() {
+        let server = DelaMcpServer::new(std::env::temp_dir());
+        let (server_transport, _client_transport) = tokio::io::duplex(4096);
+        let running_server = rmcp::service::serve_directly(server.clone(), server_transport, None);
+        let context = RequestContext::new(RequestId::Number(1), running_server.peer().clone());
+
+        let mut args = serde_json::Map::new();
+        args.insert("pid".to_string(), serde_json::Value::Number(12345.into()));
+        let req = CallToolRequestParams::new("task_stop").with_arguments(args);
+        let res = server.call_tool(req, context).await;
+        assert!(res.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_call_tool_dispatch_task_start() {
+        let server = DelaMcpServer::new(std::env::temp_dir());
+        let (server_transport, _client_transport) = tokio::io::duplex(4096);
+        let running_server = rmcp::service::serve_directly(server.clone(), server_transport, None);
+        let context = RequestContext::new(RequestId::Number(1), running_server.peer().clone());
+
+        let mut args = serde_json::Map::new();
+        args.insert(
+            "unique_name".to_string(),
+            serde_json::Value::String("nonexistent".to_string()),
+        );
+        let req = CallToolRequestParams::new("task_start").with_arguments(args);
+        let res = server.call_tool(req, context).await;
+        assert!(res.is_err());
+        let err = res.unwrap_err();
+        assert_eq!(err.code.0, -32012); // TASK_NOT_FOUND
     }
 }

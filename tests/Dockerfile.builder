@@ -9,7 +9,8 @@ RUN apk add --no-cache \
     make \
     openssl-dev \
     pkgconfig \
-    procps
+    procps \
+    python3
 
 # Set the working directory inside the container
 WORKDIR /app

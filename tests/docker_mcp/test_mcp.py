@@ -508,7 +508,7 @@ def test_running_lifecycle_and_stop():
         stop_payload = parse_tool_result(stop_response)
         assert_condition(stop_payload["pid"] == pid, "task_stop pid mismatch", stop_payload)
         assert_condition(
-            stop_payload["status"] in {"graceful", "killed", "failed"},
+            stop_payload["status"] in {"graceful", "killed", "failed", "signaled"},
             "unexpected task_stop status",
             stop_payload,
         )

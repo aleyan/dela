@@ -653,16 +653,20 @@ impl OutputChunkDto {
 /// Result of starting a task
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct StartResultDto {
-    /// Current state of the task: "exited", "running", or "failed"
+    /// Current state of the task: "exited", "running", "failed", or "signaled"
     pub state: String,
 
-    /// Process ID if the task is running
+    /// Process ID if the task is running or just finished
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pid: Option<i32>,
 
-    /// Exit code if the task has exited
+    /// Exit code if the task has exited normally
     #[serde(skip_serializing_if = "Option::is_none")]
     pub exit_code: Option<i32>,
+
+    /// Signal number if the task was terminated by a signal
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signal: Option<i32>,
 
     /// Output chunks captured before returning, preserving stream identity.
     pub output: Vec<OutputChunkDto>,
