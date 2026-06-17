@@ -1237,11 +1237,20 @@ mod tests {
     async fn test_stop_job_graceful_managed_sigkill() {
         let manager = JobManager::new();
 
-        let mut cmd = Command::new("python3");
-        cmd.arg("-c");
-        cmd.arg(
-            "import signal, time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(10)",
-        );
+        #[cfg(unix)]
+        let mut cmd = {
+            let mut cmd = Command::new("sh");
+            cmd.arg("-c");
+            cmd.arg("trap '' TERM; sleep 10");
+            cmd
+        };
+        #[cfg(not(unix))]
+        let mut cmd = {
+            let mut cmd = Command::new("cmd");
+            cmd.arg("/c");
+            cmd.arg("ping 127.0.0.1 -n 10");
+            cmd
+        };
         let child = cmd.spawn().unwrap();
         let pid = child.id().unwrap();
 

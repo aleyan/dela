@@ -924,7 +924,7 @@ impl DelaMcpServer {
                     JobState::Signaled(_) => "signaled".to_string(),
                     _ => "exited".to_string(),
                 },
-                pid: Some(pid as i32),
+                pid: None,
                 exit_code,
                 signal,
                 output: output_chunks,
@@ -3510,7 +3510,7 @@ add_custom_target(build-all COMMENT "Build everything")
 
         assert_eq!(json["state"], "exited");
         assert_eq!(json["exit_code"], 0);
-        assert!(json.get("pid").is_some());
+        assert!(json.get("pid").is_none());
         let output_chunks = json["output"].as_array().unwrap();
         assert!(output_chunks.iter().any(|chunk| {
             chunk
