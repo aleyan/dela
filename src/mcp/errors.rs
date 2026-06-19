@@ -165,6 +165,14 @@ impl DelaError {
         }
     }
 
+    /// Create a TaskNotFound error for PID-based job lookups
+    pub fn job_not_found(pid: u32) -> Self {
+        DelaError::TaskNotFound {
+            task_name: format!("Job with PID {} not found", pid),
+            hint: Some("Use 'status' to see running tasks and their PIDs".to_string()),
+        }
+    }
+
     /// Create an InternalError with a helpful hint
     pub fn internal_error(message: String, hint: Option<String>) -> Self {
         DelaError::InternalError { message, hint }

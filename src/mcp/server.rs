@@ -15,7 +15,7 @@ use rmcp::{
     service::{Peer, RequestContext, RoleServer},
     tool,
 };
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::io::{AsyncBufReadExt, BufReader, stdin, stdout};
@@ -363,6 +363,49 @@ impl DelaMcpServer {
         discovered
     }
 
+    /// Resolve a caller-supplied `cwd` to a canonical path, ensuring it stays
+    /// within `self.root`.  Relative paths are resolved against `self.root`.
+    /// Returns `self.root` when `cwd` is `None`.
+    fn resolve_requested_cwd(&self, cwd: &Option<String>) -> Result<PathBuf, ErrorData> {
+        let Some(raw) = cwd else {
+            return Ok(self.root.clone());
+        };
+
+        let candidate = if Path::new(raw).is_absolute() {
+            PathBuf::from(raw)
+        } else {
+            self.root.join(raw)
+        };
+
+        // Canonicalize both so symlinks and `..` are resolved.
+        let canonical = candidate.canonicalize().map_err(|e| {
+            DelaError::internal_error(
+                format!("Invalid cwd '{}': {}", raw, e),
+                Some(
+                    "Provide an absolute path or a relative path within the workspace".to_string(),
+                ),
+            )
+        })?;
+
+        let root_canonical = self.root.canonicalize().map_err(|e| {
+            DelaError::internal_error(format!("Cannot canonicalize server root: {}", e), None)
+        })?;
+
+        if !canonical.starts_with(&root_canonical) {
+            return Err(DelaError::internal_error(
+                format!(
+                    "Requested cwd '{}' is outside the workspace root '{}'",
+                    raw,
+                    self.root.display()
+                ),
+                Some("cwd must be within the workspace root".to_string()),
+            )
+            .into());
+        }
+
+        Ok(canonical)
+    }
+
     /// Start an MCP stdio server and block until shutdown.
     /// IMPORTANT: Do not print to stdout; MCP JSON-RPC uses stdout.
     pub async fn serve_stdio(self) -> Result<(), ErrorData> {
@@ -387,11 +430,7 @@ impl DelaMcpServer {
         &self,
         Parameters(args): Parameters<ListTasksArgs>,
     ) -> Result<CallToolResult, ErrorData> {
-        let root_dir = if let Some(cwd) = &args.cwd {
-            PathBuf::from(cwd)
-        } else {
-            self.root.clone()
-        };
+        let root_dir = self.resolve_requested_cwd(&args.cwd)?;
 
         let discovered = self.get_discovered_tasks(&root_dir).await;
 
@@ -661,11 +700,7 @@ impl DelaMcpServer {
         &self,
         Parameters(args): Parameters<TaskStartArgs>,
     ) -> Result<CallToolResult, ErrorData> {
-        let root_dir = if let Some(cwd) = &args.cwd {
-            PathBuf::from(cwd)
-        } else {
-            self.root.clone()
-        };
+        let root_dir = self.resolve_requested_cwd(&args.cwd)?;
 
         let discovered = self.get_discovered_tasks(&root_dir).await;
 
@@ -732,7 +767,7 @@ impl DelaMcpServer {
         let base_args: Vec<&String> = command_iter.collect();
 
         let mut cmd = Command::new(executable);
-        cmd.current_dir(self.root.clone());
+        cmd.current_dir(&root_dir);
 
         // Ensure we capture stdout and stderr properly
         cmd.stdout(std::process::Stdio::piped());
@@ -751,11 +786,6 @@ impl DelaMcpServer {
             for (key, value) in env_vars {
                 cmd.env(key, value);
             }
-        }
-
-        // Set working directory if specified
-        if let Some(cwd) = &args.cwd {
-            cmd.current_dir(cwd);
         }
 
         let started_at = Instant::now();
@@ -885,7 +915,7 @@ impl DelaMcpServer {
                 source_name: task.source_name.clone(),
                 args: args.args.clone(),
                 env: args.env.clone(),
-                cwd: args.cwd.as_ref().map(PathBuf::from),
+                cwd: Some(root_dir.clone()),
                 command: task.runner.get_command(task),
                 file_path: task.definition_path().to_path_buf(),
             };
@@ -961,7 +991,7 @@ impl DelaMcpServer {
             source_name: task.source_name.clone(),
             args: args.args.clone(),
             env: args.env.clone(),
-            cwd: args.cwd.as_ref().map(PathBuf::from),
+            cwd: Some(root_dir.clone()),
             command: task.runner.get_command(task),
             file_path: task.definition_path().to_path_buf(),
         };
@@ -1027,9 +1057,11 @@ impl DelaMcpServer {
         &self,
         Parameters(args): Parameters<TaskStatusArgs>,
     ) -> Result<CallToolResult, ErrorData> {
-        let job = self.job_manager.get_job(args.pid).await.ok_or_else(|| {
-            DelaError::task_not_found(format!("Job with PID {} not found", args.pid))
-        })?;
+        let job = self
+            .job_manager
+            .get_job(args.pid)
+            .await
+            .ok_or_else(|| DelaError::job_not_found(args.pid))?;
 
         let mut status = "running";
         let mut exit_code = None;
@@ -1090,7 +1122,7 @@ impl DelaMcpServer {
             .job_manager
             .get_job(args.pid)
             .await
-            .ok_or_else(|| DelaError::task_not_found(format!("Job with PID {}", args.pid)))?;
+            .ok_or_else(|| DelaError::job_not_found(args.pid))?;
 
         let requested_lines = args.lines.unwrap_or(200);
         let total_lines = job.output_buffer.len();
@@ -1221,7 +1253,7 @@ impl DelaMcpServer {
             .job_manager
             .get_job(args.pid)
             .await
-            .ok_or_else(|| DelaError::task_not_found(format!("Job with PID {}", args.pid)))?;
+            .ok_or_else(|| DelaError::job_not_found(args.pid))?;
 
         if !job.is_running() {
             return Err(DelaError::internal_error(

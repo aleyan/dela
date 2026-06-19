@@ -447,7 +447,6 @@ impl JobManager {
         jobs.values().cloned().collect()
     }
 
-
     /// Update a job's state
     pub async fn update_job_state(&self, pid: u32, state: JobState) -> anyhow::Result<()> {
         let mut jobs = self.jobs.write().await;
