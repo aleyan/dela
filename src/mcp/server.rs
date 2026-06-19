@@ -15,6 +15,7 @@ use rmcp::{
     service::{Peer, RequestContext, RoleServer},
     tool,
 };
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
@@ -141,7 +142,6 @@ impl OutputNotificationBatch {
 
 #[derive(Debug, Clone)]
 struct CachedDiscoveredTasks {
-    root: PathBuf,
     discovered: task_discovery::DiscoveredTasks,
     cached_at: Instant,
 }
@@ -152,7 +152,7 @@ pub struct DelaMcpServer {
     root: PathBuf,
     allowlist_evaluator: McpAllowlistEvaluator,
     job_manager: JobManager,
-    task_cache: Arc<RwLock<Option<CachedDiscoveredTasks>>>,
+    task_cache: Arc<RwLock<HashMap<PathBuf, CachedDiscoveredTasks>>>,
     task_cache_ttl: Duration,
     /// Peer connection for sending notifications (set during initialize)
     peer: Arc<OnceCell<Peer<RoleServer>>>,
@@ -178,7 +178,7 @@ impl DelaMcpServer {
             root,
             allowlist_evaluator,
             job_manager,
-            task_cache: Arc::new(RwLock::new(None)),
+            task_cache: Arc::new(RwLock::new(HashMap::new())),
             task_cache_ttl,
             peer: Arc::new(OnceCell::new()),
         }
@@ -345,21 +345,22 @@ impl DelaMcpServer {
     async fn get_discovered_tasks(&self, root: &PathBuf) -> task_discovery::DiscoveredTasks {
         {
             let cache = self.task_cache.read().await;
-            if let Some(entry) = cache.as_ref()
-                && &entry.root == root
-                && entry.cached_at.elapsed() < self.task_cache_ttl
-            {
-                return entry.discovered.clone();
+            if let Some(entry) = cache.get(root) {
+                if entry.cached_at.elapsed() < self.task_cache_ttl {
+                    return entry.discovered.clone();
+                }
             }
         }
 
         let discovered = task_discovery::discover_tasks(root);
         let mut cache = self.task_cache.write().await;
-        *cache = Some(CachedDiscoveredTasks {
-            root: root.clone(),
-            discovered: discovered.clone(),
-            cached_at: Instant::now(),
-        });
+        cache.insert(
+            root.clone(),
+            CachedDiscoveredTasks {
+                discovered: discovered.clone(),
+                cached_at: Instant::now(),
+            },
+        );
         discovered
     }
 
