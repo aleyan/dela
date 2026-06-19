@@ -267,6 +267,34 @@ def test_list_tasks_enriched_fields():
         stop_process(process)
 
 
+def test_list_tasks_cwd():
+    print("Test 3b: list_tasks supports custom cwd argument")
+    process, _ = start_mcp_process()
+    try:
+        # Check listing with custom cwd pointing to test_project (same results as default)
+        response, _ = send_request(
+            process,
+            tool_request(31, "list_tasks", {"cwd": "/home/testuser/test_project"}),
+        )
+        payload = parse_tool_result(response)
+        tasks = payload["tasks"]
+        assert_condition(len(tasks) > 0, "custom cwd should return tasks", payload)
+        assert_condition(any(t["unique_name"] == "test-task" for t in tasks), "should find test-task in custom cwd", tasks)
+
+        # Check listing with empty directory cwd
+        response_empty, _ = send_request(
+            process,
+            tool_request(32, "list_tasks", {"cwd": "/home/testuser/.config/dela"}),
+        )
+        payload_empty = parse_tool_result(response_empty)
+        tasks_empty = payload_empty["tasks"]
+        assert_condition(len(tasks_empty) == 0, "empty cwd should return zero tasks", payload_empty)
+        print("✓ list_tasks respects custom cwd parameter")
+        return True
+    finally:
+        stop_process(process)
+
+
 def test_task_start_quick_exit():
     print("Test 4: task_start returns direct quick-exit payload")
     process, _ = start_mcp_process()
@@ -440,7 +468,7 @@ def test_running_lifecycle_and_stop():
     try:
         start_response, _ = send_request(
             process,
-            tool_request(11, "task_start", {"unique_name": "long-running-task"}),
+            tool_request(11, "task_start", {"unique_name": "long-running-task", "cwd": "/home/testuser/test_project"}),
             timeout_seconds=10,
         )
         start_payload = parse_tool_result(start_response)
@@ -455,9 +483,20 @@ def test_running_lifecycle_and_stop():
         )
 
         status_response, _ = send_request(process, tool_request(12, "status"))
-        running = parse_tool_result(status_response)["running"]
+        status_payload = parse_tool_result(status_response)
+        assert_condition(
+            status_payload.get("cwd") == "/home/testuser/test_project",
+            "status response should include top-level server cwd",
+            status_payload,
+        )
+        running = status_payload["running"]
         running_job = find_job(running, "long-running-task", pid=pid)
         assert_condition(running_job["pid"] == pid, "status should report the running pid", running_job)
+        assert_condition(
+            running_job.get("cwd") == "/home/testuser/test_project",
+            "running job should report task-specific cwd in status",
+            running_job,
+        )
         assert_condition(
             isinstance(running_job.get("elapsed_seconds"), int),
             "status should include elapsed_seconds",
@@ -470,6 +509,11 @@ def test_running_lifecycle_and_stop():
         )
         task_status_job = parse_tool_result(task_status_response)
         assert_condition(task_status_job["state"] == "running", "task_status should report running state", task_status_job)
+        assert_condition(
+            task_status_job.get("cwd") == "/home/testuser/test_project",
+            "task_status should report task-specific cwd",
+            task_status_job,
+        )
         assert_condition(task_status_job["exit_code"] is None, "running job should not have exit_code", task_status_job)
         assert_condition(
             task_status_job["completed_at"] is None,
@@ -620,6 +664,7 @@ def main():
         test_initialize_instructions,
         test_tools_list_schema,
         test_list_tasks_enriched_fields,
+        test_list_tasks_cwd,
         test_task_start_quick_exit,
         test_task_start_args_and_spaces,
         test_error_taxonomy,
