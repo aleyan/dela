@@ -141,6 +141,7 @@ impl OutputNotificationBatch {
 
 #[derive(Debug, Clone)]
 struct CachedDiscoveredTasks {
+    root: PathBuf,
     discovered: task_discovery::DiscoveredTasks,
     cached_at: Instant,
 }
@@ -341,19 +342,21 @@ impl DelaMcpServer {
         &self.root
     }
 
-    async fn get_discovered_tasks(&self) -> task_discovery::DiscoveredTasks {
+    async fn get_discovered_tasks(&self, root: &PathBuf) -> task_discovery::DiscoveredTasks {
         {
             let cache = self.task_cache.read().await;
             if let Some(entry) = cache.as_ref()
+                && &entry.root == root
                 && entry.cached_at.elapsed() < self.task_cache_ttl
             {
                 return entry.discovered.clone();
             }
         }
 
-        let discovered = task_discovery::discover_tasks(&self.root);
+        let discovered = task_discovery::discover_tasks(root);
         let mut cache = self.task_cache.write().await;
         *cache = Some(CachedDiscoveredTasks {
+            root: root.clone(),
             discovered: discovered.clone(),
             cached_at: Instant::now(),
         });
@@ -384,7 +387,13 @@ impl DelaMcpServer {
         &self,
         Parameters(args): Parameters<ListTasksArgs>,
     ) -> Result<CallToolResult, ErrorData> {
-        let discovered = self.get_discovered_tasks().await;
+        let root_dir = if let Some(cwd) = &args.cwd {
+            PathBuf::from(cwd)
+        } else {
+            self.root.clone()
+        };
+
+        let discovered = self.get_discovered_tasks(&root_dir).await;
 
         // Apply runner filtering if specified
         let mut tasks = discovered.tasks;
@@ -429,7 +438,8 @@ impl DelaMcpServer {
 
         Ok(CallToolResult::success(vec![
             Content::json(serde_json::json!({
-                "running": running_jobs
+                "running": running_jobs,
+                "cwd": self.root.to_string_lossy().to_string()
             }))
             .expect("Failed to serialize JSON"),
         ]))
@@ -651,7 +661,13 @@ impl DelaMcpServer {
         &self,
         Parameters(args): Parameters<TaskStartArgs>,
     ) -> Result<CallToolResult, ErrorData> {
-        let discovered = self.get_discovered_tasks().await;
+        let root_dir = if let Some(cwd) = &args.cwd {
+            PathBuf::from(cwd)
+        } else {
+            self.root.clone()
+        };
+
+        let discovered = self.get_discovered_tasks(&root_dir).await;
 
         let task = discovered
             .tasks
@@ -1011,62 +1027,59 @@ impl DelaMcpServer {
         &self,
         Parameters(args): Parameters<TaskStatusArgs>,
     ) -> Result<CallToolResult, ErrorData> {
-        let jobs = self.job_manager.get_jobs_by_name(&args.unique_name).await;
-        let job_statuses: Vec<serde_json::Value> = jobs
-            .into_iter()
-            .map(|job| {
-                let mut status = "running";
-                let mut exit_code = None;
-                let mut signal = None;
-                let mut completed_at = None;
-                let mut error = None;
+        let job = self
+            .job_manager
+            .get_job(args.pid)
+            .await
+            .ok_or_else(|| DelaError::task_not_found(format!("Job with PID {} not found", args.pid)))?;
 
-                match &job.state {
-                    JobState::Running => {}
-                    JobState::Exited(code) => {
-                        status = "exited";
-                        exit_code = Some(*code);
-                        completed_at = job.completed_at;
-                    }
-                    JobState::Signaled(sig) => {
-                        status = "signaled";
-                        signal = Some(*sig);
-                        completed_at = job.completed_at;
-                    }
-                    JobState::Failed(msg) => {
-                        status = "failed";
-                        error = Some(msg.clone());
-                        completed_at = job.completed_at;
-                    }
-                }
+        let mut status = "running";
+        let mut exit_code = None;
+        let mut signal = None;
+        let mut completed_at = None;
+        let mut error = None;
 
-                let completed_at_str = completed_at
-                    .as_ref()
-                    .map(|timestamp| timestamp.to_rfc3339_opts(SecondsFormat::Secs, true));
+        match &job.state {
+            JobState::Running => {}
+            JobState::Exited(code) => {
+                status = "exited";
+                exit_code = Some(*code);
+                completed_at = job.completed_at;
+            }
+            JobState::Signaled(sig) => {
+                status = "signaled";
+                signal = Some(*sig);
+                completed_at = job.completed_at;
+            }
+            JobState::Failed(msg) => {
+                status = "failed";
+                error = Some(msg.clone());
+                completed_at = job.completed_at;
+            }
+        }
 
-                serde_json::json!({
-                    "pid": job.pid,
-                    "unique_name": job.metadata.unique_name,
-                    "source_name": job.metadata.source_name,
-                    "state": status,
-                    "error": error,
-                    "exit_code": exit_code,
-                    "signal": signal,
-                    "elapsed_seconds": job.age().as_secs(),
-                    "completed_at": completed_at_str,
-                    "command": job.metadata.command,
-                    "file_path": job.metadata.file_path.to_string_lossy(),
-                    "args": job.metadata.args,
-                    "cwd": job.metadata.cwd.map(|p| p.to_string_lossy().to_string())
-                })
-            })
-            .collect();
+        let completed_at_str = completed_at
+            .as_ref()
+            .map(|timestamp| timestamp.to_rfc3339_opts(SecondsFormat::Secs, true));
+
+        let job_status = serde_json::json!({
+            "pid": job.pid,
+            "unique_name": job.metadata.unique_name,
+            "source_name": job.metadata.source_name,
+            "state": status,
+            "error": error,
+            "exit_code": exit_code,
+            "signal": signal,
+            "elapsed_seconds": job.age().as_secs(),
+            "completed_at": completed_at_str,
+            "command": job.metadata.command,
+            "file_path": job.metadata.file_path.to_string_lossy(),
+            "args": job.metadata.args,
+            "cwd": job.metadata.cwd.map(|p| p.to_string_lossy().to_string())
+        });
 
         Ok(CallToolResult::success(vec![
-            Content::json(serde_json::json!({
-                "jobs": job_statuses
-            }))
-            .expect("Failed to serialize JSON"),
+            Content::json(job_status).expect("Failed to serialize JSON"),
         ]))
     }
 
@@ -1385,6 +1398,16 @@ impl ServerHandler for DelaMcpServer {
             serde_json::Value::String("Optional runner filter".to_string()),
         );
         list_tasks_properties.insert("runner".to_string(), serde_json::Value::Object(runner_prop));
+        let mut list_tasks_cwd_prop = Map::new();
+        list_tasks_cwd_prop.insert(
+            "type".to_string(),
+            serde_json::Value::String("string".to_string()),
+        );
+        list_tasks_cwd_prop.insert(
+            "description".to_string(),
+            serde_json::Value::String("Optional working directory to discover tasks in".to_string()),
+        );
+        list_tasks_properties.insert("cwd".to_string(), serde_json::Value::Object(list_tasks_cwd_prop));
         list_tasks_schema.insert(
             "properties".to_string(),
             serde_json::Value::Object(list_tasks_properties),
@@ -1525,18 +1548,18 @@ impl ServerHandler for DelaMcpServer {
             serde_json::Value::String("object".to_string()),
         );
         let mut task_status_properties = Map::new();
-        let mut task_status_unique_name_prop = Map::new();
-        task_status_unique_name_prop.insert(
+        let mut task_status_pid_prop = Map::new();
+        task_status_pid_prop.insert(
             "type".to_string(),
-            serde_json::Value::String("string".to_string()),
+            serde_json::Value::String("integer".to_string()),
         );
-        task_status_unique_name_prop.insert(
+        task_status_pid_prop.insert(
             "description".to_string(),
-            serde_json::Value::String("The unique name of the task to get status for".to_string()),
+            serde_json::Value::String("The PID of the job to get status for".to_string()),
         );
         task_status_properties.insert(
-            "unique_name".to_string(),
-            serde_json::Value::Object(task_status_unique_name_prop),
+            "pid".to_string(),
+            serde_json::Value::Object(task_status_pid_prop),
         );
         task_status_schema.insert(
             "properties".to_string(),
@@ -1544,7 +1567,7 @@ impl ServerHandler for DelaMcpServer {
         );
         task_status_schema.insert(
             "required".to_string(),
-            serde_json::Value::Array(vec![serde_json::Value::String("unique_name".to_string())]),
+            serde_json::Value::Array(vec![serde_json::Value::String("pid".to_string())]),
         );
 
         // Schema for task_output
@@ -1753,7 +1776,7 @@ mod tests {
 
         // Test that the new tools work with proper arguments
         let status_args = TaskStatusArgs {
-            unique_name: "test-task".to_string(),
+            pid: 12345,
         };
         let output_args = TaskOutputArgs {
             pid: 12345,
@@ -1766,9 +1789,8 @@ mod tests {
             grace_period: None,
         };
 
-        // These should work (even if they return empty results for non-existent jobs)
-        assert!(server.task_status(Parameters(status_args)).await.is_ok());
-        // task_output and task_stop should return errors for non-existent jobs
+        // task_status, task_output and task_stop should return errors for non-existent jobs
+        assert!(server.task_status(Parameters(status_args)).await.is_err());
         assert!(server.task_output(Parameters(output_args)).await.is_err());
         assert!(server.task_stop(Parameters(stop_args)).await.is_err());
 
@@ -1868,29 +1890,14 @@ mod tests {
         let temp_dir = std::env::temp_dir();
         let server = DelaMcpServer::new(temp_dir);
         let args = TaskStatusArgs {
-            unique_name: "nonexistent-task".to_string(),
+            pid: 99999,
         };
 
         // Act
-        let result = server.task_status(Parameters(args)).await.unwrap();
+        let result = server.task_status(Parameters(args)).await;
 
         // Assert
-        assert_eq!(result.content.len(), 1);
-        let content = &result.content[0];
-        match &content.raw {
-            RawContent::Text(text_content) => {
-                let json: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
-                let obj = json.as_object().unwrap();
-                assert!(obj.contains_key("jobs"));
-                let jobs = obj["jobs"].as_array().unwrap();
-                assert_eq!(
-                    jobs.len(),
-                    0,
-                    "Should return empty array for nonexistent task"
-                );
-            }
-            _ => panic!("Expected text content with JSON"),
-        }
+        assert!(result.is_err());
     }
 
     #[tokio::test]
@@ -1899,10 +1906,9 @@ mod tests {
         let temp_dir = std::env::temp_dir();
         let server = DelaMcpServer::new(temp_dir);
 
-        // Create multiple jobs with the same unique_name
         let metadata1 = JobMetadata {
             started_at: std::time::Instant::now(),
-            unique_name: "test-task".to_string(),
+            unique_name: "test-task1".to_string(),
             source_name: "test".to_string(),
             args: Some(vec!["--verbose".to_string()]),
             env: None,
@@ -1913,7 +1919,7 @@ mod tests {
 
         let metadata2 = JobMetadata {
             started_at: std::time::Instant::now(),
-            unique_name: "test-task".to_string(),
+            unique_name: "test-task2".to_string(),
             source_name: "test".to_string(),
             args: Some(vec!["--quiet".to_string()]),
             env: None,
@@ -1948,40 +1954,30 @@ mod tests {
             .await
             .unwrap();
 
-        let args = TaskStatusArgs {
-            unique_name: "test-task".to_string(),
-        };
-
-        // Act
-        let result = server.task_status(Parameters(args)).await.unwrap();
-
-        // Assert
-        assert_eq!(result.content.len(), 1);
-        let content = &result.content[0];
-        match &content.raw {
+        // Act & Assert for job 1
+        let result1 = server.task_status(Parameters(TaskStatusArgs { pid: pid1 })).await.unwrap();
+        assert_eq!(result1.content.len(), 1);
+        match &result1.content[0].raw {
             RawContent::Text(text_content) => {
-                let json: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
-                let obj = json.as_object().unwrap();
-                assert!(obj.contains_key("jobs"));
-                let jobs = obj["jobs"].as_array().unwrap();
-                assert_eq!(
-                    jobs.len(),
-                    2,
-                    "Should return two jobs for the same unique_name"
-                );
-
-                // Check that both jobs have the correct unique_name
-                for job in jobs {
-                    assert_eq!(job["unique_name"], "test-task");
-                    assert_eq!(job["source_name"], "test");
-                    assert!(job["pid"].is_number());
-                    assert!(job["state"].is_string());
-                    assert_eq!(job["state"], "running");
-                    assert!(job["exit_code"].is_null());
-                    assert!(job["completed_at"].is_null());
-                }
+                let job: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
+                assert_eq!(job["unique_name"], "test-task1");
+                assert_eq!(job["pid"], pid1);
+                assert_eq!(job["state"], "running");
             }
-            _ => panic!("Expected text content with JSON"),
+            _ => panic!("Expected text content"),
+        }
+
+        // Act & Assert for job 2
+        let result2 = server.task_status(Parameters(TaskStatusArgs { pid: pid2 })).await.unwrap();
+        assert_eq!(result2.content.len(), 1);
+        match &result2.content[0].raw {
+            RawContent::Text(text_content) => {
+                let job: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
+                assert_eq!(job["unique_name"], "test-task2");
+                assert_eq!(job["pid"], pid2);
+                assert_eq!(job["state"], "running");
+            }
+            _ => panic!("Expected text content"),
         }
     }
 
@@ -2025,7 +2021,7 @@ mod tests {
             .unwrap();
 
         let args = TaskStatusArgs {
-            unique_name: "test-task".to_string(),
+            pid,
         };
 
         // Act
@@ -2036,13 +2032,7 @@ mod tests {
         let content = &result.content[0];
         match &content.raw {
             RawContent::Text(text_content) => {
-                let json: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
-                let obj = json.as_object().unwrap();
-                assert!(obj.contains_key("jobs"));
-                let jobs = obj["jobs"].as_array().unwrap();
-                assert_eq!(jobs.len(), 1, "Should return one job");
-
-                let job = &jobs[0];
+                let job: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
                 assert_eq!(job["unique_name"], "test-task");
                 assert_eq!(job["state"], "exited");
                 assert_eq!(job["exit_code"], 0);
@@ -2088,7 +2078,7 @@ mod tests {
 
         let result = server
             .task_status(Parameters(TaskStatusArgs {
-                unique_name: "test-task".to_string(),
+                pid,
             }))
             .await
             .unwrap();
@@ -2096,12 +2086,10 @@ mod tests {
         let content = &result.content[0];
         match &content.raw {
             RawContent::Text(text_content) => {
-                let json: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
-                let jobs = json["jobs"].as_array().unwrap();
-                assert_eq!(jobs.len(), 1);
-                assert_eq!(jobs[0]["state"], "failed");
-                assert!(jobs[0]["exit_code"].is_null());
-                assert!(jobs[0]["completed_at"].is_string());
+                let job: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
+                assert_eq!(job["state"], "failed");
+                assert!(job["exit_code"].is_null());
+                assert!(job["completed_at"].is_string());
             }
             _ => panic!("Expected text content with JSON"),
         }
@@ -2922,6 +2910,7 @@ test:
         // Act & Assert - Test filtering by "make"
         let make_args = Parameters(ListTasksArgs {
             runner: Some("make".to_string()),
+            cwd: None,
         });
         let make_result = server.list_tasks(make_args).await.unwrap();
         assert_eq!(make_result.content.len(), 1);
@@ -2929,6 +2918,7 @@ test:
         // Act & Assert - Test filtering by "npm"
         let npm_args = Parameters(ListTasksArgs {
             runner: Some("npm".to_string()),
+            cwd: None,
         });
         let npm_result = server.list_tasks(npm_args).await.unwrap();
         assert_eq!(npm_result.content.len(), 1);
@@ -2936,6 +2926,7 @@ test:
         // Act & Assert - Test filtering by non-existent runner
         let nonexistent_args = Parameters(ListTasksArgs {
             runner: Some("nonexistent".to_string()),
+            cwd: None,
         });
         let nonexistent_result = server.list_tasks(nonexistent_args).await.unwrap();
         assert_eq!(nonexistent_result.content.len(), 1);
@@ -2967,6 +2958,7 @@ test:
         // Act & Assert - Test exact match
         let exact_args = Parameters(ListTasksArgs {
             runner: Some("make".to_string()),
+            cwd: None,
         });
         let exact_result = server.list_tasks(exact_args).await.unwrap();
         assert_eq!(exact_result.content.len(), 1);
@@ -2974,6 +2966,7 @@ test:
         // Act & Assert - Test case mismatch (should return empty)
         let case_args = Parameters(ListTasksArgs {
             runner: Some("MAKE".to_string()),
+            cwd: None,
         });
         let case_result = server.list_tasks(case_args).await.unwrap();
         assert_eq!(case_result.content.len(), 1);
@@ -3535,9 +3528,13 @@ add_custom_target(build-all COMMENT "Build everything")
         };
         assert_eq!(status_json["running"].as_array().unwrap().len(), 0);
 
+        let completed_jobs = server.job_manager.get_all_jobs().await;
+        let job = completed_jobs.iter().find(|j| j.metadata.unique_name == "waited_task").unwrap();
+        let pid = job.pid;
+
         let task_status_result = server
             .task_status(Parameters(TaskStatusArgs {
-                unique_name: "waited_task".to_string(),
+                pid,
             }))
             .await
             .unwrap();
@@ -3547,15 +3544,13 @@ add_custom_target(build-all COMMENT "Build everything")
             }
             _ => panic!("Expected text content"),
         };
-        let jobs = task_status_json["jobs"].as_array().unwrap();
-        assert_eq!(jobs.len(), 1);
-        assert_eq!(jobs[0]["state"], "exited");
+        assert_eq!(task_status_json["state"], "exited");
 
         sleep(Duration::from_secs(2)).await;
 
         let task_status_result_later = server
             .task_status(Parameters(TaskStatusArgs {
-                unique_name: "waited_task".to_string(),
+                pid,
             }))
             .await
             .unwrap();
@@ -3565,8 +3560,7 @@ add_custom_target(build-all COMMENT "Build everything")
             }
             _ => panic!("Expected text content"),
         };
-        let later_job = &task_status_json_later["jobs"].as_array().unwrap()[0];
-        let elapsed_seconds = later_job["elapsed_seconds"].as_u64().unwrap();
+        let elapsed_seconds = task_status_json_later["elapsed_seconds"].as_u64().unwrap();
         assert!(
             (1..=2).contains(&elapsed_seconds),
             "completed task elapsed_seconds should reflect its actual runtime, got {}",
@@ -3640,7 +3634,7 @@ add_custom_target(build-all COMMENT "Build everything")
 
         let task_status_result = server
             .task_status(Parameters(TaskStatusArgs {
-                unique_name: "still_running_task".to_string(),
+                pid,
             }))
             .await
             .unwrap();
@@ -3650,10 +3644,9 @@ add_custom_target(build-all COMMENT "Build everything")
             }
             _ => panic!("Expected text content"),
         };
-        let running_job = &task_status_json["jobs"].as_array().unwrap()[0];
-        assert_eq!(running_job["state"], "running");
+        assert_eq!(task_status_json["state"], "running");
         assert!(
-            running_job["elapsed_seconds"].as_u64().unwrap() >= 2,
+            task_status_json["elapsed_seconds"].as_u64().unwrap() >= 2,
             "elapsed_seconds should include the initial bounded wait window"
         );
 
@@ -3785,7 +3778,7 @@ add_custom_target(build-all COMMENT "Build everything")
 
                 // Check task_status immediately - should show as running
                 let task_status_args = TaskStatusArgs {
-                    unique_name: "long_task".to_string(),
+                    pid,
                 };
                 let task_status_result = server
                     .task_status(Parameters(task_status_args))
@@ -3796,17 +3789,12 @@ add_custom_target(build-all COMMENT "Build everything")
                     RawContent::Text(text_content) => {
                         let task_status_json: serde_json::Value =
                             serde_json::from_str(&text_content.text).unwrap();
-                        let jobs = task_status_json["jobs"].as_array().unwrap();
                         println!(
-                            "Task status immediately after start: {} jobs, first job state: {}",
-                            jobs.len(),
-                            jobs.first()
-                                .map(|j| j["state"].as_str().unwrap_or("unknown"))
-                                .unwrap_or("none")
+                            "Task status immediately after start: {}",
+                            task_status_json["state"].as_str().unwrap_or("unknown")
                         );
-                        assert_eq!(jobs.len(), 1, "Should have 1 job");
-                        assert_eq!(jobs[0]["state"].as_str().unwrap(), "running");
-                        assert_eq!(jobs[0]["pid"].as_i64().unwrap() as u32, pid);
+                        assert_eq!(task_status_json["state"].as_str().unwrap(), "running");
+                        assert_eq!(task_status_json["pid"].as_i64().unwrap() as u32, pid);
                     }
                     _ => panic!("Expected text content"),
                 }
@@ -3857,7 +3845,7 @@ add_custom_target(build-all COMMENT "Build everything")
 
                 // Check task_status after completion - should show as exited
                 let task_status_args_final = TaskStatusArgs {
-                    unique_name: "long_task".to_string(),
+                    pid,
                 };
                 let task_status_result_final = server
                     .task_status(Parameters(task_status_args_final))
@@ -3868,17 +3856,12 @@ add_custom_target(build-all COMMENT "Build everything")
                     RawContent::Text(text_content) => {
                         let task_status_json: serde_json::Value =
                             serde_json::from_str(&text_content.text).unwrap();
-                        let jobs = task_status_json["jobs"].as_array().unwrap();
                         println!(
-                            "Task status after completion: {} jobs, first job state: {}",
-                            jobs.len(),
-                            jobs.first()
-                                .map(|j| j["state"].as_str().unwrap_or("unknown"))
-                                .unwrap_or("none")
+                            "Task status after completion: {}",
+                            task_status_json["state"].as_str().unwrap_or("unknown")
                         );
-                        assert_eq!(jobs.len(), 1, "Should still have 1 job record");
-                        assert_eq!(jobs[0]["state"].as_str().unwrap(), "exited");
-                        assert_eq!(jobs[0]["pid"].as_i64().unwrap() as u32, pid);
+                        assert_eq!(task_status_json["state"].as_str().unwrap(), "exited");
+                        assert_eq!(task_status_json["pid"].as_i64().unwrap() as u32, pid);
                     }
                     _ => panic!("Expected text content"),
                 }
@@ -3978,9 +3961,18 @@ add_custom_target(build-all COMMENT "Build everything")
             _ => panic!("Expected text content"),
         }
 
+        let pid = server
+            .job_manager
+            .get_all_jobs()
+            .await
+            .iter()
+            .find(|job| job.metadata.unique_name == "bg-test")
+            .map(|job| job.pid)
+            .expect("Should have recorded the job");
+
         // task_status should record the job as exited quickly
         let task_status_args = TaskStatusArgs {
-            unique_name: "bg-test".to_string(),
+            pid,
         };
         let task_status_result = server
             .task_status(Parameters(task_status_args))
@@ -3989,11 +3981,8 @@ add_custom_target(build-all COMMENT "Build everything")
         let task_status_content = &task_status_result.content[0];
         match &task_status_content.raw {
             RawContent::Text(text_content) => {
-                let task_status_json: serde_json::Value =
+                let job: serde_json::Value =
                     serde_json::from_str(&text_content.text).unwrap();
-                let jobs = task_status_json["jobs"].as_array().unwrap();
-                assert!(!jobs.is_empty());
-                let job = &jobs[0];
                 assert_eq!(job["state"].as_str().unwrap(), "exited");
                 if start_state == "running" {
                     assert!(job["pid"].is_number());
@@ -4298,13 +4287,10 @@ add_custom_target(build-all COMMENT "Build everything")
         let context = RequestContext::new(RequestId::Number(1), running_server.peer().clone());
 
         let mut args = serde_json::Map::new();
-        args.insert(
-            "unique_name".to_string(),
-            serde_json::Value::String("nonexistent".to_string()),
-        );
+        args.insert("pid".to_string(), serde_json::Value::Number(12345.into()));
         let req = CallToolRequestParams::new("task_status").with_arguments(args);
         let res = server.call_tool(req, context).await;
-        assert!(res.is_ok());
+        assert!(res.is_err());
     }
 
     #[tokio::test]

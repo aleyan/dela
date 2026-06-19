@@ -90,6 +90,9 @@ pub struct ListTasksArgs {
     /// Optional runner filter - if provided, only return tasks for this runner
     /// Examples: "make", "npm", "gradle", "poetry"
     pub runner: Option<String>,
+
+    /// Optional working directory to discover tasks in
+    pub cwd: Option<String>,
 }
 
 #[cfg(test)]
@@ -373,6 +376,7 @@ mod tests {
         // Arrange & Act
         let args = ListTasksArgs {
             runner: Some("make".to_string()),
+            ..Default::default()
         };
 
         // Assert
@@ -384,8 +388,9 @@ mod tests {
         // Arrange
         let args_with_runner = ListTasksArgs {
             runner: Some("npm".to_string()),
+            ..Default::default()
         };
-        let args_without_runner = ListTasksArgs { runner: None };
+        let args_without_runner = ListTasksArgs { runner: None, ..Default::default() };
 
         // Act
         let json_with = serde_json::to_string(&args_with_runner).expect("Should serialize");
@@ -675,8 +680,8 @@ pub struct StartResultDto {
 /// Arguments for the task_status tool
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct TaskStatusArgs {
-    /// The unique name of the task to get status for
-    pub unique_name: String,
+    /// The PID of the job to get status for
+    pub pid: u32,
 }
 
 /// Arguments for the task_output tool
