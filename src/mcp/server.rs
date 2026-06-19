@@ -1027,11 +1027,9 @@ impl DelaMcpServer {
         &self,
         Parameters(args): Parameters<TaskStatusArgs>,
     ) -> Result<CallToolResult, ErrorData> {
-        let job = self
-            .job_manager
-            .get_job(args.pid)
-            .await
-            .ok_or_else(|| DelaError::task_not_found(format!("Job with PID {} not found", args.pid)))?;
+        let job = self.job_manager.get_job(args.pid).await.ok_or_else(|| {
+            DelaError::task_not_found(format!("Job with PID {} not found", args.pid))
+        })?;
 
         let mut status = "running";
         let mut exit_code = None;
@@ -1405,9 +1403,14 @@ impl ServerHandler for DelaMcpServer {
         );
         list_tasks_cwd_prop.insert(
             "description".to_string(),
-            serde_json::Value::String("Optional working directory to discover tasks in".to_string()),
+            serde_json::Value::String(
+                "Optional working directory to discover tasks in".to_string(),
+            ),
         );
-        list_tasks_properties.insert("cwd".to_string(), serde_json::Value::Object(list_tasks_cwd_prop));
+        list_tasks_properties.insert(
+            "cwd".to_string(),
+            serde_json::Value::Object(list_tasks_cwd_prop),
+        );
         list_tasks_schema.insert(
             "properties".to_string(),
             serde_json::Value::Object(list_tasks_properties),
@@ -1775,9 +1778,7 @@ mod tests {
         let server = DelaMcpServer::new(PathBuf::from("."));
 
         // Test that the new tools work with proper arguments
-        let status_args = TaskStatusArgs {
-            pid: 12345,
-        };
+        let status_args = TaskStatusArgs { pid: 12345 };
         let output_args = TaskOutputArgs {
             pid: 12345,
             lines: Some(10),
@@ -1889,9 +1890,7 @@ mod tests {
         // Arrange
         let temp_dir = std::env::temp_dir();
         let server = DelaMcpServer::new(temp_dir);
-        let args = TaskStatusArgs {
-            pid: 99999,
-        };
+        let args = TaskStatusArgs { pid: 99999 };
 
         // Act
         let result = server.task_status(Parameters(args)).await;
@@ -1955,7 +1954,10 @@ mod tests {
             .unwrap();
 
         // Act & Assert for job 1
-        let result1 = server.task_status(Parameters(TaskStatusArgs { pid: pid1 })).await.unwrap();
+        let result1 = server
+            .task_status(Parameters(TaskStatusArgs { pid: pid1 }))
+            .await
+            .unwrap();
         assert_eq!(result1.content.len(), 1);
         match &result1.content[0].raw {
             RawContent::Text(text_content) => {
@@ -1968,7 +1970,10 @@ mod tests {
         }
 
         // Act & Assert for job 2
-        let result2 = server.task_status(Parameters(TaskStatusArgs { pid: pid2 })).await.unwrap();
+        let result2 = server
+            .task_status(Parameters(TaskStatusArgs { pid: pid2 }))
+            .await
+            .unwrap();
         assert_eq!(result2.content.len(), 1);
         match &result2.content[0].raw {
             RawContent::Text(text_content) => {
@@ -2020,9 +2025,7 @@ mod tests {
             .await
             .unwrap();
 
-        let args = TaskStatusArgs {
-            pid,
-        };
+        let args = TaskStatusArgs { pid };
 
         // Act
         let result = server.task_status(Parameters(args)).await.unwrap();
@@ -2077,9 +2080,7 @@ mod tests {
             .unwrap();
 
         let result = server
-            .task_status(Parameters(TaskStatusArgs {
-                pid,
-            }))
+            .task_status(Parameters(TaskStatusArgs { pid }))
             .await
             .unwrap();
 
@@ -3529,13 +3530,14 @@ add_custom_target(build-all COMMENT "Build everything")
         assert_eq!(status_json["running"].as_array().unwrap().len(), 0);
 
         let completed_jobs = server.job_manager.get_all_jobs().await;
-        let job = completed_jobs.iter().find(|j| j.metadata.unique_name == "waited_task").unwrap();
+        let job = completed_jobs
+            .iter()
+            .find(|j| j.metadata.unique_name == "waited_task")
+            .unwrap();
         let pid = job.pid;
 
         let task_status_result = server
-            .task_status(Parameters(TaskStatusArgs {
-                pid,
-            }))
+            .task_status(Parameters(TaskStatusArgs { pid }))
             .await
             .unwrap();
         let task_status_json = match &task_status_result.content[0].raw {
@@ -3549,9 +3551,7 @@ add_custom_target(build-all COMMENT "Build everything")
         sleep(Duration::from_secs(2)).await;
 
         let task_status_result_later = server
-            .task_status(Parameters(TaskStatusArgs {
-                pid,
-            }))
+            .task_status(Parameters(TaskStatusArgs { pid }))
             .await
             .unwrap();
         let task_status_json_later = match &task_status_result_later.content[0].raw {
@@ -3633,9 +3633,7 @@ add_custom_target(build-all COMMENT "Build everything")
         assert_eq!(status_json["running"].as_array().unwrap().len(), 1);
 
         let task_status_result = server
-            .task_status(Parameters(TaskStatusArgs {
-                pid,
-            }))
+            .task_status(Parameters(TaskStatusArgs { pid }))
             .await
             .unwrap();
         let task_status_json = match &task_status_result.content[0].raw {
@@ -3777,9 +3775,7 @@ add_custom_target(build-all COMMENT "Build everything")
                 }
 
                 // Check task_status immediately - should show as running
-                let task_status_args = TaskStatusArgs {
-                    pid,
-                };
+                let task_status_args = TaskStatusArgs { pid };
                 let task_status_result = server
                     .task_status(Parameters(task_status_args))
                     .await
@@ -3844,9 +3840,7 @@ add_custom_target(build-all COMMENT "Build everything")
                 }
 
                 // Check task_status after completion - should show as exited
-                let task_status_args_final = TaskStatusArgs {
-                    pid,
-                };
+                let task_status_args_final = TaskStatusArgs { pid };
                 let task_status_result_final = server
                     .task_status(Parameters(task_status_args_final))
                     .await
@@ -3971,9 +3965,7 @@ add_custom_target(build-all COMMENT "Build everything")
             .expect("Should have recorded the job");
 
         // task_status should record the job as exited quickly
-        let task_status_args = TaskStatusArgs {
-            pid,
-        };
+        let task_status_args = TaskStatusArgs { pid };
         let task_status_result = server
             .task_status(Parameters(task_status_args))
             .await
@@ -3981,8 +3973,7 @@ add_custom_target(build-all COMMENT "Build everything")
         let task_status_content = &task_status_result.content[0];
         match &task_status_content.raw {
             RawContent::Text(text_content) => {
-                let job: serde_json::Value =
-                    serde_json::from_str(&text_content.text).unwrap();
+                let job: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
                 assert_eq!(job["state"].as_str().unwrap(), "exited");
                 if start_state == "running" {
                     assert!(job["pid"].is_number());

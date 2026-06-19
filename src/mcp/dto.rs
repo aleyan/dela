@@ -390,7 +390,10 @@ mod tests {
             runner: Some("npm".to_string()),
             ..Default::default()
         };
-        let args_without_runner = ListTasksArgs { runner: None, ..Default::default() };
+        let args_without_runner = ListTasksArgs {
+            runner: None,
+            ..Default::default()
+        };
 
         // Act
         let json_with = serde_json::to_string(&args_with_runner).expect("Should serialize");

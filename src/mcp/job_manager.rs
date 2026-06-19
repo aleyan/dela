@@ -447,14 +447,6 @@ impl JobManager {
         jobs.values().cloned().collect()
     }
 
-    /// Get jobs by unique name
-    pub async fn get_jobs_by_name(&self, unique_name: &str) -> Vec<Job> {
-        let jobs = self.jobs.read().await;
-        jobs.values()
-            .filter(|job| job.metadata.unique_name == unique_name)
-            .cloned()
-            .collect()
-    }
 
     /// Update a job's state
     pub async fn update_job_state(&self, pid: u32, state: JobState) -> anyhow::Result<()> {
