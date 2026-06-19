@@ -186,16 +186,31 @@ impl DelaMcpServer {
 
     /// Create a new MCP server instance with a custom allowlist evaluator (for testing)
     #[cfg(test)]
-    pub fn new_with_allowlist(root: PathBuf, allowlist_evaluator: McpAllowlistEvaluator) -> Self {
+    pub fn new_with_allowlist(
+        root: PathBuf,
+        mut allowlist_evaluator: McpAllowlistEvaluator,
+    ) -> Self {
+        for entry in &mut allowlist_evaluator.allowlist.entries {
+            if let Ok(canon) = entry.path.canonicalize() {
+                entry.path = canon;
+            }
+        }
+        let root = root.canonicalize().unwrap_or(root);
         Self::new_inner(root, allowlist_evaluator, TASK_DISCOVERY_CACHE_TTL)
     }
 
     #[cfg(test)]
     pub fn new_with_allowlist_and_cache_ttl(
         root: PathBuf,
-        allowlist_evaluator: McpAllowlistEvaluator,
+        mut allowlist_evaluator: McpAllowlistEvaluator,
         task_cache_ttl: Duration,
     ) -> Self {
+        for entry in &mut allowlist_evaluator.allowlist.entries {
+            if let Ok(canon) = entry.path.canonicalize() {
+                entry.path = canon;
+            }
+        }
+        let root = root.canonicalize().unwrap_or(root);
         Self::new_inner(root, allowlist_evaluator, task_cache_ttl)
     }
 
@@ -370,7 +385,10 @@ impl DelaMcpServer {
     /// Returns `self.root` when `cwd` is `None`.
     fn resolve_requested_cwd(&self, cwd: &Option<String>) -> Result<PathBuf, ErrorData> {
         let Some(raw) = cwd else {
-            return Ok(self.root.clone());
+            return self.root.canonicalize().map_err(|e| {
+                DelaError::internal_error(format!("Cannot canonicalize server root: {}", e), None)
+                    .into()
+            });
         };
 
         let candidate = if Path::new(raw).is_absolute() {

@@ -274,7 +274,7 @@ def test_list_tasks_cwd():
         # Check listing with custom cwd pointing to test_project (same results as default)
         response, _ = send_request(
             process,
-            tool_request(31, "list_tasks", {"cwd": "/home/testuser/test_project"}),
+            tool_request(31, "list_tasks", {"cwd": PROJECT_CWD}),
         )
         payload = parse_tool_result(response)
         tasks = payload["tasks"]
@@ -284,7 +284,7 @@ def test_list_tasks_cwd():
         # Check listing with empty directory cwd
         response_empty, _ = send_request(
             process,
-            tool_request(32, "list_tasks", {"cwd": "/home/testuser/test_project/assets_py"}),
+            tool_request(32, "list_tasks", {"cwd": f"{PROJECT_CWD}/assets_py"}),
         )
         payload_empty = parse_tool_result(response_empty)
         tasks_empty = payload_empty["tasks"]
