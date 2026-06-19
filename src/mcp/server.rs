@@ -1741,7 +1741,7 @@ impl ServerHandler for DelaMcpServer {
             ),
             Tool::new_with_raw(
                 "task_status",
-                Some("Status for a single unique_name (may have multiple PIDs)".into()),
+                Some("Get the status of a single job by its PID".into()),
                 task_status_schema,
             ),
             Tool::new_with_raw(

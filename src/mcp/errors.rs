@@ -48,6 +48,8 @@ pub enum DelaError {
         task_name: String,
         hint: Option<String>,
     },
+    /// Job with the given PID was not found
+    JobNotFound { pid: u32, hint: Option<String> },
     /// Generic internal error
     InternalError {
         message: String,
@@ -87,6 +89,11 @@ impl DelaError {
             DelaError::TaskNotFound { task_name, hint } => ErrorData {
                 code: DelaErrorCode::TASK_NOT_FOUND.into(),
                 message: Cow::Owned(format!("Task '{}' not found", task_name)),
+                data: hint.as_ref().map(|h| Value::String(h.clone())),
+            },
+            DelaError::JobNotFound { pid, hint } => ErrorData {
+                code: DelaErrorCode::TASK_NOT_FOUND.into(),
+                message: Cow::Owned(format!("Job with PID {} not found", pid)),
                 data: hint.as_ref().map(|h| Value::String(h.clone())),
             },
             DelaError::InternalError { message, hint } => ErrorData {
@@ -165,10 +172,10 @@ impl DelaError {
         }
     }
 
-    /// Create a TaskNotFound error for PID-based job lookups
+    /// Create a JobNotFound error for PID-based job lookups
     pub fn job_not_found(pid: u32) -> Self {
-        DelaError::TaskNotFound {
-            task_name: format!("Job with PID {} not found", pid),
+        DelaError::JobNotFound {
+            pid,
             hint: Some("Use 'status' to see running tasks and their PIDs".to_string()),
         }
     }
@@ -343,6 +350,24 @@ mod tests {
                 .as_str()
                 .unwrap()
                 .contains("dela init")
+        );
+    }
+
+    #[test]
+    fn test_job_not_found_error() {
+        let error = DelaError::job_not_found(12345);
+        let error_data = error.to_error_data();
+
+        assert_eq!(error_data.code.0, -32012);
+        assert_eq!(error_data.message.as_ref(), "Job with PID 12345 not found");
+        assert!(
+            error_data
+                .data
+                .as_ref()
+                .unwrap()
+                .as_str()
+                .unwrap()
+                .contains("status")
         );
     }
 }
