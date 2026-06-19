@@ -284,7 +284,7 @@ def test_list_tasks_cwd():
         # Check listing with empty directory cwd
         response_empty, _ = send_request(
             process,
-            tool_request(32, "list_tasks", {"cwd": "/home/testuser/.config/dela"}),
+            tool_request(32, "list_tasks", {"cwd": "/home/testuser/test_project/assets_py"}),
         )
         payload_empty = parse_tool_result(response_empty)
         tasks_empty = payload_empty["tasks"]
