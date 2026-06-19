@@ -345,10 +345,11 @@ impl DelaMcpServer {
     async fn get_discovered_tasks(&self, root: &PathBuf) -> task_discovery::DiscoveredTasks {
         {
             let cache = self.task_cache.read().await;
-            if let Some(entry) = cache.get(root) {
-                if entry.cached_at.elapsed() < self.task_cache_ttl {
-                    return entry.discovered.clone();
-                }
+            if let Some(entry) = cache
+                .get(root)
+                .filter(|entry| entry.cached_at.elapsed() < self.task_cache_ttl)
+            {
+                return entry.discovered.clone();
             }
         }
 
