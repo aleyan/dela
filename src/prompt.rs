@@ -33,35 +33,31 @@ pub fn prompt_for_task(task: &Task) -> anyhow::Result<AllowDecision> {
     }
 
     // Try to setup terminal, fallback to text prompt if it fails
-    match enable_raw_mode() {
-        Ok(_) => {
-            let mut stdout = io::stdout();
-            match execute!(stdout, EnterAlternateScreen, EnableMouseCapture) {
-                Ok(_) => {
-                    let backend = CrosstermBackend::new(stdout);
-                    match Terminal::new(backend) {
-                        Ok(mut terminal) => {
-                            let result = run_tui(&mut terminal, task);
+    match setup_terminal() {
+        Ok(mut terminal) => {
+            let result = run_tui(&mut terminal, task);
 
-                            // Restore terminal
-                            let _ = disable_raw_mode();
-                            let _ = execute!(
-                                terminal.backend_mut(),
-                                LeaveAlternateScreen,
-                                DisableMouseCapture
-                            );
-                            let _ = terminal.show_cursor();
+            // Restore terminal
+            let _ = disable_raw_mode();
+            let _ = execute!(
+                terminal.backend_mut(),
+                LeaveAlternateScreen,
+                DisableMouseCapture
+            );
+            let _ = terminal.show_cursor();
 
-                            result
-                        }
-                        Err(_) => prompt_for_task_fallback(task),
-                    }
-                }
-                Err(_) => prompt_for_task_fallback(task),
-            }
+            result
         }
         Err(_) => prompt_for_task_fallback(task),
     }
+}
+
+fn setup_terminal() -> anyhow::Result<Terminal<CrosstermBackend<Stdout>>> {
+    enable_raw_mode()?;
+    let mut stdout = io::stdout();
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    let backend = CrosstermBackend::new(stdout);
+    Terminal::new(backend).map_err(|e| anyhow::anyhow!("Failed to create terminal: {}", e))
 }
 
 /// Fallback text-based prompt for non-interactive environments
@@ -145,6 +141,22 @@ fn handle_key_code(code: KeyCode, selected: usize, options_len: usize) -> KeyAct
     }
 }
 
+fn apply_key_action(
+    action: KeyActionResult,
+    options: &[(&str, AllowDecision)],
+    selected: &mut usize,
+) -> Option<anyhow::Result<AllowDecision>> {
+    match action {
+        KeyActionResult::Continue { new_selected } => {
+            *selected = new_selected;
+            None
+        }
+        KeyActionResult::Select(index) => Some(Ok(options[index].1.clone())),
+        KeyActionResult::Cancel => Some(Err(anyhow::anyhow!("User cancelled"))),
+        KeyActionResult::Ignore => None,
+    }
+}
+
 fn run_tui(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     task: &Task,
@@ -178,19 +190,13 @@ fn run_tui(
 
         if let Event::Key(key) =
             event::read().map_err(|e| anyhow::anyhow!("Failed to read event: {}", e))?
+            && let Some(result) = apply_key_action(
+                handle_key_code(key.code, selected, options.len()),
+                &options,
+                &mut selected,
+            )
         {
-            match handle_key_code(key.code, selected, options.len()) {
-                KeyActionResult::Continue { new_selected } => {
-                    selected = new_selected;
-                }
-                KeyActionResult::Select(index) => {
-                    return Ok(options[index].1.clone());
-                }
-                KeyActionResult::Cancel => {
-                    return Err(anyhow::anyhow!("User cancelled"));
-                }
-                KeyActionResult::Ignore => {}
-            }
+            return result;
         }
     }
 }
@@ -467,5 +473,57 @@ mod tests {
             handle_key_code(KeyCode::End, 0, 0),
             KeyActionResult::Continue { new_selected: 0 }
         );
+    }
+
+    #[test]
+    fn test_apply_key_action_continue() {
+        let options = [
+            ("Allow once", AllowDecision::Allow(AllowScope::Once)),
+            ("Deny", AllowDecision::Deny),
+        ];
+        let mut selected = 0;
+        let result = apply_key_action(
+            KeyActionResult::Continue { new_selected: 1 },
+            &options,
+            &mut selected,
+        );
+        assert!(result.is_none());
+        assert_eq!(selected, 1);
+    }
+
+    #[test]
+    fn test_apply_key_action_select() {
+        let options = [
+            ("Allow once", AllowDecision::Allow(AllowScope::Once)),
+            ("Deny", AllowDecision::Deny),
+        ];
+        let mut selected = 0;
+        let result = apply_key_action(KeyActionResult::Select(1), &options, &mut selected);
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().unwrap(), AllowDecision::Deny);
+    }
+
+    #[test]
+    fn test_apply_key_action_cancel() {
+        let options = [
+            ("Allow once", AllowDecision::Allow(AllowScope::Once)),
+            ("Deny", AllowDecision::Deny),
+        ];
+        let mut selected = 0;
+        let result = apply_key_action(KeyActionResult::Cancel, &options, &mut selected);
+        assert!(result.is_some());
+        assert!(result.unwrap().is_err());
+    }
+
+    #[test]
+    fn test_apply_key_action_ignore() {
+        let options = [
+            ("Allow once", AllowDecision::Allow(AllowScope::Once)),
+            ("Deny", AllowDecision::Deny),
+        ];
+        let mut selected = 1;
+        let result = apply_key_action(KeyActionResult::Ignore, &options, &mut selected);
+        assert!(result.is_none());
+        assert_eq!(selected, 1);
     }
 }

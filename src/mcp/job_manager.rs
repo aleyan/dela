@@ -556,6 +556,65 @@ impl JobManager {
         }
     }
 
+    /// Interpret an ExitStatus into (StopResult, exit_code, signal) tuple.
+    fn interpret_exit_status(
+        status: std::process::ExitStatus,
+    ) -> (StopResult, Option<i32>, Option<i32>) {
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::ExitStatusExt;
+            if let Some(sig) = status.signal() {
+                return (StopResult::Signaled(sig), None, Some(sig));
+            }
+        }
+        let code = status.code().unwrap_or(-1);
+        (StopResult::Graceful(code), Some(code), None)
+    }
+
+    /// Update job state based on an exit status interpretation.
+    async fn record_stop_result(&self, pid: u32, stop: &StopResult) {
+        match stop {
+            StopResult::Graceful(code) => self.update_job_exited(pid, *code).await,
+            StopResult::Signaled(sig) => self.update_job_signaled(pid, *sig).await,
+            StopResult::Forced => {
+                self.update_job_failed(pid, "Stopped with SIGKILL after grace period".to_string())
+                    .await
+            }
+            StopResult::Failed(msg) => self.update_job_failed(pid, msg.clone()).await,
+        }
+    }
+
+    #[cfg(unix)]
+    async fn force_kill_process(&self, pid: u32, mut process: Child) -> anyhow::Result<StopResult> {
+        use nix::sys::signal::{self, Signal};
+        use nix::unistd::Pid;
+
+        match signal::kill(Pid::from_raw(pid as i32), Signal::SIGKILL) {
+            Ok(()) => {
+                let _ = process.wait().await;
+                let result = StopResult::Forced;
+                self.record_stop_result(pid, &result).await;
+                Ok(result)
+            }
+            Err(nix::errno::Errno::ESRCH) => {
+                let exit_status = process.wait().await.ok();
+                let result = if let Some(status) = exit_status {
+                    let (stop, _, _) = Self::interpret_exit_status(status);
+                    stop
+                } else {
+                    StopResult::Graceful(0)
+                };
+                self.record_stop_result(pid, &result).await;
+                Ok(result)
+            }
+            Err(e) => {
+                let result = StopResult::Failed(format!("Failed to send SIGKILL: {}", e));
+                self.record_stop_result(pid, &result).await;
+                Ok(result)
+            }
+        }
+    }
+
     async fn stop_managed_job(
         &self,
         pid: u32,
@@ -575,28 +634,23 @@ impl JobManager {
                     let exit_status = process.wait().await.map_err(|e| {
                         anyhow::anyhow!("Process already exited but wait failed: {}", e)
                     })?;
-                    use std::os::unix::process::ExitStatusExt;
-                    if let Some(sig) = exit_status.signal() {
-                        self.update_job_signaled(pid, sig).await;
-                        return Ok(StopResult::Signaled(sig));
-                    }
-                    let exit_code = exit_status.code().unwrap_or(0);
-                    self.update_job_exited(pid, exit_code).await;
-                    return Ok(StopResult::Graceful(exit_code));
+                    let (result, _, _) = Self::interpret_exit_status(exit_status);
+                    self.record_stop_result(pid, &result).await;
+                    return Ok(result);
                 }
                 Err(e) => {
-                    self.update_job_failed(pid, format!("Failed to send SIGTERM: {}", e))
-                        .await;
-                    return Ok(StopResult::Failed(format!("Failed to send SIGTERM: {}", e)));
+                    let result = StopResult::Failed(format!("Failed to send SIGTERM: {}", e));
+                    self.record_stop_result(pid, &result).await;
+                    return Ok(result);
                 }
             }
         }
         #[cfg(not(unix))]
         {
             if let Err(e) = process.kill().await {
-                self.update_job_failed(pid, format!("Failed to stop process: {}", e))
-                    .await;
-                return Ok(StopResult::Failed(format!("Failed to stop process: {}", e)));
+                let result = StopResult::Failed(format!("Failed to stop process: {}", e));
+                self.record_stop_result(pid, &result).await;
+                return Ok(result);
             }
         }
 
@@ -606,78 +660,29 @@ impl JobManager {
 
         match wait_result {
             Ok(Ok(exit_status)) => {
-                // Process exited gracefully
-                #[cfg(unix)]
-                {
-                    use std::os::unix::process::ExitStatusExt;
-                    if let Some(sig) = exit_status.signal() {
-                        self.update_job_signaled(pid, sig).await;
-                        return Ok(StopResult::Signaled(sig));
-                    }
-                }
-                let exit_code = exit_status.code().unwrap_or(-1);
-                self.update_job_exited(pid, exit_code).await;
-                Ok(StopResult::Graceful(exit_code))
+                let (result, _, _) = Self::interpret_exit_status(exit_status);
+                self.record_stop_result(pid, &result).await;
+                Ok(result)
             }
             Ok(Err(e)) => {
-                // Process wait failed
-                self.update_job_failed(pid, format!("Process wait failed: {}", e))
-                    .await;
-                Ok(StopResult::Failed(format!("Process wait failed: {}", e)))
+                let result = StopResult::Failed(format!("Process wait failed: {}", e));
+                self.record_stop_result(pid, &result).await;
+                Ok(result)
             }
             Err(_) => {
                 // Grace period expired, send SIGKILL
                 #[cfg(unix)]
                 {
-                    use nix::sys::signal::{self, Signal};
-                    use nix::unistd::Pid;
-
-                    let result = signal::kill(Pid::from_raw(pid as i32), Signal::SIGKILL);
-                    match result {
-                        Ok(()) => {
-                            // Wait/reap the child process to prevent zombie processes
-                            let _ = process.wait().await;
-                            self.update_job_failed(
-                                pid,
-                                "Stopped with SIGKILL after grace period".to_string(),
-                            )
-                            .await;
-                            Ok(StopResult::Forced)
-                        }
-                        Err(nix::errno::Errno::ESRCH) => {
-                            let exit_status = process.wait().await.ok();
-                            if let Some(status) = exit_status {
-                                use std::os::unix::process::ExitStatusExt;
-                                if let Some(sig) = status.signal() {
-                                    self.update_job_signaled(pid, sig).await;
-                                    return Ok(StopResult::Signaled(sig));
-                                }
-                                let code = status.code().unwrap_or(0);
-                                self.update_job_exited(pid, code).await;
-                                return Ok(StopResult::Graceful(code));
-                            }
-                            self.update_job_exited(pid, 0).await;
-                            Ok(StopResult::Graceful(0))
-                        }
-                        Err(e) => {
-                            self.update_job_failed(pid, format!("Failed to send SIGKILL: {}", e))
-                                .await;
-                            Ok(StopResult::Failed(format!("Failed to send SIGKILL: {}", e)))
-                        }
-                    }
+                    self.force_kill_process(pid, process).await
                 }
                 #[cfg(not(unix))]
                 {
                     let _ = process.kill().await;
                     let _ = process.wait().await;
-                    self.update_job_failed(
-                        pid,
-                        "SIGKILL not supported on this platform".to_string(),
-                    )
-                    .await;
-                    Ok(StopResult::Failed(
-                        "SIGKILL not supported on this platform".to_string(),
-                    ))
+                    let result =
+                        StopResult::Failed("SIGKILL not supported on this platform".to_string());
+                    self.record_stop_result(pid, &result).await;
+                    Ok(result)
                 }
             }
         }

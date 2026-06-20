@@ -713,27 +713,19 @@ impl DelaMcpServer {
         }
     }
 
-    #[tool(
-        description = "Start a task (default 1s capture, optional bounded wait, then background)"
-    )]
-    pub async fn task_start(
+    fn validate_task_for_start<'a>(
         &self,
-        Parameters(args): Parameters<TaskStartArgs>,
-    ) -> Result<CallToolResult, ErrorData> {
-        let root_dir = self.resolve_requested_cwd(&args.cwd)?;
-
-        let discovered = self.get_discovered_tasks(&root_dir).await;
-
-        let task = discovered
-            .tasks
+        tasks: &'a [crate::types::Task],
+        unique_name: &str,
+    ) -> Result<&'a crate::types::Task, ErrorData> {
+        let task = tasks
             .iter()
             .find(|t| {
-                let unique_name = t.disambiguated_name.as_ref().unwrap_or(&t.name);
-                unique_name == &args.unique_name
+                let name = t.disambiguated_name.as_ref().unwrap_or(&t.name);
+                name == unique_name
             })
-            .ok_or_else(|| DelaError::task_not_found(args.unique_name.clone()))?;
+            .ok_or_else(|| DelaError::task_not_found(unique_name.to_string()))?;
 
-        // Check if task is allowlisted for MCP execution
         let is_allowed = self
             .allowlist_evaluator
             .is_task_allowed(task)
@@ -745,27 +737,25 @@ impl DelaMcpServer {
             })?;
 
         if !is_allowed {
-            return Err(DelaError::not_allowlisted(args.unique_name.clone()).into());
+            return Err(DelaError::not_allowlisted(unique_name.to_string()).into());
         }
 
-        // Check if runner is available
         if !is_runner_available_for_mcp(&task.runner) {
             return Err(DelaError::runner_unavailable(
                 task.runner.short_name().to_string(),
-                args.unique_name.clone(),
+                unique_name.to_string(),
             )
             .into());
         }
 
-        // Check concurrency limits before starting the process
-        self.job_manager.can_start_job().await.map_err(|e| {
-            DelaError::internal_error(
-                format!("Concurrency limit exceeded: {}", e),
-                Some("Too many concurrent jobs running".to_string()),
-            )
-        })?;
+        Ok(task)
+    }
 
-        // Build the command
+    fn build_task_command(
+        task: &crate::types::Task,
+        root_dir: &Path,
+        args: &TaskStartArgs,
+    ) -> Result<Command, ErrorData> {
         let full_command = task.runner.get_command(task);
         let command_parts = split_command_words(&full_command).map_err(|e| {
             DelaError::internal_error(
@@ -787,238 +777,194 @@ impl DelaMcpServer {
         let base_args: Vec<&String> = command_iter.collect();
 
         let mut cmd = Command::new(executable);
-        cmd.current_dir(&root_dir);
-
-        // Ensure we capture stdout and stderr properly
+        cmd.current_dir(root_dir);
         cmd.stdout(std::process::Stdio::piped());
         cmd.stderr(std::process::Stdio::piped());
-
-        // Add the task name as the first argument
         cmd.args(base_args);
 
-        // Add task-specific arguments
         if let Some(task_args) = &args.args {
             cmd.args(task_args);
         }
 
-        // Set environment variables
         if let Some(env_vars) = &args.env {
             for (key, value) in env_vars {
                 cmd.env(key, value);
             }
         }
 
-        let started_at = Instant::now();
+        Ok(cmd)
+    }
 
-        // Start the process
-        let mut child = cmd.spawn().map_err(|e| {
-            DelaError::internal_error(
-                format!("Failed to start process: {}", e),
-                Some("Check if the command and arguments are valid".to_string()),
-            )
-        })?;
-
-        let pid = child.id().unwrap_or(0) as i32;
-
-        // Take stdout/stderr handles for streaming
-        let stdout_handle = child.stdout.take();
-        let stderr_handle = child.stderr.take();
-
-        // Send task started event
-        self.send_task_event(
-            pid as u32,
-            "started",
-            serde_json::json!({
-                "task": args.unique_name,
-                "command": full_command
-            }),
-        )
-        .await;
-
-        // Capture output until the bounded wait window expires while streaming via logging.
-        let capture_duration = Duration::from_secs(Self::resolve_wait_for_exit_seconds(
-            args.wait_for_exit_seconds,
-        )?);
-        let captured_output_chunks = Arc::new(tokio::sync::Mutex::new(Vec::new()));
-        let peer_clone = self.peer.clone();
-
-        // Create channels for output streaming
-        let (stdout_tx, stdout_rx) = tokio::sync::mpsc::channel::<String>(100);
-        let (stderr_tx, stderr_rx) = tokio::sync::mpsc::channel::<String>(100);
-
-        // Spawn stdout reader task
-        let stdout_task = if let Some(stdout) = stdout_handle {
-            let tx = stdout_tx;
-            Some(tokio::spawn(async move {
-                let mut reader = BufReader::new(stdout);
-                let mut line = String::new();
-                loop {
-                    line.clear();
-                    match reader.read_line(&mut line).await {
-                        Ok(0) => break, // EOF
-                        Ok(_) => {
-                            let _ = tx.send(line.clone()).await;
-                        }
-                        Err(_) => break,
-                    }
-                }
-            }))
-        } else {
-            drop(stdout_tx);
-            None
-        };
-
-        // Spawn stderr reader task
-        let stderr_task = if let Some(stderr) = stderr_handle {
-            let tx = stderr_tx;
-            Some(tokio::spawn(async move {
-                let mut reader = BufReader::new(stderr);
-                let mut line = String::new();
-                loop {
-                    line.clear();
-                    match reader.read_line(&mut line).await {
-                        Ok(0) => break, // EOF
-                        Ok(_) => {
-                            let _ = tx.send(line.clone()).await;
-                        }
-                        Err(_) => break,
-                    }
-                }
-            }))
-        } else {
-            drop(stderr_tx);
-            None
-        };
-
-        // Collect initial output for ~1 second while also streaming to logging
-        let captured_output_chunks_clone = captured_output_chunks.clone();
-        let peer_for_initial = peer_clone.clone();
-        let pid_u32 = pid as u32;
-
-        let initial_capture = tokio::spawn(Self::run_initial_capture(
-            peer_for_initial,
-            pid_u32,
-            capture_duration,
-            stdout_rx,
-            stderr_rx,
-            captured_output_chunks_clone,
-        ));
-
-        let capture_result = initial_capture.await;
-
-        // Check if process exited during initial capture
-        let process_exited = child.try_wait().is_ok_and(|status| status.is_some());
-
-        if process_exited {
-            // Process completed within 1 second
-            let exit_status = child.wait().await.map_err(|e| {
-                DelaError::internal_error(
-                    format!("Failed to wait for process: {}", e),
-                    Some("Process management error".to_string()),
-                )
-            })?;
-
-            let output_chunks = captured_output_chunks.lock().await.clone();
-
-            // Wait for reader tasks to finish
-            if let Some(task) = stdout_task {
-                let _ = task.await;
-            }
-            if let Some(task) = stderr_task {
-                let _ = task.await;
-            }
-
-            // Create job metadata and store it so task_status/task_output can query it
-            let metadata = JobMetadata {
-                started_at,
-                unique_name: args.unique_name.clone(),
-                source_name: task.source_name.clone(),
-                args: args.args.clone(),
-                env: args.env.clone(),
-                cwd: Some(root_dir.clone()),
-                command: task.runner.get_command(task),
-                file_path: task.definition_path().to_path_buf(),
-            };
-
-            let mut exit_code = exit_status.code();
-            let mut signal = None;
-            let mut exit_state = JobState::Exited(exit_code.unwrap_or(-1));
-            #[cfg(unix)]
-            {
-                use std::os::unix::process::ExitStatusExt;
-                if let Some(sig) = exit_status.signal() {
-                    signal = Some(sig);
-                    exit_code = None;
-                    exit_state = JobState::Signaled(sig);
-                }
-            }
-            self.job_manager
-                .record_completed_job(pid as u32, metadata, exit_state.clone())
-                .await
-                .map_err(|e| {
-                    DelaError::internal_error(
-                        format!("Failed to record completed job: {}", e),
-                        Some("Job management error".to_string()),
-                    )
-                })?;
-
-            // Add output to the job record
-            if !output_chunks.is_empty() {
-                Self::add_job_output_chunks(&self.job_manager, pid as u32, &output_chunks)
-                    .await
-                    .map_err(|e| {
-                        DelaError::internal_error(
-                            format!("Failed to add completed task output: {}", e),
-                            Some("Job management error".to_string()),
-                        )
-                    })?;
-            }
-
-            // Send task completed event
-            self.send_task_event(
-                pid as u32,
-                "exited",
-                serde_json::json!({
-                    "exit_code": exit_code,
-                    "task": args.unique_name
-                }),
-            )
-            .await;
-
-            let start_result = StartResultDto {
-                state: match exit_state {
-                    JobState::Signaled(_) => "signaled".to_string(),
-                    _ => "exited".to_string(),
-                },
-                pid: None,
-                exit_code,
-                signal,
-                output: output_chunks,
-            };
-
-            return Ok(CallToolResult::success(vec![
-                Content::json(&start_result).expect("Failed to serialize JSON"),
-            ]));
-        }
-
-        // Process is still running - set up background monitoring
-        let output_chunks = captured_output_chunks.lock().await.clone();
-
-        // Create job metadata
-        let metadata = JobMetadata {
+    fn build_job_metadata(
+        started_at: Instant,
+        task: &crate::types::Task,
+        args: &TaskStartArgs,
+        root_dir: &Path,
+    ) -> JobMetadata {
+        JobMetadata {
             started_at,
             unique_name: args.unique_name.clone(),
             source_name: task.source_name.clone(),
             args: args.args.clone(),
             env: args.env.clone(),
-            cwd: Some(root_dir.clone()),
+            cwd: Some(root_dir.to_path_buf()),
             command: task.runner.get_command(task),
             file_path: task.definition_path().to_path_buf(),
+        }
+    }
+
+    fn spawn_pipe_reader(
+        handle: Option<tokio::process::ChildStdout>,
+        tx: tokio::sync::mpsc::Sender<String>,
+    ) -> Option<tokio::task::JoinHandle<()>> {
+        if let Some(pipe) = handle {
+            Some(tokio::spawn(async move {
+                let mut reader = BufReader::new(pipe);
+                let mut line = String::new();
+                loop {
+                    line.clear();
+                    match reader.read_line(&mut line).await {
+                        Ok(0) => break,
+                        Ok(_) => {
+                            let _ = tx.send(line.clone()).await;
+                        }
+                        Err(_) => break,
+                    }
+                }
+            }))
+        } else {
+            drop(tx);
+            None
+        }
+    }
+
+    fn spawn_stderr_reader(
+        handle: Option<tokio::process::ChildStderr>,
+        tx: tokio::sync::mpsc::Sender<String>,
+    ) -> Option<tokio::task::JoinHandle<()>> {
+        if let Some(pipe) = handle {
+            Some(tokio::spawn(async move {
+                let mut reader = BufReader::new(pipe);
+                let mut line = String::new();
+                loop {
+                    line.clear();
+                    match reader.read_line(&mut line).await {
+                        Ok(0) => break,
+                        Ok(_) => {
+                            let _ = tx.send(line.clone()).await;
+                        }
+                        Err(_) => break,
+                    }
+                }
+            }))
+        } else {
+            drop(tx);
+            None
+        }
+    }
+
+    fn interpret_exit_status(
+        exit_status: std::process::ExitStatus,
+    ) -> (JobState, Option<i32>, Option<i32>) {
+        let mut exit_code = exit_status.code();
+        let mut signal = None;
+        let mut state = JobState::Exited(exit_code.unwrap_or(-1));
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::ExitStatusExt;
+            if let Some(sig) = exit_status.signal() {
+                signal = Some(sig);
+                exit_code = None;
+                state = JobState::Signaled(sig);
+            }
+        }
+        (state, exit_code, signal)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    async fn handle_completed_process(
+        &self,
+        pid: u32,
+        exit_status: std::process::ExitStatus,
+        metadata: JobMetadata,
+        output_chunks: Vec<OutputChunkDto>,
+        unique_name: &str,
+        stdout_task: Option<tokio::task::JoinHandle<()>>,
+        stderr_task: Option<tokio::task::JoinHandle<()>>,
+    ) -> Result<CallToolResult, ErrorData> {
+        if let Some(task) = stdout_task {
+            let _ = task.await;
+        }
+        if let Some(task) = stderr_task {
+            let _ = task.await;
+        }
+
+        let (exit_state, exit_code, signal) = Self::interpret_exit_status(exit_status);
+
+        self.job_manager
+            .record_completed_job(pid, metadata, exit_state.clone())
+            .await
+            .map_err(|e| {
+                DelaError::internal_error(
+                    format!("Failed to record completed job: {}", e),
+                    Some("Job management error".to_string()),
+                )
+            })?;
+
+        if !output_chunks.is_empty() {
+            Self::add_job_output_chunks(&self.job_manager, pid, &output_chunks)
+                .await
+                .map_err(|e| {
+                    DelaError::internal_error(
+                        format!("Failed to add completed task output: {}", e),
+                        Some("Job management error".to_string()),
+                    )
+                })?;
+        }
+
+        self.send_task_event(
+            pid,
+            "exited",
+            serde_json::json!({
+                "exit_code": exit_code,
+                "task": unique_name
+            }),
+        )
+        .await;
+
+        let start_result = StartResultDto {
+            state: match exit_state {
+                JobState::Signaled(_) => "signaled".to_string(),
+                _ => "exited".to_string(),
+            },
+            pid: None,
+            exit_code,
+            signal,
+            output: output_chunks,
         };
 
-        // Start background job management
+        Ok(CallToolResult::success(vec![
+            Content::json(&start_result).expect("Failed to serialize JSON"),
+        ]))
+    }
+
+    async fn setup_background_job(
+        &self,
+        pid: u32,
+        child: tokio::process::Child,
+        metadata: JobMetadata,
+        output_chunks: Vec<OutputChunkDto>,
+        capture_result: Result<
+            (
+                tokio::sync::mpsc::Receiver<String>,
+                tokio::sync::mpsc::Receiver<String>,
+            ),
+            tokio::task::JoinError,
+        >,
+        unique_name: &str,
+    ) -> Result<CallToolResult, ErrorData> {
         self.job_manager
-            .start_job(pid as u32, metadata, child)
+            .start_job(pid, metadata, child)
             .await
             .map_err(|e| {
                 DelaError::internal_error(
@@ -1027,9 +973,8 @@ impl DelaMcpServer {
                 )
             })?;
 
-        // Add initial output to the job
         if !output_chunks.is_empty() {
-            Self::add_job_output_chunks(&self.job_manager, pid as u32, &output_chunks)
+            Self::add_job_output_chunks(&self.job_manager, pid, &output_chunks)
                 .await
                 .map_err(|e| {
                     DelaError::internal_error(
@@ -1039,10 +984,9 @@ impl DelaMcpServer {
                 })?;
         }
 
-        // Spawn background monitoring task with continued output streaming
         let job_manager = self.job_manager.clone();
-        let peer_for_monitor = peer_clone;
-        let task_name = args.unique_name.clone();
+        let peer_for_monitor = self.peer.clone();
+        let task_name = unique_name.to_string();
 
         let (stdout_rx_opt, stderr_rx_opt) = if let Ok((rx1, rx2)) = capture_result {
             (Some(rx1), Some(rx2))
@@ -1052,7 +996,7 @@ impl DelaMcpServer {
 
         tokio::spawn(Self::run_background_monitoring(
             peer_for_monitor,
-            pid_u32,
+            pid,
             task_name,
             stdout_rx_opt,
             stderr_rx_opt,
@@ -1070,6 +1014,107 @@ impl DelaMcpServer {
         Ok(CallToolResult::success(vec![
             Content::json(&start_result).expect("Failed to serialize JSON"),
         ]))
+    }
+
+    #[tool(
+        description = "Start a task (default 1s capture, optional bounded wait, then background)"
+    )]
+    pub async fn task_start(
+        &self,
+        Parameters(args): Parameters<TaskStartArgs>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let root_dir = self.resolve_requested_cwd(&args.cwd)?;
+        let discovered = self.get_discovered_tasks(&root_dir).await;
+        let task = self.validate_task_for_start(&discovered.tasks, &args.unique_name)?;
+
+        self.job_manager.can_start_job().await.map_err(|e| {
+            DelaError::internal_error(
+                format!("Concurrency limit exceeded: {}", e),
+                Some("Too many concurrent jobs running".to_string()),
+            )
+        })?;
+
+        let full_command = task.runner.get_command(task);
+        let mut cmd = Self::build_task_command(task, &root_dir, &args)?;
+
+        let started_at = Instant::now();
+        let mut child = cmd.spawn().map_err(|e| {
+            DelaError::internal_error(
+                format!("Failed to start process: {}", e),
+                Some("Check if the command and arguments are valid".to_string()),
+            )
+        })?;
+
+        let pid = child.id().unwrap_or(0);
+        let stdout_handle = child.stdout.take();
+        let stderr_handle = child.stderr.take();
+
+        self.send_task_event(
+            pid,
+            "started",
+            serde_json::json!({
+                "task": args.unique_name,
+                "command": full_command
+            }),
+        )
+        .await;
+
+        let capture_duration = Duration::from_secs(Self::resolve_wait_for_exit_seconds(
+            args.wait_for_exit_seconds,
+        )?);
+        let captured_output_chunks = Arc::new(tokio::sync::Mutex::new(Vec::new()));
+
+        let (stdout_tx, stdout_rx) = tokio::sync::mpsc::channel::<String>(100);
+        let (stderr_tx, stderr_rx) = tokio::sync::mpsc::channel::<String>(100);
+
+        let stdout_task = Self::spawn_pipe_reader(stdout_handle, stdout_tx);
+        let stderr_task = Self::spawn_stderr_reader(stderr_handle, stderr_tx);
+
+        let initial_capture = tokio::spawn(Self::run_initial_capture(
+            self.peer.clone(),
+            pid,
+            capture_duration,
+            stdout_rx,
+            stderr_rx,
+            captured_output_chunks.clone(),
+        ));
+
+        let capture_result = initial_capture.await;
+
+        let process_exited = child.try_wait().is_ok_and(|status| status.is_some());
+        let metadata = Self::build_job_metadata(started_at, task, &args, &root_dir);
+
+        if process_exited {
+            let exit_status = child.wait().await.map_err(|e| {
+                DelaError::internal_error(
+                    format!("Failed to wait for process: {}", e),
+                    Some("Process management error".to_string()),
+                )
+            })?;
+            let output_chunks = captured_output_chunks.lock().await.clone();
+            return self
+                .handle_completed_process(
+                    pid,
+                    exit_status,
+                    metadata,
+                    output_chunks,
+                    &args.unique_name,
+                    stdout_task,
+                    stderr_task,
+                )
+                .await;
+        }
+
+        let output_chunks = captured_output_chunks.lock().await.clone();
+        self.setup_background_job(
+            pid,
+            child,
+            metadata,
+            output_chunks,
+            capture_result,
+            &args.unique_name,
+        )
+        .await
     }
 
     #[tool(description = "Status for a single unique_name (may have multiple PIDs)")]

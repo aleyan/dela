@@ -32,38 +32,7 @@ pub fn execute(verbose: bool, color: &str) -> anyhow::Result<()> {
 
     // Only show task definition files status in verbose mode
     if verbose {
-        test_println!("Task definition files:");
-        for (_def_type, files) in discovered.definitions.iter() {
-            for file in files {
-                let file_name = file
-                    .path
-                    .strip_prefix(&current_dir)
-                    .map(|p| p.to_string_lossy().to_string())
-                    .unwrap_or_else(|_| file.path.to_string_lossy().to_string());
-                match &file.status {
-                    TaskFileStatus::Parsed => {
-                        test_println!("  {} {}: Found and parsed", "✓".green(), file_name);
-                    }
-                    TaskFileStatus::NotImplemented => {
-                        test_println!(
-                            "  {} {}: Found but parsing not yet implemented",
-                            "!".yellow(),
-                            file_name
-                        );
-                    }
-                    TaskFileStatus::ParseError(e) => {
-                        test_println!("  {} {}: Error parsing: {}", "✗".red(), file_name, e);
-                    }
-                    TaskFileStatus::NotReadable(e) => {
-                        test_println!("  {} {}: Not readable: {}", "✗".red(), file_name, e);
-                    }
-                    TaskFileStatus::NotFound => {
-                        test_println!("  {} {}: Not found", "-".dimmed(), file_name);
-                    }
-                }
-            }
-        }
-        test_println!("");
+        print_verbose_definitions(&discovered, &current_dir);
     }
 
     // Create writer for output
@@ -77,20 +46,7 @@ pub fn execute(verbose: bool, color: &str) -> anyhow::Result<()> {
         writeln!(writer, "{}", line).map_err(|e| anyhow::anyhow!("Failed to write output: {}", e))
     };
 
-    // Group tasks by runner for the new format
-    let mut tasks_by_runner: HashMap<String, Vec<&Task>> = HashMap::new();
-    for task in &discovered.tasks {
-        let runner_name = task.runner.short_name().to_string();
-        tasks_by_runner.entry(runner_name).or_default().push(task);
-    }
-
-    // Track footnotes used
-    let mut used_footnotes: HashMap<char, bool> = HashMap::new();
-    used_footnotes.insert('*', false); // tool not installed
-    used_footnotes.insert('†', false); // shadowed by shell builtin
-    used_footnotes.insert('‡', false); // shadowed by command on path
-    used_footnotes.insert('‖', false); // conflicts with task from another tool
-    used_footnotes.insert('§', false); // no tool exists for ci execution
+    let tasks_by_runner = group_tasks_by_runner(&discovered.tasks);
 
     if tasks_by_runner.is_empty() {
         write_line(&format!(
@@ -98,28 +54,16 @@ pub fn execute(verbose: bool, color: &str) -> anyhow::Result<()> {
             "No tasks found in the current directory.".yellow()
         ))?;
     } else {
-        // Calculate max task name width across all runners
-        let max_task_name_width = discovered
-            .tasks
-            .iter()
-            .map(|t| t.disambiguated_name.as_ref().unwrap_or(&t.name).len())
-            .max()
-            .unwrap_or(0)
-            .max(18); // Minimum 18 characters
+        let display_width = calculate_display_width(&discovered.tasks);
 
-        // Ensure all task names will be padded to this width
-        // Round up to nearest multiple of 5 for better alignment
-        let display_width = max_task_name_width.div_ceil(5) * 5;
-
-        // Get a sorted list of runners for deterministic output
         let mut runners: Vec<String> = tasks_by_runner.keys().cloned().collect();
         runners.sort();
 
-        // Process each runner section
+        let mut used_footnotes: HashSet<char> = HashSet::new();
+
         for runner in runners {
             let tasks = tasks_by_runner.get(&runner).unwrap();
 
-            // Sort tasks by name for deterministic output
             let mut sorted_tasks = tasks.to_vec();
             sorted_tasks.sort_by(|a, b| {
                 let a_name = a.disambiguated_name.as_ref().unwrap_or(&a.name);
@@ -127,62 +71,19 @@ pub fn execute(verbose: bool, color: &str) -> anyhow::Result<()> {
                 a_name.cmp(b_name)
             });
 
-            // Add missing runner indicator if needed
-            let tool_not_installed = !is_runner_available(&sorted_tasks[0].runner);
-            let runner_name = runner.clone();
-            let runner_footnote = if sorted_tasks[0].runner == crate::types::TaskRunner::TravisCi {
-                used_footnotes.insert('§', true);
-                Some("§".yellow())
-            } else if tool_not_installed {
-                used_footnotes.insert('*', true);
-                Some("*".yellow())
-            } else {
-                None
-            };
+            let header =
+                build_section_header(&runner, &sorted_tasks, &current_dir, &mut used_footnotes);
+            write_line(&format!("\n{}", header))?;
 
             let runner_paths: HashSet<_> =
                 sorted_tasks.iter().map(|task| &task.file_path).collect();
             let section_runner_path =
                 (runner_paths.len() == 1).then_some(sorted_tasks[0].file_path.as_path());
-            let display_path = if let Some(runner_path) = section_runner_path {
-                format_runner_path_for_display(&runner, runner_path, &current_dir)
-            } else {
-                "multiple files".to_string()
-            };
 
-            // Write section header
-            let colored_runner = if tool_not_installed {
-                runner_name.dimmed().red()
-            } else {
-                runner_name.cyan()
-            };
-            let runner_header = if let Some(footnote) = runner_footnote {
-                format!("{} {}", colored_runner, footnote)
-            } else {
-                format!("{}", colored_runner)
-            };
-            write_line(&format!("\n{} — {}", runner_header, display_path.dimmed()))?;
-
-            // Process each task in the section
             for task in sorted_tasks {
-                // Check for conflicts and update footnotes tracker
                 let is_ambiguous = task_discovery::is_task_ambiguous(&discovered, &task.name);
-                if is_ambiguous {
-                    used_footnotes.insert('‖', true);
-                }
+                collect_footnotes_for_task(task, is_ambiguous, &mut used_footnotes);
 
-                if let Some(shadowed_by) = &task.shadowed_by {
-                    match shadowed_by {
-                        ShadowType::ShellBuiltin(_) => {
-                            used_footnotes.insert('†', true);
-                        }
-                        ShadowType::PathExecutable(_) => {
-                            used_footnotes.insert('‡', true);
-                        }
-                    }
-                }
-
-                // Format the task entry
                 let formatted_task = format_task_entry(task, is_ambiguous, display_width);
                 let source_label = task_source_label(task, section_runner_path, &current_dir);
                 let formatted_task =
@@ -191,34 +92,7 @@ pub fn execute(verbose: bool, color: &str) -> anyhow::Result<()> {
             }
         }
 
-        // Add footnotes legend
-        let mut footnotes: Vec<(char, &str)> = Vec::new();
-        if *used_footnotes.get(&'*').unwrap_or(&false) {
-            footnotes.push(('*', "tool not installed"));
-        }
-        if *used_footnotes.get(&'†').unwrap_or(&false) {
-            footnotes.push(('†', "shadowed by a shell builtin"));
-        }
-        if *used_footnotes.get(&'‡').unwrap_or(&false) {
-            footnotes.push(('‡', "shadowed by a command on the path"));
-        }
-        if *used_footnotes.get(&'‖').unwrap_or(&false) {
-            footnotes.push(('‖', "conflicts with task from another tool"));
-        }
-        if *used_footnotes.get(&'§').unwrap_or(&false) {
-            footnotes.push(('§', "no tool exists for ci execution"));
-        }
-
-        if !footnotes.is_empty() {
-            write_line(&format!("\n{}", "footnotes legend:".dimmed()))?;
-            for (symbol, description) in footnotes {
-                write_line(&format!(
-                    "{} {}",
-                    symbol.to_string().yellow(),
-                    description.dimmed()
-                ))?;
-            }
-        }
+        write_footnotes_legend(&used_footnotes, &mut write_line)?;
     }
 
     // Show any errors encountered during discovery
@@ -229,6 +103,153 @@ pub fn execute(verbose: bool, color: &str) -> anyhow::Result<()> {
         }
     }
 
+    Ok(())
+}
+
+fn print_verbose_definitions(
+    discovered: &task_discovery::DiscoveredTasks,
+    current_dir: &std::path::Path,
+) {
+    test_println!("Task definition files:");
+    for (_def_type, files) in discovered.definitions.iter() {
+        for file in files {
+            let file_name = file
+                .path
+                .strip_prefix(current_dir)
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_else(|_| file.path.to_string_lossy().to_string());
+            match &file.status {
+                TaskFileStatus::Parsed => {
+                    test_println!("  {} {}: Found and parsed", "✓".green(), file_name);
+                }
+                TaskFileStatus::NotImplemented => {
+                    test_println!(
+                        "  {} {}: Found but parsing not yet implemented",
+                        "!".yellow(),
+                        file_name
+                    );
+                }
+                TaskFileStatus::ParseError(e) => {
+                    test_println!("  {} {}: Error parsing: {}", "✗".red(), file_name, e);
+                }
+                TaskFileStatus::NotReadable(e) => {
+                    test_println!("  {} {}: Not readable: {}", "✗".red(), file_name, e);
+                }
+                TaskFileStatus::NotFound => {
+                    test_println!("  {} {}: Not found", "-".dimmed(), file_name);
+                }
+            }
+        }
+    }
+    test_println!("");
+}
+
+fn group_tasks_by_runner(tasks: &[Task]) -> HashMap<String, Vec<&Task>> {
+    let mut tasks_by_runner: HashMap<String, Vec<&Task>> = HashMap::new();
+    for task in tasks {
+        let runner_name = task.runner.short_name().to_string();
+        tasks_by_runner.entry(runner_name).or_default().push(task);
+    }
+    tasks_by_runner
+}
+
+fn calculate_display_width(tasks: &[Task]) -> usize {
+    let max_task_name_width = tasks
+        .iter()
+        .map(|t| t.disambiguated_name.as_ref().unwrap_or(&t.name).len())
+        .max()
+        .unwrap_or(0)
+        .max(18);
+    max_task_name_width.div_ceil(5) * 5
+}
+
+fn build_section_header(
+    runner: &str,
+    sorted_tasks: &[&Task],
+    current_dir: &std::path::Path,
+    used_footnotes: &mut HashSet<char>,
+) -> String {
+    let tool_not_installed = !is_runner_available(&sorted_tasks[0].runner);
+
+    let runner_footnote = if sorted_tasks[0].runner == crate::types::TaskRunner::TravisCi {
+        used_footnotes.insert('§');
+        Some("§".yellow())
+    } else if tool_not_installed {
+        used_footnotes.insert('*');
+        Some("*".yellow())
+    } else {
+        None
+    };
+
+    let runner_paths: HashSet<_> = sorted_tasks.iter().map(|task| &task.file_path).collect();
+    let section_runner_path =
+        (runner_paths.len() == 1).then_some(sorted_tasks[0].file_path.as_path());
+    let display_path = if let Some(runner_path) = section_runner_path {
+        format_runner_path_for_display(runner, runner_path, current_dir)
+    } else {
+        "multiple files".to_string()
+    };
+
+    let colored_runner = if tool_not_installed {
+        runner.dimmed().red()
+    } else {
+        runner.cyan()
+    };
+    let runner_header = if let Some(footnote) = runner_footnote {
+        format!("{} {}", colored_runner, footnote)
+    } else {
+        format!("{}", colored_runner)
+    };
+    format!("{} — {}", runner_header, display_path.dimmed())
+}
+
+fn collect_footnotes_for_task(task: &Task, is_ambiguous: bool, used_footnotes: &mut HashSet<char>) {
+    if is_ambiguous {
+        used_footnotes.insert('‖');
+    }
+    if let Some(shadowed_by) = &task.shadowed_by {
+        match shadowed_by {
+            ShadowType::ShellBuiltin(_) => {
+                used_footnotes.insert('†');
+            }
+            ShadowType::PathExecutable(_) => {
+                used_footnotes.insert('‡');
+            }
+        }
+    }
+}
+
+fn write_footnotes_legend(
+    used_footnotes: &HashSet<char>,
+    write_line: &mut dyn FnMut(&str) -> anyhow::Result<()>,
+) -> anyhow::Result<()> {
+    let mut footnotes: Vec<(char, &str)> = Vec::new();
+    if used_footnotes.contains(&'*') {
+        footnotes.push(('*', "tool not installed"));
+    }
+    if used_footnotes.contains(&'†') {
+        footnotes.push(('†', "shadowed by a shell builtin"));
+    }
+    if used_footnotes.contains(&'‡') {
+        footnotes.push(('‡', "shadowed by a command on the path"));
+    }
+    if used_footnotes.contains(&'‖') {
+        footnotes.push(('‖', "conflicts with task from another tool"));
+    }
+    if used_footnotes.contains(&'§') {
+        footnotes.push(('§', "no tool exists for ci execution"));
+    }
+
+    if !footnotes.is_empty() {
+        write_line(&format!("\n{}", "footnotes legend:".dimmed()))?;
+        for (symbol, description) in footnotes {
+            write_line(&format!(
+                "{} {}",
+                symbol.to_string().yellow(),
+                description.dimmed()
+            ))?;
+        }
+    }
     Ok(())
 }
 
