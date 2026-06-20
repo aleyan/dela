@@ -447,15 +447,6 @@ impl JobManager {
         jobs.values().cloned().collect()
     }
 
-    /// Get jobs by unique name
-    pub async fn get_jobs_by_name(&self, unique_name: &str) -> Vec<Job> {
-        let jobs = self.jobs.read().await;
-        jobs.values()
-            .filter(|job| job.metadata.unique_name == unique_name)
-            .cloned()
-            .collect()
-    }
-
     /// Update a job's state
     pub async fn update_job_state(&self, pid: u32, state: JobState) -> anyhow::Result<()> {
         let mut jobs = self.jobs.write().await;
@@ -854,6 +845,47 @@ mod tests {
     use super::*;
     use tokio::process::Command;
 
+    fn spawn_cmd(program: &str, args: &[&str], piped: bool) -> tokio::process::Child {
+        let mut cmd = Command::new(program);
+        for arg in args {
+            cmd.arg(arg);
+        }
+        if piped {
+            cmd.stdout(std::process::Stdio::piped());
+            cmd.stderr(std::process::Stdio::piped());
+        }
+        match cmd.spawn() {
+            Ok(child) => child,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                #[cfg(unix)]
+                {
+                    for path in &["/bin", "/usr/bin", "/usr/local/bin"] {
+                        let full_path = std::path::Path::new(path).join(program);
+                        let mut fallback_cmd = Command::new(&full_path);
+                        for arg in args {
+                            fallback_cmd.arg(arg);
+                        }
+                        if piped {
+                            fallback_cmd.stdout(std::process::Stdio::piped());
+                            fallback_cmd.stderr(std::process::Stdio::piped());
+                        }
+                        if let Ok(child) = fallback_cmd.spawn() {
+                            return child;
+                        }
+                    }
+                }
+                panic!(
+                    "Failed to spawn command '{}' with args {:?}: {:?}",
+                    program, args, e
+                );
+            }
+            Err(e) => panic!(
+                "Failed to spawn command '{}' with args {:?}: {:?}",
+                program, args, e
+            ),
+        }
+    }
+
     #[test]
     fn test_ring_buffer_basic() {
         let mut buffer = RingBuffer::new(3, 100);
@@ -927,12 +959,7 @@ mod tests {
         let manager = JobManager::new();
 
         // Create a simple command
-        let mut cmd = Command::new("echo");
-        cmd.arg("test");
-        cmd.stdout(std::process::Stdio::piped());
-        cmd.stderr(std::process::Stdio::piped());
-
-        let child = cmd.spawn().unwrap();
+        let child = spawn_cmd("echo", &["test"], true);
         let pid = child.id().unwrap();
 
         let metadata = JobMetadata {
@@ -958,12 +985,7 @@ mod tests {
     async fn test_job_manager_get_job() {
         let manager = JobManager::new();
 
-        let mut cmd = Command::new("echo");
-        cmd.arg("test");
-        cmd.stdout(std::process::Stdio::piped());
-        cmd.stderr(std::process::Stdio::piped());
-
-        let child = cmd.spawn().unwrap();
+        let child = spawn_cmd("echo", &["test"], true);
         let pid = child.id().unwrap();
 
         let metadata = JobMetadata {
@@ -991,12 +1013,7 @@ mod tests {
     async fn test_job_manager_add_output() {
         let manager = JobManager::new();
 
-        let mut cmd = Command::new("echo");
-        cmd.arg("test");
-        cmd.stdout(std::process::Stdio::piped());
-        cmd.stderr(std::process::Stdio::piped());
-
-        let child = cmd.spawn().unwrap();
+        let child = spawn_cmd("echo", &["test"], true);
         let pid = child.id().unwrap();
 
         let metadata = JobMetadata {
@@ -1037,12 +1054,7 @@ mod tests {
             gc_interval_seconds: 0, // Run GC immediately
         });
 
-        let mut cmd = Command::new("echo");
-        cmd.arg("test");
-        cmd.stdout(std::process::Stdio::piped());
-        cmd.stderr(std::process::Stdio::piped());
-
-        let child = cmd.spawn().unwrap();
+        let child = spawn_cmd("echo", &["test"], true);
         let pid = child.id().unwrap();
 
         let metadata = JobMetadata {
@@ -1076,12 +1088,7 @@ mod tests {
     async fn test_job_manager_records_completion_metadata() {
         let manager = JobManager::new();
 
-        let mut cmd = Command::new("echo");
-        cmd.arg("test");
-        cmd.stdout(std::process::Stdio::piped());
-        cmd.stderr(std::process::Stdio::piped());
-
-        let child = cmd.spawn().unwrap();
+        let child = spawn_cmd("echo", &["test"], true);
         let pid = child.id().unwrap();
 
         let metadata = JobMetadata {
@@ -1111,12 +1118,7 @@ mod tests {
     async fn test_record_completed_job_rejects_overwriting_running_job() {
         let manager = JobManager::new();
 
-        let mut cmd = Command::new("sleep");
-        cmd.arg("5");
-        cmd.stdout(std::process::Stdio::piped());
-        cmd.stderr(std::process::Stdio::piped());
-
-        let child = cmd.spawn().unwrap();
+        let child = spawn_cmd("sleep", &["5"], true);
         let pid = child.id().unwrap();
 
         let metadata = JobMetadata {
@@ -1157,9 +1159,7 @@ mod tests {
     async fn test_stop_job_graceful_managed_success() {
         let manager = JobManager::new();
 
-        let mut cmd = Command::new("sleep");
-        cmd.arg("10");
-        let child = cmd.spawn().unwrap();
+        let child = spawn_cmd("sleep", &["10"], false);
         let pid = child.id().unwrap();
 
         let metadata = JobMetadata {
@@ -1192,7 +1192,7 @@ mod tests {
     async fn test_stop_job_graceful_fallback() {
         let manager = JobManager::new();
 
-        let mut child = tokio::process::Command::new("true").spawn().unwrap();
+        let mut child = spawn_cmd("true", &[], false);
         let pid = child.id().unwrap();
 
         // Wait for it to exit so it's fully reaped and no longer a zombie.
@@ -1238,20 +1238,9 @@ mod tests {
         let manager = JobManager::new();
 
         #[cfg(unix)]
-        let mut cmd = {
-            let mut cmd = Command::new("sh");
-            cmd.arg("-c");
-            cmd.arg("trap '' TERM; sleep 10");
-            cmd
-        };
+        let child = spawn_cmd("sh", &["-c", "trap '' TERM; sleep 10"], false);
         #[cfg(not(unix))]
-        let mut cmd = {
-            let mut cmd = Command::new("cmd");
-            cmd.arg("/c");
-            cmd.arg("ping 127.0.0.1 -n 10");
-            cmd
-        };
-        let child = cmd.spawn().unwrap();
+        let child = spawn_cmd("cmd", &["/c", "ping 127.0.0.1 -n 10"], false);
         let pid = child.id().unwrap();
 
         let metadata = JobMetadata {
@@ -1291,8 +1280,7 @@ mod tests {
     async fn test_stop_job_graceful_already_exited() {
         let manager = JobManager::new();
 
-        let mut cmd = Command::new("echo");
-        let child = cmd.spawn().unwrap();
+        let child = spawn_cmd("echo", &[], false);
         let pid = child.id().unwrap();
 
         let metadata = JobMetadata {
