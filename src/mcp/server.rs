@@ -927,6 +927,7 @@ impl DelaMcpServer {
             "exited",
             serde_json::json!({
                 "exit_code": exit_code,
+                "signal": signal,
                 "task": unique_name
             }),
         )
@@ -1045,7 +1046,13 @@ impl DelaMcpServer {
             )
         })?;
 
-        let pid = child.id().unwrap_or(0);
+        let pid = match child.id() {
+            Some(id) => id,
+            None => {
+                tracing::warn!("Process ID is unavailable for task '{}'", args.unique_name);
+                0
+            }
+        };
         let stdout_handle = child.stdout.take();
         let stderr_handle = child.stderr.take();
 

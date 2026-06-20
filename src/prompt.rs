@@ -55,9 +55,20 @@ pub fn prompt_for_task(task: &Task) -> anyhow::Result<AllowDecision> {
 fn setup_terminal() -> anyhow::Result<Terminal<CrosstermBackend<Stdout>>> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    if let Err(e) = execute!(stdout, EnterAlternateScreen, EnableMouseCapture) {
+        let _ = disable_raw_mode();
+        return Err(anyhow::anyhow!("Failed to enter alternate screen: {}", e));
+    }
     let backend = CrosstermBackend::new(stdout);
-    Terminal::new(backend).map_err(|e| anyhow::anyhow!("Failed to create terminal: {}", e))
+    match Terminal::new(backend) {
+        Ok(t) => Ok(t),
+        Err(e) => {
+            let mut stdout = io::stdout();
+            let _ = execute!(stdout, LeaveAlternateScreen, DisableMouseCapture);
+            let _ = disable_raw_mode();
+            Err(anyhow::anyhow!("Failed to create terminal: {}", e))
+        }
+    }
 }
 
 /// Fallback text-based prompt for non-interactive environments

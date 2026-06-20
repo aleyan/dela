@@ -5,7 +5,7 @@
     {
       "file": "./src/prompt.rs",
       "function": "run_tui",
-      "line": 160,
+      "line": 171,
       "cyclomatic": 6.0,
       "coverage": 0.0,
       "crap": 42.0
@@ -22,6 +22,14 @@
       "file": "./src/mcp/job_manager.rs",
       "function": "JobManager::stop_job",
       "line": 511,
+      "cyclomatic": 5.0,
+      "coverage": 0.0,
+      "crap": 30.0
+    },
+    {
+      "file": "./src/prompt.rs",
+      "function": "setup_terminal",
+      "line": 55,
       "cyclomatic": 5.0,
       "coverage": 0.0,
       "crap": 30.0
@@ -77,7 +85,7 @@
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::task_output",
-      "line": 1182,
+      "line": 1189,
       "cyclomatic": 16.0,
       "coverage": 73.40425531914893,
       "crap": 20.81588857960183
@@ -277,7 +285,7 @@
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::call_tool",
-      "line": 1434,
+      "line": 1441,
       "cyclomatic": 13.0,
       "coverage": 100.0,
       "crap": 13.0
@@ -299,20 +307,20 @@
       "crap": 12.018
     },
     {
-      "file": "./src/prompt.rs",
-      "function": "setup_terminal",
-      "line": 55,
-      "cyclomatic": 3.0,
-      "coverage": 0.0,
-      "crap": 12.0
-    },
-    {
       "file": "./src/parsers/parse_makefile.rs",
       "function": "parse",
       "line": 16,
       "cyclomatic": 8.0,
       "coverage": 61.111111111111114,
       "crap": 11.764060356652948
+    },
+    {
+      "file": "./src/mcp/server.rs",
+      "function": "DelaMcpServer::task_start",
+      "line": 1023,
+      "cyclomatic": 11.0,
+      "coverage": 82.27848101265823,
+      "crap": 11.673423400582914
     },
     {
       "file": "./src/commands/list.rs",
@@ -325,7 +333,7 @@
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::task_stop",
-      "line": 1312,
+      "line": 1319,
       "cyclomatic": 8.0,
       "coverage": 62.71186440677966,
       "crap": 11.318119184532012
@@ -341,7 +349,7 @@
     {
       "file": "./src/prompt.rs",
       "function": "handle_key_code",
-      "line": 110,
+      "line": 121,
       "cyclomatic": 11.0,
       "coverage": 95.0,
       "crap": 11.015125
@@ -413,7 +421,7 @@
     {
       "file": "./src/prompt.rs",
       "function": "prompt_for_task_fallback",
-      "line": 64,
+      "line": 75,
       "cyclomatic": 10.0,
       "coverage": 90.0,
       "crap": 10.1
@@ -457,14 +465,6 @@
       "cyclomatic": 5.0,
       "coverage": 42.857142857142854,
       "crap": 9.66472303206997
-    },
-    {
-      "file": "./src/mcp/server.rs",
-      "function": "DelaMcpServer::task_start",
-      "line": 1022,
-      "cyclomatic": 9.0,
-      "coverage": 84.21052631578947,
-      "crap": 9.318851144481703
     },
     {
       "file": "./src/parsers/parse_justfile.rs",
@@ -511,8 +511,8 @@
       "function": "DelaMcpServer::handle_completed_process",
       "line": 885,
       "cyclomatic": 8.0,
-      "coverage": 78.18181818181819,
-      "crap": 8.664715251690458
+      "coverage": 78.57142857142857,
+      "crap": 8.629737609329446
     },
     {
       "file": "./src/allowlist.rs",
@@ -693,7 +693,7 @@
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::task_status",
-      "line": 1121,
+      "line": 1128,
       "cyclomatic": 6.0,
       "coverage": 89.58333333333334,
       "crap": 6.040690104166666
@@ -781,7 +781,7 @@
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::initialize",
-      "line": 1420,
+      "line": 1427,
       "cyclomatic": 2.0,
       "coverage": 0.0,
       "crap": 6.0
@@ -853,7 +853,7 @@
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::setup_background_job",
-      "line": 951,
+      "line": 952,
       "cyclomatic": 5.0,
       "coverage": 82.14285714285714,
       "crap": 5.142356049562682
@@ -941,7 +941,7 @@
     {
       "file": "./src/prompt.rs",
       "function": "apply_key_action",
-      "line": 144,
+      "line": 155,
       "cyclomatic": 5.0,
       "coverage": 100.0,
       "crap": 5.0
@@ -1637,7 +1637,7 @@
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::list_tools",
-      "line": 1472,
+      "line": 1479,
       "cyclomatic": 1.0,
       "coverage": 0.0,
       "crap": 2.0
@@ -1645,7 +1645,7 @@
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::set_level",
-      "line": 1830,
+      "line": 1837,
       "cyclomatic": 1.0,
       "coverage": 0.0,
       "crap": 2.0
@@ -2541,7 +2541,7 @@
     {
       "file": "./src/mcp/server.rs",
       "function": "parse_tool_args",
-      "line": 1386,
+      "line": 1393,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -2549,7 +2549,7 @@
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::get_info",
-      "line": 1401,
+      "line": 1408,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -2557,7 +2557,7 @@
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::set_level_impl",
-      "line": 1842,
+      "line": 1849,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -2565,7 +2565,7 @@
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::set_level_impl",
-      "line": 1848,
+      "line": 1855,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -2693,7 +2693,7 @@
     {
       "file": "./src/prompt.rs",
       "function": "ui",
-      "line": 204,
+      "line": 215,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
