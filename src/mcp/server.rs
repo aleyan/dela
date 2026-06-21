@@ -31,6 +31,9 @@ const OUTPUT_NOTIFICATION_FLUSH_INTERVAL: Duration = Duration::from_secs(1);
 const OUTPUT_NOTIFICATION_MAX_BYTES: usize = 4 * 1024;
 const OUTPUT_NOTIFICATION_MAX_LINES: usize = 100;
 
+static NEXT_FALLBACK_PID: std::sync::atomic::AtomicU32 =
+    std::sync::atomic::AtomicU32::new(1_000_000_000);
+
 fn classify_output_log_level(stream: &str, line: &str) -> LoggingLevel {
     let normalized = line.trim().to_ascii_lowercase();
 
@@ -1049,8 +1052,14 @@ impl DelaMcpServer {
         let pid = match child.id() {
             Some(id) => id,
             None => {
-                tracing::warn!("Process ID is unavailable for task '{}'", args.unique_name);
-                0
+                let fallback_pid =
+                    NEXT_FALLBACK_PID.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                tracing::warn!(
+                    "Process ID is unavailable for task '{}', using fallback PID {}",
+                    args.unique_name,
+                    fallback_pid
+                );
+                fallback_pid
             }
         };
         let stdout_handle = child.stdout.take();
