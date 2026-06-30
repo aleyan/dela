@@ -78,9 +78,9 @@ release_verify_npm_token:
 	trap 'rm -f "$$NPM_USERCONFIG"' EXIT; \
 	chmod 600 "$$NPM_USERCONFIG"; \
 	printf '%s\n' "//registry.npmjs.org/:_authToken=$${NPM_TOKEN}" > "$$NPM_USERCONFIG"; \
-	echo "Validating NPM_TOKEN..."; \
-	if ! npm --userconfig "$$NPM_USERCONFIG" --cache "$(NPM_CACHE_DIR)" whoami --registry=https://registry.npmjs.org >/dev/null; then \
-		echo "Error: NPM_TOKEN was rejected by npm."; \
+	echo "Validating NPM_TOKEN has publish access for @aleyan scope..."; \
+	if ! npm --userconfig "$$NPM_USERCONFIG" --cache "$(NPM_CACHE_DIR)" publish ./npm/dela --access public --dry-run >/dev/null 2>&1; then \
+		echo "Error: NPM_TOKEN does not have publish access for @aleyan/dela."; \
 		exit 1; \
 	fi
 

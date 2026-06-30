@@ -12,6 +12,7 @@ npm_release_prep:
 	for dir in $(NPM_PLATFORM_DIRS); do \
 		archive="dist/$$(basename $$dir).tar.gz"; \
 		mkdir -p "$$dir"; \
+		rm -f "$$dir/dela"; \
 		echo "Extracting $$archive -> $$dir"; \
 		tar -xzf "$$archive" -C "$$dir"; \
 	done; \
@@ -39,12 +40,12 @@ npm_publish:
 			npm --cache "$(NPM_CACHE_DIR)" pack "./$$dir" --dry-run; \
 			continue; \
 		fi; \
-		if npm --cache "$(NPM_CACHE_DIR)" view "$$name@$$version" version >/dev/null 2>&1; then \
+		if npm --cache "$(NPM_CACHE_DIR)" view "$$name@$$version" version --registry=https://registry.npmjs.org >/dev/null 2>&1; then \
 			echo "$$name@$$version is already published; skipping."; \
 			continue; \
 		fi; \
 		echo "Publishing $$name@$$version from $$dir..."; \
-		npm --cache "$(NPM_CACHE_DIR)" publish "./$$dir" --access public; \
+		npm --cache "$(NPM_CACHE_DIR)" publish "./$$dir" --access public --registry=https://registry.npmjs.org; \
 	done
 
 npm_verify_local:
