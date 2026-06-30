@@ -18,6 +18,10 @@ The release automation is in .github/workflows/release.yml:
 make release_verify
 ```
 
+`make release_verify` requires `NPM_TOKEN` and `CARGO_REGISTRY_TOKEN` in the
+environment and validates both tokens. The GitHub dry run validates those
+repository secrets plus the workflow `GITHUB_TOKEN`.
+
 4. Run the GitHub dry run from the UI:
    - open `Actions`
    - open `Release to crates.io`
@@ -48,9 +52,12 @@ make release_publish
 - the tag does not already exist locally
 - the tag does not already exist on `origin`
 - the version is not already on crates.io
+- `NPM_TOKEN` is accepted by npm
+- `CARGO_REGISTRY_TOKEN` is accepted by crates.io
 - lint, tests, integration tests, and `cargo publish --dry-run --locked`
 
-The release workflow also calls `make release_verify` for the shared metadata checks.
+The release workflow calls `make release_verify_github`, which emits workflow
+outputs and verifies release metadata plus npm, crates.io, and GitHub tokens.
 
 `make release_publish`:
 
@@ -80,4 +87,3 @@ Do not create the actual release from the GitHub Releases page. GitHub does allo
 - [ ] GitHub Releases shows the release
 - [ ] crates.io shows the version
 - [ ] npmjs.com shows the version
-

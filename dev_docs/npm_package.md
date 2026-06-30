@@ -104,9 +104,12 @@ It should:
 
 Publishing the wrapper last matters because it references the platform packages
 through `optionalDependencies`.
+The publish step should skip package versions that are already on npm so a
+failed release can be rerun after a partial publish.
 
 The workflow needs an `NPM_TOKEN` repository secret with publish access for the
-`@aleyan` npm scope.
+`@aleyan` npm scope. `make release_verify` and `make release_verify_github`
+validate this token before publishing.
 
 ## Local Verification
 
@@ -149,8 +152,8 @@ Keep `cargo install dela` and direct GitHub binaries as alternate install paths.
 - [x] Add the JS launcher.
 - [x] Add `npm/*/dela` to `.gitignore`.
 - [x] Add npm publishing to `.github/workflows/release.yml`.
-- [x] Add the `NPM_TOKEN` GitHub secret.
+- [ ] Add the `NPM_TOKEN` GitHub secret.
 - [x] Verify local `npm pack` output.
-- [x] Test a global install from a packed tarball.
-- [x] Publish platform packages and then the wrapper package.
+- [ ] Test a global install from a packed tarball.
+- [ ] Publish platform packages and then the wrapper package.
 - [x] Update `README.md`, `INSTALL.md`, and release docs with npm install instructions.
