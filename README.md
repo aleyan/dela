@@ -10,14 +10,14 @@ Dela is a task runner that provides discovery for task definitions in various fo
 
 ## Installation
 
-Install `dela` from npmjs.com via npm or another compatible javascript package manager and initialize it to set up shell integration:
+Install `dela` from npmjs.com via npm or another compatible JavaScript package manager and initialize it to set up shell integration:
 
 ```sh
 $ npm install -g @aleyan/dela
 $ dela init
 ```
 
-Alternatievly you can build and install the rust binary directly from crates.io with the following:
+Alternatively, you can build and install the Rust binary directly from crates.io:
 
 ```sh
 $ cargo +1.93.0 install dela
@@ -165,7 +165,7 @@ Other task runners that handle multiple runners are [task-keeper](https://github
 
 ## Development
 
-For developing `dela`, please refer to the [development guide](dev_docs/development.md), [testing guide](dev_docs/testing.md), and [style guide](dev_docs/styling.md).
+For developing `dela`, please refer to the [development guide](dev_docs/development.md), [testing guide](dev_docs/testing.md), and [style guide](dev_docs/style.md).
 
 ## Disclaimer
 

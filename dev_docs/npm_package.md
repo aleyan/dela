@@ -123,13 +123,17 @@ npm pack ./npm/dela --dry-run
 npm pack ./npm/dela-darwin-arm64 --dry-run
 ```
 
-For the first end-to-end install test, use a temporary registry such as Verdaccio
-or install the wrapper tarball with the matching platform tarball:
+For the first full end-to-end install test, use a temporary registry such as
+Verdaccio. For a local no-registry smoke test, install the wrapper tarball with
+the matching platform tarball in an isolated prefix:
 
 ```sh
-npm install -g ./aleyan-dela-0.0.6.tgz ./aleyan-dela-darwin-arm64-0.0.6.tgz
-dela --version
-dela init
+npm install -g \
+  --prefix target/npm-install-prefix \
+  --omit=optional \
+  ./aleyan-dela-darwin-arm64-0.0.6.tgz \
+  ./aleyan-dela-0.0.6.tgz
+target/npm-install-prefix/bin/dela --version
 ```
 
 Use the platform tarball that matches the test machine.
