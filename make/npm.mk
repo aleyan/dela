@@ -3,40 +3,20 @@
 NPM_VERSION ?= $(shell grep -m 1 '^version = ' Cargo.toml | cut -d '"' -f2)
 NPM_CACHE_DIR ?= $(CURDIR)/target/npm-cache
 
-NPM_PACKAGE_DIRS := npm/dela-darwin-amd64 npm/dela-darwin-arm64 npm/dela-linux-amd64 npm/dela-linux-arm64 npm/dela
+NPM_PLATFORM_DIRS := npm/dela-darwin-amd64 npm/dela-darwin-arm64 npm/dela-linux-amd64 npm/dela-linux-arm64
+NPM_PACKAGE_DIRS := $(NPM_PLATFORM_DIRS) npm/dela
 
 npm_release_prep:
 	@set -euo pipefail; \
 	echo "Preparing NPM packages for version $(NPM_VERSION)..."; \
-	mkdir -p npm/dela-darwin-amd64 npm/dela-darwin-arm64 npm/dela-linux-amd64 npm/dela-linux-arm64; \
-	echo "Extracting platform binaries from dist/..."; \
-	tar -xzf dist/dela-darwin-amd64.tar.gz -C npm/dela-darwin-amd64; \
-	tar -xzf dist/dela-darwin-arm64.tar.gz -C npm/dela-darwin-arm64; \
-	tar -xzf dist/dela-linux-amd64.tar.gz -C npm/dela-linux-amd64; \
-	tar -xzf dist/dela-linux-arm64.tar.gz -C npm/dela-linux-arm64; \
-	node -e " \
-		const fs = require('fs'); \
-		const version = '$(NPM_VERSION)'; \
-		const packages = [ \
-			'npm/dela', \
-			'npm/dela-darwin-amd64', \
-			'npm/dela-darwin-arm64', \
-			'npm/dela-linux-amd64', \
-			'npm/dela-linux-arm64' \
-		]; \
-		packages.forEach(dir => { \
-			const file = dir + '/package.json'; \
-			const pkg = JSON.parse(fs.readFileSync(file, 'utf8')); \
-			pkg.version = version; \
-			if (pkg.optionalDependencies) { \
-				for (const dep of Object.keys(pkg.optionalDependencies)) { \
-					pkg.optionalDependencies[dep] = version; \
-				} \
-			} \
-			fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + '\n'); \
-		}); \
-	"; \
-	for dir in npm/dela-darwin-amd64 npm/dela-darwin-arm64 npm/dela-linux-amd64 npm/dela-linux-arm64; do \
+	for dir in $(NPM_PLATFORM_DIRS); do \
+		archive="dist/$$(basename $$dir).tar.gz"; \
+		mkdir -p "$$dir"; \
+		echo "Extracting $$archive -> $$dir"; \
+		tar -xzf "$$archive" -C "$$dir"; \
+	done; \
+	node scripts/npm_set_versions.js "$(NPM_VERSION)"; \
+	for dir in $(NPM_PLATFORM_DIRS); do \
 		if [ ! -x "$$dir/dela" ]; then \
 			echo "Error: $$dir/dela does not exist or is not executable!"; \
 			exit 1; \
@@ -86,28 +66,7 @@ npm_verify_local:
 		exit 1; \
 	fi; \
 	cp target/release/dela "$$PLATFORM_DIR/dela"; \
-	node -e " \
-		const fs = require('fs'); \
-		const version = '$(NPM_VERSION)'; \
-		const packages = [ \
-			'npm/dela', \
-			'npm/dela-darwin-amd64', \
-			'npm/dela-darwin-arm64', \
-			'npm/dela-linux-amd64', \
-			'npm/dela-linux-arm64' \
-		]; \
-		packages.forEach(dir => { \
-			const file = dir + '/package.json'; \
-			const pkg = JSON.parse(fs.readFileSync(file, 'utf8')); \
-			pkg.version = version; \
-			if (pkg.optionalDependencies) { \
-				for (const dep of Object.keys(pkg.optionalDependencies)) { \
-					pkg.optionalDependencies[dep] = version; \
-				} \
-			} \
-			fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + '\n'); \
-		}); \
-	"; \
+	node scripts/npm_set_versions.js "$(NPM_VERSION)"; \
 	echo "Verifying launcher execution..."; \
 	node npm/dela/bin/dela --version; \
 	echo "Verifying npm pack for wrapper package..."; \

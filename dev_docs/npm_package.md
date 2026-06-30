@@ -119,8 +119,8 @@ Before publishing, verify the launcher and package contents:
 cargo build --release
 cp target/release/dela npm/dela-darwin-arm64/dela # use the local platform dir
 node npm/dela/bin/dela --version
-npm pack npm/dela --dry-run
-npm pack npm/dela-darwin-arm64 --dry-run
+npm pack ./npm/dela --dry-run
+npm pack ./npm/dela-darwin-arm64 --dry-run
 ```
 
 For the first end-to-end install test, use a temporary registry such as Verdaccio

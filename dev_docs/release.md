@@ -24,7 +24,7 @@ repository secrets plus the workflow `GITHUB_TOKEN`.
 
 4. Run the GitHub dry run from the UI:
    - open `Actions`
-   - open `Release to crates.io`
+   - open `Release`
    - click `Run workflow`
    - leave `dry_run=true`
    - run it on `main`
@@ -35,7 +35,7 @@ repository secrets plus the workflow `GITHUB_TOKEN`.
 make release_publish
 ```
 
-7. Open `Actions` and watch the tag-triggered `Release to crates.io` workflow finish.
+7. Open `Actions` and watch the tag-triggered `Release` workflow finish.
 8. Verify the release on:
    - GitHub Releases
    - crates.io
