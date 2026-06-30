@@ -1,0 +1,19 @@
+{
+  "name": "@aleyan/dela-linux-amd64",
+  "version": "0.0.6",
+  "description": "Linux x86_64 binary for dela",
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "files": [
+    "dela"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aleyan/dela.git"
+  }
+}

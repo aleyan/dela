@@ -35,6 +35,7 @@ make release_publish
 8. Verify the release on:
    - GitHub Releases
    - crates.io
+   - npmjs.com (as `@aleyan/dela`)
 
 ## What The Make Targets Do
 
@@ -78,3 +79,5 @@ Do not create the actual release from the GitHub Releases page. GitHub does allo
 - [ ] real `Release` workflow passed
 - [ ] GitHub Releases shows the release
 - [ ] crates.io shows the version
+- [ ] npmjs.com shows the version
+

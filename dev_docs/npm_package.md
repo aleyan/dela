@@ -145,12 +145,12 @@ Keep `cargo install dela` and direct GitHub binaries as alternate install paths.
 
 ## Implementation Checklist
 
-- [ ] Create the `npm/` package directories.
-- [ ] Add the JS launcher.
-- [ ] Add `npm/*/dela` to `.gitignore`.
-- [ ] Add npm publishing to `.github/workflows/release.yml`.
-- [ ] Add the `NPM_TOKEN` GitHub secret.
-- [ ] Verify local `npm pack` output.
-- [ ] Test a global install from a packed tarball.
-- [ ] Publish platform packages and then the wrapper package.
-- [ ] Update `README.md`, `INSTALL.md`, and release docs with npm install instructions.
+- [x] Create the `npm/` package directories.
+- [x] Add the JS launcher.
+- [x] Add `npm/*/dela` to `.gitignore`.
+- [x] Add npm publishing to `.github/workflows/release.yml`.
+- [x] Add the `NPM_TOKEN` GitHub secret.
+- [x] Verify local `npm pack` output.
+- [x] Test a global install from a packed tarball.
+- [x] Publish platform packages and then the wrapper package.
+- [x] Update `README.md`, `INSTALL.md`, and release docs with npm install instructions.

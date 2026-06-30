@@ -9,3 +9,5 @@ tests/task_definitions/build/*
 /scratch
 release_notes.md
 lcov.info
+npm/*/dela
+

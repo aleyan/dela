@@ -1,0 +1,33 @@
+{
+  "name": "@aleyan/dela",
+  "version": "0.0.6",
+  "description": "A task runner that delegates the work to other tools",
+  "bin": {
+    "dela": "bin/dela"
+  },
+  "files": [
+    "bin/dela"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aleyan/dela.git"
+  },
+  "keywords": [
+    "task-runner",
+    "automation",
+    "build",
+    "make"
+  ],
+  "author": "Alexander Yankov",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/aleyan/dela/issues"
+  },
+  "homepage": "https://github.com/aleyan/dela#readme",
+  "optionalDependencies": {
+    "@aleyan/dela-darwin-amd64": "0.0.6",
+    "@aleyan/dela-darwin-arm64": "0.0.6",
+    "@aleyan/dela-linux-amd64": "0.0.6",
+    "@aleyan/dela-linux-arm64": "0.0.6"
+  }
+}

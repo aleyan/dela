@@ -2,6 +2,13 @@
 
 There are several ways to install `dela`:
 
+## Via NPM (Recommended)
+
+```sh
+npm install -g @aleyan/dela
+dela init
+```
+
 ## From Source (using Cargo)
 
 ```sh

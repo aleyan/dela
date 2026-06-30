@@ -11,6 +11,8 @@ VERBOSE ?= 0
 
 include make/release.mk
 include make/crap.mk
+include make/npm.mk
+
 
 build:
 	@echo "Building dela..."

@@ -10,10 +10,10 @@ Dela is a task runner that provides discovery for task definitions in various fo
 
 ## Installation
 
-Install `dela` from crates.io and initialize it to set up shell integration:
+Install `dela` via npm and initialize it to set up shell integration:
 
 ```sh
-$ cargo +1.93.0 install dela
+$ npm install -g @aleyan/dela
 $ dela init
 ```
 

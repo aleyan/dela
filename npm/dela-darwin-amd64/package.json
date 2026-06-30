@@ -1,0 +1,19 @@
+{
+  "name": "@aleyan/dela-darwin-amd64",
+  "version": "0.0.6",
+  "description": "macOS Intel binary for dela",
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "files": [
+    "dela"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aleyan/dela.git"
+  }
+}

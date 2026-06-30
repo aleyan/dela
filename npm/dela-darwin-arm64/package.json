@@ -1,0 +1,19 @@
+{
+  "name": "@aleyan/dela-darwin-arm64",
+  "version": "0.0.6",
+  "description": "macOS Apple Silicon binary for dela",
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "files": [
+    "dela"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aleyan/dela.git"
+  }
+}
