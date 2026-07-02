@@ -6,6 +6,7 @@ NPM_CACHE_DIR ?= $(CURDIR)/target/npm-cache
 NPM_PLATFORM_DIRS := npm/dela-darwin-amd64 npm/dela-darwin-arm64 npm/dela-linux-amd64 npm/dela-linux-arm64
 NPM_PACKAGE_DIRS := $(NPM_PLATFORM_DIRS) npm/dela
 
+# Prepare npm package directories from already-built dist/*.tar.gz release archives.
 npm_release_prep:
 	@set -euo pipefail; \
 	echo "Preparing NPM packages for version $(NPM_VERSION)..."; \
@@ -25,6 +26,7 @@ npm_release_prep:
 	done; \
 	echo "NPM packages prepared successfully."
 
+# Publish npm packages, or pack-check them when NPM_PUBLISH_DRY_RUN=1.
 npm_publish:
 	@set -euo pipefail; \
 	mkdir -p "$(NPM_CACHE_DIR)"; \
@@ -60,6 +62,7 @@ npm_publish:
 		npm --userconfig "$$NPM_USERCONFIG" --cache "$(NPM_CACHE_DIR)" publish "./$$dir" --access public --registry=https://registry.npmjs.org; \
 	done
 
+# Build the local release binary if needed and verify the npm launcher/package shape.
 npm_verify_local:
 	@set -euo pipefail; \
 	echo "Locally verifying NPM packaging..."; \
