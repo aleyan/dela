@@ -67,8 +67,9 @@ make release_publish
 - `CARGO_REGISTRY_TOKEN` is accepted by crates.io
 - lint, tests, integration tests, and `cargo publish --dry-run --locked`
 
-The release workflow calls `make release_verify_github`, which emits workflow
-outputs and verifies release metadata plus npm, crates.io, and GitHub tokens.
+The release workflow calls private target `make _release_verify_github`, which
+emits workflow outputs and verifies release metadata plus npm, crates.io, and
+GitHub tokens.
 
 `make release_publish`:
 

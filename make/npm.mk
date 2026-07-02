@@ -1,4 +1,4 @@
-.PHONY: npm_release_prep npm_publish npm_verify_local
+.PHONY: _npm_release_prep npm_publish npm_verify_local
 
 NPM_CACHE_DIR ?= $(CURDIR)/target/npm-cache
 
@@ -6,7 +6,7 @@ NPM_PLATFORM_DIRS := npm/dela-darwin-amd64 npm/dela-darwin-arm64 npm/dela-linux-
 NPM_PACKAGE_DIRS := $(NPM_PLATFORM_DIRS) npm/dela
 
 # Prepare npm package directories from already-built dist/*.tar.gz release archives.
-npm_release_prep: release_set_versions
+_npm_release_prep: release_set_versions
 	@set -euo pipefail; \
 	echo "Preparing NPM packages for version $(DELA_VERSION)..."; \
 	for dir in $(NPM_PLATFORM_DIRS); do \
@@ -44,7 +44,7 @@ npm_publish:
 		name=$$(node -p "require('./$$dir/package.json').name"); \
 		version=$$(node -p "require('./$$dir/package.json').version"); \
 		if [ "$$dir" != "npm/dela" ] && [ ! -x "$$dir/dela" ]; then \
-			echo "Error: $$dir/dela does not exist or is not executable. Run make npm_release_prep first."; \
+			echo "Error: $$dir/dela does not exist or is not executable. Run make _npm_release_prep first."; \
 			exit 1; \
 		fi; \
 		if [ "$${NPM_PUBLISH_DRY_RUN:-0}" = "1" ]; then \

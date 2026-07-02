@@ -1,4 +1,4 @@
-.PHONY: release_set_versions release_verify release_verify_github release_verify_metadata release_verify_tag_available release_verify_crate_unpublished release_verify_tokens release_verify_npm_token release_verify_cargo_token release_verify_github_token release_verify_tests release_emit_github_outputs release_guard_github_dry_run release_publish release_notes
+.PHONY: release_set_versions release_verify _release_verify_github _release_verify_metadata _release_verify_tag_available _release_verify_crate_unpublished _release_verify_tokens _release_verify_npm_token _release_verify_cargo_token _release_verify_github_token _release_verify_tests _release_emit_github_outputs _release_guard_github_dry_run release_publish _release_notes
 
 RELEASE_VERSION = $(shell grep -m 1 '^version = ' Cargo.toml | cut -d '"' -f2)
 RELEASE_TAG = v$(RELEASE_VERSION)
@@ -10,15 +10,15 @@ release_set_versions:
 	node scripts/set_versions.js "$(DELA_VERSION)"
 
 # Full local prerelease check for humans before pushing the release tag.
-release_verify: release_verify_metadata release_verify_tag_available release_verify_crate_unpublished release_verify_tokens release_verify_tests
+release_verify: _release_verify_metadata _release_verify_tag_available _release_verify_crate_unpublished _release_verify_tokens _release_verify_tests
 	@echo "Release verification passed for $(RELEASE_TAG)."
 
 # GitHub Actions entrypoint. Emits workflow outputs and validates repository
 # secrets, but leaves lint/tests/package checks to dedicated jobs.
-release_verify_github: release_guard_github_dry_run release_emit_github_outputs release_verify_metadata release_verify_tokens release_verify_github_token
+_release_verify_github: _release_guard_github_dry_run _release_emit_github_outputs _release_verify_metadata _release_verify_tokens _release_verify_github_token
 	@echo "GitHub release verification passed for $(RELEASE_TAG)."
 
-release_verify_metadata:
+_release_verify_metadata:
 	@set -euo pipefail; \
 	echo "Verifying release metadata for $(RELEASE_TAG)..."; \
 	if ! echo "$(RELEASE_VERSION)" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$$'; then \
@@ -42,7 +42,7 @@ release_verify_metadata:
 		exit 1; \
 	fi
 
-release_verify_tag_available:
+_release_verify_tag_available:
 	@set -euo pipefail; \
 	if git rev-parse -q --verify "refs/tags/$(RELEASE_TAG)" >/dev/null; then \
 		echo "Error: local tag $(RELEASE_TAG) already exists."; \
@@ -53,7 +53,7 @@ release_verify_tag_available:
 		exit 1; \
 	fi
 
-release_verify_crate_unpublished:
+_release_verify_crate_unpublished:
 	@set -euo pipefail; \
 	if ! command -v jq >/dev/null 2>&1; then \
 		echo "Error: jq is required for release_verify."; \
@@ -65,9 +65,9 @@ release_verify_crate_unpublished:
 		exit 1; \
 	fi
 
-release_verify_tokens: release_verify_npm_token release_verify_cargo_token
+_release_verify_tokens: _release_verify_npm_token _release_verify_cargo_token
 
-release_verify_npm_token:
+_release_verify_npm_token:
 	@set -euo pipefail; \
 	if ! command -v npm >/dev/null 2>&1; then \
 		echo "Error: npm is required to validate NPM_TOKEN."; \
@@ -89,7 +89,7 @@ release_verify_npm_token:
 		exit 1; \
 	fi
 
-release_verify_cargo_token:
+_release_verify_cargo_token:
 	@set -euo pipefail; \
 	if [ -z "$${CARGO_REGISTRY_TOKEN:-}" ]; then \
 		echo "Error: CARGO_REGISTRY_TOKEN is required for release verification."; \
@@ -101,7 +101,7 @@ release_verify_cargo_token:
 		exit 1; \
 	fi
 
-release_verify_github_token:
+_release_verify_github_token:
 	@set -euo pipefail; \
 	if ! command -v gh >/dev/null 2>&1; then \
 		echo "Error: gh is required to validate GH_TOKEN."; \
@@ -121,7 +121,7 @@ release_verify_github_token:
 		exit 1; \
 	fi
 
-release_verify_tests:
+_release_verify_tests:
 	@set -euo pipefail; \
 	echo "Running lint..."; \
 	$(MAKE) lint; \
@@ -132,7 +132,7 @@ release_verify_tests:
 	echo "Running cargo publish dry run..."; \
 	cargo publish --dry-run --locked
 
-release_emit_github_outputs:
+_release_emit_github_outputs:
 	@set -euo pipefail; \
 	if [ -n "$${GITHUB_OUTPUT:-}" ]; then \
 		echo "version=$(RELEASE_VERSION)" >> "$$GITHUB_OUTPUT"; \
@@ -142,7 +142,7 @@ release_emit_github_outputs:
 		echo "tag_name=$(RELEASE_TAG)"; \
 	fi
 
-release_guard_github_dry_run:
+_release_guard_github_dry_run:
 	@set -euo pipefail; \
 	if [ "$${GITHUB_EVENT_NAME:-}" = "workflow_dispatch" ] && [ "$${RELEASE_DRY_RUN:-true}" != "true" ]; then \
 		echo "::error::Manual runs are dry-run only. Push a v* tag to publish."; \
@@ -150,7 +150,7 @@ release_guard_github_dry_run:
 	fi
 
 # Extracts release notes for the current version from CHANGELOG.md into release_notes.md
-release_notes:
+_release_notes:
 	@set -euo pipefail; \
 	VERSION=$$(grep -m 1 '^version = ' Cargo.toml | cut -d '"' -f2); \
 	echo "Extracting release notes for $$VERSION into release_notes.md..."; \

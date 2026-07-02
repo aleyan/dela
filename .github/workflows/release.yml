@@ -51,7 +51,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_DRY_RUN: ${{ inputs.dry_run }}
         shell: bash
-        run: make release_verify_github
+        run: make _release_verify_github
 
   lint-and-unit-tests:
     name: Lint And Unit Tests
@@ -187,7 +187,7 @@ jobs:
             fi
           fi
 
-          make release_notes
+          make _release_notes
 
           gh release create "${TAG_NAME}" \
             --draft \
@@ -271,7 +271,7 @@ jobs:
           merge-multiple: true
 
       - name: Prepare NPM packages
-        run: make npm_release_prep DELA_VERSION="${{ needs.verify-release.outputs.version }}"
+        run: make _npm_release_prep DELA_VERSION="${{ needs.verify-release.outputs.version }}"
 
       - name: Dry-run package contents
         run: make npm_publish NPM_PUBLISH_DRY_RUN=1
@@ -299,7 +299,7 @@ jobs:
           merge-multiple: true
 
       - name: Prepare NPM packages
-        run: make npm_release_prep DELA_VERSION="${{ needs.verify-release.outputs.version }}"
+        run: make _npm_release_prep DELA_VERSION="${{ needs.verify-release.outputs.version }}"
 
       - name: Publish to NPM
         env:
