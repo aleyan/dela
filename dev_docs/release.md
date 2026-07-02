@@ -36,11 +36,14 @@ repository secrets for npm and crates.io plus the workflow `GITHUB_TOKEN`.
    - leave `dry_run=true`
    - run it on `main`
 7. Confirm the dry run passed and inspect the uploaded artifacts.
-8. Publish the release tag:
+8. Start the real release by pushing the `v*` tag. The local helper is:
 
 ```sh
 make release_publish
 ```
+
+`make release_publish` only guards and pushes the tag. GitHub Actions does the
+actual publishing after the tag exists.
 
 9. Open `Actions` and watch the tag-triggered `Release` workflow finish.
 10. Verify the release on:
@@ -79,11 +82,12 @@ GitHub tokens.
 - requires a clean working tree
 - requires local `main` to match `origin/main`
 - asks you to type the exact tag name
-- creates and pushes the annotated tag
+- creates and pushes the annotated tag that triggers GitHub Actions
 
 ## GitHub UI Notes
 
-Use GitHub UI for running the dry run and for monitoring the release.
+Use GitHub UI for running the dry run and for monitoring the real tag-triggered
+release.
 
 Do not create the actual release from the GitHub Releases page. GitHub does allow creating a tag from `Draft a new release`, but this repo is designed for the tag push to trigger the workflow, create the draft release, upload assets, publish to crates.io, and then publish the GitHub release.
 

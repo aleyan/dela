@@ -51,11 +51,12 @@ make release_verify
 GitHub: `Actions` -> `Release` -> `Run workflow` -> `main`, with
 `dry_run=true`.
 
-3. From a clean, up-to-date local `main`, publish the tag:
+3. Start the real GitHub release by pushing the `v*` tag. The local helper is:
 
 ```sh
 make release_publish
 ```
 
-The pushed `v*` tag triggers the real GitHub release workflow. Do not publish
-from the GitHub Releases page manually.
+GitHub Actions does the publishing. `make release_publish` only guards and
+pushes the tag; use it as the CLI escape hatch when you are not creating the tag
+through GitHub. Do not publish from the GitHub Releases page manually.
