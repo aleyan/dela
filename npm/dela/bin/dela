@@ -1,0 +1,66 @@
+#!/usr/bin/env node
+
+const fs = require('fs');
+const path = require('path');
+const child_process = require('child_process');
+
+const platform = process.platform;
+const arch = process.arch;
+
+const PLATFORMS = {
+  'darwin-x64': '@aleyan/dela-darwin-amd64',
+  'darwin-arm64': '@aleyan/dela-darwin-arm64',
+  'linux-x64': '@aleyan/dela-linux-amd64',
+  'linux-arm64': '@aleyan/dela-linux-arm64'
+};
+
+const key = `${platform}-${arch}`;
+const pkgName = PLATFORMS[key];
+
+if (!pkgName) {
+  console.error(`Error: Unsupported platform/architecture combination: ${key}`);
+  console.error(`dela currently supports: ${Object.keys(PLATFORMS).join(', ')}`);
+  process.exit(1);
+}
+
+let binaryPath;
+try {
+  const pkgJsonPath = require.resolve(`${pkgName}/package.json`);
+  binaryPath = path.join(path.dirname(pkgJsonPath), 'dela');
+} catch (err) {
+  // Local development fallback: look in the sibling directory in the repository
+  const siblingPath = path.join(__dirname, '..', '..', pkgName.split('/')[1], 'dela');
+  if (fs.existsSync(siblingPath)) {
+    binaryPath = siblingPath;
+  } else {
+    console.error(`Error: Failed to find the platform-specific package "${pkgName}".`);
+    console.error(`Please verify that optional dependencies were installed correctly.`);
+    console.error(`You might need to reinstall dela: npm install -g @aleyan/dela`);
+    process.exit(1);
+  }
+}
+
+if (!fs.existsSync(binaryPath)) {
+  console.error(`Error: The native binary could not be found at: ${binaryPath}`);
+  console.error(`This can happen if the installation was corrupted or optional dependencies failed to install.`);
+  console.error(`Please try reinstalling dela: npm install -g @aleyan/dela`);
+  process.exit(1);
+}
+
+const args = process.argv.slice(2);
+const result = child_process.spawnSync(binaryPath, args, { stdio: 'inherit' });
+
+if (result.error) {
+  console.error(`Error: Failed to execute dela binary: ${result.error.message}`);
+  process.exit(1);
+}
+
+if (result.status !== null) {
+  process.exit(result.status);
+} else if (result.signal) {
+  process.kill(process.pid, result.signal);
+  // Fallback in case process.kill does not terminate the process synchronously
+  process.exit(1);
+} else {
+  process.exit(0);
+}

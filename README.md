@@ -10,7 +10,14 @@ Dela is a task runner that provides discovery for task definitions in various fo
 
 ## Installation
 
-Install `dela` from crates.io and initialize it to set up shell integration:
+Install `dela` from npmjs.com via npm or another compatible JavaScript package manager and initialize it to set up shell integration:
+
+```sh
+$ npm install -g @aleyan/dela
+$ dela init
+```
+
+Alternatively, you can build and install the Rust binary directly from crates.io:
 
 ```sh
 $ cargo +1.93.0 install dela
@@ -158,34 +165,8 @@ Other task runners that handle multiple runners are [task-keeper](https://github
 
 ## Development
 
-For local development:
+For developing `dela`, please refer to the [development guide](dev_docs/development.md), [testing guide](dev_docs/testing.md), and [style guide](dev_docs/style.md).
 
-```sh
-$ cargo install --path .
-$ source resources/zsh.sh  # or equivalent for your shell
-```
-
-### Testing MCP with Inspector
-
-To test the MCP server interactively with the [MCP Inspector](https://github.com/modelcontextprotocol/inspector):
-
-```sh
-# Build and run with Inspector
-$ cargo build --quiet
-$ RUST_LOG=warn npx @modelcontextprotocol/inspector ./target/debug/dela mcp
-```
-
-## Testing
-
-Run all tests:
-```sh
-$ make tests_integration
-```
-
-Run integrations test with `test_shells`, it requires `Make`, `Docker`, and `dela` to be installed.
-
-```sh
-$ tests_integration
-```
+## Disclaimer
 
 Note: `dela` is not at 0.1 yet and its CLI is subject to change.

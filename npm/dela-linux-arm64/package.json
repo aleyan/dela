@@ -1,0 +1,19 @@
+{
+  "name": "@aleyan/dela-linux-arm64",
+  "version": "0.0.6",
+  "description": "Linux ARM64 binary for dela",
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "files": [
+    "dela"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aleyan/dela.git"
+  }
+}
