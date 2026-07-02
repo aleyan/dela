@@ -1,15 +1,19 @@
-.PHONY: npm_release_prep npm_publish npm_verify_local
+.PHONY: npm_set_versions npm_release_prep npm_publish npm_verify_local
 
-NPM_VERSION ?= $(shell grep -m 1 '^version = ' Cargo.toml | cut -d '"' -f2)
+DELA_VERSION ?= $(shell grep -m 1 '^version = ' Cargo.toml | cut -d '"' -f2)
 NPM_CACHE_DIR ?= $(CURDIR)/target/npm-cache
 
 NPM_PLATFORM_DIRS := npm/dela-darwin-amd64 npm/dela-darwin-arm64 npm/dela-linux-amd64 npm/dela-linux-arm64
 NPM_PACKAGE_DIRS := $(NPM_PLATFORM_DIRS) npm/dela
 
+# Set Cargo.toml, Cargo.lock, and all npm package versions to DELA_VERSION.
+npm_set_versions:
+	node scripts/npm_set_versions.js "$(DELA_VERSION)"
+
 # Prepare npm package directories from already-built dist/*.tar.gz release archives.
 npm_release_prep:
 	@set -euo pipefail; \
-	echo "Preparing NPM packages for version $(NPM_VERSION)..."; \
+	echo "Preparing NPM packages for version $(DELA_VERSION)..."; \
 	for dir in $(NPM_PLATFORM_DIRS); do \
 		archive="dist/$$(basename $$dir).tar.gz"; \
 		mkdir -p "$$dir"; \
@@ -17,7 +21,7 @@ npm_release_prep:
 		echo "Extracting $$archive -> $$dir"; \
 		tar -xzf "$$archive" -C "$$dir"; \
 	done; \
-	node scripts/npm_set_versions.js "$(NPM_VERSION)"; \
+	$(MAKE) npm_set_versions DELA_VERSION="$(DELA_VERSION)"; \
 	for dir in $(NPM_PLATFORM_DIRS); do \
 		if [ ! -x "$$dir/dela" ]; then \
 			echo "Error: $$dir/dela does not exist or is not executable!"; \
@@ -82,7 +86,7 @@ npm_verify_local:
 		exit 1; \
 	fi; \
 	cp target/release/dela "$$PLATFORM_DIR/dela"; \
-	node scripts/npm_set_versions.js "$(NPM_VERSION)"; \
+	$(MAKE) npm_set_versions DELA_VERSION="$(DELA_VERSION)"; \
 	echo "Verifying launcher execution..."; \
 	node npm/dela/bin/dela --version; \
 	echo "Verifying npm pack for wrapper package..."; \

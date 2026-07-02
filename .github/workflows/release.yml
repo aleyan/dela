@@ -271,7 +271,7 @@ jobs:
           merge-multiple: true
 
       - name: Prepare NPM packages
-        run: make npm_release_prep NPM_VERSION="${{ needs.verify-release.outputs.version }}"
+        run: make npm_release_prep DELA_VERSION="${{ needs.verify-release.outputs.version }}"
 
       - name: Dry-run package contents
         run: make npm_publish NPM_PUBLISH_DRY_RUN=1
@@ -299,7 +299,7 @@ jobs:
           merge-multiple: true
 
       - name: Prepare NPM packages
-        run: make npm_release_prep NPM_VERSION="${{ needs.verify-release.outputs.version }}"
+        run: make npm_release_prep DELA_VERSION="${{ needs.verify-release.outputs.version }}"
 
       - name: Publish to NPM
         env:
