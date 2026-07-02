@@ -1,20 +1,30 @@
 #!/usr/bin/env node
 
-// Sets Cargo.toml, Cargo.lock, and all npm package.json files to the given version.
-// Usage: node scripts/npm_set_versions.js <version>
+// Sets Cargo.toml, Cargo.lock, CHANGELOG.md, and npm package.json versions.
+// Usage: node scripts/set_versions.js <version>
 
 const fs = require('fs');
 const path = require('path');
 
 const version = process.argv[2];
 if (!version) {
-  console.error('Usage: npm_set_versions.js <version>');
+  console.error('Usage: set_versions.js <version>');
   process.exit(1);
 }
 
 if (!/^\d+\.\d+\.\d+$/.test(version)) {
   console.error(`Invalid version "${version}". Expected X.Y.Z.`);
   process.exit(1);
+}
+
+const releaseDate = process.env.RELEASE_DATE || new Date().toISOString().slice(0, 10);
+if (!/^\d{4}-\d{2}-\d{2}$/.test(releaseDate)) {
+  console.error(`Invalid RELEASE_DATE "${releaseDate}". Expected YYYY-MM-DD.`);
+  process.exit(1);
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function setCargoVersion() {
@@ -82,6 +92,32 @@ function setCargoLockVersion() {
   fs.writeFileSync(cargoLock, nextLines.join('\n'));
 }
 
+function setChangelogVersion() {
+  const changelog = 'CHANGELOG.md';
+  const content = fs.readFileSync(changelog, 'utf8');
+  const headingPattern = new RegExp(`^## \\[${escapeRegExp(version)}\\] - (.*)$`, 'm');
+  const existingHeading = content.match(headingPattern);
+  if (existingHeading) {
+    if (existingHeading[1] === 'Unreleased') {
+      const nextContent = content.replace(headingPattern, `## [${version}] - ${releaseDate}`);
+      fs.writeFileSync(changelog, nextContent);
+    }
+    return;
+  }
+
+  const newEntry = `## [${version}] - ${releaseDate}\n\n`;
+  const firstReleaseHeading = content.match(/^## \[/m);
+  if (!firstReleaseHeading || firstReleaseHeading.index === undefined) {
+    const separator = content.endsWith('\n') ? '\n' : '\n\n';
+    fs.writeFileSync(changelog, `${content}${separator}${newEntry}`);
+    return;
+  }
+
+  const insertAt = firstReleaseHeading.index;
+  const nextContent = `${content.slice(0, insertAt)}${newEntry}${content.slice(insertAt)}`;
+  fs.writeFileSync(changelog, nextContent);
+}
+
 const packages = [
   'npm/dela',
   'npm/dela-darwin-amd64',
@@ -92,6 +128,7 @@ const packages = [
 
 setCargoVersion();
 setCargoLockVersion();
+setChangelogVersion();
 
 packages.forEach(dir => {
   const file = path.join(dir, 'package.json');

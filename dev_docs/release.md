@@ -10,38 +10,49 @@ The release automation is in .github/workflows/release.yml:
 
 ## Normal Flow
 
-1. Update `Cargo.toml` and `CHANGELOG.md` in the release commit.
-2. Make sure that commit is on `main`.
-3. Run the local prerelease checks:
+1. Pick the next version, for example `0.0.7`.
+2. Update Cargo, npm package versions, and the changelog heading:
+
+```sh
+make release_set_versions DELA_VERSION=0.0.7
+```
+
+3. Fill in the new `CHANGELOG.md` entry with release notes.
+4. Commit those changes and make sure that commit is on `main`.
+5. Run the local prerelease checks:
 
 ```sh
 make release_verify
 ```
 
 `make release_verify` requires `NPM_TOKEN` and `CARGO_REGISTRY_TOKEN` in the
-environment and validates both tokens. The GitHub dry run validates those
-repository secrets plus the workflow `GITHUB_TOKEN`.
+environment and validates both tokens. The GitHub dry run validates the
+repository secrets for npm and crates.io plus the workflow `GITHUB_TOKEN`.
 
-4. Run the GitHub dry run from the UI:
+6. Run the GitHub dry run from the UI:
    - open `Actions`
    - open `Release`
    - click `Run workflow`
    - leave `dry_run=true`
    - run it on `main`
-5. Confirm the dry run passed and inspect the uploaded artifacts.
-6. Publish the release tag:
+7. Confirm the dry run passed and inspect the uploaded artifacts.
+8. Publish the release tag:
 
 ```sh
 make release_publish
 ```
 
-7. Open `Actions` and watch the tag-triggered `Release` workflow finish.
-8. Verify the release on:
+9. Open `Actions` and watch the tag-triggered `Release` workflow finish.
+10. Verify the release on:
    - GitHub Releases
    - crates.io
    - npmjs.com (as `@aleyan/dela`)
 
 ## What The Make Targets Do
+
+`make release_set_versions DELA_VERSION=x.y.z` updates `Cargo.toml`,
+`Cargo.lock`, every npm `package.json`, and creates or updates the matching
+`CHANGELOG.md` heading.
 
 `make release_verify` checks:
 
@@ -65,6 +76,7 @@ outputs and verifies release metadata plus npm, crates.io, and GitHub tokens.
 - requires an interactive terminal
 - requires `main`
 - requires a clean working tree
+- requires local `main` to match `origin/main`
 - asks you to type the exact tag name
 - creates and pushes the annotated tag
 
@@ -77,6 +89,7 @@ Do not create the actual release from the GitHub Releases page. GitHub does allo
 ## Quick Checklist
 
 - [ ] `Cargo.toml` version is correct
+- [ ] npm package versions match `Cargo.toml`
 - [ ] `CHANGELOG.md` has the exact version and date
 - [ ] release commit is on `main`
 - [ ] `make release_verify` passed

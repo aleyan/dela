@@ -1,8 +1,13 @@
-.PHONY: release_verify release_verify_github release_verify_metadata release_verify_tag_available release_verify_crate_unpublished release_verify_tokens release_verify_npm_token release_verify_cargo_token release_verify_github_token release_verify_tests release_emit_github_outputs release_guard_github_dry_run release_publish release_notes
+.PHONY: release_set_versions release_verify release_verify_github release_verify_metadata release_verify_tag_available release_verify_crate_unpublished release_verify_tokens release_verify_npm_token release_verify_cargo_token release_verify_github_token release_verify_tests release_emit_github_outputs release_guard_github_dry_run release_publish release_notes
 
-RELEASE_VERSION := $(shell grep -m 1 '^version = ' Cargo.toml | cut -d '"' -f2)
-RELEASE_TAG := v$(RELEASE_VERSION)
+RELEASE_VERSION = $(shell grep -m 1 '^version = ' Cargo.toml | cut -d '"' -f2)
+RELEASE_TAG = v$(RELEASE_VERSION)
+DELA_VERSION ?= $(RELEASE_VERSION)
 NPM_CACHE_DIR ?= $(CURDIR)/target/npm-cache
+
+# Set Cargo.toml, Cargo.lock, CHANGELOG.md, and npm package versions.
+release_set_versions:
+	node scripts/set_versions.js "$(DELA_VERSION)"
 
 # Full local prerelease check for humans before pushing the release tag.
 release_verify: release_verify_metadata release_verify_tag_available release_verify_crate_unpublished release_verify_tokens release_verify_tests
