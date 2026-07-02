@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 use super::allowlist::McpAllowlistEvaluator;
 use super::dto::{
     ListTasksArgs, OutputChunkDto, StartResultDto, TaskDto, TaskOutputArgs, TaskStartArgs,
@@ -221,11 +223,10 @@ impl DelaMcpServer {
     async fn send_log(&self, level: LoggingLevel, logger: &str, data: serde_json::Value) {
         if let Some(peer) = self.peer.get() {
             let _ = peer
-                .notify_logging_message(LoggingMessageNotificationParam {
-                    level,
-                    logger: Some(logger.to_string()),
-                    data,
-                })
+                .notify_logging_message(
+                    LoggingMessageNotificationParam::new(level, data)
+                        .with_logger(logger.to_string()),
+                )
                 .await;
         }
     }
@@ -287,11 +288,10 @@ impl DelaMcpServer {
 
         if let Some(peer) = peer.get() {
             let _ = peer
-                .notify_logging_message(LoggingMessageNotificationParam {
-                    level,
-                    logger: Some(format!("task:{}", pid)),
-                    data,
-                })
+                .notify_logging_message(
+                    LoggingMessageNotificationParam::new(level, data)
+                        .with_logger(format!("task:{}", pid)),
+                )
                 .await;
         }
     }
@@ -470,7 +470,7 @@ impl DelaMcpServer {
             .collect();
 
         Ok(CallToolResult::success(vec![
-            Content::json(serde_json::json!({
+            ContentBlock::json(serde_json::json!({
             "tasks": task_dtos
             }))
             .expect("Failed to serialize JSON"),
@@ -499,7 +499,7 @@ impl DelaMcpServer {
             .collect();
 
         Ok(CallToolResult::success(vec![
-            Content::json(serde_json::json!({
+            ContentBlock::json(serde_json::json!({
                 "running": running_jobs,
                 "cwd": self.root.to_string_lossy().to_string()
             }))
@@ -700,17 +700,19 @@ impl DelaMcpServer {
 
             if let Some(peer_ref) = peer.get() {
                 let _ = peer_ref
-                    .notify_logging_message(rmcp::model::LoggingMessageNotificationParam {
-                        level: LoggingLevel::Notice,
-                        logger: Some(format!("task:{}", pid_u32)),
-                        data: serde_json::json!({
-                            "event": "exited",
-                            "pid": pid_u32,
-                            "exit_code": exit_code,
-                            "signal": signal,
-                            "task": task_name
-                        }),
-                    })
+                    .notify_logging_message(
+                        rmcp::model::LoggingMessageNotificationParam::new(
+                            LoggingLevel::Notice,
+                            serde_json::json!({
+                                "event": "exited",
+                                "pid": pid_u32,
+                                "exit_code": exit_code,
+                                "signal": signal,
+                                "task": task_name
+                            }),
+                        )
+                        .with_logger(format!("task:{}", pid_u32)),
+                    )
                     .await;
             }
         }
@@ -948,7 +950,7 @@ impl DelaMcpServer {
         };
 
         Ok(CallToolResult::success(vec![
-            Content::json(&start_result).expect("Failed to serialize JSON"),
+            ContentBlock::json(&start_result).expect("Failed to serialize JSON"),
         ]))
     }
 
@@ -1016,7 +1018,7 @@ impl DelaMcpServer {
         };
 
         Ok(CallToolResult::success(vec![
-            Content::json(&start_result).expect("Failed to serialize JSON"),
+            ContentBlock::json(&start_result).expect("Failed to serialize JSON"),
         ]))
     }
 
@@ -1190,7 +1192,7 @@ impl DelaMcpServer {
         });
 
         Ok(CallToolResult::success(vec![
-            Content::json(job_status).expect("Failed to serialize JSON"),
+            ContentBlock::json(job_status).expect("Failed to serialize JSON"),
         ]))
     }
 
@@ -1320,7 +1322,7 @@ impl DelaMcpServer {
         }
 
         Ok(CallToolResult::success(vec![
-            Content::json(&response).expect("Failed to serialize JSON"),
+            ContentBlock::json(&response).expect("Failed to serialize JSON"),
         ]))
     }
 
@@ -1386,7 +1388,7 @@ impl DelaMcpServer {
         };
 
         Ok(CallToolResult::success(vec![
-            Content::json(serde_json::json!({
+            ContentBlock::json(serde_json::json!({
                 "pid": args.pid,
                 "status": status,
                 "message": message,
@@ -1924,8 +1926,8 @@ mod tests {
         // Assert - Should return empty array when no jobs are running
         assert_eq!(result.content.len(), 1);
         let content = &result.content[0];
-        match &content.raw {
-            RawContent::Text(text_content) => {
+        match content {
+            ContentBlock::Text(text_content) => {
                 let json: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
                 let obj = json.as_object().unwrap();
                 assert!(obj.contains_key("running"));
@@ -1978,8 +1980,8 @@ mod tests {
         // Assert
         assert_eq!(result.content.len(), 1);
         let content = &result.content[0];
-        match &content.raw {
-            RawContent::Text(text_content) => {
+        match content {
+            ContentBlock::Text(text_content) => {
                 let json: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
                 let obj = json.as_object().unwrap();
                 assert!(obj.contains_key("running"));
@@ -2072,8 +2074,8 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(result1.content.len(), 1);
-        match &result1.content[0].raw {
-            RawContent::Text(text_content) => {
+        match &result1.content[0] {
+            ContentBlock::Text(text_content) => {
                 let job: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
                 assert_eq!(job["unique_name"], "test-task1");
                 assert_eq!(job["pid"], pid1);
@@ -2088,8 +2090,8 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(result2.content.len(), 1);
-        match &result2.content[0].raw {
-            RawContent::Text(text_content) => {
+        match &result2.content[0] {
+            ContentBlock::Text(text_content) => {
                 let job: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
                 assert_eq!(job["unique_name"], "test-task2");
                 assert_eq!(job["pid"], pid2);
@@ -2146,8 +2148,8 @@ mod tests {
         // Assert
         assert_eq!(result.content.len(), 1);
         let content = &result.content[0];
-        match &content.raw {
-            RawContent::Text(text_content) => {
+        match content {
+            ContentBlock::Text(text_content) => {
                 let job: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
                 assert_eq!(job["unique_name"], "test-task");
                 assert_eq!(job["state"], "exited");
@@ -2198,8 +2200,8 @@ mod tests {
             .unwrap();
 
         let content = &result.content[0];
-        match &content.raw {
-            RawContent::Text(text_content) => {
+        match content {
+            ContentBlock::Text(text_content) => {
                 let job: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
                 assert_eq!(job["state"], "failed");
                 assert!(job["exit_code"].is_null());
@@ -2266,8 +2268,8 @@ mod tests {
         // Assert
         assert_eq!(result.content.len(), 1);
         let content = &result.content[0];
-        match &content.raw {
-            RawContent::Text(text_content) => {
+        match content {
+            ContentBlock::Text(text_content) => {
                 let json: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
                 let obj = json.as_object().unwrap();
                 assert_eq!(obj["pid"], pid);
@@ -2339,8 +2341,8 @@ mod tests {
         // Assert
         assert_eq!(result.content.len(), 1);
         let content = &result.content[0];
-        match &content.raw {
-            RawContent::Text(text_content) => {
+        match content {
+            ContentBlock::Text(text_content) => {
                 let json: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
                 let obj = json.as_object().unwrap();
                 assert_eq!(obj["pid"], pid);
@@ -2411,8 +2413,8 @@ mod tests {
 
         // Assert
         let content = &result.content[0];
-        match &content.raw {
-            RawContent::Text(text_content) => {
+        match content {
+            ContentBlock::Text(text_content) => {
                 let json: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
                 let obj = json.as_object().unwrap();
                 let output = obj["output"].as_array().unwrap();
@@ -2482,8 +2484,8 @@ mod tests {
         // Assert
         assert_eq!(result.content.len(), 1);
         let content = &result.content[0];
-        match &content.raw {
-            RawContent::Text(text_content) => {
+        match content {
+            ContentBlock::Text(text_content) => {
                 let json: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
                 let obj = json.as_object().unwrap();
                 assert_eq!(obj["pid"], pid);
@@ -2566,8 +2568,8 @@ mod tests {
         // Assert
         assert_eq!(result.content.len(), 1);
         let content = &result.content[0];
-        match &content.raw {
-            RawContent::Text(text_content) => {
+        match content {
+            ContentBlock::Text(text_content) => {
                 let json: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
                 let obj = json.as_object().unwrap();
                 assert_eq!(obj["pid"], pid);
@@ -2622,8 +2624,8 @@ mod tests {
         // Assert
         assert_eq!(result.content.len(), 1);
         let content = &result.content[0];
-        match &content.raw {
-            RawContent::Text(text_content) => {
+        match content {
+            ContentBlock::Text(text_content) => {
                 let json: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
                 let obj = json.as_object().unwrap();
                 assert_eq!(obj["pid"], pid);
@@ -2826,8 +2828,8 @@ mod tests {
         // Assert
         assert_eq!(result.content.len(), 1);
         let content = &result.content[0];
-        match &content.raw {
-            RawContent::Text(text_content) => {
+        match content {
+            ContentBlock::Text(text_content) => {
                 let json: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
                 let obj = json.as_object().unwrap();
 
@@ -2930,14 +2932,14 @@ test:
             .await
             .unwrap();
 
-        let first_json = match &first_result.content[0].raw {
-            RawContent::Text(text_content) => {
+        let first_json = match &first_result.content[0] {
+            ContentBlock::Text(text_content) => {
                 serde_json::from_str::<serde_json::Value>(&text_content.text).unwrap()
             }
             _ => panic!("Expected text content with JSON"),
         };
-        let second_json = match &second_result.content[0].raw {
-            RawContent::Text(text_content) => {
+        let second_json = match &second_result.content[0] {
+            ContentBlock::Text(text_content) => {
                 serde_json::from_str::<serde_json::Value>(&text_content.text).unwrap()
             }
             _ => panic!("Expected text content with JSON"),
@@ -2980,8 +2982,8 @@ test:
             .await
             .unwrap();
 
-        let refreshed_json = match &refreshed_result.content[0].raw {
-            RawContent::Text(text_content) => {
+        let refreshed_json = match &refreshed_result.content[0] {
+            ContentBlock::Text(text_content) => {
                 serde_json::from_str::<serde_json::Value>(&text_content.text).unwrap()
             }
             _ => panic!("Expected text content with JSON"),
@@ -3155,8 +3157,8 @@ test: ## Run tests
         // Assert
         assert_eq!(result.content.len(), 1);
         let content = &result.content[0];
-        match &content.raw {
-            RawContent::Text(text_content) => {
+        match content {
+            ContentBlock::Text(text_content) => {
                 let json: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
                 let obj = json.as_object().unwrap();
                 assert!(obj.contains_key("tasks"));
@@ -3428,8 +3430,8 @@ add_custom_target(build-all COMMENT "Build everything")
                 // If it succeeds, verify the structure
                 assert_eq!(call_result.content.len(), 1);
                 let content = &call_result.content[0];
-                match &content.raw {
-                    RawContent::Text(text_content) => {
+                match content {
+                    ContentBlock::Text(text_content) => {
                         let json: serde_json::Value =
                             serde_json::from_str(&text_content.text).unwrap();
                         let obj = json.as_object().unwrap();
@@ -3608,8 +3610,8 @@ add_custom_target(build-all COMMENT "Build everything")
 
         let result = server.task_start(args).await.unwrap();
         let content = &result.content[0];
-        let json = match &content.raw {
-            RawContent::Text(text_content) => {
+        let json = match content {
+            ContentBlock::Text(text_content) => {
                 serde_json::from_str::<serde_json::Value>(&text_content.text).unwrap()
             }
             _ => panic!("Expected text content"),
@@ -3634,8 +3636,8 @@ add_custom_target(build-all COMMENT "Build everything")
         assert!(json.get("initial_output").is_none());
 
         let status_result = server.status().await.unwrap();
-        let status_json = match &status_result.content[0].raw {
-            RawContent::Text(text_content) => {
+        let status_json = match &status_result.content[0] {
+            ContentBlock::Text(text_content) => {
                 serde_json::from_str::<serde_json::Value>(&text_content.text).unwrap()
             }
             _ => panic!("Expected text content"),
@@ -3653,8 +3655,8 @@ add_custom_target(build-all COMMENT "Build everything")
             .task_status(Parameters(TaskStatusArgs { pid }))
             .await
             .unwrap();
-        let task_status_json = match &task_status_result.content[0].raw {
-            RawContent::Text(text_content) => {
+        let task_status_json = match &task_status_result.content[0] {
+            ContentBlock::Text(text_content) => {
                 serde_json::from_str::<serde_json::Value>(&text_content.text).unwrap()
             }
             _ => panic!("Expected text content"),
@@ -3667,8 +3669,8 @@ add_custom_target(build-all COMMENT "Build everything")
             .task_status(Parameters(TaskStatusArgs { pid }))
             .await
             .unwrap();
-        let task_status_json_later = match &task_status_result_later.content[0].raw {
-            RawContent::Text(text_content) => {
+        let task_status_json_later = match &task_status_result_later.content[0] {
+            ContentBlock::Text(text_content) => {
                 serde_json::from_str::<serde_json::Value>(&text_content.text).unwrap()
             }
             _ => panic!("Expected text content"),
@@ -3718,8 +3720,8 @@ add_custom_target(build-all COMMENT "Build everything")
 
         let result = server.task_start(args).await.unwrap();
         let content = &result.content[0];
-        let json = match &content.raw {
-            RawContent::Text(text_content) => {
+        let json = match content {
+            ContentBlock::Text(text_content) => {
                 serde_json::from_str::<serde_json::Value>(&text_content.text).unwrap()
             }
             _ => panic!("Expected text content"),
@@ -3737,8 +3739,8 @@ add_custom_target(build-all COMMENT "Build everything")
         assert!(json.get("initial_output").is_none());
 
         let status_result = server.status().await.unwrap();
-        let status_json = match &status_result.content[0].raw {
-            RawContent::Text(text_content) => {
+        let status_json = match &status_result.content[0] {
+            ContentBlock::Text(text_content) => {
                 serde_json::from_str::<serde_json::Value>(&text_content.text).unwrap()
             }
             _ => panic!("Expected text content"),
@@ -3749,8 +3751,8 @@ add_custom_target(build-all COMMENT "Build everything")
             .task_status(Parameters(TaskStatusArgs { pid }))
             .await
             .unwrap();
-        let task_status_json = match &task_status_result.content[0].raw {
-            RawContent::Text(text_content) => {
+        let task_status_json = match &task_status_result.content[0] {
+            ContentBlock::Text(text_content) => {
                 serde_json::from_str::<serde_json::Value>(&text_content.text).unwrap()
             }
             _ => panic!("Expected text content"),
@@ -3858,8 +3860,8 @@ add_custom_target(build-all COMMENT "Build everything")
         // Parse the result to get the PID
         let start_response = start_result.unwrap();
         let content = &start_response.content[0];
-        match &content.raw {
-            RawContent::Text(text_content) => {
+        match content {
+            ContentBlock::Text(text_content) => {
                 let json_response: serde_json::Value =
                     serde_json::from_str(&text_content.text).unwrap();
                 let pid = json_response["pid"].as_i64().unwrap() as u32;
@@ -3872,8 +3874,8 @@ add_custom_target(build-all COMMENT "Build everything")
                 // Check status immediately - should show as running
                 let status_result = server.status().await.unwrap();
                 let status_content = &status_result.content[0];
-                match &status_content.raw {
-                    RawContent::Text(text_content) => {
+                match status_content {
+                    ContentBlock::Text(text_content) => {
                         let status_json: serde_json::Value =
                             serde_json::from_str(&text_content.text).unwrap();
                         let running_jobs = status_json["running"].as_array().unwrap();
@@ -3894,8 +3896,8 @@ add_custom_target(build-all COMMENT "Build everything")
                     .await
                     .unwrap();
                 let task_status_content = &task_status_result.content[0];
-                match &task_status_content.raw {
-                    RawContent::Text(text_content) => {
+                match task_status_content {
+                    ContentBlock::Text(text_content) => {
                         let task_status_json: serde_json::Value =
                             serde_json::from_str(&text_content.text).unwrap();
                         println!(
@@ -3913,8 +3915,8 @@ add_custom_target(build-all COMMENT "Build everything")
 
                 let status_result_after_1s = server.status().await.unwrap();
                 let status_content_after_1s = &status_result_after_1s.content[0];
-                match &status_content_after_1s.raw {
-                    RawContent::Text(text_content) => {
+                match status_content_after_1s {
+                    ContentBlock::Text(text_content) => {
                         let status_json: serde_json::Value =
                             serde_json::from_str(&text_content.text).unwrap();
                         let running_jobs = status_json["running"].as_array().unwrap();
@@ -3934,8 +3936,8 @@ add_custom_target(build-all COMMENT "Build everything")
                 // Check status after completion - should show no running jobs
                 let status_result_final = server.status().await.unwrap();
                 let status_content_final = &status_result_final.content[0];
-                match &status_content_final.raw {
-                    RawContent::Text(text_content) => {
+                match status_content_final {
+                    ContentBlock::Text(text_content) => {
                         let status_json: serde_json::Value =
                             serde_json::from_str(&text_content.text).unwrap();
                         let running_jobs = status_json["running"].as_array().unwrap();
@@ -3959,8 +3961,8 @@ add_custom_target(build-all COMMENT "Build everything")
                     .await
                     .unwrap();
                 let task_status_content_final = &task_status_result_final.content[0];
-                match &task_status_content_final.raw {
-                    RawContent::Text(text_content) => {
+                match task_status_content_final {
+                    ContentBlock::Text(text_content) => {
                         let task_status_json: serde_json::Value =
                             serde_json::from_str(&text_content.text).unwrap();
                         println!(
@@ -4039,8 +4041,8 @@ add_custom_target(build-all COMMENT "Build everything")
 
         // Parse start result
         let content = &start_response.content[0];
-        let start_state = match &content.raw {
-            RawContent::Text(text_content) => {
+        let start_state = match content {
+            ContentBlock::Text(text_content) => {
                 let json_response: serde_json::Value =
                     serde_json::from_str(&text_content.text).unwrap();
                 json_response["state"].as_str().unwrap().to_string()
@@ -4054,8 +4056,8 @@ add_custom_target(build-all COMMENT "Build everything")
         // Immediately after, status should often show 0 running because parent shell exits
         let status_result = server.status().await.unwrap();
         let status_content = &status_result.content[0];
-        match &status_content.raw {
-            RawContent::Text(text_content) => {
+        match status_content {
+            ContentBlock::Text(text_content) => {
                 let status_json: serde_json::Value =
                     serde_json::from_str(&text_content.text).unwrap();
                 let running_jobs = status_json["running"].as_array().unwrap();
@@ -4084,8 +4086,8 @@ add_custom_target(build-all COMMENT "Build everything")
             .await
             .unwrap();
         let task_status_content = &task_status_result.content[0];
-        match &task_status_content.raw {
-            RawContent::Text(text_content) => {
+        match task_status_content {
+            ContentBlock::Text(text_content) => {
                 let job: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
                 assert_eq!(job["state"].as_str().unwrap(), "exited");
                 if start_state == "running" {
@@ -4144,8 +4146,8 @@ add_custom_target(build-all COMMENT "Build everything")
 
         // Extract pid
         let content = &start_response.content[0];
-        let pid = match &content.raw {
-            RawContent::Text(text_content) => {
+        let pid = match content {
+            ContentBlock::Text(text_content) => {
                 let json_response: serde_json::Value =
                     serde_json::from_str(&text_content.text).unwrap();
                 json_response["pid"].as_i64().unwrap() as u32
@@ -4165,8 +4167,8 @@ add_custom_target(build-all COMMENT "Build everything")
         };
         let out_result = server.task_output(Parameters(out_args)).await.unwrap();
         let out_content = &out_result.content[0];
-        match &out_content.raw {
-            RawContent::Text(text_content) => {
+        match out_content {
+            ContentBlock::Text(text_content) => {
                 let output_json: serde_json::Value =
                     serde_json::from_str(&text_content.text).unwrap();
                 assert_eq!(output_json["pid"].as_i64().unwrap() as u32, pid);
