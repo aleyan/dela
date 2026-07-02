@@ -28,6 +28,18 @@ npm_release_prep:
 npm_publish:
 	@set -euo pipefail; \
 	mkdir -p "$(NPM_CACHE_DIR)"; \
+	NPM_USERCONFIG=""; \
+	if [ "$${NPM_PUBLISH_DRY_RUN:-0}" != "1" ]; then \
+		if [ -z "$${NPM_TOKEN:-}" ]; then \
+			echo "Error: NPM_TOKEN is required to publish npm packages."; \
+			exit 1; \
+		fi; \
+		mkdir -p target/npm-auth; \
+		NPM_USERCONFIG=$$(mktemp "$(CURDIR)/target/npm-auth/npmrc.XXXXXX"); \
+		trap 'rm -f "$$NPM_USERCONFIG"' EXIT; \
+		chmod 600 "$$NPM_USERCONFIG"; \
+		printf '%s\n' "//registry.npmjs.org/:_authToken=$${NPM_TOKEN}" > "$$NPM_USERCONFIG"; \
+	fi; \
 	for dir in $(NPM_PACKAGE_DIRS); do \
 		name=$$(node -p "require('./$$dir/package.json').name"); \
 		version=$$(node -p "require('./$$dir/package.json').version"); \
@@ -45,7 +57,7 @@ npm_publish:
 			continue; \
 		fi; \
 		echo "Publishing $$name@$$version from $$dir..."; \
-		npm --cache "$(NPM_CACHE_DIR)" publish "./$$dir" --access public --registry=https://registry.npmjs.org; \
+		npm --userconfig "$$NPM_USERCONFIG" --cache "$(NPM_CACHE_DIR)" publish "./$$dir" --access public --registry=https://registry.npmjs.org; \
 	done
 
 npm_verify_local:

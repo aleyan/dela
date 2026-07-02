@@ -110,6 +110,8 @@ failed release can be rerun after a partial publish.
 The workflow needs an `NPM_TOKEN` repository secret with publish access for the
 `@aleyan` npm scope. `make release_verify` and `make release_verify_github`
 validate this token before publishing.
+`make npm_publish` also reads `NPM_TOKEN` directly, so local and GitHub
+publishing use the same environment variable.
 
 ## Local Verification
 
