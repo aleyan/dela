@@ -171,6 +171,6 @@ Keep `cargo install dela` and direct GitHub binaries as alternate install paths.
 - [x] Add npm publishing to `.github/workflows/release.yml`.
 - [ ] Configure trusted publishing for all five npm packages.
 - [x] Verify local `npm pack` output.
-- [ ] Test a global install from a packed tarball.
-- [ ] Publish platform packages and then the wrapper package.
+- [x] Test a global install from the published wrapper package.
+- [x] Publish platform packages and then the wrapper package.
 - [x] Update `README.md`, `INSTALL.md`, and release docs with npm install instructions.
