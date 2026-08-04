@@ -1,4 +1,4 @@
-.PHONY: release_set_versions release_verify _release_verify_github _release_verify_metadata _release_verify_tag_available _release_verify_crate_unpublished _release_verify_tokens _release_verify_cargo_token _release_verify_github_token _release_verify_tests _release_emit_github_outputs _release_guard_github_dry_run release_publish _release_notes
+.PHONY: release_set_versions release_verify _release_verify_github _release_verify_metadata _release_verify_tag_available _release_verify_crate_unpublished _release_verify_github_token _release_verify_tests _release_emit_github_outputs _release_guard_github_dry_run release_publish _release_notes
 
 RELEASE_VERSION = $(shell grep -m 1 '^version = ' Cargo.toml | cut -d '"' -f2)
 RELEASE_TAG = v$(RELEASE_VERSION)
@@ -9,12 +9,12 @@ release_set_versions:
 	node scripts/set_versions.js "$(DELA_VERSION)"
 
 # Full local prerelease check for humans before pushing the release tag.
-release_verify: _release_verify_metadata _release_verify_tag_available _release_verify_crate_unpublished _release_verify_tokens _release_verify_tests
+release_verify: _release_verify_metadata _release_verify_tag_available _release_verify_crate_unpublished _release_verify_tests
 	@echo "Release verification passed for $(RELEASE_TAG)."
 
-# GitHub Actions entrypoint. Emits workflow outputs and validates repository
-# secrets, but leaves lint/tests/package checks to dedicated jobs.
-_release_verify_github: _release_guard_github_dry_run _release_emit_github_outputs _release_verify_metadata _release_verify_tokens _release_verify_github_token
+# GitHub Actions entrypoint. Emits workflow outputs and validates GitHub access,
+# but leaves lint/tests/package checks to dedicated jobs.
+_release_verify_github: _release_guard_github_dry_run _release_emit_github_outputs _release_verify_metadata _release_verify_github_token
 	@echo "GitHub release verification passed for $(RELEASE_TAG)."
 
 _release_verify_metadata:
@@ -61,20 +61,6 @@ _release_verify_crate_unpublished:
 	RESPONSE=$$(curl --fail --silent --show-error --location https://crates.io/api/v1/crates/dela); \
 	if echo "$$RESPONSE" | jq -e --arg version "$(RELEASE_VERSION)" '.versions[] | select(.num == $$version)' >/dev/null; then \
 		echo "Error: version $(RELEASE_VERSION) already exists on crates.io."; \
-		exit 1; \
-	fi
-
-_release_verify_tokens: _release_verify_cargo_token
-
-_release_verify_cargo_token:
-	@set -euo pipefail; \
-	if [ -z "$${CARGO_REGISTRY_TOKEN:-}" ]; then \
-		echo "Error: CARGO_REGISTRY_TOKEN is required for release verification."; \
-		exit 1; \
-	fi; \
-	echo "Validating CARGO_REGISTRY_TOKEN..."; \
-	if ! cargo owner --list dela --token "$$CARGO_REGISTRY_TOKEN" >/dev/null; then \
-		echo "Error: CARGO_REGISTRY_TOKEN was rejected by crates.io."; \
 		exit 1; \
 	fi
 

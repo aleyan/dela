@@ -25,11 +25,11 @@ make release_set_versions DELA_VERSION=0.0.7
 make release_verify
 ```
 
-`make release_verify` requires `CARGO_REGISTRY_TOKEN` in the environment and
-validates it. npm publishing uses GitHub Actions trusted publishing (OIDC), so
-there is no long-lived npm token to validate locally. The GitHub dry run
-validates the crates.io and GitHub credentials and checks the npm package
-contents without publishing them.
+`make release_verify` does not require registry credentials. npm and crates.io
+publishing both use GitHub Actions trusted publishing (OIDC), so long-lived
+registry tokens are not part of the release flow. The GitHub dry run validates
+the workflow GitHub token and checks the Cargo and npm package contents without
+publishing them.
 
 6. Run the GitHub dry run from the UI:
    - open `Actions`
@@ -68,14 +68,37 @@ actual publishing after the tag exists.
 - the tag does not already exist locally
 - the tag does not already exist on `origin`
 - the version is not already on crates.io
-- `CARGO_REGISTRY_TOKEN` is accepted by crates.io
 - lint, tests, integration tests, and `cargo publish --dry-run --locked`
 
 The release workflow calls private target `make _release_verify_github`, which
-emits workflow outputs and verifies release metadata plus the crates.io and
-GitHub tokens.
+emits workflow outputs and verifies release metadata plus the workflow
+`GITHUB_TOKEN`. Registry authentication happens only in the tag-triggered
+publish jobs.
 
-## npm Trusted Publishing Setup
+## Registry Trusted Publishing Setup
+
+Complete this one-time setup before releasing `0.0.7`. Both registries match
+the GitHub OIDC identity against the repository and workflow filename, so use
+the exact values below and leave the optional environment unset.
+
+### crates.io
+
+Open the `dela` crate settings on crates.io and add a GitHub Actions trusted
+publisher with:
+
+- GitHub organization or user: `aleyan`
+- GitHub repository: `dela`
+- workflow filename: `release.yml`
+- environment: leave unset
+
+The `publish-crate` job grants `id-token: write` and uses the official
+`rust-lang/crates-io-auth-action` to exchange the GitHub identity for a
+short-lived crates.io token. That token is passed only to `cargo publish` and
+is automatically revoked when the job completes. Cargo receives it through the
+standard `CARGO_REGISTRY_TOKEN` environment variable; do not source that
+variable from a GitHub Actions secret.
+
+### npm
 
 The `publish-npm` job publishes through npm trusted publishing. It runs on a
 GitHub-hosted runner with Node.js 24 and requests a short-lived OIDC identity
@@ -100,11 +123,16 @@ Use the following settings for every package:
 - environment: leave unset
 - allowed action: `npm publish`
 
-Configure all five packages before removing the old `NPM_TOKEN` repository
-secret. Once a tag release succeeds through OIDC, revoke the npm automation
-token and delete the unused GitHub secret. If a release is interrupted, rerun
-the workflow: already-published package versions are skipped, platform packages
-are published first, and the wrapper package is published last.
+Configure the crates.io publisher and all five npm publishers before releasing
+`0.0.7`. The GitHub dry run cannot validate registry-side trusted publisher
+settings because it does not request publishing credentials. The first real
+tag release is the end-to-end OIDC check.
+
+After one tag release succeeds through OIDC, revoke the old crates.io and npm
+tokens and delete the unused `CARGO_REGISTRY_TOKEN` and `NPM_TOKEN` GitHub
+secrets. If a release is interrupted, rerun the workflow: already-published
+Cargo and npm versions are skipped, npm platform packages are published first,
+and the wrapper package is published last.
 
 `make release_publish`:
 
@@ -132,7 +160,8 @@ Do not create the actual release from the GitHub Releases page. GitHub does allo
 - [ ] `make release_verify` passed
 - [ ] GitHub dry run passed
 - [ ] dry-run artifacts look correct
-- [ ] trusted publishing is configured for all five npm packages
+- [ ] crates.io trusted publishing is configured for `dela`
+- [ ] npm trusted publishing is configured for all five packages
 - [ ] `make release_publish` completed
 - [ ] real `Release` workflow passed
 - [ ] GitHub Releases shows the release
