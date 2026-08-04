@@ -107,11 +107,22 @@ through `optionalDependencies`.
 The publish step should skip package versions that are already on npm so a
 failed release can be rerun after a partial publish.
 
-The workflow needs an `NPM_TOKEN` repository secret with publish access for the
-`@aleyan` npm scope. `make release_verify` and the private GitHub workflow
-target `make _release_verify_github` validate this token before publishing.
-`make npm_publish` also reads `NPM_TOKEN` directly, so local and GitHub
-publishing use the same environment variable.
+The workflow publishes with npm trusted publishing (OIDC), not a long-lived npm
+token. The `publish-npm` job must run on a GitHub-hosted runner, use Node.js
+22.14.0 or newer, and grant `id-token: write`. npm then exchanges the GitHub
+identity for a short-lived credential during `npm publish`.
+
+Trusted publisher settings are per package. Configure all five packages on
+npmjs.com for GitHub Actions using organization/user `aleyan`, repository
+`dela`, workflow filename `release.yml`, no environment, and the `npm publish`
+allowed action. After one successful OIDC release, revoke the old automation
+token and remove the unused `NPM_TOKEN` GitHub secret.
+
+The GitHub dry run validates package contents but cannot validate the npm-side
+trusted publisher configuration without publishing. A real tag release is the
+end-to-end check. Reruns remain safe because `make npm_publish` skips versions
+that are already public. Non-dry-run `make npm_publish` is restricted to GitHub
+Actions with an OIDC identity; use `make npm_verify_local` for local checks.
 
 ## Local Verification
 
@@ -158,7 +169,7 @@ Keep `cargo install dela` and direct GitHub binaries as alternate install paths.
 - [x] Add the JS launcher.
 - [x] Add `npm/*/dela` to `.gitignore`.
 - [x] Add npm publishing to `.github/workflows/release.yml`.
-- [ ] Add the `NPM_TOKEN` GitHub secret.
+- [ ] Configure trusted publishing for all five npm packages.
 - [x] Verify local `npm pack` output.
 - [ ] Test a global install from a packed tarball.
 - [ ] Publish platform packages and then the wrapper package.

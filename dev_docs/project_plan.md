@@ -216,6 +216,7 @@ This plan outlines the major development phases and tasks for building `dela`, a
   - [x] [DTKT-48] Publish to crates.io.
   - [ ] [DTKT-49] Tag a stable release in the repository.
   - [x] [DTKT-115] Mark realeses on github.
+  - [x] [DTKT-211] Migrate automated npm publishing from a long-lived 2FA-bypass token to GitHub Actions trusted publishing with OIDC.
 
 - [ ] **Community Feedback**
   - [ ] [DTKT-50] Collect user feedback on command discovery and allowlist features.

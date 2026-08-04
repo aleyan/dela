@@ -1,9 +1,8 @@
-.PHONY: release_set_versions release_verify _release_verify_github _release_verify_metadata _release_verify_tag_available _release_verify_crate_unpublished _release_verify_tokens _release_verify_npm_token _release_verify_cargo_token _release_verify_github_token _release_verify_tests _release_emit_github_outputs _release_guard_github_dry_run release_publish _release_notes
+.PHONY: release_set_versions release_verify _release_verify_github _release_verify_metadata _release_verify_tag_available _release_verify_crate_unpublished _release_verify_tokens _release_verify_cargo_token _release_verify_github_token _release_verify_tests _release_emit_github_outputs _release_guard_github_dry_run release_publish _release_notes
 
 RELEASE_VERSION = $(shell grep -m 1 '^version = ' Cargo.toml | cut -d '"' -f2)
 RELEASE_TAG = v$(RELEASE_VERSION)
 DELA_VERSION ?= $(RELEASE_VERSION)
-NPM_CACHE_DIR ?= $(CURDIR)/target/npm-cache
 
 # Set Cargo.toml, Cargo.lock, CHANGELOG.md, and npm package versions.
 release_set_versions:
@@ -65,29 +64,7 @@ _release_verify_crate_unpublished:
 		exit 1; \
 	fi
 
-_release_verify_tokens: _release_verify_npm_token _release_verify_cargo_token
-
-_release_verify_npm_token:
-	@set -euo pipefail; \
-	if ! command -v npm >/dev/null 2>&1; then \
-		echo "Error: npm is required to validate NPM_TOKEN."; \
-		exit 1; \
-	fi; \
-	if [ -z "$${NPM_TOKEN:-}" ]; then \
-		echo "Error: NPM_TOKEN is required for release verification."; \
-		echo "Set NPM_TOKEN to an npm token with publish access for the @aleyan scope."; \
-		exit 1; \
-	fi; \
-	mkdir -p "$(NPM_CACHE_DIR)" target/npm-auth; \
-	NPM_USERCONFIG=$$(mktemp "$(CURDIR)/target/npm-auth/npmrc.XXXXXX"); \
-	trap 'rm -f "$$NPM_USERCONFIG"' EXIT; \
-	chmod 600 "$$NPM_USERCONFIG"; \
-	printf '%s\n' "//registry.npmjs.org/:_authToken=$${NPM_TOKEN}" > "$$NPM_USERCONFIG"; \
-	echo "Validating NPM_TOKEN has publish access for @aleyan scope..."; \
-	if ! npm --userconfig "$$NPM_USERCONFIG" --cache "$(NPM_CACHE_DIR)" publish ./npm/dela --access public --dry-run >/dev/null 2>&1; then \
-		echo "Error: NPM_TOKEN does not have publish access for @aleyan/dela."; \
-		exit 1; \
-	fi
+_release_verify_tokens: _release_verify_cargo_token
 
 _release_verify_cargo_token:
 	@set -euo pipefail; \

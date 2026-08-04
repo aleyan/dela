@@ -25,9 +25,11 @@ make release_set_versions DELA_VERSION=0.0.7
 make release_verify
 ```
 
-`make release_verify` requires `NPM_TOKEN` and `CARGO_REGISTRY_TOKEN` in the
-environment and validates both tokens. The GitHub dry run validates the
-repository secrets for npm and crates.io plus the workflow `GITHUB_TOKEN`.
+`make release_verify` requires `CARGO_REGISTRY_TOKEN` in the environment and
+validates it. npm publishing uses GitHub Actions trusted publishing (OIDC), so
+there is no long-lived npm token to validate locally. The GitHub dry run
+validates the crates.io and GitHub credentials and checks the npm package
+contents without publishing them.
 
 6. Run the GitHub dry run from the UI:
    - open `Actions`
@@ -66,13 +68,43 @@ actual publishing after the tag exists.
 - the tag does not already exist locally
 - the tag does not already exist on `origin`
 - the version is not already on crates.io
-- `NPM_TOKEN` is accepted by npm
 - `CARGO_REGISTRY_TOKEN` is accepted by crates.io
 - lint, tests, integration tests, and `cargo publish --dry-run --locked`
 
 The release workflow calls private target `make _release_verify_github`, which
-emits workflow outputs and verifies release metadata plus npm, crates.io, and
+emits workflow outputs and verifies release metadata plus the crates.io and
 GitHub tokens.
+
+## npm Trusted Publishing Setup
+
+The `publish-npm` job publishes through npm trusted publishing. It runs on a
+GitHub-hosted runner with Node.js 24 and requests a short-lived OIDC identity
+token using the `id-token: write` job permission. Do not add `NPM_TOKEN` or
+`NODE_AUTH_TOKEN` to this job.
+
+Each of these packages must have its own trusted publisher configured on
+npmjs.com because npm stores trusted publisher settings per package:
+
+- `@aleyan/dela-darwin-amd64`
+- `@aleyan/dela-darwin-arm64`
+- `@aleyan/dela-linux-amd64`
+- `@aleyan/dela-linux-arm64`
+- `@aleyan/dela`
+
+Use the following settings for every package:
+
+- provider: GitHub Actions
+- organization or user: `aleyan`
+- repository: `dela`
+- workflow filename: `release.yml`
+- environment: leave unset
+- allowed action: `npm publish`
+
+Configure all five packages before removing the old `NPM_TOKEN` repository
+secret. Once a tag release succeeds through OIDC, revoke the npm automation
+token and delete the unused GitHub secret. If a release is interrupted, rerun
+the workflow: already-published package versions are skipped, platform packages
+are published first, and the wrapper package is published last.
 
 `make release_publish`:
 
@@ -100,6 +132,7 @@ Do not create the actual release from the GitHub Releases page. GitHub does allo
 - [ ] `make release_verify` passed
 - [ ] GitHub dry run passed
 - [ ] dry-run artifacts look correct
+- [ ] trusted publishing is configured for all five npm packages
 - [ ] `make release_publish` completed
 - [ ] real `Release` workflow passed
 - [ ] GitHub Releases shows the release
