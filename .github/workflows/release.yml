@@ -169,7 +169,7 @@ jobs:
     if: ${{ github.event_name == 'push' && github.ref_type == 'tag' }}
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write # Required to create or update GitHub release contents.
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -209,7 +209,7 @@ jobs:
     if: ${{ github.event_name == 'push' && github.ref_type == 'tag' }}
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write # Required to create or update GitHub release contents.
     steps:
       - name: Download built archives
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -232,8 +232,8 @@ jobs:
     if: ${{ github.event_name == 'push' && github.ref_type == 'tag' }}
     runs-on: ubuntu-latest
     permissions:
-      contents: read
-      id-token: write
+      contents: read # Required for actions/checkout.
+      id-token: write # Required to request an OIDC token for registry authentication.
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -302,8 +302,8 @@ jobs:
     if: ${{ github.event_name == 'push' && github.ref_type == 'tag' }}
     runs-on: ubuntu-latest
     permissions:
-      contents: read
-      id-token: write
+      contents: read # Required for actions/checkout.
+      id-token: write # Required to request an OIDC token for registry authentication.
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -334,7 +334,7 @@ jobs:
     if: ${{ github.event_name == 'push' && github.ref_type == 'tag' }}
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write # Required to create or update GitHub release contents.
     steps:
       - name: Publish draft release
         env:
