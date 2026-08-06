@@ -1453,8 +1453,8 @@ impl ServerHandler for DelaMcpServer {
         &self,
         request: CallToolRequestParams,
         _context: RequestContext<RoleServer>,
-    ) -> Result<CallToolResult, ErrorData> {
-        match request.name.as_ref() {
+    ) -> Result<CallToolResponse, ErrorData> {
+        let result = match request.name.as_ref() {
             "list_tasks" => {
                 let args: ListTasksArgs = parse_tool_args(request.arguments)?;
                 self.list_tasks(Parameters(args)).await
@@ -1484,7 +1484,9 @@ impl ServerHandler for DelaMcpServer {
                 Some("Use 'list_tools' to see available tools".to_string()),
             )
             .into()),
-        }
+        };
+
+        result.map(CallToolResponse::from)
     }
 
     async fn list_tools(
@@ -1841,6 +1843,7 @@ impl ServerHandler for DelaMcpServer {
             tools,
             next_cursor: None,
             meta: None,
+            ..Default::default()
         })
     }
 
