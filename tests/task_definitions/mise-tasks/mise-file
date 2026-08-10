@@ -1,0 +1,3 @@
+#!/bin/sh
+#MISE description="Run a mise file task"
+printf 'Mise file task arguments: %s\n' "$*"

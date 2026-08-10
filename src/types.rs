@@ -39,6 +39,8 @@ pub enum TaskDefinitionType {
     CMake,
     /// Justfile
     Justfile,
+    /// mise configuration and file tasks
+    Mise,
 }
 
 /// Different types of task runners supported by dela.
@@ -100,6 +102,9 @@ pub enum TaskRunner {
     /// Just task runner
     /// Used when Justfile is present
     Just,
+    /// mise task runner
+    /// Used for tasks defined in mise configuration files or file-task directories
+    Mise,
 }
 
 /// Status of a task definition file
@@ -241,6 +246,9 @@ impl TaskRunner {
                 )
             }
             TaskRunner::Just => format!("just {}", task.source_name),
+            TaskRunner::Mise => {
+                format!("mise run -- {}", shell_words::quote(&task.source_name))
+            }
         }
     }
 
@@ -265,6 +273,7 @@ impl TaskRunner {
             TaskRunner::TravisCi => "travis",
             TaskRunner::CMake => "cmake",
             TaskRunner::Just => "just",
+            TaskRunner::Mise => "mise",
         }
     }
 }
@@ -369,5 +378,27 @@ mod tests {
 
         // 5. Assert get_all returns None for query on non-inserted key
         assert!(defs.get_all(&TaskDefinitionType::PyprojectToml).is_none());
+    }
+
+    #[test]
+    fn test_mise_command_keeps_the_task_name_as_one_argument() {
+        let task = Task {
+            name: "release candidate".to_string(),
+            file_path: PathBuf::from("mise.toml"),
+            definition_path: None,
+            definition_type: TaskDefinitionType::Mise,
+            runner: TaskRunner::Mise,
+            source_name: "release candidate".to_string(),
+            description: None,
+            shadowed_by: None,
+            disambiguated_name: None,
+        };
+
+        let command = TaskRunner::Mise.get_command(&task);
+
+        assert_eq!(
+            crate::runner::split_command_words(&command).unwrap(),
+            vec!["mise", "run", "--", "release candidate"]
+        );
     }
 }

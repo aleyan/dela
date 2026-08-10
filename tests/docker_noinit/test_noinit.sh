@@ -214,6 +214,41 @@ fi
 
 cd /home/testuser/test_project
 
+# Test 6d: Discover and execute mise TOML and file tasks
+echo "\nTest 6d: Testing mise task support"
+mise_list=$(dela list 2>&1)
+if echo "$mise_list" | grep -q "mise-build" && echo "$mise_list" | grep -q "mise-file"; then
+    echo "${GREEN}✓ dela list shows mise TOML and file tasks${NC}"
+else
+    echo "${RED}✗ dela list failed to show mise tasks${NC}"
+    exit 1
+fi
+
+if echo "$mise_list" | grep -q "mise-hidden"; then
+    echo "${RED}✗ dela list showed a hidden mise task${NC}"
+    exit 1
+else
+    echo "${GREEN}✓ dela list omits hidden mise tasks${NC}"
+fi
+
+output=$(dela get-command mise-build 2>&1)
+if echo "$output" | grep -q "mise run -- mise-build"; then
+    echo "${GREEN}✓ get-command returns the mise runner command${NC}"
+else
+    echo "${RED}✗ get-command failed for a mise task${NC}"
+    echo "Got: $output"
+    exit 1
+fi
+
+output=$(dela run 'mise-file first "argument with spaces"' 2>&1)
+if echo "$output" | grep -q "Mise file task arguments: first argument with spaces"; then
+    echo "${GREEN}✓ mise task execution preserves arguments${NC}"
+else
+    echo "${RED}✗ mise task execution did not preserve arguments${NC}"
+    echo "Got: $output"
+    exit 1
+fi
+
 # Test 7: Basic dela list for Maven tasks
 echo "\nTest 7: Testing dela list for Maven tasks"
 if list_and_grep "clean" && list_and_grep "compile" && list_and_grep "profile:dev"; then
@@ -998,4 +1033,3 @@ fi
 rm -f duplicate_test.json duplicate_test.mk list_output.txt list_output_long.txt
 
 echo "\n${GREEN}All non-init tests completed successfully!${NC}"
-

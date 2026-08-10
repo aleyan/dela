@@ -149,6 +149,7 @@ impl DelaError {
                     .to_string(),
             ),
             "just" => Some("Install just: https://github.com/casey/just#installation".to_string()),
+            "mise" => Some("Install mise: https://mise.jdx.dev/getting-started.html".to_string()),
             "docker compose" => Some(
                 "Install Docker Desktop or Docker Engine with Compose support: https://docs.docker.com/compose/install/"
                     .to_string(),

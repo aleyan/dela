@@ -41,6 +41,7 @@ pub fn is_runner_available(runner: &TaskRunner) -> bool {
         TaskRunner::TravisCi => false, // Travis CI tasks are not executable locally
         TaskRunner::CMake => check_path_executable("cmake").is_some(),
         TaskRunner::Just => check_path_executable("just").is_some(),
+        TaskRunner::Mise => check_path_executable("mise").is_some(),
     }
 }
 
@@ -296,6 +297,24 @@ mod tests {
 
         assert!(is_runner_available(&TaskRunner::CMake));
         assert!(!is_runner_available_for_mcp(&TaskRunner::CMake));
+
+        reset_mock();
+        reset_to_real_environment();
+    }
+
+    #[test]
+    #[serial]
+    fn test_mise_runner() {
+        reset_mock();
+        enable_mock();
+
+        let env = TestEnvironment::new().with_executable("mise");
+        set_test_environment(env);
+        assert!(is_runner_available(&TaskRunner::Mise));
+
+        let env = TestEnvironment::new();
+        set_test_environment(env);
+        assert!(!is_runner_available(&TaskRunner::Mise));
 
         reset_mock();
         reset_to_real_environment();

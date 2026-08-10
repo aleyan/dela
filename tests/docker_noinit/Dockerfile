@@ -55,6 +55,8 @@ COPY tests/task_definitions/package.json /home/testuser/test_project/
 COPY tests/task_definitions/pyproject.toml /home/testuser/test_project/
 COPY tests/task_definitions/uv.lock /home/testuser/test_project/
 COPY tests/task_definitions/Taskfile.yml /home/testuser/test_project/
+COPY tests/task_definitions/mise.toml /home/testuser/test_project/
+COPY tests/task_definitions/mise-tasks /home/testuser/test_project/mise-tasks
 COPY tests/task_definitions/pom.xml /home/testuser/test_project/
 COPY tests/task_definitions/build.gradle /home/testuser/test_project/
 COPY tests/task_definitions/build.gradle.kts /home/testuser/test_project/
@@ -64,6 +66,9 @@ COPY tests/task_definitions/github_actions/.github /home/testuser/test_project/.
 COPY tests/task_definitions/docker-compose.yml /home/testuser/test_project/
 COPY tests/task_definitions/compose.yml /home/testuser/test_project/
 COPY tests/task_definitions/turbo_repo /home/testuser/turbo_repo
+COPY tests/fake_runners/mise /usr/local/bin/mise
+RUN chmod +x /usr/local/bin/mise \
+    /home/testuser/test_project/mise-tasks/mise-file
 RUN chown -R testuser:testuser /home/testuser/test_project
 RUN chown -R testuser:testuser /home/testuser/turbo_repo
 
