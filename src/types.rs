@@ -247,7 +247,7 @@ impl TaskRunner {
             }
             TaskRunner::Just => format!("just {}", task.source_name),
             TaskRunner::Mise => {
-                format!("mise run -- {}", shell_words::quote(&task.source_name))
+                format!("mise run {} --", shell_words::quote(&task.source_name))
             }
         }
     }
@@ -398,7 +398,7 @@ mod tests {
 
         assert_eq!(
             crate::runner::split_command_words(&command).unwrap(),
-            vec!["mise", "run", "--", "release candidate"]
+            vec!["mise", "run", "release candidate", "--"]
         );
     }
 }

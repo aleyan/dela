@@ -97,7 +97,7 @@ fn parse_task_table(value: &toml::Value, path: &Path) -> Result<Vec<Task>, DelaP
     })?;
 
     let mut task_entries: Vec<_> = task_table.iter().collect();
-    task_entries.sort_by(|(left, _), (right, _)| left.cmp(right));
+    task_entries.sort_by_key(|(name, _)| *name);
 
     let mut tasks = Vec::new();
     for (name, definition) in task_entries {

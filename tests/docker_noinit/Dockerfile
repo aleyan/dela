@@ -20,7 +20,8 @@ RUN apk add --no-cache \
     util-linux \
     git \
     go-task \
-    act
+    act \
+    mise
 
 # Alpine names the binary go-task, while Taskfiles use the upstream task command.
 RUN ln -s /usr/bin/go-task /usr/local/bin/task
@@ -66,9 +67,7 @@ COPY tests/task_definitions/github_actions/.github /home/testuser/test_project/.
 COPY tests/task_definitions/docker-compose.yml /home/testuser/test_project/
 COPY tests/task_definitions/compose.yml /home/testuser/test_project/
 COPY tests/task_definitions/turbo_repo /home/testuser/turbo_repo
-COPY tests/fake_runners/mise /usr/local/bin/mise
-RUN chmod +x /usr/local/bin/mise \
-    /home/testuser/test_project/mise-tasks/mise-file
+RUN chmod +x /home/testuser/test_project/mise-tasks/mise-file
 RUN chown -R testuser:testuser /home/testuser/test_project
 RUN chown -R testuser:testuser /home/testuser/turbo_repo
 
@@ -82,6 +81,8 @@ WORKDIR /home/testuser/test_project
 ENV HOME=/home/testuser
 ENV SHELL=/bin/zsh
 ENV PATH="/home/testuser/.local/bin:${PATH}"
+
+RUN mise trust /home/testuser/test_project/mise.toml
 
 # Entry point script will be mounted
 CMD ["zsh", "/home/testuser/test_script.sh"]

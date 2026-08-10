@@ -232,7 +232,7 @@ else
 fi
 
 output=$(dela get-command mise-build 2>&1)
-if echo "$output" | grep -q "mise run -- mise-build"; then
+if echo "$output" | grep -q "mise run mise-build --"; then
     echo "${GREEN}✓ get-command returns the mise runner command${NC}"
 else
     echo "${RED}✗ get-command failed for a mise task${NC}"
