@@ -39,6 +39,12 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 log "SCRIPT_DIR: ${SCRIPT_DIR}"
 log "PROJECT_ROOT: ${PROJECT_ROOT}"
 
+# Build the default builder image when run directly without one.
+if [ -z "$BUILDER_IMAGE" ] && ! docker image inspect dela-builder >/dev/null 2>&1; then
+    log "Building base builder image..."
+    docker build --platform "$DOCKER_PLATFORM" -t dela-builder -f "${SCRIPT_DIR}/Dockerfile.builder" "${PROJECT_ROOT}"
+fi
+
 # Function to run tests for a specific shell
 run_shell_tests() {
     local shell=$1
@@ -124,4 +130,4 @@ else
         log "Testing ${shell} shell integration..."
         run_shell_tests "${shell}"
     done
-fi 
+fi
