@@ -17,25 +17,16 @@ RUN apk add --no-cache \
     maven \
     gradle \
     docker-cli \
-    util-linux && \
-    apk add --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/v3.24/community go-task
+    util-linux \
+    git \
+    go-task \
+    act
 
-# symlink go-task to task
+# Alpine names the binary go-task, while Taskfiles use the upstream task command.
 RUN ln -s /usr/bin/go-task /usr/local/bin/task
 
+# Turborepo is not packaged by Alpine, so install the pinned npm release.
 RUN npm install -g turbo@2.9.6
-
-
-# Install act (GitHub Actions runner)
-# TODO: Get act from the package manager, once it is in a non-edge alpine release.
-RUN apk add --no-cache curl git bash && \
-    mkdir -p /tmp/act-installation && \
-    cd /tmp/act-installation && \
-    curl -s https://raw.githubusercontent.com/nektos/act/master/install.sh | bash && \
-    mv ./bin/act /usr/local/bin/ && \
-    chmod +x /usr/local/bin/act && \
-    cd / && \
-    rm -rf /tmp/act-installation
 
 # Create test user
 RUN adduser -D -s /bin/zsh testuser
