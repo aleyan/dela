@@ -38,7 +38,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@fa04a1451ff1842e2626ccb99004d0195b455a88 # master
         with:
-          toolchain: 1.93.0
+          toolchain: 1.96.1
 
       - name: Verify release metadata
         id: release_meta
@@ -60,7 +60,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@fa04a1451ff1842e2626ccb99004d0195b455a88 # master
         with:
-          toolchain: 1.93.0
+          toolchain: 1.96.1
           components: rustfmt, clippy
 
       - name: Run lint
@@ -96,7 +96,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@fa04a1451ff1842e2626ccb99004d0195b455a88 # master
         with:
-          toolchain: 1.93.0
+          toolchain: 1.96.1
 
       - name: Validate publish package
         run: cargo publish --dry-run --locked
@@ -134,7 +134,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@fa04a1451ff1842e2626ccb99004d0195b455a88 # master
         with:
-          toolchain: 1.93.0
+          toolchain: 1.96.1
           targets: ${{ matrix.target }}
 
       - name: Install Linux cross-compilation tools
@@ -242,7 +242,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@fa04a1451ff1842e2626ccb99004d0195b455a88 # master
         with:
-          toolchain: 1.93.0
+          toolchain: 1.96.1
 
       - name: Check whether version is already published
         id: crates_version
