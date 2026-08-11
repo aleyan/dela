@@ -3,7 +3,7 @@
 FROM dela-builder AS builder
 
 # Test environment
-FROM alpine:3.21
+FROM alpine:3.24
     
 # Install required packages
 RUN apk add --no-cache \
@@ -18,7 +18,7 @@ RUN apk add --no-cache \
     gradle \
     docker-cli \
     util-linux && \
-    apk add --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/v3.21/community go-task
+    apk add --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/v3.24/community go-task
 
 # symlink go-task to task
 RUN ln -s /usr/bin/go-task /usr/local/bin/task

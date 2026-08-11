@@ -3,7 +3,7 @@
 FROM dela-builder AS builder
 
 # Test environment
-FROM alpine:3.21
+FROM alpine:3.24
     
 # Install required packages
 RUN apk add --no-cache \
@@ -13,7 +13,7 @@ RUN apk add --no-cache \
     uv \
     poetry \
     npm && \
-    apk add --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/v3.21/community task
+    apk add --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/v3.24/community task
 
 # Create test user
 RUN adduser -D -s /bin/pwsh testuser

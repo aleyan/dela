@@ -2,7 +2,7 @@
 FROM dela-builder AS builder
 
 # Test environment
-FROM rust:1.93.0-alpine3.21
+FROM dela-builder
 
 # Install build dependencies
 RUN apk add --no-cache \

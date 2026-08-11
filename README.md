@@ -20,7 +20,7 @@ $ dela init
 Alternatively, you can build and install the Rust binary directly from crates.io:
 
 ```sh
-$ cargo +1.93.0 install dela
+$ cargo +1.96.1 install dela
 $ dela init
 ```
 
