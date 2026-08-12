@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.4
 # --- Stage 1: Builder ---
-FROM rust:1.93.0-alpine3.21 AS builder
+FROM rust:1.96.1-alpine3.24 AS builder
 
 # Install build dependencies
 RUN apk add --no-cache \
@@ -35,4 +35,4 @@ COPY README.md ./
 
 # Build the project (debug mode only)
 RUN cargo build --all-features && \
-    cargo test --all-features --no-run 
+    cargo test --all-features --no-run

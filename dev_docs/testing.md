@@ -40,7 +40,7 @@ The project uses a combination of unit tests and integration tests. Unit tests c
 
 Each shell type (bash, fish, zsh, pwsh) has its own Dockerfile in the `tests/docker_*/` directories. These Dockerfiles:
 
-1. **Base Environment**: All use `alpine:3.21` as the base image
+1. **Base Environment**: All use Alpine 3.24 as the base image
 2. **Package Installation**: Install shell-specific packages and common tools:
    - Shell-specific package (bash/fish/zsh/powershell)
    - Build tools (make)

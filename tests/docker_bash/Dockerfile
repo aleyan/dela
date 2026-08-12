@@ -3,7 +3,7 @@
 FROM dela-builder AS builder
 
 # Test environment
-FROM alpine:3.21
+FROM alpine:3.24
 
 # Install minimal required packages for testing
 RUN apk add --no-cache \
@@ -11,10 +11,10 @@ RUN apk add --no-cache \
     make \
     python3 \
     uv \
-    poetry && \
-    apk add --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/v3.21/community go-task
+    poetry \
+    go-task
 
-# symlink go-task to task
+# Alpine names the binary go-task, while Taskfiles use the upstream task command.
 RUN ln -s /usr/bin/go-task /usr/local/bin/task
 
 # Create test user

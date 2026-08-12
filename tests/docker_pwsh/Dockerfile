@@ -3,7 +3,7 @@
 FROM dela-builder AS builder
 
 # Test environment
-FROM alpine:3.21
+FROM alpine:3.24
     
 # Install required packages
 RUN apk add --no-cache \
@@ -12,8 +12,11 @@ RUN apk add --no-cache \
     python3 \
     uv \
     poetry \
-    npm && \
-    apk add --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/v3.21/community task
+    npm \
+    go-task
+
+# Alpine names the binary go-task, while Taskfiles use the upstream task command.
+RUN ln -s /usr/bin/go-task /usr/local/bin/task
 
 # Create test user
 RUN adduser -D -s /bin/pwsh testuser
