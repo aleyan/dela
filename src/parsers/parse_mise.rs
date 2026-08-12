@@ -25,7 +25,10 @@ pub fn parse_included_toml(path: &Path) -> Result<Vec<Task>, DelaParseError> {
 }
 
 /// Return local task sources configured through `task_config.includes`.
-pub fn task_includes(path: &Path) -> Result<Option<Vec<String>>, DelaParseError> {
+pub fn task_includes(
+    path: &Path,
+    config_root: &Path,
+) -> Result<Option<Vec<String>>, DelaParseError> {
     let contents = std::fs::read_to_string(path)?;
     let config: toml::Value = toml::from_str(&contents)?;
     let Some(includes) = config
@@ -45,15 +48,57 @@ pub fn task_includes(path: &Path) -> Result<Option<Vec<String>>, DelaParseError>
     includes
         .iter()
         .map(|include| {
-            include.as_str().map(str::to_string).ok_or_else(|| {
+            let include = include.as_str().ok_or_else(|| {
                 DelaParseError::Syntax(format!(
                     "task_config.includes in '{}' must contain only strings",
                     path.display()
                 ))
-            })
+            })?;
+            render_task_include(include, path, config_root)
         })
         .collect::<Result<Vec<_>, _>>()
         .map(Some)
+}
+
+fn render_task_include(
+    include: &str,
+    config_path: &Path,
+    config_root: &Path,
+) -> Result<String, DelaParseError> {
+    let mut rendered = String::new();
+    let mut remaining = include;
+
+    while let Some(start) = remaining.find("{{") {
+        if remaining[..start].contains("}}") {
+            return Err(unsupported_include_template(config_path, include));
+        }
+        rendered.push_str(&remaining[..start]);
+
+        let expression = &remaining[start + 2..];
+        let Some(end) = expression.find("}}") else {
+            return Err(unsupported_include_template(config_path, include));
+        };
+        if expression[..end].trim() != "config_root" {
+            return Err(unsupported_include_template(config_path, include));
+        }
+
+        rendered.push_str(&config_root.to_string_lossy());
+        remaining = &expression[end + 2..];
+    }
+
+    if remaining.contains("}}") {
+        return Err(unsupported_include_template(config_path, include));
+    }
+    rendered.push_str(remaining);
+    Ok(rendered)
+}
+
+fn unsupported_include_template(config_path: &Path, include: &str) -> DelaParseError {
+    DelaParseError::Syntax(format!(
+        "unsupported template in task_config.includes entry '{}' in '{}'; only config_root is supported",
+        include,
+        config_path.display()
+    ))
 }
 
 /// Parse a standalone mise file task.
@@ -183,6 +228,7 @@ fn mise_directive(line: &str) -> Option<&str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
     use tempfile::TempDir;
 
     #[test]
@@ -278,9 +324,45 @@ hide = true
         .unwrap();
 
         assert_eq!(
-            task_includes(&path).unwrap(),
+            task_includes(&path, temp_dir.path()).unwrap(),
             Some(vec!["tasks.toml".to_string(), "project-tasks".to_string()])
         );
+    }
+
+    #[test]
+    #[serial]
+    fn test_parse_task_includes_renders_config_root() {
+        let temp_dir = TempDir::new().unwrap();
+        let path = temp_dir.path().join(".config/mise/config.toml");
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(
+            &path,
+            "[task_config]\nincludes = ['{{ config_root }}/tasks.toml']\n",
+        )
+        .unwrap();
+
+        assert_eq!(
+            task_includes(&path, temp_dir.path()).unwrap(),
+            Some(vec![
+                temp_dir.path().join("tasks.toml").display().to_string()
+            ])
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn test_parse_task_includes_rejects_unsupported_templates() {
+        let temp_dir = TempDir::new().unwrap();
+        let path = temp_dir.path().join("mise.toml");
+        std::fs::write(
+            &path,
+            "[task_config]\nincludes = ['{{ env.HOME }}/tasks.toml']\n",
+        )
+        .unwrap();
+
+        let error = task_includes(&path, temp_dir.path()).unwrap_err();
+
+        assert!(error.to_string().contains("only config_root is supported"));
     }
 
     #[test]

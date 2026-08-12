@@ -19,9 +19,9 @@ const MISE_CONFIG_PATHS_HIGH_TO_LOW: [&str; 8] = [
 const DEFAULT_FILE_TASK_DIRECTORIES: [&str; 5] = [
     "mise-tasks",
     ".mise-tasks",
-    "mise/tasks",
     ".mise/tasks",
     ".config/mise/tasks",
+    "mise/tasks",
 ];
 
 pub(crate) struct MiseDiscovery;
@@ -39,7 +39,7 @@ fn discover_mise_tasks(dir: &Path, discovered: &mut DiscoveredTasks) {
 
     for config_path in &config_paths {
         let tasks = parse_mise::parse(config_path);
-        let includes = parse_mise::task_includes(config_path);
+        let includes = parse_mise::task_includes(config_path, dir);
 
         match (tasks, includes) {
             (Ok(tasks), Ok(includes)) => {
@@ -160,7 +160,7 @@ fn discover_task_directory(
         }
     };
 
-    let mut paths: Vec<_> = entries.flatten().map(|entry| entry.path()).collect();
+    let mut paths: Vec<_> = entries.flatten().filter_map(non_symlink_path).collect();
     paths.sort();
 
     if paths.is_empty() && task_directory == current_directory {
@@ -187,6 +187,11 @@ fn discover_task_directory(
             }
         }
     }
+}
+
+fn non_symlink_path(entry: std::fs::DirEntry) -> Option<PathBuf> {
+    let path = entry.path();
+    (!path.is_symlink()).then_some(path)
 }
 
 fn discover_included_toml(
@@ -258,7 +263,7 @@ fn record_parse_error(
 }
 
 fn is_local_include(include: &str) -> bool {
-    !include.contains("://") && !include.contains("{{")
+    !include.contains("://")
 }
 
 fn is_executable(path: &Path) -> std::io::Result<bool> {
@@ -270,6 +275,7 @@ fn is_executable(path: &Path) -> std::io::Result<bool> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
     use std::fs;
     #[cfg(unix)]
     use std::os::unix::fs::PermissionsExt;
@@ -341,7 +347,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         fs::write(
             temp_dir.path().join(".mise.toml"),
-            "[task_config]\nincludes = ['tasks.toml', 'project-tasks']\n",
+            "[task_config]\nincludes = ['{{ config_root }}/tasks.toml', 'project-tasks']\n",
         )
         .unwrap();
         fs::write(
@@ -373,6 +379,57 @@ mod tests {
 
         assert_eq!(task_names, vec!["deploy", "shared"]);
         assert!(!task_names.contains(&"ignored"));
+    }
+
+    #[test]
+    #[serial]
+    fn test_later_default_task_directory_wins() {
+        let temp_dir = TempDir::new().unwrap();
+        for relative_directory in DEFAULT_FILE_TASK_DIRECTORIES {
+            let task_directory = temp_dir.path().join(relative_directory);
+            fs::create_dir_all(&task_directory).unwrap();
+            let task = task_directory.join("build");
+            fs::write(&task, "#!/bin/sh\n").unwrap();
+            make_executable(&task);
+        }
+
+        let mut discovered = DiscoveredTasks::default();
+        discover_mise_tasks(temp_dir.path(), &mut discovered);
+
+        let task = discovered
+            .tasks
+            .iter()
+            .find(|task| task.name == "build")
+            .unwrap();
+        assert_eq!(task.file_path, temp_dir.path().join("mise/tasks/build"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    #[serial]
+    fn test_directory_symlink_is_not_followed() {
+        use std::os::unix::fs::symlink;
+
+        let temp_dir = TempDir::new().unwrap();
+        let task_directory = temp_dir.path().join("mise-tasks");
+        fs::create_dir_all(&task_directory).unwrap();
+        let task = task_directory.join("build");
+        fs::write(&task, "#!/bin/sh\n").unwrap();
+        make_executable(&task);
+        symlink(".", task_directory.join("loop")).unwrap();
+
+        let mut discovered = DiscoveredTasks::default();
+        discover_mise_tasks(temp_dir.path(), &mut discovered);
+
+        assert_eq!(
+            discovered
+                .tasks
+                .iter()
+                .map(|task| task.name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["build"]
+        );
+        assert!(discovered.errors.is_empty());
     }
 
     #[test]
