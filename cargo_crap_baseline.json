@@ -837,7 +837,7 @@
     {
       "file": "./src/main.rs",
       "function": "main",
-      "line": 271,
+      "line": 272,
       "cyclomatic": 4.0,
       "coverage": 0.0,
       "crap": 20.0
@@ -845,7 +845,7 @@
     {
       "file": "./src/main.rs",
       "function": "run_command",
-      "line": 198,
+      "line": 199,
       "cyclomatic": 21.0,
       "coverage": 85.24590163934425,
       "crap": 22.416369652085418
@@ -1981,7 +1981,7 @@
     {
       "file": "./src/parsers/parse_mise.rs",
       "function": "file_task_name",
-      "line": 145,
+      "line": 190,
       "cyclomatic": 3.0,
       "coverage": 100.0,
       "crap": 3.0
@@ -1989,7 +1989,7 @@
     {
       "file": "./src/parsers/parse_mise.rs",
       "function": "mise_directive",
-      "line": 176,
+      "line": 221,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -2005,7 +2005,7 @@
     {
       "file": "./src/parsers/parse_mise.rs",
       "function": "parse_file_task",
-      "line": 60,
+      "line": 105,
       "cyclomatic": 4.0,
       "coverage": 96.15384615384616,
       "crap": 4.000910332271279
@@ -2013,7 +2013,7 @@
     {
       "file": "./src/parsers/parse_mise.rs",
       "function": "parse_file_task_metadata",
-      "line": 159,
+      "line": 204,
       "cyclomatic": 3.0,
       "coverage": 85.71428571428571,
       "crap": 3.0262390670553936
@@ -2029,18 +2029,34 @@
     {
       "file": "./src/parsers/parse_mise.rs",
       "function": "parse_task_table",
-      "line": 91,
+      "line": 136,
       "cyclomatic": 7.0,
       "coverage": 88.63636363636364,
       "crap": 7.071903174305034
     },
     {
       "file": "./src/parsers/parse_mise.rs",
+      "function": "render_task_include",
+      "line": 63,
+      "cyclomatic": 5.0,
+      "coverage": 88.46153846153845,
+      "crap": 5.038404642694584
+    },
+    {
+      "file": "./src/parsers/parse_mise.rs",
       "function": "task_includes",
       "line": 28,
       "cyclomatic": 4.0,
-      "coverage": 61.53846153846154,
-      "crap": 4.9103322712790165
+      "coverage": 66.66666666666666,
+      "crap": 4.5925925925925934
+    },
+    {
+      "file": "./src/parsers/parse_mise.rs",
+      "function": "unsupported_include_template",
+      "line": 96,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
     },
     {
       "file": "./src/parsers/parse_package_json.rs",
@@ -2557,7 +2573,15 @@
     {
       "file": "./src/task_discovery/mise.rs",
       "function": "MiseDiscovery::discover",
-      "line": 30,
+      "line": 36,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/task_discovery/mise.rs",
+      "function": "conf_d_config_files",
+      "line": 136,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -2565,7 +2589,7 @@
     {
       "file": "./src/task_discovery/mise.rs",
       "function": "discover_file_task",
-      "line": 206,
+      "line": 233,
       "cyclomatic": 4.0,
       "coverage": 85.71428571428571,
       "crap": 4.0466472303206995
@@ -2573,7 +2597,7 @@
     {
       "file": "./src/task_discovery/mise.rs",
       "function": "discover_included_toml",
-      "line": 192,
+      "line": 219,
       "cyclomatic": 3.0,
       "coverage": 91.66666666666666,
       "crap": 3.0052083333333335
@@ -2581,15 +2605,15 @@
     {
       "file": "./src/task_discovery/mise.rs",
       "function": "discover_mise_tasks",
-      "line": 35,
+      "line": 41,
       "cyclomatic": 9.0,
-      "coverage": 96.66666666666667,
-      "crap": 9.003
+      "coverage": 98.33333333333333,
+      "crap": 9.000375
     },
     {
       "file": "./src/task_discovery/mise.rs",
       "function": "discover_task_directory",
-      "line": 149,
+      "line": 168,
       "cyclomatic": 11.0,
       "coverage": 58.82352941176471,
       "crap": 19.447588031752492
@@ -2597,7 +2621,7 @@
     {
       "file": "./src/task_discovery/mise.rs",
       "function": "discover_task_source",
-      "line": 132,
+      "line": 151,
       "cyclomatic": 5.0,
       "coverage": 81.25,
       "crap": 5.164794921875
@@ -2605,15 +2629,15 @@
     {
       "file": "./src/task_discovery/mise.rs",
       "function": "find_mise_config_files",
-      "line": 110,
-      "cyclomatic": 2.0,
-      "coverage": 57.89473684210527,
-      "crap": 2.2985857996792536
+      "line": 119,
+      "cyclomatic": 4.0,
+      "coverage": 100.0,
+      "crap": 4.0
     },
     {
       "file": "./src/task_discovery/mise.rs",
       "function": "insert_tasks_if_absent",
-      "line": 222,
+      "line": 249,
       "cyclomatic": 2.0,
       "coverage": 100.0,
       "crap": 2.0
@@ -2621,7 +2645,7 @@
     {
       "file": "./src/task_discovery/mise.rs",
       "function": "is_executable",
-      "line": 264,
+      "line": 291,
       "cyclomatic": 2.0,
       "coverage": 100.0,
       "crap": 2.0
@@ -2629,15 +2653,15 @@
     {
       "file": "./src/task_discovery/mise.rs",
       "function": "is_local_include",
-      "line": 260,
-      "cyclomatic": 2.0,
+      "line": 287,
+      "cyclomatic": 1.0,
       "coverage": 100.0,
-      "crap": 2.0
+      "crap": 1.0
     },
     {
       "file": "./src/task_discovery/mise.rs",
       "function": "record_parse_error",
-      "line": 239,
+      "line": 266,
       "cyclomatic": 1.0,
       "coverage": 0.0,
       "crap": 2.0
@@ -2645,10 +2669,18 @@
     {
       "file": "./src/task_discovery/mise.rs",
       "function": "record_parsed",
-      "line": 228,
+      "line": 255,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
+    },
+    {
+      "file": "./src/task_discovery/mise.rs",
+      "function": "task_directory_entry",
+      "line": 214,
+      "cyclomatic": 2.0,
+      "coverage": 100.0,
+      "crap": 2.0
     },
     {
       "file": "./src/task_discovery/npm.rs",

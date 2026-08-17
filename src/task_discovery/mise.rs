@@ -5,23 +5,29 @@ use crate::types::{Task, TaskDefinitionFile, TaskDefinitionType, TaskFileStatus}
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-const MISE_CONFIG_PATHS_HIGH_TO_LOW: [&str; 8] = [
+/// mise configuration sources that can define tasks, highest precedence first.
+/// An entry naming a `conf.d` directory stands for every `.toml` file inside it.
+const MISE_CONFIG_PATHS_HIGH_TO_LOW: [&str; 10] = [
     "mise.local.toml",
     ".mise.local.toml",
     "mise.toml",
     ".mise.toml",
     "mise/config.toml",
     ".mise/config.toml",
+    ".mise/conf.d",
     ".config/mise.toml",
     ".config/mise/config.toml",
+    ".config/mise/conf.d",
 ];
 
-const DEFAULT_FILE_TASK_DIRECTORIES: [&str; 5] = [
+/// Directories mise searches for file tasks, in the order it searches them.
+/// The first directory holding a given task name is the one that defines it.
+const DEFAULT_FILE_TASK_DIRECTORIES_HIGH_TO_LOW: [&str; 5] = [
     "mise-tasks",
     ".mise-tasks",
+    "mise/tasks",
     ".mise/tasks",
     ".config/mise/tasks",
-    "mise/tasks",
 ];
 
 pub(crate) struct MiseDiscovery;
@@ -62,7 +68,7 @@ fn discover_mise_tasks(dir: &Path, discovered: &mut DiscoveredTasks) {
 
     let task_sources: Vec<PathBuf> = configured_includes.map_or_else(
         || {
-            DEFAULT_FILE_TASK_DIRECTORIES
+            DEFAULT_FILE_TASK_DIRECTORIES_HIGH_TO_LOW
                 .iter()
                 .map(|path| dir.join(path))
                 .collect()
@@ -83,8 +89,11 @@ fn discover_mise_tasks(dir: &Path, discovered: &mut DiscoveredTasks) {
         },
     );
 
+    // Task sources are ordered highest precedence first, and tasks are only
+    // inserted under a name that is still free, so the first source naming a
+    // task is the one that defines it.
     let mut found_task_source = false;
-    for task_source in task_sources.into_iter().rev() {
+    for task_source in task_sources {
         if task_source.exists() {
             found_task_source = true;
         }
@@ -108,24 +117,34 @@ fn discover_mise_tasks(dir: &Path, discovered: &mut DiscoveredTasks) {
 }
 
 fn find_mise_config_files(dir: &Path) -> Vec<PathBuf> {
-    let mut paths: Vec<_> = MISE_CONFIG_PATHS_HIGH_TO_LOW
-        .iter()
-        .map(|relative_path| dir.join(relative_path))
-        .filter(|path| path.is_file())
-        .collect();
+    let mut paths = Vec::new();
 
-    let conf_d = dir.join(".config/mise/conf.d");
-    if let Ok(entries) = std::fs::read_dir(conf_d) {
-        let mut conf_d_paths: Vec<_> = entries
-            .flatten()
-            .map(|entry| entry.path())
-            .filter(|path| path.is_file() && path.extension().is_some_and(|ext| ext == "toml"))
-            .collect();
-        conf_d_paths.sort();
-        conf_d_paths.reverse();
-        paths.extend(conf_d_paths);
+    for relative_path in MISE_CONFIG_PATHS_HIGH_TO_LOW {
+        let path = dir.join(relative_path);
+        if relative_path.ends_with("conf.d") {
+            paths.extend(conf_d_config_files(&path));
+        } else if path.is_file() {
+            paths.push(path);
+        }
     }
 
+    paths
+}
+
+/// Return the `.toml` files in a `conf.d` directory, highest precedence first.
+/// mise layers them alphabetically, so the last name alphabetically wins.
+fn conf_d_config_files(conf_d: &Path) -> Vec<PathBuf> {
+    let Ok(entries) = std::fs::read_dir(conf_d) else {
+        return Vec::new();
+    };
+
+    let mut paths: Vec<_> = entries
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| path.is_file() && path.extension().is_some_and(|ext| ext == "toml"))
+        .collect();
+    paths.sort();
+    paths.reverse();
     paths
 }
 
@@ -160,7 +179,7 @@ fn discover_task_directory(
         }
     };
 
-    let mut paths: Vec<_> = entries.flatten().filter_map(non_symlink_path).collect();
+    let mut paths: Vec<_> = entries.flatten().filter_map(task_directory_entry).collect();
     paths.sort();
 
     if paths.is_empty() && task_directory == current_directory {
@@ -189,9 +208,12 @@ fn discover_task_directory(
     }
 }
 
-fn non_symlink_path(entry: std::fs::DirEntry) -> Option<PathBuf> {
+/// Symlinked directories are skipped, so a task directory linking back to one of
+/// its own ancestors cannot send the walk into a loop. Symlinked files are kept:
+/// linking a script into a task directory is an ordinary way to define a task.
+fn task_directory_entry(entry: std::fs::DirEntry) -> Option<PathBuf> {
     let path = entry.path();
-    (!path.is_symlink()).then_some(path)
+    (!path.is_symlink() || path.is_file()).then_some(path)
 }
 
 fn discover_included_toml(
@@ -384,9 +406,9 @@ mod tests {
     #[cfg(unix)]
     #[test]
     #[serial]
-    fn test_later_default_task_directory_wins() {
+    fn test_first_default_task_directory_searched_wins() {
         let temp_dir = TempDir::new().unwrap();
-        for relative_directory in DEFAULT_FILE_TASK_DIRECTORIES {
+        for relative_directory in DEFAULT_FILE_TASK_DIRECTORIES_HIGH_TO_LOW {
             let task_directory = temp_dir.path().join(relative_directory);
             fs::create_dir_all(&task_directory).unwrap();
             let task = task_directory.join("build");
@@ -402,7 +424,11 @@ mod tests {
             .iter()
             .find(|task| task.name == "build")
             .unwrap();
-        assert_eq!(task.file_path, temp_dir.path().join("mise/tasks/build"));
+        assert_eq!(task.file_path, temp_dir.path().join("mise-tasks/build"));
+        assert_eq!(
+            task.allowlist_path(),
+            temp_dir.path().join("mise-tasks/build")
+        );
     }
 
     #[cfg(unix)]
@@ -431,6 +457,104 @@ mod tests {
             vec!["build"]
         );
         assert!(discovered.errors.is_empty());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    #[serial]
+    fn test_symlinked_file_task_is_discovered() {
+        use std::os::unix::fs::symlink;
+
+        let temp_dir = TempDir::new().unwrap();
+        let script_directory = temp_dir.path().join("scripts");
+        fs::create_dir_all(&script_directory).unwrap();
+        let script = script_directory.join("deploy.sh");
+        fs::write(&script, "#!/bin/sh\n#MISE description='Deploy it'\n").unwrap();
+        make_executable(&script);
+
+        let task_directory = temp_dir.path().join("mise-tasks");
+        fs::create_dir_all(&task_directory).unwrap();
+        let link = task_directory.join("deploy");
+        symlink(&script, &link).unwrap();
+
+        let mut discovered = DiscoveredTasks::default();
+        discover_mise_tasks(temp_dir.path(), &mut discovered);
+
+        let task = discovered
+            .tasks
+            .iter()
+            .find(|task| task.name == "deploy")
+            .unwrap();
+        assert_eq!(task.description, Some("Deploy it".to_string()));
+        assert_eq!(task.allowlist_path(), link);
+    }
+
+    #[test]
+    fn test_conf_d_tasks_are_discovered_below_their_sibling_config() {
+        let temp_dir = TempDir::new().unwrap();
+        let conf_d = temp_dir.path().join(".mise/conf.d");
+        fs::create_dir_all(&conf_d).unwrap();
+        fs::write(
+            conf_d.join("10-build.toml"),
+            "[tasks.build]\ndescription = 'Lower precedence'\nrun = 'echo low'\n",
+        )
+        .unwrap();
+        fs::write(
+            conf_d.join("20-extra.toml"),
+            "[tasks.build]\ndescription = 'Higher precedence'\nrun = 'echo high'\n[tasks.extra]\nrun = 'echo extra'\n",
+        )
+        .unwrap();
+        fs::write(
+            temp_dir.path().join("mise.toml"),
+            "[tasks.build]\ndescription = 'Root config wins'\nrun = 'echo root'\n",
+        )
+        .unwrap();
+
+        let mut discovered = DiscoveredTasks::default();
+        discover_mise_tasks(temp_dir.path(), &mut discovered);
+
+        let task_names: Vec<_> = discovered
+            .tasks
+            .iter()
+            .map(|task| task.name.as_str())
+            .collect();
+        assert_eq!(task_names, vec!["build", "extra"]);
+
+        let build = discovered
+            .tasks
+            .iter()
+            .find(|task| task.name == "build")
+            .unwrap();
+        assert_eq!(build.description, Some("Root config wins".to_string()));
+        assert_eq!(build.file_path, temp_dir.path().join("mise.toml"));
+    }
+
+    #[test]
+    fn test_conf_d_layers_alphabetically_last_over_earlier_files() {
+        let temp_dir = TempDir::new().unwrap();
+        let conf_d = temp_dir.path().join(".mise/conf.d");
+        fs::create_dir_all(&conf_d).unwrap();
+        fs::write(
+            conf_d.join("10-build.toml"),
+            "[tasks.build]\ndescription = 'Lower precedence'\nrun = 'echo low'\n",
+        )
+        .unwrap();
+        fs::write(
+            conf_d.join("20-build.toml"),
+            "[tasks.build]\ndescription = 'Higher precedence'\nrun = 'echo high'\n",
+        )
+        .unwrap();
+
+        let mut discovered = DiscoveredTasks::default();
+        discover_mise_tasks(temp_dir.path(), &mut discovered);
+
+        let build = discovered
+            .tasks
+            .iter()
+            .find(|task| task.name == "build")
+            .unwrap();
+        assert_eq!(build.description, Some("Higher precedence".to_string()));
+        assert_eq!(build.file_path, conf_d.join("20-build.toml"));
     }
 
     #[test]
