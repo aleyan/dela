@@ -381,6 +381,7 @@ mod tests {
         assert!(!task_names.contains(&"ignored"));
     }
 
+    #[cfg(unix)]
     #[test]
     #[serial]
     fn test_later_default_task_directory_wins() {
