@@ -5,11 +5,10 @@ use crate::types::{Task, TaskDefinitionFile, TaskDefinitionType, TaskFileStatus}
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-/// mise configuration sources that can define tasks, highest precedence first.
-/// An entry naming a `conf.d` directory stands for every `.toml` file inside it.
-const MISE_CONFIG_PATHS_HIGH_TO_LOW: [&str; 10] = [
-    "mise.local.toml",
-    ".mise.local.toml",
+/// mise configuration sources below the environment-specific and local files,
+/// highest precedence first. An entry naming a `conf.d` directory stands for
+/// every `.toml` file inside it.
+const BASE_MISE_CONFIG_PATHS_HIGH_TO_LOW: [&str; 8] = [
     "mise.toml",
     ".mise.toml",
     "mise/config.toml",
@@ -39,7 +38,16 @@ impl TaskDiscovery for MiseDiscovery {
 }
 
 fn discover_mise_tasks(dir: &Path, discovered: &mut DiscoveredTasks) {
-    let config_paths = find_mise_config_files(dir);
+    let mise_env = std::env::var("MISE_ENV").ok();
+    discover_mise_tasks_with_env(dir, discovered, mise_env.as_deref());
+}
+
+fn discover_mise_tasks_with_env(
+    dir: &Path,
+    discovered: &mut DiscoveredTasks,
+    mise_env: Option<&str>,
+) {
+    let config_paths = find_mise_config_files(dir, mise_env);
     let mut tasks_by_name = BTreeMap::new();
     let mut configured_includes = None;
 
@@ -76,6 +84,7 @@ fn discover_mise_tasks(dir: &Path, discovered: &mut DiscoveredTasks) {
         |includes| {
             includes
                 .into_iter()
+                .rev()
                 .filter(|include| is_local_include(include))
                 .map(|include| {
                     let path = PathBuf::from(include);
@@ -116,11 +125,11 @@ fn discover_mise_tasks(dir: &Path, discovered: &mut DiscoveredTasks) {
     discovered.tasks.extend(tasks);
 }
 
-fn find_mise_config_files(dir: &Path) -> Vec<PathBuf> {
+fn find_mise_config_files(dir: &Path, mise_env: Option<&str>) -> Vec<PathBuf> {
     let mut paths = Vec::new();
 
-    for relative_path in MISE_CONFIG_PATHS_HIGH_TO_LOW {
-        let path = dir.join(relative_path);
+    for relative_path in mise_config_paths_high_to_low(mise_env) {
+        let path = dir.join(&relative_path);
         if relative_path.ends_with("conf.d") {
             paths.extend(conf_d_config_files(&path));
         } else if path.is_file() {
@@ -128,6 +137,35 @@ fn find_mise_config_files(dir: &Path) -> Vec<PathBuf> {
         }
     }
 
+    paths
+}
+
+fn mise_config_paths_high_to_low(mise_env: Option<&str>) -> Vec<String> {
+    let environments: Vec<_> = mise_env
+        .unwrap_or_default()
+        .split(',')
+        .map(str::trim)
+        .filter(|environment| !environment.is_empty())
+        .collect();
+    let mut paths = Vec::new();
+
+    // The final environment has the highest precedence when MISE_ENV contains
+    // multiple comma-separated values.
+    for environment in environments.iter().rev() {
+        paths.push(format!("mise.{environment}.local.toml"));
+        paths.push(format!(".mise.{environment}.local.toml"));
+    }
+    paths.push("mise.local.toml".to_string());
+    paths.push(".mise.local.toml".to_string());
+    for environment in environments.iter().rev() {
+        paths.push(format!("mise.{environment}.toml"));
+        paths.push(format!(".mise.{environment}.toml"));
+    }
+    paths.extend(
+        BASE_MISE_CONFIG_PATHS_HIGH_TO_LOW
+            .iter()
+            .map(|path| (*path).to_string()),
+    );
     paths
 }
 
@@ -401,6 +439,80 @@ mod tests {
 
         assert_eq!(task_names, vec!["deploy", "shared"]);
         assert!(!task_names.contains(&"ignored"));
+    }
+
+    #[test]
+    #[serial]
+    fn test_later_custom_include_wins() {
+        let temp_dir = TempDir::new().unwrap();
+        fs::write(
+            temp_dir.path().join("mise.toml"),
+            "[task_config]\nincludes = ['first.toml', 'second.toml']\n",
+        )
+        .unwrap();
+        fs::write(
+            temp_dir.path().join("first.toml"),
+            "[build]\ndescription = 'First include'\nrun = 'echo first'\n",
+        )
+        .unwrap();
+        fs::write(
+            temp_dir.path().join("second.toml"),
+            "[build]\ndescription = 'Second include'\nrun = 'echo second'\n",
+        )
+        .unwrap();
+
+        let mut discovered = DiscoveredTasks::default();
+        discover_mise_tasks(temp_dir.path(), &mut discovered);
+
+        let build = discovered
+            .tasks
+            .iter()
+            .find(|task| task.name == "build")
+            .unwrap();
+        assert_eq!(build.description, Some("Second include".to_string()));
+        assert_eq!(build.file_path, temp_dir.path().join("second.toml"));
+    }
+
+    #[test]
+    #[serial]
+    fn test_mise_env_config_files_follow_precedence() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_paths = [
+            "mise.ci.local.toml",
+            ".mise.ci.local.toml",
+            "mise.local.toml",
+            ".mise.local.toml",
+            "mise.ci.toml",
+            ".mise.ci.toml",
+            "mise.toml",
+            ".mise.toml",
+        ];
+        for config_path in config_paths {
+            fs::write(
+                temp_dir.path().join(config_path),
+                format!("[tasks.build]\ndescription = '{config_path}'\nrun = 'echo build'\n"),
+            )
+            .unwrap();
+        }
+
+        assert_eq!(
+            find_mise_config_files(temp_dir.path(), Some("ci")),
+            config_paths
+                .iter()
+                .map(|path| temp_dir.path().join(path))
+                .collect::<Vec<_>>()
+        );
+
+        let mut discovered = DiscoveredTasks::default();
+        discover_mise_tasks_with_env(temp_dir.path(), &mut discovered, Some("ci"));
+
+        let build = discovered
+            .tasks
+            .iter()
+            .find(|task| task.name == "build")
+            .unwrap();
+        assert_eq!(build.description, Some("mise.ci.local.toml".to_string()));
+        assert_eq!(build.file_path, temp_dir.path().join("mise.ci.local.toml"));
     }
 
     #[cfg(unix)]
