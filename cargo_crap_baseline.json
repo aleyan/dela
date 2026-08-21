@@ -837,7 +837,7 @@
     {
       "file": "./src/main.rs",
       "function": "main",
-      "line": 271,
+      "line": 272,
       "cyclomatic": 4.0,
       "coverage": 0.0,
       "crap": 20.0
@@ -845,7 +845,7 @@
     {
       "file": "./src/main.rs",
       "function": "run_command",
-      "line": 198,
+      "line": 199,
       "cyclomatic": 21.0,
       "coverage": 85.24590163934425,
       "crap": 22.416369652085418
@@ -917,7 +917,7 @@
     {
       "file": "./src/mcp/errors.rs",
       "function": "DelaError::internal_error",
-      "line": 184,
+      "line": 185,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -925,7 +925,7 @@
     {
       "file": "./src/mcp/errors.rs",
       "function": "DelaError::job_not_found",
-      "line": 176,
+      "line": 177,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -933,7 +933,7 @@
     {
       "file": "./src/mcp/errors.rs",
       "function": "DelaError::mcp_not_ready",
-      "line": 189,
+      "line": 190,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -950,14 +950,14 @@
       "file": "./src/mcp/errors.rs",
       "function": "DelaError::runner_unavailable",
       "line": 121,
-      "cyclomatic": 16.0,
-      "coverage": 83.33333333333334,
-      "crap": 17.185185185185183
+      "cyclomatic": 17.0,
+      "coverage": 81.3953488372093,
+      "crap": 18.861068836706202
     },
     {
       "file": "./src/mcp/errors.rs",
       "function": "DelaError::task_not_found",
-      "line": 168,
+      "line": 169,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -981,7 +981,7 @@
     {
       "file": "./src/mcp/errors.rs",
       "function": "ErrorData::from",
-      "line": 201,
+      "line": 202,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -1979,6 +1979,86 @@
       "crap": 21.132568359375
     },
     {
+      "file": "./src/parsers/parse_mise.rs",
+      "function": "file_task_name",
+      "line": 190,
+      "cyclomatic": 3.0,
+      "coverage": 100.0,
+      "crap": 3.0
+    },
+    {
+      "file": "./src/parsers/parse_mise.rs",
+      "function": "mise_directive",
+      "line": 221,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/parsers/parse_mise.rs",
+      "function": "parse",
+      "line": 6,
+      "cyclomatic": 3.0,
+      "coverage": 100.0,
+      "crap": 3.0
+    },
+    {
+      "file": "./src/parsers/parse_mise.rs",
+      "function": "parse_file_task",
+      "line": 105,
+      "cyclomatic": 4.0,
+      "coverage": 96.15384615384616,
+      "crap": 4.000910332271279
+    },
+    {
+      "file": "./src/parsers/parse_mise.rs",
+      "function": "parse_file_task_metadata",
+      "line": 204,
+      "cyclomatic": 3.0,
+      "coverage": 85.71428571428571,
+      "crap": 3.0262390670553936
+    },
+    {
+      "file": "./src/parsers/parse_mise.rs",
+      "function": "parse_included_toml",
+      "line": 21,
+      "cyclomatic": 3.0,
+      "coverage": 100.0,
+      "crap": 3.0
+    },
+    {
+      "file": "./src/parsers/parse_mise.rs",
+      "function": "parse_task_table",
+      "line": 136,
+      "cyclomatic": 7.0,
+      "coverage": 88.63636363636364,
+      "crap": 7.071903174305034
+    },
+    {
+      "file": "./src/parsers/parse_mise.rs",
+      "function": "render_task_include",
+      "line": 63,
+      "cyclomatic": 5.0,
+      "coverage": 88.46153846153845,
+      "crap": 5.038404642694584
+    },
+    {
+      "file": "./src/parsers/parse_mise.rs",
+      "function": "task_includes",
+      "line": 28,
+      "cyclomatic": 4.0,
+      "coverage": 66.66666666666666,
+      "crap": 4.5925925925925934
+    },
+    {
+      "file": "./src/parsers/parse_mise.rs",
+      "function": "unsupported_include_template",
+      "line": 96,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
       "file": "./src/parsers/parse_package_json.rs",
       "function": "parse",
       "line": 6,
@@ -2238,14 +2318,14 @@
       "file": "./src/runner.rs",
       "function": "is_runner_available",
       "line": 21,
-      "cyclomatic": 20.0,
+      "cyclomatic": 21.0,
       "coverage": 100.0,
-      "crap": 20.0
+      "crap": 21.0
     },
     {
       "file": "./src/runner.rs",
       "function": "is_runner_available_for_mcp",
-      "line": 50,
+      "line": 51,
       "cyclomatic": 3.0,
       "coverage": 100.0,
       "crap": 3.0
@@ -2285,7 +2365,7 @@
     {
       "file": "./src/task_discovery.rs",
       "function": "DiscoveredTasks::add_task",
-      "line": 41,
+      "line": 42,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -2293,7 +2373,7 @@
     {
       "file": "./src/task_discovery.rs",
       "function": "DiscoveredTasks::new",
-      "line": 36,
+      "line": 37,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -2301,7 +2381,7 @@
     {
       "file": "./src/task_discovery.rs",
       "function": "discover_tasks",
-      "line": 51,
+      "line": 52,
       "cyclomatic": 2.0,
       "coverage": 100.0,
       "crap": 2.0
@@ -2491,6 +2571,118 @@
       "crap": 5.404663923182442
     },
     {
+      "file": "./src/task_discovery/mise.rs",
+      "function": "MiseDiscovery::discover",
+      "line": 36,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/task_discovery/mise.rs",
+      "function": "conf_d_config_files",
+      "line": 136,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/task_discovery/mise.rs",
+      "function": "discover_file_task",
+      "line": 233,
+      "cyclomatic": 4.0,
+      "coverage": 85.71428571428571,
+      "crap": 4.0466472303206995
+    },
+    {
+      "file": "./src/task_discovery/mise.rs",
+      "function": "discover_included_toml",
+      "line": 219,
+      "cyclomatic": 3.0,
+      "coverage": 91.66666666666666,
+      "crap": 3.0052083333333335
+    },
+    {
+      "file": "./src/task_discovery/mise.rs",
+      "function": "discover_mise_tasks",
+      "line": 41,
+      "cyclomatic": 9.0,
+      "coverage": 98.33333333333333,
+      "crap": 9.000375
+    },
+    {
+      "file": "./src/task_discovery/mise.rs",
+      "function": "discover_task_directory",
+      "line": 168,
+      "cyclomatic": 11.0,
+      "coverage": 58.82352941176471,
+      "crap": 19.447588031752492
+    },
+    {
+      "file": "./src/task_discovery/mise.rs",
+      "function": "discover_task_source",
+      "line": 151,
+      "cyclomatic": 5.0,
+      "coverage": 81.25,
+      "crap": 5.164794921875
+    },
+    {
+      "file": "./src/task_discovery/mise.rs",
+      "function": "find_mise_config_files",
+      "line": 119,
+      "cyclomatic": 4.0,
+      "coverage": 100.0,
+      "crap": 4.0
+    },
+    {
+      "file": "./src/task_discovery/mise.rs",
+      "function": "insert_tasks_if_absent",
+      "line": 249,
+      "cyclomatic": 2.0,
+      "coverage": 100.0,
+      "crap": 2.0
+    },
+    {
+      "file": "./src/task_discovery/mise.rs",
+      "function": "is_executable",
+      "line": 291,
+      "cyclomatic": 2.0,
+      "coverage": 100.0,
+      "crap": 2.0
+    },
+    {
+      "file": "./src/task_discovery/mise.rs",
+      "function": "is_local_include",
+      "line": 287,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/task_discovery/mise.rs",
+      "function": "record_parse_error",
+      "line": 266,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0
+    },
+    {
+      "file": "./src/task_discovery/mise.rs",
+      "function": "record_parsed",
+      "line": 255,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/task_discovery/mise.rs",
+      "function": "task_directory_entry",
+      "line": 214,
+      "cyclomatic": 2.0,
+      "coverage": 100.0,
+      "crap": 2.0
+    },
+    {
       "file": "./src/task_discovery/npm.rs",
       "function": "NpmDiscovery::discover",
       "line": 10,
@@ -2525,7 +2717,7 @@
     {
       "file": "./src/task_discovery/registry.rs",
       "function": "registered_discoveries",
-      "line": 23,
+      "line": 24,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -2789,30 +2981,6 @@
     {
       "file": "./src/types.rs",
       "function": "DiscoveredTaskDefinitions::get_all",
-      "line": 154,
-      "cyclomatic": 1.0,
-      "coverage": 100.0,
-      "crap": 1.0
-    },
-    {
-      "file": "./src/types.rs",
-      "function": "DiscoveredTaskDefinitions::get_first",
-      "line": 148,
-      "cyclomatic": 1.0,
-      "coverage": 100.0,
-      "crap": 1.0
-    },
-    {
-      "file": "./src/types.rs",
-      "function": "DiscoveredTaskDefinitions::insert",
-      "line": 139,
-      "cyclomatic": 1.0,
-      "coverage": 100.0,
-      "crap": 1.0
-    },
-    {
-      "file": "./src/types.rs",
-      "function": "DiscoveredTaskDefinitions::iter",
       "line": 159,
       "cyclomatic": 1.0,
       "coverage": 100.0,
@@ -2820,8 +2988,32 @@
     },
     {
       "file": "./src/types.rs",
+      "function": "DiscoveredTaskDefinitions::get_first",
+      "line": 153,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/types.rs",
+      "function": "DiscoveredTaskDefinitions::insert",
+      "line": 144,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/types.rs",
+      "function": "DiscoveredTaskDefinitions::iter",
+      "line": 164,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/types.rs",
       "function": "Task::allowlist_path",
-      "line": 198,
+      "line": 203,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -2829,7 +3021,7 @@
     {
       "file": "./src/types.rs",
       "function": "Task::definition_path",
-      "line": 193,
+      "line": 198,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -2837,23 +3029,23 @@
     {
       "file": "./src/types.rs",
       "function": "TaskRunner::get_command",
-      "line": 205,
-      "cyclomatic": 21.0,
+      "line": 210,
+      "cyclomatic": 22.0,
       "coverage": 100.0,
-      "crap": 21.0
+      "crap": 22.0
     },
     {
       "file": "./src/types.rs",
       "function": "TaskRunner::short_name",
-      "line": 248,
-      "cyclomatic": 19.0,
-      "coverage": 95.23809523809523,
-      "crap": 19.038980671633734
+      "line": 256,
+      "cyclomatic": 20.0,
+      "coverage": 90.9090909090909,
+      "crap": 20.30052592036063
     },
     {
       "file": "./src/types.rs",
       "function": "deserialize_path",
-      "line": 309,
+      "line": 318,
       "cyclomatic": 2.0,
       "coverage": 100.0,
       "crap": 2.0
@@ -2861,16 +3053,16 @@
     {
       "file": "./src/types.rs",
       "function": "serialize_path",
-      "line": 302,
+      "line": 311,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
     }
   ],
   "diagnostics": {
-    "analyzed_files": 60,
-    "lcov_files": 60,
-    "matched_files": 60,
+    "analyzed_files": 62,
+    "lcov_files": 62,
+    "matched_files": 62,
     "source_only": {
       "count": 0,
       "examples": []

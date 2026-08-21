@@ -1,0 +1,7 @@
+[tasks.mise-build]
+description = "Build with mise"
+run = "echo 'Mise build task executed successfully'"
+
+[tasks.mise-hidden]
+run = "echo 'This task should stay hidden'"
+hide = true

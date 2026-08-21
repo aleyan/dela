@@ -448,6 +448,7 @@ mod tests {
                 TaskRunner::TravisCi => TaskDefinitionType::TravisCi,
                 TaskRunner::CMake => TaskDefinitionType::CMake,
                 TaskRunner::Just => TaskDefinitionType::Justfile,
+                TaskRunner::Mise => TaskDefinitionType::Mise,
             },
             runner,
             source_name: name.to_string(),

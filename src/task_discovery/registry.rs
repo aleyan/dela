@@ -1,9 +1,9 @@
 use crate::task_discovery::{
     TaskDiscovery, cmake::CmakeDiscovery, docker_compose::DockerComposeDiscovery,
     github_actions::GithubActionsDiscovery, gradle::GradleDiscovery, justfile::JustfileDiscovery,
-    make::MakefileDiscovery, maven::MavenDiscovery, npm::NpmDiscovery, python::PythonDiscovery,
-    shell_scripts::ShellScriptDiscovery, taskfile::TaskfileDiscovery, travis_ci::TravisCiDiscovery,
-    turbo::TurboDiscovery,
+    make::MakefileDiscovery, maven::MavenDiscovery, mise::MiseDiscovery, npm::NpmDiscovery,
+    python::PythonDiscovery, shell_scripts::ShellScriptDiscovery, taskfile::TaskfileDiscovery,
+    travis_ci::TravisCiDiscovery, turbo::TurboDiscovery,
 };
 
 static MAKEFILE_DISCOVERY: MakefileDiscovery = MakefileDiscovery;
@@ -18,6 +18,7 @@ static DOCKER_COMPOSE_DISCOVERY: DockerComposeDiscovery = DockerComposeDiscovery
 static TRAVIS_CI_DISCOVERY: TravisCiDiscovery = TravisCiDiscovery;
 static CMAKE_DISCOVERY: CmakeDiscovery = CmakeDiscovery;
 static JUSTFILE_DISCOVERY: JustfileDiscovery = JustfileDiscovery;
+static MISE_DISCOVERY: MiseDiscovery = MiseDiscovery;
 static SHELL_SCRIPT_DISCOVERY: ShellScriptDiscovery = ShellScriptDiscovery;
 
 pub(crate) fn registered_discoveries() -> Vec<&'static dyn TaskDiscovery> {
@@ -34,6 +35,7 @@ pub(crate) fn registered_discoveries() -> Vec<&'static dyn TaskDiscovery> {
         &TRAVIS_CI_DISCOVERY,
         &CMAKE_DISCOVERY,
         &JUSTFILE_DISCOVERY,
+        &MISE_DISCOVERY,
         &SHELL_SCRIPT_DISCOVERY,
     ]
 }

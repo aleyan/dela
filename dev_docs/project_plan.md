@@ -375,6 +375,7 @@ Advanced MCP features for better editor integration and real-time feedback.
   - [x] [DTKT-136] Implement Turborepo support
   - [ ] [DTKT-190] Implement Rake support
   - [x] [DTKT-137] Implement Justfile parser and task discovery
+  - [x] [DTKT-213] Implement mise TOML and executable file-task discovery and execution.
   - [ ] [DTKT-122] Add Starlark parsing for Bazel
   - [ ] [DTKT-123] Implement Bazel task running.
 

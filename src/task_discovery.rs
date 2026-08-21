@@ -6,6 +6,7 @@ mod gradle;
 mod justfile;
 mod make;
 mod maven;
+mod mise;
 mod npm;
 mod python;
 mod registry;
