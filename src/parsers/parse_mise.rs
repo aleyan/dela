@@ -2,16 +2,46 @@ use crate::parsers::errors::DelaParseError;
 use crate::types::{Task, TaskDefinitionType, TaskRunner};
 use std::path::Path;
 
-/// Parse tasks from a mise configuration file.
-pub fn parse(path: &Path) -> Result<Vec<Task>, DelaParseError> {
+fn read_toml(path: &Path) -> Result<toml::Value, DelaParseError> {
     let contents = std::fs::read_to_string(path)?;
-    let config: toml::Value = toml::from_str(&contents)?;
+    Ok(toml::from_str(&contents)?)
+}
 
+fn tasks_from_config(config: &toml::Value, path: &Path) -> Result<Vec<Task>, DelaParseError> {
     let Some(tasks) = config.get("tasks") else {
         return Ok(Vec::new());
     };
 
     parse_task_table(tasks, path)
+}
+
+/// Parse tasks from a mise configuration file.
+#[allow(dead_code)]
+pub fn parse(path: &Path) -> Result<Vec<Task>, DelaParseError> {
+    let config = read_toml(path)?;
+    tasks_from_config(&config, path)
+}
+
+/// Parse a mise configuration file's inline `[tasks]` table and its
+/// `task_config.includes` in a single read/parse pass. The two results are
+/// independent: a malformed `includes` entry does not discard tasks that
+/// parsed successfully, and vice versa.
+#[allow(clippy::type_complexity)]
+pub fn parse_config(
+    path: &Path,
+    config_root: &Path,
+) -> Result<
+    (
+        Result<Vec<Task>, DelaParseError>,
+        Result<Option<Vec<String>>, DelaParseError>,
+    ),
+    DelaParseError,
+> {
+    let config = read_toml(path)?;
+    Ok((
+        tasks_from_config(&config, path),
+        includes_from_config(&config, path, config_root),
+    ))
 }
 
 /// Parse a TOML file included through `task_config.includes`.
@@ -25,12 +55,20 @@ pub fn parse_included_toml(path: &Path) -> Result<Vec<Task>, DelaParseError> {
 }
 
 /// Return local task sources configured through `task_config.includes`.
+#[allow(dead_code)]
 pub fn task_includes(
     path: &Path,
     config_root: &Path,
 ) -> Result<Option<Vec<String>>, DelaParseError> {
-    let contents = std::fs::read_to_string(path)?;
-    let config: toml::Value = toml::from_str(&contents)?;
+    let config = read_toml(path)?;
+    includes_from_config(&config, path, config_root)
+}
+
+fn includes_from_config(
+    config: &toml::Value,
+    path: &Path,
+    config_root: &Path,
+) -> Result<Option<Vec<String>>, DelaParseError> {
     let Some(includes) = config
         .get("task_config")
         .and_then(|task_config| task_config.get("includes"))

@@ -52,28 +52,44 @@ fn discover_mise_tasks_with_env(
     let mut configured_includes = None;
 
     for config_path in &config_paths {
-        let tasks = parse_mise::parse(config_path);
-        let includes = parse_mise::task_includes(config_path, dir);
-
-        match (tasks, includes) {
-            (Ok(tasks), Ok(includes)) => {
-                insert_tasks_if_absent(&mut tasks_by_name, tasks);
-                if configured_includes.is_none() {
-                    configured_includes = includes;
-                }
-                set_definition(
-                    discovered,
-                    TaskDefinitionFile {
-                        path: config_path.clone(),
-                        definition_type: TaskDefinitionType::Mise,
-                        status: TaskFileStatus::Parsed,
-                    },
-                );
+        let (tasks_result, includes_result) = match parse_mise::parse_config(config_path, dir) {
+            Ok(results) => results,
+            Err(error) => {
+                record_parse_error(config_path, error, discovered);
+                continue;
             }
-            (Err(error), _) | (_, Err(error)) => record_parse_error(config_path, error, discovered),
+        };
+
+        let tasks_error = tasks_result.as_ref().err().map(ToString::to_string);
+        let includes_error = includes_result.as_ref().err().map(ToString::to_string);
+
+        if let Ok(tasks) = tasks_result {
+            insert_tasks_if_absent(&mut tasks_by_name, tasks);
         }
+        if let Ok(includes) = includes_result
+            && configured_includes.is_none()
+        {
+            configured_includes = includes;
+        }
+
+        for error in tasks_error.iter().chain(includes_error.iter()) {
+            push_error(config_path, error, discovered);
+        }
+
+        set_definition(
+            discovered,
+            TaskDefinitionFile {
+                path: config_path.clone(),
+                definition_type: TaskDefinitionType::Mise,
+                status: match tasks_error.or(includes_error) {
+                    Some(error) => TaskFileStatus::ParseError(error),
+                    None => TaskFileStatus::Parsed,
+                },
+            },
+        );
     }
 
+    let is_explicit_includes = configured_includes.is_some();
     let task_sources: Vec<PathBuf> = configured_includes.map_or_else(
         || {
             DEFAULT_FILE_TASK_DIRECTORIES_HIGH_TO_LOW
@@ -105,8 +121,17 @@ fn discover_mise_tasks_with_env(
     for task_source in task_sources {
         if task_source.exists() {
             found_task_source = true;
+            discover_task_source(&task_source, &mut tasks_by_name, discovered);
+        } else if is_explicit_includes {
+            set_definition(
+                discovered,
+                TaskDefinitionFile {
+                    path: task_source,
+                    definition_type: TaskDefinitionType::Mise,
+                    status: TaskFileStatus::NotFound,
+                },
+            );
         }
-        discover_task_source(&task_source, &mut tasks_by_name, discovered);
     }
 
     if config_paths.is_empty() && !found_task_source {
@@ -301,17 +326,21 @@ fn record_parsed(path: &Path, discovered: &mut DiscoveredTasks) {
     );
 }
 
+fn push_error(path: &Path, error: impl std::fmt::Display, discovered: &mut DiscoveredTasks) {
+    discovered.errors.push(format!(
+        "Failed to parse mise task definition {}: {}",
+        path.display(),
+        error
+    ));
+}
+
 fn record_parse_error(
     path: &Path,
     error: impl std::fmt::Display,
     discovered: &mut DiscoveredTasks,
 ) {
     let error = error.to_string();
-    discovered.errors.push(format!(
-        "Failed to parse mise task definition {}: {}",
-        path.display(),
-        error
-    ));
+    push_error(path, &error, discovered);
     set_definition(
         discovered,
         TaskDefinitionFile {
@@ -439,6 +468,49 @@ mod tests {
 
         assert_eq!(task_names, vec!["deploy", "shared"]);
         assert!(!task_names.contains(&"ignored"));
+    }
+
+    #[test]
+    #[serial]
+    fn test_inline_tasks_survive_unsupported_includes_template() {
+        let temp_dir = TempDir::new().unwrap();
+        fs::write(
+            temp_dir.path().join("mise.toml"),
+            "[tasks.build]\nrun = 'echo build'\n\n[task_config]\nincludes = ['{{ env.HOME }}/tasks.toml']\n",
+        )
+        .unwrap();
+
+        let mut discovered = DiscoveredTasks::default();
+        discover_mise_tasks(temp_dir.path(), &mut discovered);
+
+        assert!(discovered.tasks.iter().any(|task| task.name == "build"));
+        assert!(discovered
+            .errors
+            .iter()
+            .any(|error| error.contains("only config_root is supported")));
+    }
+
+    #[test]
+    #[serial]
+    fn test_missing_include_target_is_recorded() {
+        let temp_dir = TempDir::new().unwrap();
+        fs::write(
+            temp_dir.path().join("mise.toml"),
+            "[task_config]\nincludes = ['missing-tasks.toml']\n",
+        )
+        .unwrap();
+
+        let mut discovered = DiscoveredTasks::default();
+        discover_mise_tasks(temp_dir.path(), &mut discovered);
+
+        let missing_path = temp_dir.path().join("missing-tasks.toml");
+        let recorded = discovered
+            .definitions
+            .iter()
+            .flat_map(|(_, files)| files)
+            .find(|file| file.path == missing_path)
+            .unwrap();
+        assert_eq!(recorded.status, TaskFileStatus::NotFound);
     }
 
     #[test]
