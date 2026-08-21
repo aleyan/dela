@@ -484,10 +484,12 @@ mod tests {
         discover_mise_tasks(temp_dir.path(), &mut discovered);
 
         assert!(discovered.tasks.iter().any(|task| task.name == "build"));
-        assert!(discovered
-            .errors
-            .iter()
-            .any(|error| error.contains("only config_root is supported")));
+        assert!(
+            discovered
+                .errors
+                .iter()
+                .any(|error| error.contains("only config_root is supported"))
+        );
     }
 
     #[test]
