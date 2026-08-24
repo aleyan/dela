@@ -132,7 +132,6 @@ struct MergeResult {
 }
 
 /// Merge dela into an existing JSON config file (Cursor, VSCode, Gemini, Claude Code)
-fn merge_dela_into_json(editor: Editor, existing: &str) -> anyhow::Result<String> {
 fn merge_dela_into_json(editor: Editor, existing: &str) -> anyhow::Result<MergeResult> {
     let mut mutated = false;
     let mut root: serde_json::Value = if existing.trim().is_empty() {
@@ -163,10 +162,6 @@ fn merge_dela_into_json(editor: Editor, existing: &str) -> anyhow::Result<MergeR
 
     let exe_path = dela_executable_path();
     if let Some(existing_entry) = servers_obj.get_mut("dela").and_then(|v| v.as_object_mut()) {
-        existing_entry.insert(
-            "command".to_string(),
-            serde_json::Value::String(dela_executable_path()),
-        );
         if existing_entry.get("command") != Some(&serde_json::Value::String(exe_path.clone())) {
             existing_entry.insert("command".to_string(), serde_json::Value::String(exe_path));
             mutated = true;
@@ -175,7 +170,6 @@ fn merge_dela_into_json(editor: Editor, existing: &str) -> anyhow::Result<MergeR
             existing_entry.insert("args".to_string(), serde_json::json!(["mcp"]));
             mutated = true;
         }
-        if matches!(editor, Editor::Vscode) && !existing_entry.contains_key("type") {
         if matches!(editor, Editor::Vscode)
             && existing_entry.get("type") != Some(&serde_json::Value::String("stdio".to_string()))
         {
@@ -200,7 +194,6 @@ fn merge_dela_into_json(editor: Editor, existing: &str) -> anyhow::Result<MergeR
     let mut result = serde_json::to_string_pretty(&root)
         .map_err(|e| anyhow::anyhow!("Failed to serialize config: {}", e))?;
     result.push('\n');
-    Ok(result)
     Ok(MergeResult {
         content: result,
         mutated: true,
@@ -208,7 +201,6 @@ fn merge_dela_into_json(editor: Editor, existing: &str) -> anyhow::Result<MergeR
 }
 
 /// Merge dela into an existing TOML config file (Codex)
-fn merge_dela_into_toml(existing: &str) -> anyhow::Result<String> {
 fn merge_dela_into_toml(existing: &str) -> anyhow::Result<MergeResult> {
     let mut mutated = false;
     let mut table: toml::Table = if existing.trim().is_empty() {
@@ -234,7 +226,6 @@ fn merge_dela_into_toml(existing: &str) -> anyhow::Result<MergeResult> {
 
     let exe_path = dela_executable_path();
     if let Some(existing_dela) = mcp_table.get_mut("dela").and_then(|v| v.as_table_mut()) {
-        existing_dela.insert("command".to_string(), toml::Value::String(exe_path));
         if existing_dela.get("command") != Some(&toml::Value::String(exe_path.clone())) {
             existing_dela.insert("command".to_string(), toml::Value::String(exe_path));
             mutated = true;
@@ -257,7 +248,6 @@ fn merge_dela_into_toml(existing: &str) -> anyhow::Result<MergeResult> {
         mutated = true;
     }
 
-    toml::to_string_pretty(&table).map_err(|e| anyhow::anyhow!("Failed to serialize config: {}", e))
     if !mutated {
         return Ok(MergeResult {
             content: existing.to_string(),
@@ -295,8 +285,6 @@ fn generate_config_at(editor: Editor, config_path: &PathBuf) -> anyhow::Result<(
         };
 
         match merged {
-            Ok(content) => {
-                if content == existing {
             Ok(merge_result) => {
                 if !merge_result.mutated {
                     eprintln!(
@@ -305,7 +293,6 @@ fn generate_config_at(editor: Editor, config_path: &PathBuf) -> anyhow::Result<(
                         config_path.display()
                     );
                 } else {
-                    fs::write(config_path, &content)
                     fs::write(config_path, &merge_result.content)
                         .map_err(|e| anyhow::anyhow!("Failed to write config file: {}", e))?;
                     eprintln!(
@@ -334,8 +321,6 @@ fn generate_config_at(editor: Editor, config_path: &PathBuf) -> anyhow::Result<(
         _ => "{}".to_string(),
     };
     let content = match editor {
-        Editor::Codex => merge_dela_into_toml(&initial_content)?,
-        _ => merge_dela_into_json(editor, &initial_content)?,
         Editor::Codex => merge_dela_into_toml(&initial_content)?.content,
         _ => merge_dela_into_json(editor, &initial_content)?.content,
     };
