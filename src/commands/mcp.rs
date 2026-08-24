@@ -125,9 +125,18 @@ impl Editor {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct MergeResult {
+    content: String,
+    mutated: bool,
+}
+
 /// Merge dela into an existing JSON config file (Cursor, VSCode, Gemini, Claude Code)
 fn merge_dela_into_json(editor: Editor, existing: &str) -> anyhow::Result<String> {
+fn merge_dela_into_json(editor: Editor, existing: &str) -> anyhow::Result<MergeResult> {
+    let mut mutated = false;
     let mut root: serde_json::Value = if existing.trim().is_empty() {
+        mutated = true;
         serde_json::json!({})
     } else {
         serde_json::from_str(existing)
@@ -144,6 +153,7 @@ fn merge_dela_into_json(editor: Editor, existing: &str) -> anyhow::Result<String
             key.to_string(),
             serde_json::Value::Object(serde_json::Map::new()),
         );
+        mutated = true;
     }
 
     let servers_obj = obj
@@ -151,33 +161,58 @@ fn merge_dela_into_json(editor: Editor, existing: &str) -> anyhow::Result<String
         .and_then(|v| v.as_object_mut())
         .with_context(|| format!("'{}' in config is not an object", key))?;
 
+    let exe_path = dela_executable_path();
     if let Some(existing_entry) = servers_obj.get_mut("dela").and_then(|v| v.as_object_mut()) {
         existing_entry.insert(
             "command".to_string(),
             serde_json::Value::String(dela_executable_path()),
         );
+        if existing_entry.get("command") != Some(&serde_json::Value::String(exe_path.clone())) {
+            existing_entry.insert("command".to_string(), serde_json::Value::String(exe_path));
+            mutated = true;
+        }
         if !existing_entry.contains_key("args") {
             existing_entry.insert("args".to_string(), serde_json::json!(["mcp"]));
+            mutated = true;
         }
         if matches!(editor, Editor::Vscode) && !existing_entry.contains_key("type") {
+        if matches!(editor, Editor::Vscode)
+            && existing_entry.get("type") != Some(&serde_json::Value::String("stdio".to_string()))
+        {
             existing_entry.insert(
                 "type".to_string(),
                 serde_json::Value::String("stdio".to_string()),
             );
+            mutated = true;
         }
     } else {
         servers_obj.insert("dela".to_string(), editor.dela_json_entry());
+        mutated = true;
+    }
+
+    if !mutated {
+        return Ok(MergeResult {
+            content: existing.to_string(),
+            mutated: false,
+        });
     }
 
     let mut result = serde_json::to_string_pretty(&root)
         .map_err(|e| anyhow::anyhow!("Failed to serialize config: {}", e))?;
     result.push('\n');
     Ok(result)
+    Ok(MergeResult {
+        content: result,
+        mutated: true,
+    })
 }
 
 /// Merge dela into an existing TOML config file (Codex)
 fn merge_dela_into_toml(existing: &str) -> anyhow::Result<String> {
+fn merge_dela_into_toml(existing: &str) -> anyhow::Result<MergeResult> {
+    let mut mutated = false;
     let mut table: toml::Table = if existing.trim().is_empty() {
+        mutated = true;
         toml::Table::new()
     } else {
         toml::from_str(existing)
@@ -189,6 +224,7 @@ fn merge_dela_into_toml(existing: &str) -> anyhow::Result<String> {
             "mcp_servers".to_string(),
             toml::Value::Table(toml::map::Map::new()),
         );
+        mutated = true;
     }
 
     let mcp_table = table
@@ -199,11 +235,16 @@ fn merge_dela_into_toml(existing: &str) -> anyhow::Result<String> {
     let exe_path = dela_executable_path();
     if let Some(existing_dela) = mcp_table.get_mut("dela").and_then(|v| v.as_table_mut()) {
         existing_dela.insert("command".to_string(), toml::Value::String(exe_path));
+        if existing_dela.get("command") != Some(&toml::Value::String(exe_path.clone())) {
+            existing_dela.insert("command".to_string(), toml::Value::String(exe_path));
+            mutated = true;
+        }
         if !existing_dela.contains_key("args") {
             existing_dela.insert(
                 "args".to_string(),
                 toml::Value::Array(vec![toml::Value::String("mcp".to_string())]),
             );
+            mutated = true;
         }
     } else {
         let mut dela = toml::map::Map::new();
@@ -213,9 +254,23 @@ fn merge_dela_into_toml(existing: &str) -> anyhow::Result<String> {
             toml::Value::Array(vec![toml::Value::String("mcp".to_string())]),
         );
         mcp_table.insert("dela".to_string(), toml::Value::Table(dela));
+        mutated = true;
     }
 
     toml::to_string_pretty(&table).map_err(|e| anyhow::anyhow!("Failed to serialize config: {}", e))
+    if !mutated {
+        return Ok(MergeResult {
+            content: existing.to_string(),
+            mutated: false,
+        });
+    }
+
+    let serialized = toml::to_string_pretty(&table)
+        .map_err(|e| anyhow::anyhow!("Failed to serialize config: {}", e))?;
+    Ok(MergeResult {
+        content: serialized,
+        mutated: true,
+    })
 }
 
 /// Generate MCP config file for an editor at a specific path
@@ -242,6 +297,8 @@ fn generate_config_at(editor: Editor, config_path: &PathBuf) -> anyhow::Result<(
         match merged {
             Ok(content) => {
                 if content == existing {
+            Ok(merge_result) => {
+                if !merge_result.mutated {
                     eprintln!(
                         "✓ {} config already has dela at {}",
                         editor.name(),
@@ -249,6 +306,7 @@ fn generate_config_at(editor: Editor, config_path: &PathBuf) -> anyhow::Result<(
                     );
                 } else {
                     fs::write(config_path, &content)
+                    fs::write(config_path, &merge_result.content)
                         .map_err(|e| anyhow::anyhow!("Failed to write config file: {}", e))?;
                     eprintln!(
                         "✓ Updated dela in {} config at {}",
@@ -278,6 +336,8 @@ fn generate_config_at(editor: Editor, config_path: &PathBuf) -> anyhow::Result<(
     let content = match editor {
         Editor::Codex => merge_dela_into_toml(&initial_content)?,
         _ => merge_dela_into_json(editor, &initial_content)?,
+        Editor::Codex => merge_dela_into_toml(&initial_content)?.content,
+        _ => merge_dela_into_json(editor, &initial_content)?.content,
     };
 
     fs::write(config_path, content)
@@ -383,6 +443,46 @@ mod tests {
         assert!(result.is_ok());
 
         // File should be unchanged -- already has dela with exact absolute path
+        let content = fs::read_to_string(&config_path).unwrap();
+        assert_eq!(content, original);
+    }
+
+    #[test]
+    fn test_generate_config_preserves_minified_json_when_unchanged() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join(".cursor/mcp.json");
+        fs::create_dir_all(config_path.parent().unwrap()).unwrap();
+
+        let original = format!(
+            r#"{{"mcpServers":{{"dela":{{"args":["mcp"],"command":"{}"}}}}}}"#,
+            dela_executable_path()
+        );
+        fs::write(&config_path, &original).unwrap();
+
+        let result = generate_config_at(Editor::Cursor, &config_path);
+        assert!(result.is_ok());
+
+        // File should be unchanged byte-for-byte -- minified format preserved
+        let content = fs::read_to_string(&config_path).unwrap();
+        assert_eq!(content, original);
+    }
+
+    #[test]
+    fn test_generate_config_preserves_commented_toml_when_unchanged() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join(".codex/config.toml");
+        fs::create_dir_all(config_path.parent().unwrap()).unwrap();
+
+        let original = format!(
+            "# User comments above dela\n[mcp_servers.dela]\n# Command comment\ncommand = \"{}\"\nargs = [\"mcp\"]\n\n# User comments below\n",
+            dela_executable_path()
+        );
+        fs::write(&config_path, &original).unwrap();
+
+        let result = generate_config_at(Editor::Codex, &config_path);
+        assert!(result.is_ok());
+
+        // File should be unchanged byte-for-byte -- comments preserved
         let content = fs::read_to_string(&config_path).unwrap();
         assert_eq!(content, original);
     }
