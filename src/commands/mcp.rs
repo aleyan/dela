@@ -1,14 +1,23 @@
 use crate::mcp;
 use anyhow::Context;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 fn dela_executable_path() -> String {
     std::env::current_exe()
         .ok()
-        .and_then(|p| p.canonicalize().ok())
-        .map(|p| p.to_string_lossy().into_owned())
+        .and_then(|path| path.canonicalize().ok())
+        .map(|path| path.to_string_lossy().into_owned())
         .unwrap_or_else(|| "dela".to_string())
+}
+
+fn command_needs_update(command: Option<&str>) -> bool {
+    // A different valid absolute path may be another installation; keeping it avoids
+    // needlessly reserializing a user-global config whenever dela is invoked elsewhere.
+    command.is_none_or(|command| {
+        let path = Path::new(command);
+        !path.is_absolute() || !path.exists()
+    })
 }
 
 /// Supported editors for MCP config generation
@@ -57,13 +66,6 @@ impl Editor {
         }
     }
 
-    fn dela_marker(&self) -> &'static str {
-        match self {
-            Editor::Codex => "mcp_servers.dela",
-            _ => "\"dela\"",
-        }
-    }
-
     /// The top-level key under which MCP server entries live
     fn servers_key(&self) -> &'static str {
         match self {
@@ -96,9 +98,51 @@ impl Editor {
     }
 }
 
+fn merge_dela_json_entry(
+    editor: Editor,
+    servers: &mut serde_json::Map<String, serde_json::Value>,
+) -> bool {
+    let Some(existing_entry) = servers
+        .get_mut("dela")
+        .and_then(|value| value.as_object_mut())
+    else {
+        servers.insert("dela".to_string(), editor.dela_json_entry());
+        return true;
+    };
+
+    let mut mutated = false;
+    if command_needs_update(
+        existing_entry
+            .get("command")
+            .and_then(serde_json::Value::as_str),
+    ) {
+        existing_entry.insert(
+            "command".to_string(),
+            serde_json::Value::String(dela_executable_path()),
+        );
+        mutated = true;
+    }
+    if existing_entry.get("args") != Some(&serde_json::json!(["mcp"])) {
+        existing_entry.insert("args".to_string(), serde_json::json!(["mcp"]));
+        mutated = true;
+    }
+    if matches!(editor, Editor::Vscode)
+        && existing_entry.get("type") != Some(&serde_json::Value::String("stdio".to_string()))
+    {
+        existing_entry.insert(
+            "type".to_string(),
+            serde_json::Value::String("stdio".to_string()),
+        );
+        mutated = true;
+    }
+    mutated
+}
+
 /// Merge dela into an existing JSON config file (Cursor, VSCode, Gemini, Claude Code)
-fn merge_dela_into_json(editor: Editor, existing: &str) -> anyhow::Result<String> {
+fn merge_dela_into_json(editor: Editor, existing: &str) -> anyhow::Result<Option<String>> {
+    let mut mutated = false;
     let mut root: serde_json::Value = if existing.trim().is_empty() {
+        mutated = true;
         serde_json::json!({})
     } else {
         serde_json::from_str(existing)
@@ -115,24 +159,64 @@ fn merge_dela_into_json(editor: Editor, existing: &str) -> anyhow::Result<String
             key.to_string(),
             serde_json::Value::Object(serde_json::Map::new()),
         );
+        mutated = true;
     }
 
     let servers_obj = obj
         .get_mut(key)
         .and_then(|v| v.as_object_mut())
         .with_context(|| format!("'{}' in config is not an object", key))?;
+    mutated |= merge_dela_json_entry(editor, servers_obj);
 
-    servers_obj.insert("dela".to_string(), editor.dela_json_entry());
+    if !mutated {
+        return Ok(None);
+    }
 
     let mut result = serde_json::to_string_pretty(&root)
         .map_err(|e| anyhow::anyhow!("Failed to serialize config: {}", e))?;
     result.push('\n');
-    Ok(result)
+    Ok(Some(result))
+}
+
+fn merge_dela_toml_entry(mcp_table: &mut toml::map::Map<String, toml::Value>) -> bool {
+    let Some(existing_dela) = mcp_table
+        .get_mut("dela")
+        .and_then(toml::Value::as_table_mut)
+    else {
+        let mut dela = toml::map::Map::new();
+        dela.insert(
+            "command".to_string(),
+            toml::Value::String(dela_executable_path()),
+        );
+        dela.insert(
+            "args".to_string(),
+            toml::Value::Array(vec![toml::Value::String("mcp".to_string())]),
+        );
+        mcp_table.insert("dela".to_string(), toml::Value::Table(dela));
+        return true;
+    };
+
+    let mut mutated = false;
+    if command_needs_update(existing_dela.get("command").and_then(toml::Value::as_str)) {
+        existing_dela.insert(
+            "command".to_string(),
+            toml::Value::String(dela_executable_path()),
+        );
+        mutated = true;
+    }
+    let expected_args = toml::Value::Array(vec![toml::Value::String("mcp".to_string())]);
+    if existing_dela.get("args") != Some(&expected_args) {
+        existing_dela.insert("args".to_string(), expected_args);
+        mutated = true;
+    }
+    mutated
 }
 
 /// Merge dela into an existing TOML config file (Codex)
-fn merge_dela_into_toml(existing: &str) -> anyhow::Result<String> {
+fn merge_dela_into_toml(existing: &str) -> anyhow::Result<Option<String>> {
+    let mut mutated = false;
     let mut table: toml::Table = if existing.trim().is_empty() {
+        mutated = true;
         toml::Table::new()
     } else {
         toml::from_str(existing)
@@ -144,23 +228,63 @@ fn merge_dela_into_toml(existing: &str) -> anyhow::Result<String> {
             "mcp_servers".to_string(),
             toml::Value::Table(toml::map::Map::new()),
         );
+        mutated = true;
     }
 
     let mcp_table = table
         .get_mut("mcp_servers")
         .and_then(|v| v.as_table_mut())
         .context("'mcp_servers' in config is not a table")?;
+    mutated |= merge_dela_toml_entry(mcp_table);
 
-    let exe_path = dela_executable_path();
-    let mut dela = toml::map::Map::new();
-    dela.insert("command".to_string(), toml::Value::String(exe_path));
-    dela.insert(
-        "args".to_string(),
-        toml::Value::Array(vec![toml::Value::String("mcp".to_string())]),
-    );
-    mcp_table.insert("dela".to_string(), toml::Value::Table(dela));
+    if !mutated {
+        return Ok(None);
+    }
 
-    toml::to_string_pretty(&table).map_err(|e| anyhow::anyhow!("Failed to serialize config: {}", e))
+    let serialized = toml::to_string_pretty(&table)
+        .map_err(|e| anyhow::anyhow!("Failed to serialize config: {}", e))?;
+    Ok(Some(serialized))
+}
+
+fn merge_editor_config(editor: Editor, existing: &str) -> anyhow::Result<Option<String>> {
+    match editor {
+        Editor::Codex => merge_dela_into_toml(existing),
+        _ => merge_dela_into_json(editor, existing),
+    }
+}
+
+fn update_existing_config(editor: Editor, config_path: &Path) -> anyhow::Result<()> {
+    let existing = fs::read_to_string(config_path)
+        .map_err(|e| anyhow::anyhow!("Failed to read existing config: {}", e))?;
+
+    match merge_editor_config(editor, &existing) {
+        Ok(Some(content)) => {
+            fs::write(config_path, content)
+                .map_err(|e| anyhow::anyhow!("Failed to write config file: {}", e))?;
+            eprintln!(
+                "✓ Updated dela in {} config at {}",
+                editor.name(),
+                config_path.display()
+            );
+        }
+        Ok(None) => {
+            eprintln!(
+                "✓ {} config already has dela at {}",
+                editor.name(),
+                config_path.display()
+            );
+        }
+        Err(error) => {
+            eprintln!(
+                "⚠ Could not auto-merge into {} config at {}: {}",
+                editor.name(),
+                config_path.display(),
+                error
+            );
+            eprintln!("  Please manually add dela to the config.");
+        }
+    }
+    Ok(())
 }
 
 /// Generate MCP config file for an editor at a specific path
@@ -173,58 +297,16 @@ fn generate_config_at(editor: Editor, config_path: &PathBuf) -> anyhow::Result<(
             .map_err(|e| anyhow::anyhow!("Failed to create {} directory: {}", editor.name(), e))?;
     }
 
-    // Check if config already exists
     if config_path.exists() {
-        let existing = fs::read_to_string(config_path)
-            .map_err(|e| anyhow::anyhow!("Failed to read existing config: {}", e))?;
-
-        if existing.contains(editor.dela_marker()) {
-            eprintln!(
-                "✓ {} config already has dela at {}",
-                editor.name(),
-                config_path.display()
-            );
-            return Ok(());
-        }
-
-        // Try to merge dela into existing config
-        let merged = match editor {
-            Editor::Codex => merge_dela_into_toml(&existing),
-            _ => merge_dela_into_json(editor, &existing),
-        };
-
-        match merged {
-            Ok(content) => {
-                fs::write(config_path, content)
-                    .map_err(|e| anyhow::anyhow!("Failed to write config file: {}", e))?;
-                eprintln!(
-                    "✓ Added dela to {} config at {}",
-                    editor.name(),
-                    config_path.display()
-                );
-            }
-            Err(e) => {
-                eprintln!(
-                    "⚠ Could not auto-merge into {} config at {}: {}",
-                    editor.name(),
-                    config_path.display(),
-                    e
-                );
-                eprintln!("  Please manually add dela to the config.");
-            }
-        }
-        return Ok(());
+        return update_existing_config(editor, config_path);
     }
 
-    // Write the config file using merge functions on empty config to generate absolute path
     let initial_content = match editor {
         Editor::Codex => "".to_string(),
         _ => "{}".to_string(),
     };
-    let content = match editor {
-        Editor::Codex => merge_dela_into_toml(&initial_content)?,
-        _ => merge_dela_into_json(editor, &initial_content)?,
-    };
+    let content = merge_editor_config(editor, &initial_content)?
+        .context("Empty editor config did not produce a dela entry")?;
 
     fs::write(config_path, content)
         .map_err(|e| anyhow::anyhow!("Failed to write config file: {}", e))?;
@@ -319,15 +401,136 @@ mod tests {
         let config_path = temp_dir.path().join(".cursor/mcp.json");
         fs::create_dir_all(config_path.parent().unwrap()).unwrap();
 
-        let original = r#"{"mcpServers": {"dela": {"command": "dela"}}}"#;
+        let original = format!(
+            "{{\n  \"mcpServers\": {{\n    \"dela\": {{\n      \"args\": [\n        \"mcp\"\n      ],\n      \"command\": \"{}\"\n    }}\n  }}\n}}\n",
+            dela_executable_path()
+        );
+        fs::write(&config_path, &original).unwrap();
+
+        let result = generate_config_at(Editor::Cursor, &config_path);
+        assert!(result.is_ok());
+
+        // File should be unchanged -- already has dela with exact absolute path
+        let content = fs::read_to_string(&config_path).unwrap();
+        assert_eq!(content, original);
+    }
+
+    #[test]
+    fn test_generate_config_leaves_valid_alternate_json_command_unchanged() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join(".cursor/mcp.json");
+        fs::create_dir_all(config_path.parent().unwrap()).unwrap();
+        let alternate_dela = temp_dir.path().join("installed/dela");
+        fs::create_dir_all(alternate_dela.parent().unwrap()).unwrap();
+        fs::write(&alternate_dela, "").unwrap();
+
+        let original = format!(
+            r#"{{"mcpServers":{{"dela":{{"args":["mcp"],"command":"{}"}}}}}}"#,
+            alternate_dela.display()
+        );
+        fs::write(&config_path, &original).unwrap();
+
+        let result = generate_config_at(Editor::Cursor, &config_path);
+        assert!(result.is_ok());
+
+        let content = fs::read_to_string(&config_path).unwrap();
+        assert_eq!(content, original);
+    }
+
+    #[test]
+    fn test_generate_config_leaves_valid_alternate_toml_command_unchanged() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join(".codex/config.toml");
+        fs::create_dir_all(config_path.parent().unwrap()).unwrap();
+        let alternate_dela = temp_dir.path().join("installed/dela");
+        fs::create_dir_all(alternate_dela.parent().unwrap()).unwrap();
+        fs::write(&alternate_dela, "").unwrap();
+
+        let original = format!(
+            "# User comments above dela\n[mcp_servers.dela]\n# Command comment\ncommand = \"{}\"\nargs = [\"mcp\"]\n\n# User comments below\n",
+            alternate_dela.display()
+        );
+        fs::write(&config_path, &original).unwrap();
+
+        let result = generate_config_at(Editor::Codex, &config_path);
+        assert!(result.is_ok());
+
+        let content = fs::read_to_string(&config_path).unwrap();
+        assert_eq!(content, original);
+    }
+
+    #[test]
+    fn test_command_update_policy() {
+        let temp_dir = TempDir::new().unwrap();
+        let existing_dela = temp_dir.path().join("installed/dela");
+        fs::create_dir_all(existing_dela.parent().unwrap()).unwrap();
+        fs::write(&existing_dela, "").unwrap();
+        let missing_dela = temp_dir.path().join("missing/dela");
+
+        assert!(command_needs_update(None));
+        assert!(command_needs_update(Some("dela")));
+        assert!(command_needs_update(Some(missing_dela.to_str().unwrap())));
+        assert!(!command_needs_update(Some(existing_dela.to_str().unwrap())));
+    }
+
+    #[test]
+    fn test_generate_config_repairs_empty_args() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join(".cursor/mcp.json");
+        fs::create_dir_all(config_path.parent().unwrap()).unwrap();
+        let original = format!(
+            r#"{{"mcpServers":{{"dela":{{"args":[],"command":"{}"}}}}}}"#,
+            dela_executable_path()
+        );
+        fs::write(&config_path, original).unwrap();
+
+        generate_config_at(Editor::Cursor, &config_path).unwrap();
+
+        let content = fs::read_to_string(&config_path).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();
+        assert_eq!(
+            parsed["mcpServers"]["dela"]["args"],
+            serde_json::json!(["mcp"])
+        );
+    }
+
+    #[test]
+    fn test_generate_config_updates_relative_command_to_absolute_path() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join(".cursor/mcp.json");
+        fs::create_dir_all(config_path.parent().unwrap()).unwrap();
+
+        let original = r#"{"mcpServers": {"dela": {"command": "dela", "args": ["mcp"]}}}"#;
         fs::write(&config_path, original).unwrap();
 
         let result = generate_config_at(Editor::Cursor, &config_path);
         assert!(result.is_ok());
 
-        // File should be unchanged -- already has dela
         let content = fs::read_to_string(&config_path).unwrap();
-        assert_eq!(content, original);
+        let expected_cmd = format!("\"command\": \"{}\"", dela_executable_path());
+        assert!(content.contains(&expected_cmd));
+    }
+
+    #[test]
+    fn test_merge_codex_updates_relative_command_and_preserves_subtables() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join(".codex/config.toml");
+        fs::create_dir_all(config_path.parent().unwrap()).unwrap();
+
+        fs::write(
+            &config_path,
+            "[mcp_servers.dela]\ncommand = \"dela\"\nargs = [\"mcp\"]\n\n[mcp_servers.dela.tools.status]\napproval_mode = \"approve\"\n",
+        )
+        .unwrap();
+
+        let result = generate_config_at(Editor::Codex, &config_path);
+        assert!(result.is_ok());
+
+        let content = fs::read_to_string(&config_path).unwrap();
+        let expected_cmd = format!("command = \"{}\"", dela_executable_path());
+        assert!(content.contains(&expected_cmd));
+        assert!(content.contains("[mcp_servers.dela.tools.status]"));
+        assert!(content.contains("approval_mode = \"approve\""));
     }
 
     #[test]
