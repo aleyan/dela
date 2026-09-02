@@ -39,5 +39,5 @@ anyhow = "1.0.102"
 
 [dev-dependencies]
 tempfile = "3.27.0"
-serial_test = "3.5.0"
+serial_test = "4.0.1"
 libc = "0.2.186"
