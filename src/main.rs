@@ -84,7 +84,7 @@ enum Commands {
         #[arg(long)]
         init_cursor: bool,
 
-        /// Generate .vscode/mcp.json for VSCode
+        /// Generate <user profile>/Code/User/mcp.json for VSCode
         #[arg(long)]
         init_vscode: bool,
 
@@ -96,7 +96,7 @@ enum Commands {
         #[arg(long)]
         init_gemini: bool,
 
-        /// Generate ~/.claude-code/settings.json for Claude Code
+        /// Generate ~/.claude.json for Claude Code
         #[arg(long)]
         init_claude_code: bool,
 

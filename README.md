@@ -84,11 +84,11 @@ You need to have dela installed first and then run the command for your coding a
 
 ```sh
 $ dela mcp --init-cursor       # Cursor: ~/.cursor/mcp.json
-$ dela mcp --init-vscode       # VSCode: ~/.vscode/mcp.json
+$ dela mcp --init-vscode       # VSCode: <user profile>/Code/User/mcp.json
 $ dela mcp --init-codex        # OpenAI Codex: ~/.codex/config.toml
 $ dela mcp --init-gemini       # Gemini CLI: ~/.gemini/settings.json
 $ dela mcp --init-antigravity  # Antigravity: ~/.gemini/config/mcp_config.json
-$ dela mcp --init-claude-code  # Claude Code: ~/.claude-code/settings.json
+$ dela mcp --init-claude-code  # Claude Code: ~/.claude.json
 $ dela mcp --init-cline        # Cline: ~/.cline/data/settings/cline_mcp_settings.json (override with CLINE_MCP_SETTINGS_PATH)
 $ dela mcp --init-opencode     # OpenCode: ~/.config/opencode/opencode.json
 $ dela mcp --init-crush        # Crush: ~/.config/crush/crush.json
