@@ -56,6 +56,13 @@ impl InitTarget<'_> {
     }
 }
 
+/// The on-disk format of an editor's config file
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum ConfigFormat {
+    Json,
+    Toml,
+}
+
 /// How an editor expects the dela launch command to be encoded in a server entry
 #[derive(Debug, Clone, Copy)]
 enum CommandShape {
@@ -77,6 +84,7 @@ pub enum Editor {
     Cline,
     OpenCode,
     Crush,
+    Grok,
 }
 
 impl Editor {
@@ -91,6 +99,7 @@ impl Editor {
             Editor::Cline => "Cline",
             Editor::OpenCode => "OpenCode",
             Editor::Crush => "Crush",
+            Editor::Grok => "Grok Build",
         }
     }
 
@@ -114,6 +123,9 @@ impl Editor {
                 .unwrap_or_else(|_| home.join(".cline/data/settings/cline_mcp_settings.json")),
             Editor::OpenCode => home.join(".config/opencode/opencode.json"),
             Editor::Crush => home.join(".config/crush/crush.json"),
+            // Grok Build keeps user-scope servers in its main config, the same file
+            // `grok mcp add --scope user` writes.
+            Editor::Grok => home.join(".grok/config.toml"),
         }
     }
 
@@ -126,8 +138,16 @@ impl Editor {
             | Editor::Antigravity
             | Editor::Cline => "mcpServers",
             Editor::Vscode => "servers",
-            Editor::Codex => "mcp_servers",
+            Editor::Codex | Editor::Grok => "mcp_servers",
             Editor::OpenCode | Editor::Crush => "mcp",
+        }
+    }
+
+    /// The file format the editor's config is written in
+    fn config_format(&self) -> ConfigFormat {
+        match self {
+            Editor::Codex | Editor::Grok => ConfigFormat::Toml,
+            _ => ConfigFormat::Json,
         }
     }
 
@@ -358,6 +378,11 @@ fn merge_dela_toml_entry(target: InitTarget, servers: &mut toml_edit::Table) -> 
         let mut dela = toml_edit::Table::new();
         dela.insert("command", toml_edit::value(dela_executable_path()));
         dela.insert("args", toml_args_value(&target.desired_args()));
+        if matches!(target.editor, Editor::Grok) {
+            // Grok writes this itself. Seed it once on creation only -- never on merge, so
+            // a later `grok mcp disable dela` is not silently undone by a re-init.
+            dela.insert("enabled", toml_edit::value(true));
+        }
         servers.insert("dela", toml_edit::Item::Table(dela));
         return true;
     };
@@ -385,18 +410,19 @@ fn merge_dela_into_toml(target: InitTarget, existing: &str) -> anyhow::Result<Op
         .parse()
         .map_err(|e| anyhow::anyhow!("Failed to parse config as TOML: {}", e))?;
 
-    if !doc.contains_key("mcp_servers") {
+    let key = target.editor.servers_key();
+    if !doc.contains_key(key) {
         let mut servers = toml_edit::Table::new();
         // Implicit so the entry renders as [mcp_servers.dela], not a bare [mcp_servers].
         servers.set_implicit(true);
-        doc.insert("mcp_servers", toml_edit::Item::Table(servers));
+        doc.insert(key, toml_edit::Item::Table(servers));
         mutated = true;
     }
 
     let servers = doc
-        .get_mut("mcp_servers")
+        .get_mut(key)
         .and_then(|item| item.as_table_mut())
-        .context("'mcp_servers' in config is not a table")?;
+        .with_context(|| format!("'{}' in config is not a table", key))?;
     mutated |= merge_dela_toml_entry(target, servers);
 
     if !mutated {
@@ -419,9 +445,9 @@ fn write_config_atomically(config_path: &Path, content: &str) -> anyhow::Result<
 }
 
 fn merge_editor_config(target: InitTarget, existing: &str) -> anyhow::Result<Option<String>> {
-    match target.editor {
-        Editor::Codex => merge_dela_into_toml(target, existing),
-        _ => merge_dela_into_json(target, existing),
+    match target.editor.config_format() {
+        ConfigFormat::Toml => merge_dela_into_toml(target, existing),
+        ConfigFormat::Json => merge_dela_into_json(target, existing),
     }
 }
 
@@ -473,9 +499,9 @@ fn generate_config_at(target: InitTarget, config_path: &Path) -> anyhow::Result<
         return update_existing_config(target, config_path);
     }
 
-    let initial_content = match target.editor {
-        Editor::Codex => "".to_string(),
-        _ => "{}".to_string(),
+    let initial_content = match target.editor.config_format() {
+        ConfigFormat::Toml => "".to_string(),
+        ConfigFormat::Json => "{}".to_string(),
     };
     let content = merge_editor_config(target, &initial_content)?
         .context("Empty editor config did not produce a dela entry")?;
@@ -824,6 +850,83 @@ mod tests {
     }
 
     #[test]
+    fn test_generate_grok_config_new() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join("config.toml");
+        generate_config_at(global(Editor::Grok), &config_path).unwrap();
+
+        let content = fs::read_to_string(&config_path).unwrap();
+        assert_eq!(
+            content,
+            format!(
+                "[mcp_servers.dela]\ncommand = \"{}\"\nargs = [\"mcp\"]\nenabled = true\n",
+                dela_executable_path()
+            )
+        );
+    }
+
+    #[test]
+    fn test_grok_merge_preserves_existing_settings() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join("config.toml");
+        // ~/.grok/config.toml is Grok's main config, not an MCP-only file.
+        let original = "\
+[cli]
+installer = \"internal\"
+auto_update = true
+
+[ui]
+yolo = false
+";
+        fs::write(&config_path, original).unwrap();
+
+        generate_config_at(global(Editor::Grok), &config_path).unwrap();
+
+        let merged = fs::read_to_string(&config_path).unwrap();
+        assert!(
+            merged.starts_with(original),
+            "existing settings changed: {merged}"
+        );
+        assert!(merged.contains("[mcp_servers.dela]"));
+        assert!(merged.contains("enabled = true"));
+    }
+
+    #[test]
+    fn test_grok_merge_does_not_re_enable_a_disabled_server() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join("config.toml");
+        // What `grok mcp disable dela` leaves behind.
+        let original = format!(
+            "disabled_mcp_servers = [\"dela\"]\n\n[mcp_servers.dela]\ncommand = \"{}\"\nargs = [\"mcp\"]\nenabled = false\n",
+            dela_executable_path()
+        );
+        fs::write(&config_path, &original).unwrap();
+
+        generate_config_at(global(Editor::Grok), &config_path).unwrap();
+
+        // Re-running init must not silently undo a deliberate disable.
+        assert_eq!(fs::read_to_string(&config_path).unwrap(), original);
+    }
+
+    #[test]
+    fn test_grok_repairs_stale_command_path() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join("config.toml");
+        fs::write(
+            &config_path,
+            "[mcp_servers.dela]\ncommand = \"dela\"\nargs = [\"mcp\"]\nenabled = false\n",
+        )
+        .unwrap();
+
+        generate_config_at(global(Editor::Grok), &config_path).unwrap();
+
+        let merged = fs::read_to_string(&config_path).unwrap();
+        assert!(merged.contains(&format!("command = \"{}\"", dela_executable_path())));
+        // The broken path is fixed without touching the user's enabled choice.
+        assert!(merged.contains("enabled = false"));
+    }
+
+    #[test]
     fn test_codex_merge_preserves_comments_and_layout() {
         let temp_dir = TempDir::new().unwrap();
         let config_path = temp_dir.path().join("config.toml");
@@ -1071,6 +1174,7 @@ args = [\"serve\"]
             Editor::Crush.config_path(),
             home.join(".config/crush/crush.json")
         );
+        assert_eq!(Editor::Grok.config_path(), home.join(".grok/config.toml"));
     }
 
     #[test]
@@ -1127,6 +1231,7 @@ args = [\"serve\"]
             Editor::Cline,
             Editor::OpenCode,
             Editor::Crush,
+            Editor::Grok,
         ] {
             let name = editor.name();
             assert!(!name.is_empty());
