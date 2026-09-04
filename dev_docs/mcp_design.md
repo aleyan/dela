@@ -530,10 +530,12 @@ dela mcp [--cwd <dir>]
 ```
 Starts stdio server in `<dir>` (default `.`).
 
+`dela mcp --init-<editor> [--cwd <workspace>]` generates editor config. Without `--cwd`
+the entry is workspace-agnostic; with it, the entry pins `--cwd <absolute workspace>`.
+
 Planned convenience entry points:
 - `dela mcp --self-test`
 - `dela mcp --inspect-task <unique_name>`
-- `dela mcp --init-<editor> --cwd <workspace>` for workspace-aware config generation
 
 ⸻
 

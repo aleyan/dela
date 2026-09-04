@@ -94,6 +94,9 @@ $ dela mcp --init-opencode     # OpenCode: ~/.config/opencode/opencode.json
 $ dela mcp --init-crush        # Crush: ~/.config/crush/crush.json
 ```
 
+Re-running an `--init-*` flag repairs a broken entry (a missing binary, a relative path)
+and otherwise leaves your config alone, including any arguments you added by hand.
+
 ### Starting the MCP Server Manually
 Assuming you have already run `dela init`.
 

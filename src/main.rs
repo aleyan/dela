@@ -77,10 +77,13 @@ enum Commands {
     /// Example: dela mcp --init-cursor
     Mcp {
         /// Working directory for the MCP server
-        #[arg(long, default_value = ".")]
-        cwd: String,
+        ///
+        /// With an --init-* flag, pins the generated config entry to this workspace
+        /// instead of letting dela discover tasks from wherever the editor starts it.
+        #[arg(long)]
+        cwd: Option<String>,
 
-        /// Generate .cursor/mcp.json for Cursor IDE
+        /// Generate ~/.cursor/mcp.json for Cursor IDE
         #[arg(long)]
         init_cursor: bool,
 
@@ -482,7 +485,7 @@ mod tests {
 
         for f in flags {
             let cmd = Commands::Mcp {
-                cwd: ".".to_string(),
+                cwd: None,
                 init_cursor: f.1,
                 init_vscode: f.2,
                 init_codex: f.3,
@@ -517,7 +520,7 @@ mod tests {
     #[tokio::test]
     async fn test_run_command_mcp_conflicting_flags() {
         let cmd = Commands::Mcp {
-            cwd: ".".to_string(),
+            cwd: None,
             init_cursor: true,
             init_vscode: true,
             init_codex: false,

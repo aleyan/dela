@@ -20,6 +20,42 @@ fn command_needs_update(command: Option<&str>) -> bool {
     })
 }
 
+/// Only args that would not start dela's MCP server are rewritten. Anything a user
+/// appended (a `--cwd` pin, timeout flags) is theirs to keep.
+fn args_need_update(first_arg: Option<&str>) -> bool {
+    first_arg != Some("mcp")
+}
+
+/// An editor to configure, plus the workspace `--cwd` pinned it to (if any)
+#[derive(Debug, Clone, Copy)]
+struct InitTarget<'a> {
+    editor: Editor,
+    /// Set only when the user passed `--cwd`, which pins the generated entry to one
+    /// workspace instead of letting dela discover tasks from wherever the editor starts it.
+    workspace: Option<&'a Path>,
+}
+
+impl InitTarget<'_> {
+    /// The arguments dela should be launched with
+    fn desired_args(&self) -> Vec<String> {
+        let mut args = vec!["mcp".to_string()];
+        if let Some(workspace) = self.workspace {
+            args.push("--cwd".to_string());
+            args.push(workspace.to_string_lossy().into_owned());
+        }
+        args
+    }
+
+    /// Whether args already present should be replaced. An explicit `--cwd` is a direct
+    /// instruction and wins; without one, existing args are only repaired if broken.
+    fn args_need_replacing(&self, existing: Option<&[String]>) -> bool {
+        match self.workspace {
+            Some(_) => existing != Some(self.desired_args().as_slice()),
+            None => args_need_update(existing.and_then(|args| args.first()).map(String::as_str)),
+        }
+    }
+}
+
 /// How an editor expects the dela launch command to be encoded in a server entry
 #[derive(Debug, Clone, Copy)]
 enum CommandShape {
@@ -123,21 +159,26 @@ impl Editor {
             _ => CommandShape::CommandArgs,
         }
     }
+}
 
+impl InitTarget<'_> {
     /// The dela entry as a serde_json::Value (for JSON-based editors)
     fn dela_json_entry(&self) -> serde_json::Value {
         let exe_path = dela_executable_path();
+        let args = self.desired_args();
         let mut entry = serde_json::Map::new();
-        if let Some(entry_type) = self.entry_type() {
+        if let Some(entry_type) = self.editor.entry_type() {
             entry.insert("type".to_string(), serde_json::json!(entry_type));
         }
-        match self.command_shape() {
+        match self.editor.command_shape() {
             CommandShape::CommandArgs => {
                 entry.insert("command".to_string(), serde_json::json!(exe_path));
-                entry.insert("args".to_string(), serde_json::json!(["mcp"]));
+                entry.insert("args".to_string(), serde_json::json!(args));
             }
             CommandShape::CommandArray => {
-                entry.insert("command".to_string(), serde_json::json!([exe_path, "mcp"]));
+                let mut argv = vec![exe_path];
+                argv.extend(args);
+                entry.insert("command".to_string(), serde_json::json!(argv));
             }
         }
         serde_json::Value::Object(entry)
@@ -145,19 +186,19 @@ impl Editor {
 }
 
 fn merge_dela_json_entry(
-    editor: Editor,
+    target: InitTarget,
     servers: &mut serde_json::Map<String, serde_json::Value>,
 ) -> bool {
     let Some(existing_entry) = servers
         .get_mut("dela")
         .and_then(|value| value.as_object_mut())
     else {
-        servers.insert("dela".to_string(), editor.dela_json_entry());
+        servers.insert("dela".to_string(), target.dela_json_entry());
         return true;
     };
 
     let mut mutated = false;
-    match editor.command_shape() {
+    match target.editor.command_shape() {
         CommandShape::CommandArgs => {
             if command_needs_update(
                 existing_entry
@@ -170,25 +211,39 @@ fn merge_dela_json_entry(
                 );
                 mutated = true;
             }
-            if existing_entry.get("args") != Some(&serde_json::json!(["mcp"])) {
-                existing_entry.insert("args".to_string(), serde_json::json!(["mcp"]));
+            let existing_args = json_string_array(existing_entry.get("args"));
+            if target.args_need_replacing(existing_args.as_deref()) {
+                existing_entry.insert("args".to_string(), serde_json::json!(target.desired_args()));
                 mutated = true;
             }
         }
         CommandShape::CommandArray => {
-            // Accept either the array shape or a bare string left by an older dela, so a
-            // valid alternate install survives the conversion.
-            let existing_exe = existing_entry
-                .get("command")
-                .and_then(|command| match command {
-                    serde_json::Value::Array(argv) => argv.first(),
-                    other => Some(other),
-                })
-                .and_then(serde_json::Value::as_str)
+            // Accept the array shape or the string+args shape left by an older dela, so a
+            // valid alternate install and any extra args survive the conversion.
+            let existing_argv = json_string_array(existing_entry.get("command"));
+            let (existing_exe, existing_args) = match existing_argv.as_deref() {
+                Some([exe, args @ ..]) => (Some(exe.clone()), Some(args.to_vec())),
+                _ => (
+                    existing_entry
+                        .get("command")
+                        .and_then(serde_json::Value::as_str)
+                        .map(str::to_string),
+                    json_string_array(existing_entry.get("args")),
+                ),
+            };
+
+            let exe = existing_exe
                 .filter(|exe| !command_needs_update(Some(exe)))
-                .map(str::to_string);
-            let expected =
-                serde_json::json!([existing_exe.unwrap_or_else(dela_executable_path), "mcp"]);
+                .unwrap_or_else(dela_executable_path);
+            let args = if target.args_need_replacing(existing_args.as_deref()) {
+                target.desired_args()
+            } else {
+                existing_args.unwrap_or_else(|| target.desired_args())
+            };
+
+            let mut argv = vec![exe];
+            argv.extend(args);
+            let expected = serde_json::json!(argv);
             if existing_entry.get("command") != Some(&expected) {
                 existing_entry.insert("command".to_string(), expected);
                 mutated = true;
@@ -199,13 +254,22 @@ fn merge_dela_json_entry(
             }
         }
     }
-    if let Some(entry_type) = editor.entry_type()
+    if let Some(entry_type) = target.editor.entry_type()
         && existing_entry.get("type") != Some(&serde_json::json!(entry_type))
     {
         existing_entry.insert("type".to_string(), serde_json::json!(entry_type));
         mutated = true;
     }
     mutated
+}
+
+/// A JSON array read as plain strings, or None if it is absent or holds anything else
+fn json_string_array(value: Option<&serde_json::Value>) -> Option<Vec<String>> {
+    value
+        .and_then(serde_json::Value::as_array)?
+        .iter()
+        .map(|item| item.as_str().map(str::to_string))
+        .collect()
 }
 
 /// Drop a dela entry dela itself wrote under a key the editor does not accept
@@ -230,7 +294,7 @@ fn remove_legacy_dela_entry(
 }
 
 /// Merge dela into an existing JSON config file (Cursor, VSCode, Gemini, Claude Code)
-fn merge_dela_into_json(editor: Editor, existing: &str) -> anyhow::Result<Option<String>> {
+fn merge_dela_into_json(target: InitTarget, existing: &str) -> anyhow::Result<Option<String>> {
     let mut mutated = false;
     let mut root: serde_json::Value = if existing.trim().is_empty() {
         mutated = true;
@@ -244,7 +308,7 @@ fn merge_dela_into_json(editor: Editor, existing: &str) -> anyhow::Result<Option
         .as_object_mut()
         .context("Config file is not a JSON object")?;
 
-    let key = editor.servers_key();
+    let key = target.editor.servers_key();
     if !obj.contains_key(key) {
         obj.insert(
             key.to_string(),
@@ -257,9 +321,9 @@ fn merge_dela_into_json(editor: Editor, existing: &str) -> anyhow::Result<Option
         .get_mut(key)
         .and_then(|v| v.as_object_mut())
         .with_context(|| format!("'{}' in config is not an object", key))?;
-    mutated |= merge_dela_json_entry(editor, servers_obj);
+    mutated |= merge_dela_json_entry(target, servers_obj);
 
-    if let Some(legacy_key) = editor.legacy_servers_key() {
+    if let Some(legacy_key) = target.editor.legacy_servers_key() {
         mutated |= remove_legacy_dela_entry(obj, legacy_key);
     }
 
@@ -273,72 +337,73 @@ fn merge_dela_into_json(editor: Editor, existing: &str) -> anyhow::Result<Option
     Ok(Some(result))
 }
 
-fn merge_dela_toml_entry(mcp_table: &mut toml::map::Map<String, toml::Value>) -> bool {
-    let Some(existing_dela) = mcp_table
+/// A TOML array read as plain strings, or None if it is absent or holds anything else
+fn toml_string_array(item: Option<&toml_edit::Item>) -> Option<Vec<String>> {
+    item?
+        .as_array()?
+        .iter()
+        .map(|value| value.as_str().map(str::to_string))
+        .collect()
+}
+
+fn toml_args_value(args: &[String]) -> toml_edit::Item {
+    toml_edit::value(args.iter().collect::<toml_edit::Array>())
+}
+
+fn merge_dela_toml_entry(target: InitTarget, servers: &mut toml_edit::Table) -> bool {
+    let Some(dela) = servers
         .get_mut("dela")
-        .and_then(toml::Value::as_table_mut)
+        .and_then(|item| item.as_table_like_mut())
     else {
-        let mut dela = toml::map::Map::new();
-        dela.insert(
-            "command".to_string(),
-            toml::Value::String(dela_executable_path()),
-        );
-        dela.insert(
-            "args".to_string(),
-            toml::Value::Array(vec![toml::Value::String("mcp".to_string())]),
-        );
-        mcp_table.insert("dela".to_string(), toml::Value::Table(dela));
+        let mut dela = toml_edit::Table::new();
+        dela.insert("command", toml_edit::value(dela_executable_path()));
+        dela.insert("args", toml_args_value(&target.desired_args()));
+        servers.insert("dela", toml_edit::Item::Table(dela));
         return true;
     };
 
     let mut mutated = false;
-    if command_needs_update(existing_dela.get("command").and_then(toml::Value::as_str)) {
-        existing_dela.insert(
-            "command".to_string(),
-            toml::Value::String(dela_executable_path()),
-        );
+    if command_needs_update(dela.get("command").and_then(|item| item.as_str())) {
+        dela.insert("command", toml_edit::value(dela_executable_path()));
         mutated = true;
     }
-    let expected_args = toml::Value::Array(vec![toml::Value::String("mcp".to_string())]);
-    if existing_dela.get("args") != Some(&expected_args) {
-        existing_dela.insert("args".to_string(), expected_args);
+    let existing_args = toml_string_array(dela.get("args"));
+    if target.args_need_replacing(existing_args.as_deref()) {
+        dela.insert("args", toml_args_value(&target.desired_args()));
         mutated = true;
     }
     mutated
 }
 
 /// Merge dela into an existing TOML config file (Codex)
-fn merge_dela_into_toml(existing: &str) -> anyhow::Result<Option<String>> {
-    let mut mutated = false;
-    let mut table: toml::Table = if existing.trim().is_empty() {
-        mutated = true;
-        toml::Table::new()
-    } else {
-        toml::from_str(existing)
-            .map_err(|e| anyhow::anyhow!("Failed to parse config as TOML: {}", e))?
-    };
+///
+/// Uses toml_edit rather than a parse/reserialize round trip so comments, key order and
+/// formatting in the user's config survive untouched.
+fn merge_dela_into_toml(target: InitTarget, existing: &str) -> anyhow::Result<Option<String>> {
+    let mut mutated = existing.trim().is_empty();
+    let mut doc: toml_edit::DocumentMut = existing
+        .parse()
+        .map_err(|e| anyhow::anyhow!("Failed to parse config as TOML: {}", e))?;
 
-    if !table.contains_key("mcp_servers") {
-        table.insert(
-            "mcp_servers".to_string(),
-            toml::Value::Table(toml::map::Map::new()),
-        );
+    if !doc.contains_key("mcp_servers") {
+        let mut servers = toml_edit::Table::new();
+        // Implicit so the entry renders as [mcp_servers.dela], not a bare [mcp_servers].
+        servers.set_implicit(true);
+        doc.insert("mcp_servers", toml_edit::Item::Table(servers));
         mutated = true;
     }
 
-    let mcp_table = table
+    let servers = doc
         .get_mut("mcp_servers")
-        .and_then(|v| v.as_table_mut())
+        .and_then(|item| item.as_table_mut())
         .context("'mcp_servers' in config is not a table")?;
-    mutated |= merge_dela_toml_entry(mcp_table);
+    mutated |= merge_dela_toml_entry(target, servers);
 
     if !mutated {
         return Ok(None);
     }
 
-    let serialized = toml::to_string_pretty(&table)
-        .map_err(|e| anyhow::anyhow!("Failed to serialize config: {}", e))?;
-    Ok(Some(serialized))
+    Ok(Some(doc.to_string()))
 }
 
 /// Write through a temp file in the same directory so an interrupted write can never
@@ -353,37 +418,37 @@ fn write_config_atomically(config_path: &Path, content: &str) -> anyhow::Result<
     })
 }
 
-fn merge_editor_config(editor: Editor, existing: &str) -> anyhow::Result<Option<String>> {
-    match editor {
-        Editor::Codex => merge_dela_into_toml(existing),
-        _ => merge_dela_into_json(editor, existing),
+fn merge_editor_config(target: InitTarget, existing: &str) -> anyhow::Result<Option<String>> {
+    match target.editor {
+        Editor::Codex => merge_dela_into_toml(target, existing),
+        _ => merge_dela_into_json(target, existing),
     }
 }
 
-fn update_existing_config(editor: Editor, config_path: &Path) -> anyhow::Result<()> {
+fn update_existing_config(target: InitTarget, config_path: &Path) -> anyhow::Result<()> {
     let existing = fs::read_to_string(config_path)
         .map_err(|e| anyhow::anyhow!("Failed to read existing config: {}", e))?;
 
-    match merge_editor_config(editor, &existing) {
+    match merge_editor_config(target, &existing) {
         Ok(Some(content)) => {
             write_config_atomically(config_path, &content)?;
             eprintln!(
                 "✓ Updated dela in {} config at {}",
-                editor.name(),
+                target.editor.name(),
                 config_path.display()
             );
         }
         Ok(None) => {
             eprintln!(
                 "✓ {} config already has dela at {}",
-                editor.name(),
+                target.editor.name(),
                 config_path.display()
             );
         }
         Err(error) => {
             eprintln!(
                 "⚠ Could not auto-merge into {} config at {}: {}",
-                editor.name(),
+                target.editor.name(),
                 config_path.display(),
                 error
             );
@@ -394,31 +459,32 @@ fn update_existing_config(editor: Editor, config_path: &Path) -> anyhow::Result<
 }
 
 /// Generate MCP config file for an editor at a specific path
-fn generate_config_at(editor: Editor, config_path: &Path) -> anyhow::Result<()> {
+fn generate_config_at(target: InitTarget, config_path: &Path) -> anyhow::Result<()> {
     // Create parent directory if it doesn't exist
     if let Some(parent) = config_path.parent()
         && !parent.exists()
     {
-        fs::create_dir_all(parent)
-            .map_err(|e| anyhow::anyhow!("Failed to create {} directory: {}", editor.name(), e))?;
+        fs::create_dir_all(parent).map_err(|e| {
+            anyhow::anyhow!("Failed to create {} directory: {}", target.editor.name(), e)
+        })?;
     }
 
     if config_path.exists() {
-        return update_existing_config(editor, config_path);
+        return update_existing_config(target, config_path);
     }
 
-    let initial_content = match editor {
+    let initial_content = match target.editor {
         Editor::Codex => "".to_string(),
         _ => "{}".to_string(),
     };
-    let content = merge_editor_config(editor, &initial_content)?
+    let content = merge_editor_config(target, &initial_content)?
         .context("Empty editor config did not produce a dela entry")?;
 
     write_config_atomically(config_path, &content)?;
 
     eprintln!(
         "✓ Created {} config at {}",
-        editor.name(),
+        target.editor.name(),
         config_path.display()
     );
 
@@ -426,25 +492,43 @@ fn generate_config_at(editor: Editor, config_path: &Path) -> anyhow::Result<()> 
 }
 
 /// Generate MCP config file for an editor at its default global path
-fn generate_config(editor: Editor) -> anyhow::Result<()> {
-    let config_path = editor.config_path();
-    generate_config_at(editor, &config_path)
+fn generate_config(target: InitTarget) -> anyhow::Result<()> {
+    let config_path = target.editor.config_path();
+    generate_config_at(target, &config_path)
 }
 
-/// Execute the MCP command
-pub async fn execute(cwd: String, init_editor: Option<Editor>) -> anyhow::Result<()> {
-    // Resolve the path relative to the current working directory
-    let root_path = if cwd == "." {
+/// Absolute path for a `--cwd` written into a config file
+///
+/// Editor configs are global and the editor may launch dela from anywhere, so a relative
+/// path in the generated entry would resolve against the wrong directory.
+fn pinned_workspace(cwd: &str) -> anyhow::Result<PathBuf> {
+    let path = if cwd == "." {
         std::env::current_dir()
             .map_err(|e| anyhow::anyhow!("Failed to get current directory: {}", e))?
     } else {
-        PathBuf::from(&cwd)
+        PathBuf::from(cwd)
     };
+    Ok(path.canonicalize().unwrap_or(path))
+}
 
+/// Execute the MCP command
+pub async fn execute(cwd: Option<String>, init_editor: Option<Editor>) -> anyhow::Result<()> {
     if let Some(editor) = init_editor {
-        generate_config(editor)?;
-        return Ok(());
+        // Without --cwd the entry stays workspace-agnostic and dela discovers tasks from
+        // wherever the editor starts it; with --cwd it is pinned to that workspace.
+        let workspace = cwd.as_deref().map(pinned_workspace).transpose()?;
+        return generate_config(InitTarget {
+            editor,
+            workspace: workspace.as_deref(),
+        });
     }
+
+    // Resolve the path relative to the current working directory
+    let root_path = match cwd.as_deref() {
+        None | Some(".") => std::env::current_dir()
+            .map_err(|e| anyhow::anyhow!("Failed to get current directory: {}", e))?,
+        Some(cwd) => PathBuf::from(cwd),
+    };
 
     crate::allowlist::load_allowlist().map_err(|e| {
         anyhow::anyhow!(
@@ -469,11 +553,19 @@ mod tests {
     use super::*;
     use tempfile::TempDir;
 
+    /// An unpinned target, matching `dela mcp --init-<editor>` with no --cwd
+    fn global(editor: Editor) -> InitTarget<'static> {
+        InitTarget {
+            editor,
+            workspace: None,
+        }
+    }
+
     #[test]
     fn test_generate_cursor_config_new() {
         let temp_dir = TempDir::new().unwrap();
         let config_path = temp_dir.path().join(".cursor/mcp.json");
-        let result = generate_config_at(Editor::Cursor, &config_path);
+        let result = generate_config_at(global(Editor::Cursor), &config_path);
 
         assert!(result.is_ok());
         assert!(config_path.exists());
@@ -488,7 +580,7 @@ mod tests {
     fn test_generate_vscode_config_new() {
         let temp_dir = TempDir::new().unwrap();
         let config_path = temp_dir.path().join(".vscode/mcp.json");
-        let result = generate_config_at(Editor::Vscode, &config_path);
+        let result = generate_config_at(global(Editor::Vscode), &config_path);
 
         assert!(result.is_ok());
         assert!(config_path.exists());
@@ -512,7 +604,7 @@ mod tests {
         );
         fs::write(&config_path, &original).unwrap();
 
-        let result = generate_config_at(Editor::Cursor, &config_path);
+        let result = generate_config_at(global(Editor::Cursor), &config_path);
         assert!(result.is_ok());
 
         // File should be unchanged -- already has dela with exact absolute path
@@ -535,7 +627,7 @@ mod tests {
         );
         fs::write(&config_path, &original).unwrap();
 
-        let result = generate_config_at(Editor::Cursor, &config_path);
+        let result = generate_config_at(global(Editor::Cursor), &config_path);
         assert!(result.is_ok());
 
         let content = fs::read_to_string(&config_path).unwrap();
@@ -557,7 +649,7 @@ mod tests {
         );
         fs::write(&config_path, &original).unwrap();
 
-        let result = generate_config_at(Editor::Codex, &config_path);
+        let result = generate_config_at(global(Editor::Codex), &config_path);
         assert!(result.is_ok());
 
         let content = fs::read_to_string(&config_path).unwrap();
@@ -579,6 +671,188 @@ mod tests {
     }
 
     #[test]
+    fn test_merge_preserves_user_added_args() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join("mcp.json");
+        let original = format!(
+            r#"{{"mcpServers":{{"dela":{{"command":"{}","args":["mcp","--cwd","/some/workspace"]}}}}}}"#,
+            dela_executable_path()
+        );
+        fs::write(&config_path, &original).unwrap();
+
+        generate_config_at(global(Editor::Cursor), &config_path).unwrap();
+
+        // Nothing was broken, so the file is left byte-identical -- including the --cwd.
+        assert_eq!(fs::read_to_string(&config_path).unwrap(), original);
+    }
+
+    #[test]
+    fn test_merge_preserves_user_added_args_in_toml() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join("config.toml");
+        let original = format!(
+            "[mcp_servers.dela]\ncommand = \"{}\"\nargs = [\"mcp\", \"--cwd\", \"/some/workspace\"]\n",
+            dela_executable_path()
+        );
+        fs::write(&config_path, &original).unwrap();
+
+        generate_config_at(global(Editor::Codex), &config_path).unwrap();
+
+        assert_eq!(fs::read_to_string(&config_path).unwrap(), original);
+    }
+
+    #[test]
+    fn test_merge_repairs_args_that_would_not_start_the_server() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join("mcp.json");
+        fs::write(
+            &config_path,
+            format!(
+                r#"{{"mcpServers":{{"dela":{{"command":"{}","args":["serve","--cwd","/w"]}}}}}}"#,
+                dela_executable_path()
+            ),
+        )
+        .unwrap();
+
+        generate_config_at(global(Editor::Cursor), &config_path).unwrap();
+
+        let parsed: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&config_path).unwrap()).unwrap();
+        assert_eq!(
+            parsed["mcpServers"]["dela"]["args"],
+            serde_json::json!(["mcp"])
+        );
+    }
+
+    #[test]
+    fn test_init_with_cwd_pins_workspace() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join("mcp.json");
+        let workspace = temp_dir.path().join("workspace");
+        fs::create_dir_all(&workspace).unwrap();
+
+        let target = InitTarget {
+            editor: Editor::Cursor,
+            workspace: Some(&workspace),
+        };
+        generate_config_at(target, &config_path).unwrap();
+
+        let parsed: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&config_path).unwrap()).unwrap();
+        assert_eq!(
+            parsed["mcpServers"]["dela"]["args"],
+            serde_json::json!(["mcp", "--cwd", workspace.to_string_lossy()])
+        );
+    }
+
+    #[test]
+    fn test_explicit_cwd_overrides_an_existing_pin() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join("mcp.json");
+        let workspace = temp_dir.path().join("new");
+        fs::create_dir_all(&workspace).unwrap();
+        fs::write(
+            &config_path,
+            format!(
+                r#"{{"mcpServers":{{"dela":{{"command":"{}","args":["mcp","--cwd","/old"]}}}}}}"#,
+                dela_executable_path()
+            ),
+        )
+        .unwrap();
+
+        let target = InitTarget {
+            editor: Editor::Cursor,
+            workspace: Some(&workspace),
+        };
+        generate_config_at(target, &config_path).unwrap();
+
+        let parsed: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&config_path).unwrap()).unwrap();
+        assert_eq!(
+            parsed["mcpServers"]["dela"]["args"],
+            serde_json::json!(["mcp", "--cwd", workspace.to_string_lossy()])
+        );
+    }
+
+    #[test]
+    fn test_opencode_pins_workspace_in_command_array() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join("opencode.json");
+        let workspace = temp_dir.path().join("workspace");
+        fs::create_dir_all(&workspace).unwrap();
+
+        let target = InitTarget {
+            editor: Editor::OpenCode,
+            workspace: Some(&workspace),
+        };
+        generate_config_at(target, &config_path).unwrap();
+
+        let parsed: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&config_path).unwrap()).unwrap();
+        assert_eq!(
+            parsed["mcp"]["dela"]["command"],
+            serde_json::json!([
+                dela_executable_path(),
+                "mcp",
+                "--cwd",
+                workspace.to_string_lossy()
+            ])
+        );
+    }
+
+    #[test]
+    fn test_opencode_migration_carries_over_extra_args() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join("opencode.json");
+        fs::write(
+            &config_path,
+            format!(
+                r#"{{"mcp":{{"dela":{{"command":"{}","args":["mcp","--cwd","/w"]}}}}}}"#,
+                dela_executable_path()
+            ),
+        )
+        .unwrap();
+
+        generate_config_at(global(Editor::OpenCode), &config_path).unwrap();
+
+        let parsed: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&config_path).unwrap()).unwrap();
+        assert_eq!(
+            parsed["mcp"]["dela"]["command"],
+            serde_json::json!([dela_executable_path(), "mcp", "--cwd", "/w"])
+        );
+    }
+
+    #[test]
+    fn test_codex_merge_preserves_comments_and_layout() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join("config.toml");
+        let original = "\
+# Codex settings a user wrote by hand
+model = \"o3\"
+
+# Keep this comment attached to the server
+[mcp_servers.other]
+command = \"other\"  # trailing note
+args = [\"serve\"]
+";
+        fs::write(&config_path, original).unwrap();
+
+        generate_config_at(global(Editor::Codex), &config_path).unwrap();
+
+        let merged = fs::read_to_string(&config_path).unwrap();
+        assert!(merged.contains("# Codex settings a user wrote by hand"));
+        assert!(merged.contains("# Keep this comment attached to the server"));
+        assert!(merged.contains("command = \"other\"  # trailing note"));
+        // The untouched part of the file is preserved verbatim, dela is appended.
+        assert!(
+            merged.starts_with(original),
+            "existing content was rewritten: {merged}"
+        );
+        assert!(merged.contains("[mcp_servers.dela]"));
+    }
+
+    #[test]
     fn test_generate_config_repairs_empty_args() {
         let temp_dir = TempDir::new().unwrap();
         let config_path = temp_dir.path().join(".cursor/mcp.json");
@@ -589,7 +863,7 @@ mod tests {
         );
         fs::write(&config_path, original).unwrap();
 
-        generate_config_at(Editor::Cursor, &config_path).unwrap();
+        generate_config_at(global(Editor::Cursor), &config_path).unwrap();
 
         let content = fs::read_to_string(&config_path).unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();
@@ -608,7 +882,7 @@ mod tests {
         let original = r#"{"mcpServers": {"dela": {"command": "dela", "args": ["mcp"]}}}"#;
         fs::write(&config_path, original).unwrap();
 
-        let result = generate_config_at(Editor::Cursor, &config_path);
+        let result = generate_config_at(global(Editor::Cursor), &config_path);
         assert!(result.is_ok());
 
         let content = fs::read_to_string(&config_path).unwrap();
@@ -628,7 +902,7 @@ mod tests {
         )
         .unwrap();
 
-        let result = generate_config_at(Editor::Codex, &config_path);
+        let result = generate_config_at(global(Editor::Codex), &config_path);
         assert!(result.is_ok());
 
         let content = fs::read_to_string(&config_path).unwrap();
@@ -657,7 +931,7 @@ mod tests {
         )
         .unwrap();
 
-        let result = generate_config_at(Editor::Cursor, &config_path);
+        let result = generate_config_at(global(Editor::Cursor), &config_path);
         assert!(result.is_ok());
 
         let content = fs::read_to_string(&config_path).unwrap();
@@ -690,7 +964,7 @@ mod tests {
         )
         .unwrap();
 
-        let result = generate_config_at(Editor::Vscode, &config_path);
+        let result = generate_config_at(global(Editor::Vscode), &config_path);
         assert!(result.is_ok());
 
         let content = fs::read_to_string(&config_path).unwrap();
@@ -713,7 +987,7 @@ mod tests {
         // Config exists but has no mcpServers key
         fs::write(&config_path, r#"{"someOtherSetting": true}"#).unwrap();
 
-        let result = generate_config_at(Editor::Cursor, &config_path);
+        let result = generate_config_at(global(Editor::Cursor), &config_path);
         assert!(result.is_ok());
 
         let content = fs::read_to_string(&config_path).unwrap();
@@ -736,7 +1010,7 @@ mod tests {
         )
         .unwrap();
 
-        let result = generate_config_at(Editor::Codex, &config_path);
+        let result = generate_config_at(global(Editor::Codex), &config_path);
         assert!(result.is_ok());
 
         let content = fs::read_to_string(&config_path).unwrap();
@@ -758,7 +1032,7 @@ mod tests {
         let original = "// this is a comment\n{\"mcpServers\": {}}";
         fs::write(&config_path, original).unwrap();
 
-        let result = generate_config_at(Editor::Cursor, &config_path);
+        let result = generate_config_at(global(Editor::Cursor), &config_path);
         // Should still succeed (graceful fallback)
         assert!(result.is_ok());
 
@@ -863,7 +1137,7 @@ mod tests {
     fn test_generate_claude_code_config_new() {
         let temp_dir = TempDir::new().unwrap();
         let config_path = temp_dir.path().join(".claude.json");
-        generate_config_at(Editor::ClaudeCode, &config_path).unwrap();
+        generate_config_at(global(Editor::ClaudeCode), &config_path).unwrap();
 
         let parsed: serde_json::Value =
             serde_json::from_str(&fs::read_to_string(&config_path).unwrap()).unwrap();
@@ -887,7 +1161,7 @@ mod tests {
         )
         .unwrap();
 
-        generate_config_at(Editor::ClaudeCode, &config_path).unwrap();
+        generate_config_at(global(Editor::ClaudeCode), &config_path).unwrap();
 
         let parsed: serde_json::Value =
             serde_json::from_str(&fs::read_to_string(&config_path).unwrap()).unwrap();
@@ -911,7 +1185,7 @@ mod tests {
         let original = r#"{"numStartups":7,"lastCost":0.41145139999999997,"tipsHistory":{"z":1,"a":2},"frame_ms":0.027125000022351742}"#;
         fs::write(&config_path, original).unwrap();
 
-        generate_config_at(Editor::ClaudeCode, &config_path).unwrap();
+        generate_config_at(global(Editor::ClaudeCode), &config_path).unwrap();
 
         let merged = fs::read_to_string(&config_path).unwrap();
         assert!(
@@ -943,7 +1217,7 @@ mod tests {
     fn test_generate_opencode_config_uses_local_command_array() {
         let temp_dir = TempDir::new().unwrap();
         let config_path = temp_dir.path().join("opencode.json");
-        generate_config_at(Editor::OpenCode, &config_path).unwrap();
+        generate_config_at(global(Editor::OpenCode), &config_path).unwrap();
 
         let parsed: serde_json::Value =
             serde_json::from_str(&fs::read_to_string(&config_path).unwrap()).unwrap();
@@ -974,7 +1248,7 @@ mod tests {
         )
         .unwrap();
 
-        generate_config_at(Editor::OpenCode, &config_path).unwrap();
+        generate_config_at(global(Editor::OpenCode), &config_path).unwrap();
 
         let parsed: serde_json::Value =
             serde_json::from_str(&fs::read_to_string(&config_path).unwrap()).unwrap();
@@ -992,7 +1266,7 @@ mod tests {
     fn test_generate_crush_config_new() {
         let temp_dir = TempDir::new().unwrap();
         let config_path = temp_dir.path().join("crush.json");
-        generate_config_at(Editor::Crush, &config_path).unwrap();
+        generate_config_at(global(Editor::Crush), &config_path).unwrap();
 
         let parsed: serde_json::Value =
             serde_json::from_str(&fs::read_to_string(&config_path).unwrap()).unwrap();
@@ -1020,7 +1294,7 @@ mod tests {
         )
         .unwrap();
 
-        generate_config_at(Editor::Crush, &config_path).unwrap();
+        generate_config_at(global(Editor::Crush), &config_path).unwrap();
 
         let parsed: serde_json::Value =
             serde_json::from_str(&fs::read_to_string(&config_path).unwrap()).unwrap();
@@ -1039,7 +1313,7 @@ mod tests {
         )
         .unwrap();
 
-        generate_config_at(Editor::Crush, &config_path).unwrap();
+        generate_config_at(global(Editor::Crush), &config_path).unwrap();
 
         let parsed: serde_json::Value =
             serde_json::from_str(&fs::read_to_string(&config_path).unwrap()).unwrap();
@@ -1052,7 +1326,7 @@ mod tests {
     fn test_vscode_entry_keeps_stdio_type() {
         let temp_dir = TempDir::new().unwrap();
         let config_path = temp_dir.path().join("Code/User/mcp.json");
-        generate_config_at(Editor::Vscode, &config_path).unwrap();
+        generate_config_at(global(Editor::Vscode), &config_path).unwrap();
 
         let parsed: serde_json::Value =
             serde_json::from_str(&fs::read_to_string(&config_path).unwrap()).unwrap();
@@ -1076,7 +1350,7 @@ mod tests {
             std::env::set_var("HOME", temp_dir.path());
         }
 
-        let result = execute(".".to_string(), Some(Editor::Cursor)).await;
+        let result = execute(None, Some(Editor::Cursor)).await;
         if let Err(ref e) = result {
             panic!("execute failed with error: {:?}", e);
         }
