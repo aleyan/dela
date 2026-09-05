@@ -92,7 +92,7 @@ $ dela mcp --init-claude-code  # Claude Code: ~/.claude.json
 $ dela mcp --init-cline        # Cline: ~/.cline/data/settings/cline_mcp_settings.json (override with CLINE_MCP_SETTINGS_PATH)
 $ dela mcp --init-opencode     # OpenCode: ~/.config/opencode/opencode.json
 $ dela mcp --init-crush        # Crush: ~/.config/crush/crush.json
-$ dela mcp --init-grok         # Grok Build: ~/.grok/config.toml
+$ dela mcp --init-grok         # Grok Build: ~/.grok/config.toml (override with $GROK_HOME/config.toml)
 ```
 
 Re-running an `--init-*` flag repairs a broken entry (a missing binary, a relative path)

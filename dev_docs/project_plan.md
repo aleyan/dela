@@ -327,6 +327,7 @@ Advanced MCP features for better editor integration and real-time feedback.
 **High Priority:**
 - [x] **[DTKT-177]** MCP **logging notifications** for real-time output streaming (tracing + subscriber)
 - [x] **[DTKT-201]** Add stream-aware `task_start.output` chunks
+- [x] **[DTKT-214]** Repair malformed MCP launch arguments, honor `GROK_HOME`, and refuse unsafe Crush legacy configuration merges (PR #189 review).
 - [x] **[DTKT-186]** **Editor config generation** - generate `.cursor/mcp.json` or similar config files via `dela mcp --init-cursor`
 
 **Medium Priority:**

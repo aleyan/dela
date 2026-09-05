@@ -119,7 +119,7 @@ enum Commands {
         #[arg(long)]
         init_crush: bool,
 
-        /// Generate ~/.grok/config.toml for Grok Build
+        /// Generate $GROK_HOME/config.toml (default ~/.grok/config.toml) for Grok Build
         #[arg(long)]
         init_grok: bool,
     },
@@ -347,10 +347,18 @@ mod tests {
     struct TestEnvGuard {
         old_dir: Option<std::path::PathBuf>,
         old_home: Option<String>,
+        old_grok_home: Option<std::ffi::OsString>,
     }
 
     impl Drop for TestEnvGuard {
         fn drop(&mut self) {
+            unsafe {
+                if let Some(ref value) = self.old_grok_home {
+                    std::env::set_var("GROK_HOME", value);
+                } else {
+                    std::env::remove_var("GROK_HOME");
+                }
+            }
             if let Some(ref dir) = self.old_dir {
                 let _ = std::env::set_current_dir(dir);
             }
@@ -422,10 +430,12 @@ mod tests {
         let _guard = TestEnvGuard {
             old_dir: std::env::current_dir().ok(),
             old_home: std::env::var("HOME").ok(),
+            old_grok_home: std::env::var_os("GROK_HOME"),
         };
         std::env::set_current_dir(temp_dir.path()).unwrap();
         unsafe {
             std::env::set_var("HOME", temp_dir.path());
+            std::env::set_var("GROK_HOME", temp_dir.path().join("grok"));
         }
 
         // Each flag must reach generate_config and produce that editor's config file.

@@ -20,10 +20,20 @@ fn command_needs_update(command: Option<&str>) -> bool {
     })
 }
 
-/// Only args that would not start dela's MCP server are rewritten. Anything a user
-/// appended (a `--cwd` pin, timeout flags) is theirs to keep.
-fn args_need_update(first_arg: Option<&str>) -> bool {
-    first_arg != Some("mcp")
+/// Preserve only server launch arguments, excluding help and editor initialization.
+fn args_need_update(args: Option<&[String]>) -> bool {
+    let Some([command, options @ ..]) = args else {
+        return true;
+    };
+    if command != "mcp" {
+        return true;
+    }
+    match options {
+        [] => false,
+        [flag, cwd] if flag == "--cwd" => cwd.is_empty() || cwd.starts_with('-'),
+        [option] => option.strip_prefix("--cwd=").is_none_or(str::is_empty),
+        _ => true,
+    }
 }
 
 /// An editor to configure, plus the workspace `--cwd` pinned it to (if any)
@@ -51,7 +61,7 @@ impl InitTarget<'_> {
     fn args_need_replacing(&self, existing: Option<&[String]>) -> bool {
         match self.workspace {
             Some(_) => existing != Some(self.desired_args().as_slice()),
-            None => args_need_update(existing.and_then(|args| args.first()).map(String::as_str)),
+            None => args_need_update(existing),
         }
     }
 }
@@ -125,7 +135,10 @@ impl Editor {
             Editor::Crush => home.join(".config/crush/crush.json"),
             // Grok Build keeps user-scope servers in its main config, the same file
             // `grok mcp add --scope user` writes.
-            Editor::Grok => home.join(".grok/config.toml"),
+            Editor::Grok => std::env::var_os("GROK_HOME")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| home.join(".grok"))
+                .join("config.toml"),
         }
     }
 
@@ -292,25 +305,26 @@ fn json_string_array(value: Option<&serde_json::Value>) -> Option<Vec<String>> {
         .collect()
 }
 
-/// Drop a dela entry dela itself wrote under a key the editor does not accept
+/// Remove the invalid legacy key only when no unrelated entries would be lost.
 fn remove_legacy_dela_entry(
     obj: &mut serde_json::Map<String, serde_json::Value>,
     legacy_key: &str,
-) -> bool {
-    let Some(servers) = obj
-        .get_mut(legacy_key)
-        .and_then(serde_json::Value::as_object_mut)
-    else {
-        return false;
+) -> anyhow::Result<bool> {
+    let Some(value) = obj.get(legacy_key) else {
+        return Ok(false);
     };
-    if servers.shift_remove("dela").is_none() {
-        return false;
+    if value
+        .as_object()
+        .is_none_or(|servers| servers.keys().any(|name| name != "dela"))
+    {
+        anyhow::bail!(
+            "'{}' is not supported by Crush. Manually migrate its entries to 'mcp' and remove '{}' before re-running initialization.",
+            legacy_key,
+            legacy_key
+        );
     }
-    // Only remove the key itself if dela was the sole thing keeping it around.
-    if servers.is_empty() {
-        obj.shift_remove(legacy_key);
-    }
-    true
+    obj.shift_remove(legacy_key);
+    Ok(true)
 }
 
 /// Merge dela into an existing JSON config file (Cursor, VSCode, Gemini, Claude Code)
@@ -344,7 +358,7 @@ fn merge_dela_into_json(target: InitTarget, existing: &str) -> anyhow::Result<Op
     mutated |= merge_dela_json_entry(target, servers_obj);
 
     if let Some(legacy_key) = target.editor.legacy_servers_key() {
-        mutated |= remove_legacy_dela_entry(obj, legacy_key);
+        mutated |= remove_legacy_dela_entry(obj, legacy_key)?;
     }
 
     if !mutated {
@@ -778,6 +792,63 @@ mod tests {
             parsed["mcpServers"]["dela"]["args"],
             serde_json::json!(["mcp"])
         );
+    }
+
+    #[test]
+    fn test_launch_argument_grammar() {
+        for args in [
+            vec!["mcp"],
+            vec!["mcp", "--cwd", "/workspace with spaces"],
+            vec!["mcp", "--cwd=/workspace"],
+        ] {
+            let args: Vec<String> = args.into_iter().map(str::to_string).collect();
+            assert!(!args_need_update(Some(&args)), "{args:?}");
+        }
+        assert!(args_need_update(None));
+    }
+
+    #[test]
+    fn test_all_config_shapes_repair_malformed_launch_arguments() {
+        for args in [
+            vec![],
+            vec!["serve"],
+            vec!["mcp", "--cwd"],
+            vec!["mcp", "--cwd", ""],
+            vec!["mcp", "--cwd="],
+            vec!["mcp", "--cwd", "--help"],
+            vec!["mcp", "--cwd", "/w", "--cwd", "/other"],
+            vec!["mcp", "--unknown"],
+            vec!["mcp", "--help"],
+            vec!["mcp", "--init-cursor"],
+            vec!["mcp", "unexpected"],
+        ] {
+            for editor in [Editor::Cursor, Editor::OpenCode, Editor::Grok] {
+                let target = global(editor);
+                let original = match editor.config_format() {
+                    ConfigFormat::Json => {
+                        let mut entry = target.dela_json_entry();
+                        match editor.command_shape() {
+                            CommandShape::CommandArgs => entry["args"] = serde_json::json!(args),
+                            CommandShape::CommandArray => {
+                                let mut argv = vec![dela_executable_path()];
+                                argv.extend(args.iter().map(|arg| arg.to_string()));
+                                entry["command"] = serde_json::json!(argv);
+                            }
+                        }
+                        serde_json::json!({editor.servers_key(): {"dela": entry}}).to_string()
+                    }
+                    ConfigFormat::Toml => format!(
+                        "[mcp_servers.dela]\ncommand = {:?}\nargs = {:?}\nenabled = true\n",
+                        dela_executable_path(),
+                        args
+                    ),
+                };
+                let repaired = merge_editor_config(target, &original).unwrap().unwrap();
+                let expected = merge_editor_config(target, "").unwrap().unwrap();
+                assert_eq!(repaired, expected, "{editor:?}: {args:?}");
+                assert!(merge_editor_config(target, &repaired).unwrap().is_none());
+            }
+        }
     }
 
     #[test]
@@ -1256,6 +1327,7 @@ args = [\"serve\"]
     }
 
     #[test]
+    #[serial_test::serial]
     fn test_editor_config_paths_use_home_dir() {
         let home = dirs::home_dir().unwrap();
         assert_eq!(Editor::Cursor.config_path(), home.join(".cursor/mcp.json"));
@@ -1285,7 +1357,6 @@ args = [\"serve\"]
             Editor::Crush.config_path(),
             home.join(".config/crush/crush.json")
         );
-        assert_eq!(Editor::Grok.config_path(), home.join(".grok/config.toml"));
     }
 
     #[test]
@@ -1306,6 +1377,31 @@ args = [\"serve\"]
             }
         }
         assert_eq!(config_path, override_path);
+    }
+
+    #[test]
+    #[serial_test::serial]
+    fn test_grok_config_path_override_and_fallback() {
+        let temp_dir = TempDir::new().unwrap();
+        let old_grok_home = std::env::var_os("GROK_HOME");
+        unsafe {
+            std::env::set_var("GROK_HOME", temp_dir.path());
+        }
+        let overridden = Editor::Grok.config_path();
+        unsafe {
+            std::env::remove_var("GROK_HOME");
+        }
+        let fallback = Editor::Grok.config_path();
+        unsafe {
+            if let Some(value) = old_grok_home {
+                std::env::set_var("GROK_HOME", value);
+            }
+        }
+        assert_eq!(overridden, temp_dir.path().join("config.toml"));
+        assert_eq!(
+            fallback,
+            dirs::home_dir().unwrap().join(".grok/config.toml")
+        );
     }
 
     struct TestEnvGuard {
@@ -1520,22 +1616,24 @@ args = [\"serve\"]
     }
 
     #[test]
-    fn test_crush_keeps_legacy_key_holding_other_servers() {
+    #[serial_test::serial]
+    fn test_crush_requires_manual_migration_without_writing() {
         let temp_dir = TempDir::new().unwrap();
         let config_path = temp_dir.path().join("crush.json");
-        fs::write(
-            &config_path,
-            r#"{"mcpServers":{"dela":{"command":"dela","args":["mcp"]},"other":{"command":"other"}}}"#,
-        )
-        .unwrap();
+        for legacy in [
+            serde_json::json!({"dela": {"command": "dela"}, "other": {"command": "other"}}),
+            serde_json::json!({"other": {"command": "other"}}),
+            serde_json::json!("invalid"),
+        ] {
+            let original = serde_json::json!({"mcpServers": legacy}).to_string();
+            fs::write(&config_path, &original).unwrap();
 
-        generate_config_at(global(Editor::Crush), &config_path).unwrap();
+            let error = merge_editor_config(global(Editor::Crush), &original).unwrap_err();
+            assert!(error.to_string().contains("Manually migrate"));
+            generate_config_at(global(Editor::Crush), &config_path).unwrap();
 
-        let parsed: serde_json::Value =
-            serde_json::from_str(&fs::read_to_string(&config_path).unwrap()).unwrap();
-        assert!(parsed["mcpServers"]["dela"].is_null());
-        assert_eq!(parsed["mcpServers"]["other"]["command"], "other");
-        assert_eq!(parsed["mcp"]["dela"]["type"], "stdio");
+            assert_eq!(fs::read_to_string(&config_path).unwrap(), original);
+        }
     }
 
     #[test]
