@@ -438,6 +438,21 @@ fn write_config_atomically(config_path: &Path, content: &str) -> anyhow::Result<
     let tmp_path = config_path.with_extension(format!("dela-tmp-{}", std::process::id()));
     fs::write(&tmp_path, content)
         .map_err(|e| anyhow::anyhow!("Failed to write config file: {}", e))?;
+
+    // The temp file is a fresh inode created under the process umask, so replacing a
+    // restrictive config would otherwise widen it (~/.claude.json is 0600 and holds
+    // account state). Carry the destination's permissions over before the rename.
+    if let Ok(metadata) = fs::metadata(config_path)
+        && let Err(e) = fs::set_permissions(&tmp_path, metadata.permissions())
+    {
+        let _ = fs::remove_file(&tmp_path);
+        return Err(anyhow::anyhow!(
+            "Failed to preserve permissions of {}: {}",
+            config_path.display(),
+            e
+        ));
+    }
+
     fs::rename(&tmp_path, config_path).map_err(|e| {
         let _ = fs::remove_file(&tmp_path);
         anyhow::anyhow!("Failed to write config file: {}", e)
@@ -534,7 +549,22 @@ fn pinned_workspace(cwd: &str) -> anyhow::Result<PathBuf> {
     } else {
         PathBuf::from(cwd)
     };
-    Ok(path.canonicalize().unwrap_or(path))
+    // Refuse rather than fall back to the relative path: a pin that cannot be resolved
+    // now becomes an entry that silently finds no tasks later, and nothing repairs it.
+    let resolved = path.canonicalize().map_err(|e| {
+        anyhow::anyhow!(
+            "Cannot pin --cwd to {}: {}. Pass a directory that exists.",
+            path.display(),
+            e
+        )
+    })?;
+    if !resolved.is_dir() {
+        return Err(anyhow::anyhow!(
+            "Cannot pin --cwd to {}: not a directory.",
+            resolved.display()
+        ));
+    }
+    Ok(resolved)
 }
 
 /// Execute the MCP command
@@ -846,6 +876,87 @@ mod tests {
         assert_eq!(
             parsed["mcp"]["dela"]["command"],
             serde_json::json!([dela_executable_path(), "mcp", "--cwd", "/w"])
+        );
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_merge_preserves_restrictive_config_permissions() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join(".claude.json");
+        fs::write(&config_path, r#"{"numStartups":1}"#).unwrap();
+        fs::set_permissions(&config_path, fs::Permissions::from_mode(0o600)).unwrap();
+
+        generate_config_at(global(Editor::ClaudeCode), &config_path).unwrap();
+
+        // The atomic replace must not widen a config that holds account state.
+        let mode = fs::metadata(&config_path).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600, "permissions widened to {mode:o}");
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_write_leaves_no_temp_file_behind() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join("mcp.json");
+        generate_config_at(global(Editor::Cursor), &config_path).unwrap();
+        generate_config_at(global(Editor::Cursor), &config_path).unwrap();
+
+        let leftovers: Vec<_> = fs::read_dir(temp_dir.path())
+            .unwrap()
+            .filter_map(|entry| entry.ok().map(|e| e.file_name()))
+            .filter(|name| name.to_string_lossy().contains("dela-tmp"))
+            .collect();
+        assert!(
+            leftovers.is_empty(),
+            "temp files left behind: {leftovers:?}"
+        );
+    }
+
+    #[test]
+    #[serial_test::serial]
+    fn test_pinned_workspace_makes_a_relative_path_absolute() {
+        let temp_dir = TempDir::new().unwrap();
+        let _guard = TestEnvGuard {
+            old_dir: std::env::current_dir().ok(),
+            old_home: std::env::var("HOME").ok(),
+        };
+        std::env::set_current_dir(temp_dir.path()).unwrap();
+        fs::create_dir_all("workspace").unwrap();
+
+        let resolved = pinned_workspace("./workspace").unwrap();
+
+        assert!(resolved.is_absolute(), "{resolved:?} is not absolute");
+        assert!(resolved.ends_with("workspace"));
+    }
+
+    #[test]
+    fn test_pinned_workspace_rejects_a_missing_directory() {
+        let temp_dir = TempDir::new().unwrap();
+        let missing = temp_dir.path().join("typo");
+
+        let error = pinned_workspace(missing.to_str().unwrap()).unwrap_err();
+
+        // Better to fail loudly than to write an entry that finds no tasks.
+        assert!(
+            error.to_string().contains("Cannot pin --cwd"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn test_pinned_workspace_rejects_a_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let file = temp_dir.path().join("not-a-dir");
+        fs::write(&file, "").unwrap();
+
+        let error = pinned_workspace(file.to_str().unwrap()).unwrap_err();
+
+        assert!(
+            error.to_string().contains("not a directory"),
+            "unexpected error: {error}"
         );
     }
 
