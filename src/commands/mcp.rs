@@ -136,6 +136,7 @@ impl Editor {
             // Grok Build keeps user-scope servers in its main config, the same file
             // `grok mcp add --scope user` writes.
             Editor::Grok => std::env::var_os("GROK_HOME")
+                .filter(|path| !path.is_empty())
                 .map(PathBuf::from)
                 .unwrap_or_else(|| home.join(".grok"))
                 .join("config.toml"),
@@ -1389,6 +1390,10 @@ args = [\"serve\"]
         }
         let overridden = Editor::Grok.config_path();
         unsafe {
+            std::env::set_var("GROK_HOME", "");
+        }
+        let empty = Editor::Grok.config_path();
+        unsafe {
             std::env::remove_var("GROK_HOME");
         }
         let fallback = Editor::Grok.config_path();
@@ -1398,10 +1403,9 @@ args = [\"serve\"]
             }
         }
         assert_eq!(overridden, temp_dir.path().join("config.toml"));
-        assert_eq!(
-            fallback,
-            dirs::home_dir().unwrap().join(".grok/config.toml")
-        );
+        let expected_fallback = dirs::home_dir().unwrap().join(".grok/config.toml");
+        assert_eq!(empty, expected_fallback);
+        assert_eq!(fallback, expected_fallback);
     }
 
     struct TestEnvGuard {
