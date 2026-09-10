@@ -77,14 +77,17 @@ enum Commands {
     /// Example: dela mcp --init-cursor
     Mcp {
         /// Working directory for the MCP server
-        #[arg(long, default_value = ".")]
-        cwd: String,
+        ///
+        /// With an --init-* flag, pins the generated config entry to this workspace
+        /// instead of letting dela discover tasks from wherever the editor starts it.
+        #[arg(long)]
+        cwd: Option<String>,
 
-        /// Generate .cursor/mcp.json for Cursor IDE
+        /// Generate ~/.cursor/mcp.json for Cursor IDE
         #[arg(long)]
         init_cursor: bool,
 
-        /// Generate .vscode/mcp.json for VSCode
+        /// Generate <user profile>/Code/User/mcp.json for VSCode
         #[arg(long)]
         init_vscode: bool,
 
@@ -96,7 +99,7 @@ enum Commands {
         #[arg(long)]
         init_gemini: bool,
 
-        /// Generate ~/.claude-code/settings.json for Claude Code
+        /// Generate ~/.claude.json for Claude Code
         #[arg(long)]
         init_claude_code: bool,
 
@@ -115,6 +118,10 @@ enum Commands {
         /// Generate ~/.config/crush/crush.json for Crush
         #[arg(long)]
         init_crush: bool,
+
+        /// Generate $GROK_HOME/config.toml (default ~/.grok/config.toml) for Grok Build
+        #[arg(long)]
+        init_grok: bool,
     },
 
     /// Initialize dela and configure shell integration
@@ -209,6 +216,7 @@ async fn run_command(command: Commands) -> anyhow::Result<()> {
             init_cline,
             init_opencode,
             init_crush,
+            init_grok,
         } => {
             let init_flags = [
                 init_cursor,
@@ -220,6 +228,7 @@ async fn run_command(command: Commands) -> anyhow::Result<()> {
                 init_cline,
                 init_opencode,
                 init_crush,
+                init_grok,
             ];
             let init_count = init_flags.iter().filter(|&&x| x).count();
             if init_count > 1 {
@@ -246,6 +255,8 @@ async fn run_command(command: Commands) -> anyhow::Result<()> {
                 Some(commands::mcp::Editor::OpenCode)
             } else if init_crush {
                 Some(commands::mcp::Editor::Crush)
+            } else if init_grok {
+                Some(commands::mcp::Editor::Grok)
             } else {
                 None
             };
@@ -336,10 +347,18 @@ mod tests {
     struct TestEnvGuard {
         old_dir: Option<std::path::PathBuf>,
         old_home: Option<String>,
+        old_grok_home: Option<std::ffi::OsString>,
     }
 
     impl Drop for TestEnvGuard {
         fn drop(&mut self) {
+            unsafe {
+                if let Some(ref value) = self.old_grok_home {
+                    std::env::set_var("GROK_HOME", value);
+                } else {
+                    std::env::remove_var("GROK_HOME");
+                }
+            }
             if let Some(ref dir) = self.old_dir {
                 let _ = std::env::set_current_dir(dir);
             }
@@ -355,6 +374,55 @@ mod tests {
         }
     }
 
+    /// Build `dela mcp --init-<editor>` with exactly one flag set.
+    ///
+    /// The match is exhaustive over `Editor`, so a new editor fails to compile here until
+    /// it is wired to a flag.
+    fn mcp_init_command(editor: Editor) -> Commands {
+        let mut cmd = Commands::Mcp {
+            cwd: None,
+            init_cursor: false,
+            init_vscode: false,
+            init_codex: false,
+            init_gemini: false,
+            init_claude_code: false,
+            init_antigravity: false,
+            init_cline: false,
+            init_opencode: false,
+            init_crush: false,
+            init_grok: false,
+        };
+        let Commands::Mcp {
+            init_cursor,
+            init_vscode,
+            init_codex,
+            init_gemini,
+            init_claude_code,
+            init_antigravity,
+            init_cline,
+            init_opencode,
+            init_crush,
+            init_grok,
+            ..
+        } = &mut cmd
+        else {
+            unreachable!("constructed above as Commands::Mcp")
+        };
+        *match editor {
+            Editor::Cursor => init_cursor,
+            Editor::Vscode => init_vscode,
+            Editor::Codex => init_codex,
+            Editor::Gemini => init_gemini,
+            Editor::ClaudeCode => init_claude_code,
+            Editor::Antigravity => init_antigravity,
+            Editor::Cline => init_cline,
+            Editor::OpenCode => init_opencode,
+            Editor::Crush => init_crush,
+            Editor::Grok => init_grok,
+        } = true;
+        cmd
+    }
+
     #[tokio::test]
     #[serial_test::serial]
     async fn test_run_command_mcp_all_flags() {
@@ -362,151 +430,37 @@ mod tests {
         let _guard = TestEnvGuard {
             old_dir: std::env::current_dir().ok(),
             old_home: std::env::var("HOME").ok(),
+            old_grok_home: std::env::var_os("GROK_HOME"),
         };
         std::env::set_current_dir(temp_dir.path()).unwrap();
         unsafe {
             std::env::set_var("HOME", temp_dir.path());
+            std::env::set_var("GROK_HOME", temp_dir.path().join("grok"));
         }
 
-        // Test each flag to ensure the match arm is evaluated and runs generate_config
-        let flags = vec![
-            (
-                Editor::Cursor,
-                true,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-            ), // Cursor
-            (
-                Editor::Vscode,
-                false,
-                true,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-            ), // Vscode
-            (
-                Editor::Codex,
-                false,
-                false,
-                true,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-            ), // Codex
-            (
-                Editor::Gemini,
-                false,
-                false,
-                false,
-                true,
-                false,
-                false,
-                false,
-                false,
-                false,
-            ), // Gemini
-            (
-                Editor::ClaudeCode,
-                false,
-                false,
-                false,
-                false,
-                true,
-                false,
-                false,
-                false,
-                false,
-            ), // ClaudeCode
-            (
-                Editor::Antigravity,
-                false,
-                false,
-                false,
-                false,
-                false,
-                true,
-                false,
-                false,
-                false,
-            ), // Antigravity
-            (
-                Editor::Cline,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                true,
-                false,
-                false,
-            ), // Cline
-            (
-                Editor::OpenCode,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                true,
-                false,
-            ), // OpenCode
-            (
-                Editor::Crush,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                true,
-            ), // Crush
-        ];
+        // Each flag must reach generate_config and produce that editor's config file.
+        for editor in [
+            Editor::Cursor,
+            Editor::Vscode,
+            Editor::Codex,
+            Editor::Gemini,
+            Editor::ClaudeCode,
+            Editor::Antigravity,
+            Editor::Cline,
+            Editor::OpenCode,
+            Editor::Crush,
+            Editor::Grok,
+        ] {
+            let expected_path = editor.config_path();
+            let _ = std::fs::remove_file(&expected_path);
 
-        for f in flags {
-            let cmd = Commands::Mcp {
-                cwd: ".".to_string(),
-                init_cursor: f.1,
-                init_vscode: f.2,
-                init_codex: f.3,
-                init_gemini: f.4,
-                init_claude_code: f.5,
-                init_antigravity: f.6,
-                init_cline: f.7,
-                init_opencode: f.8,
-                init_crush: f.9,
-            };
-
-            let expected_path = f.0.config_path();
-            if expected_path.exists() {
-                let _ = std::fs::remove_file(&expected_path);
-            }
-
-            let result = run_command(cmd).await;
-            assert!(result.is_ok());
+            run_command(mcp_init_command(editor)).await.unwrap();
 
             assert!(
                 expected_path.exists(),
                 "Config path {:?} was not generated for {:?}",
                 expected_path,
-                f.0
+                editor
             );
 
             // Clean up config file to ensure test isolation
@@ -517,7 +471,7 @@ mod tests {
     #[tokio::test]
     async fn test_run_command_mcp_conflicting_flags() {
         let cmd = Commands::Mcp {
-            cwd: ".".to_string(),
+            cwd: None,
             init_cursor: true,
             init_vscode: true,
             init_codex: false,
@@ -527,6 +481,7 @@ mod tests {
             init_cline: false,
             init_opencode: false,
             init_crush: false,
+            init_grok: false,
         };
         let result = run_command(cmd).await;
         assert!(result.is_err());
