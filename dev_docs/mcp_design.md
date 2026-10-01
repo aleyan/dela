@@ -65,7 +65,7 @@ This redesign narrows each tool to a single, clear responsibility and aligns wit
 Library & Transport
 	•	Library: rmcp (stdio transport)
 	•	Runtime: tokio multi-thread
-	•	Capabilities: tools + logging (request-scoped task output streaming during `task_start`)
+	•	Capabilities: tools + logging (request-scoped task output streaming during `task_start`, alongside progress notifications)
 
 Add (dev):
 
@@ -104,7 +104,10 @@ Libraries and their roles:
   is still running when the window expires, MCP backgrounds it and returns `running` with the PID.
 - **Output ring buffer**: Per-PID bounded buffer (default 10,000 lines, 5 MB). `task_output` returns stream-aware chunks and supports retained-buffer paging with `offset` plus `lines`.
 - **Lifecycle**: `task_stop` sends SIGTERM, waits grace (default 5s), then SIGKILL. Background jobs are GC'd after a TTL (configurable).
-- **Request-scoped streaming**: While a `task_start` call is in flight (its capture/bounded-wait window), task output and `started`/`exited` events are sent as `notifications/message` on that request. Once the task is backgrounded the request has returned, so nothing more is pushed; clients poll `task_status` and `task_output` by PID.
+- **Request-scoped streaming**: While a `task_start` call is in flight (its capture/bounded-wait window), output is streamed in batches (flushed every second, 100 lines, or 4 KB) using only what that request asked for (`src/mcp/notifier.rs`):
+  - **Progress**: if the request `_meta` has a `progressToken`, each batch is a `notifications/progress` whose `message` is the batch text and whose `progress` is the running count of streamed lines (no `total`; the task length is unknown).
+  - **Logs**: if the request `_meta` has `io.modelcontextprotocol/logLevel`, output lines classified at or above that level are sent as `notifications/message` (`{type, pid, lines}`, tagged with the most severe line's level), plus `started`/`exited` events at `notice`. Without a requested level no log notifications are sent. `logging/setLevel` is accepted for legacy clients but ignored, since a connection-wide level would be session state.
+  - Once the task is backgrounded the request has returned, so nothing more is pushed; clients poll `task_status` and `task_output` by PID.
 
 ⸻
 

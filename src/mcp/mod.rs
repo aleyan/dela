@@ -2,6 +2,7 @@ mod allowlist;
 mod dto;
 mod errors;
 mod job_manager;
+mod notifier;
 mod server;
 
 pub use errors::DelaError;

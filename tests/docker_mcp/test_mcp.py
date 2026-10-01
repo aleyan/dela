@@ -123,10 +123,13 @@ def stateless_meta():
     }
 
 
-def send_request(process, request, timeout_seconds=10):
-    """Send a stateless request, stamping the metadata that replaces initialize."""
+def send_request(process, request, timeout_seconds=10, meta=None):
+    """Send a stateless request, stamping the metadata that replaces initialize.
+
+    `meta` adds per-request keys such as progressToken or the requested log level.
+    """
     request = dict(request)
-    request["params"] = {**request.get("params", {}), "_meta": stateless_meta()}
+    request["params"] = {**request.get("params", {}), "_meta": {**stateless_meta(), **(meta or {})}}
     process.stdin.write(json.dumps(request) + "\n")
     process.stdin.flush()
     return read_until_response(process, request["id"], timeout_seconds=timeout_seconds)
@@ -184,6 +187,10 @@ def find_job(jobs, unique_name, pid=None):
 
 def logging_notifications(notifications):
     return [n for n in notifications if n.get("method") == "notifications/message"]
+
+
+def progress_notifications(notifications):
+    return [n for n in notifications if n.get("method") == "notifications/progress"]
 
 
 def output_text(payload, stream=None, field="output"):
@@ -352,6 +359,7 @@ def test_task_start_quick_exit():
             process,
             tool_request(4, "task_start", {"unique_name": "test-task"}),
             timeout_seconds=10,
+            meta={"progressToken": "quick-exit"},
         )
         payload = parse_tool_result(response)
         assert_condition(payload["state"] == "exited", "quick task should exit", payload)
@@ -368,9 +376,19 @@ def test_task_start_quick_exit():
             "quick exit payload should not use legacy ok/result wrapper",
             payload,
         )
+        progress = progress_notifications(notifications)
         assert_condition(
-            any(n.get("method") == "notifications/message" for n in notifications),
-            "quick exit should stream at least one logging notification",
+            any(
+                n["params"].get("progressToken") == "quick-exit"
+                and "Test task executed successfully" in n["params"].get("message", "")
+                for n in progress
+            ),
+            "quick exit should stream its output as progress notifications",
+            notifications,
+        )
+        assert_condition(
+            not logging_notifications(notifications),
+            "no log notifications without a requested log level",
             notifications,
         )
         print("✓ task_start quick-exit contract matches current MCP shape")
@@ -450,6 +468,7 @@ def test_bounded_wait_completion():
                 },
             ),
             timeout_seconds=15,
+            meta={"progressToken": "bounded-wait"},
         )
         payload = parse_tool_result(response)
         assert_condition(payload["state"] == "exited", "bounded wait should complete task", payload)
@@ -466,10 +485,16 @@ def test_bounded_wait_completion():
             "missing completion stdout from bounded wait task",
             payload,
         )
+        progress_values = [n["params"]["progress"] for n in progress_notifications(notifications)]
         assert_condition(
-            len(logging_notifications(notifications)) >= 2,
-            "bounded wait should stream logging notifications while waiting",
+            len(progress_values) >= 2,
+            "bounded wait should stream progress notifications while waiting",
             notifications,
+        )
+        assert_condition(
+            progress_values == sorted(set(progress_values)),
+            "progress should strictly increase",
+            progress_values,
         )
         print("✓ task_start bounded wait works for completed tasks")
         return True
@@ -662,6 +687,7 @@ def test_logging_severity_classification():
                 },
             ),
             timeout_seconds=10,
+            meta={"io.modelcontextprotocol/logLevel": "info"},
         )
         payload = parse_tool_result(response)
         assert_condition(payload["state"] == "exited", "stderr-level-task should exit", payload)
@@ -702,7 +728,32 @@ def test_logging_severity_classification():
         assert_condition("chunk" not in batch, "batched payload should not include chunk", batch)
         assert_condition("byte_count" not in batch, "batched payload should not include byte_count", batch)
         assert_condition("line_count" not in batch, "batched payload should not include line_count", batch)
-        print("✓ stderr notification levels are classified correctly")
+
+        _, warning_notifications = send_request(
+            process,
+            tool_request(
+                21,
+                "task_start",
+                {
+                    "unique_name": "stderr-level-task",
+                    "wait_for_exit_seconds": 3,
+                },
+            ),
+            timeout_seconds=10,
+            meta={"io.modelcontextprotocol/logLevel": "warning"},
+        )
+        warning_logs = logging_notifications(warning_notifications)
+        warning_lines = [
+            line
+            for log in warning_logs
+            for line in log.get("params", {}).get("data", {}).get("lines", [])
+        ]
+        assert_condition(
+            warning_lines == ["warning: this is a warning", "error: this is an error"],
+            "logLevel=warning should drop info lines and lifecycle events",
+            warning_logs,
+        )
+        print("✓ stderr notification levels are classified and filtered by requested level")
         return True
     finally:
         stop_process(process)
