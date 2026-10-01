@@ -105,7 +105,7 @@ Assuming you have already run `dela init`.
 $ dela mcp [--cwd <directory>]
 ```
 
-The server communicates over stdio using JSON-RPC 2.0 and streams task output via logging notifications.
+The server communicates over stdio using JSON-RPC 2.0 and is stateless at the protocol level: it serves both MCP `2026-07-28` clients (no `initialize` handshake, per-request metadata) and older clients that still run `initialize`. While a `task_start` call is in flight its output is also streamed as logging notifications; once a task is backgrounded, read its progress with `task_status` and `task_output`.
 
 ### Available Tools
 

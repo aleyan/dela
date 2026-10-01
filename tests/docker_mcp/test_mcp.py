@@ -10,6 +10,9 @@ import time
 
 PROJECT_CWD = "/home/testuser/test_project"
 MCP_COMMAND = ["/usr/local/bin/dela", "mcp", "--cwd", PROJECT_CWD]
+STATELESS_PROTOCOL_VERSION = "2026-07-28"
+LEGACY_PROTOCOL_VERSION = "2025-11-25"
+CLIENT_INFO = {"name": "docker-mcp-test", "version": "1.0.0"}
 
 
 def fail(message, *, payload=None):
@@ -20,6 +23,7 @@ def fail(message, *, payload=None):
 
 
 def start_mcp_process():
+    """Start a server for a stateless client: no initialize handshake, per-request _meta."""
     env = os.environ.copy()
     env.update(
         {
@@ -38,17 +42,20 @@ def start_mcp_process():
         env=env,
     )
 
+    return process
+
+
+def start_legacy_mcp_process():
+    """Start a server and run the pre-2026 initialize handshake."""
+    process = start_mcp_process()
     initialize_request = {
         "jsonrpc": "2.0",
         "id": 1,
         "method": "initialize",
         "params": {
-            "protocolVersion": "2024-11-05",
+            "protocolVersion": LEGACY_PROTOCOL_VERSION,
             "capabilities": {},
-            "clientInfo": {
-                "name": "docker-mcp-test",
-                "version": "1.0.0",
-            },
+            "clientInfo": CLIENT_INFO,
         },
     }
     process.stdin.write(json.dumps(initialize_request) + "\n")
@@ -108,7 +115,18 @@ def read_until_response(process, request_id, timeout_seconds=10):
     raise TimeoutError(f"timed out waiting for response id {request_id}")
 
 
+def stateless_meta():
+    return {
+        "io.modelcontextprotocol/protocolVersion": STATELESS_PROTOCOL_VERSION,
+        "io.modelcontextprotocol/clientCapabilities": {},
+        "io.modelcontextprotocol/clientInfo": CLIENT_INFO,
+    }
+
+
 def send_request(process, request, timeout_seconds=10):
+    """Send a stateless request, stamping the metadata that replaces initialize."""
+    request = dict(request)
+    request["params"] = {**request.get("params", {}), "_meta": stateless_meta()}
     process.stdin.write(json.dumps(request) + "\n")
     process.stdin.flush()
     return read_until_response(process, request["id"], timeout_seconds=timeout_seconds)
@@ -183,28 +201,59 @@ def output_text(payload, stream=None, field="output"):
     return "".join(texts)
 
 
-def test_initialize_instructions():
-    print("Test 1: initialize advertises bounded wait and logging")
-    process, init_response = start_mcp_process()
+def assert_instructions(instructions):
+    assert_condition(
+        "wait_for_exit_seconds" in instructions,
+        "instructions missing wait_for_exit_seconds",
+        instructions,
+    )
+    assert_condition(
+        "default 1-second capture window" in instructions,
+        "instructions missing default capture wording",
+        instructions,
+    )
+
+
+def test_discover_instructions():
+    print("Test 1: server/discover advertises stateless protocol and instructions")
+    process = start_mcp_process()
     try:
-        info = init_response["result"]["serverInfo"]
-        instructions = init_response["result"].get("instructions", "")
-        assert_condition(
-            "wait_for_exit_seconds" in instructions,
-            "instructions missing wait_for_exit_seconds",
-            instructions,
+        response, _ = send_request(
+            process,
+            {"jsonrpc": "2.0", "id": 1, "method": "server/discover", "params": {}},
         )
+        result = response["result"]
         assert_condition(
-            "default 1-second capture window" in instructions,
-            "instructions missing default capture wording",
-            instructions,
+            STATELESS_PROTOCOL_VERSION in result.get("supportedVersions", []),
+            "server/discover should advertise the stateless protocol version",
+            result,
         )
+        assert_condition("tools" in result.get("capabilities", {}), "tools capability missing", result)
+        assert_instructions(result.get("instructions", ""))
+        print("✓ server/discover works without an initialize handshake")
+        return True
+    finally:
+        stop_process(process)
+
+
+def test_legacy_initialize():
+    print("Test 1b: legacy initialize handshake still works")
+    process, init_response = start_legacy_mcp_process()
+    try:
+        result = init_response["result"]
         assert_condition(
-            info["name"],
-            "serverInfo.name should be present",
-            info,
+            result.get("protocolVersion") == LEGACY_PROTOCOL_VERSION,
+            "initialize should echo the legacy protocol version",
+            result,
         )
-        print("✓ initialize response includes current MCP instructions")
+        assert_condition(result["serverInfo"]["name"], "serverInfo.name should be present", result)
+        assert_instructions(result.get("instructions", ""))
+
+        process.stdin.write(json.dumps(tool_request(2, "status")) + "\n")
+        process.stdin.flush()
+        response, _ = read_until_response(process, 2)
+        assert_condition("running" in parse_tool_result(response), "legacy status call failed", response)
+        print("✓ legacy initialize clients are still served")
         return True
     finally:
         stop_process(process)
@@ -212,7 +261,7 @@ def test_initialize_instructions():
 
 def test_tools_list_schema():
     print("Test 2: tools/list exposes MCP tool surface and bounded wait schema")
-    process, _ = start_mcp_process()
+    process = start_mcp_process()
     try:
         response, _ = send_request(
             process,
@@ -245,7 +294,7 @@ def test_tools_list_schema():
 
 def test_list_tasks_enriched_fields():
     print("Test 3: list_tasks returns enriched fields")
-    process, _ = start_mcp_process()
+    process = start_mcp_process()
     try:
         response, _ = send_request(process, tool_request(3, "list_tasks"))
         payload = parse_tool_result(response)
@@ -269,7 +318,7 @@ def test_list_tasks_enriched_fields():
 
 def test_list_tasks_cwd():
     print("Test 3b: list_tasks supports custom cwd argument")
-    process, _ = start_mcp_process()
+    process = start_mcp_process()
     try:
         # Check listing with custom cwd pointing to test_project (same results as default)
         response, _ = send_request(
@@ -297,7 +346,7 @@ def test_list_tasks_cwd():
 
 def test_task_start_quick_exit():
     print("Test 4: task_start returns direct quick-exit payload")
-    process, _ = start_mcp_process()
+    process = start_mcp_process()
     try:
         response, notifications = send_request(
             process,
@@ -332,7 +381,7 @@ def test_task_start_quick_exit():
 
 def test_task_start_args_and_spaces():
     print("Test 5: task_start preserves space-containing args for the underlying runner")
-    process, _ = start_mcp_process()
+    process = start_mcp_process()
     try:
         response, _ = send_request(
             process,
@@ -359,7 +408,7 @@ def test_task_start_args_and_spaces():
 
 def test_error_taxonomy():
     print("Test 6: task_start returns current TaskNotFound and NotAllowlisted errors")
-    process, _ = start_mcp_process()
+    process = start_mcp_process()
     try:
         not_found_response, _ = send_request(
             process,
@@ -388,7 +437,7 @@ def test_error_taxonomy():
 
 def test_bounded_wait_completion():
     print("Test 7: task_start bounded wait returns completed task in one round trip")
-    process, _ = start_mcp_process()
+    process = start_mcp_process()
     try:
         response, notifications = send_request(
             process,
@@ -430,7 +479,7 @@ def test_bounded_wait_completion():
 
 def test_task_status_completion_metadata():
     print("Test 8: task_status exposes exit_code and completed_at for completed jobs")
-    process, _ = start_mcp_process()
+    process = start_mcp_process()
     try:
         start_response, _ = send_request(
             process,
@@ -464,7 +513,7 @@ def test_task_status_completion_metadata():
 
 def test_running_lifecycle_and_stop():
     print("Test 9: background execution, status, output, and stop lifecycle")
-    process, _ = start_mcp_process()
+    process = start_mcp_process()
     try:
         start_response, _ = send_request(
             process,
@@ -579,7 +628,7 @@ def test_running_lifecycle_and_stop():
 
 def test_nonexistent_job_tools():
     print("Test 10: task_output and task_stop reject nonexistent jobs")
-    process, _ = start_mcp_process()
+    process = start_mcp_process()
     try:
         output_response, _ = send_request(
             process,
@@ -600,7 +649,7 @@ def test_nonexistent_job_tools():
 
 def test_logging_severity_classification():
     print("Test 11: stderr logging notifications use info, warning, and error levels correctly")
-    process, _ = start_mcp_process()
+    process = start_mcp_process()
     try:
         response, notifications = send_request(
             process,
@@ -661,7 +710,8 @@ def test_logging_severity_classification():
 
 def main():
     tests = [
-        test_initialize_instructions,
+        test_discover_instructions,
+        test_legacy_initialize,
         test_tools_list_schema,
         test_list_tasks_enriched_fields,
         test_list_tasks_cwd,

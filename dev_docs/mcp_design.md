@@ -23,6 +23,14 @@ All human/debug output must go to **stderr**. The server should enter
 JSON-RPC messages over stdio, not `Content-Length` framed messages. Any local debugging
 client or smoke-test utility should write one JSON-RPC message per line and read one line
 per response/notification.
+
+**Stateless protocol:** dela targets MCP `2026-07-28`, which drops the `initialize` handshake.
+A stateless client sends `server/discover` (optional) and then plain requests whose `_meta`
+carries `io.modelcontextprotocol/protocolVersion`, `io.modelcontextprotocol/clientCapabilities`,
+and `io.modelcontextprotocol/clientInfo`. Older clients that still send `initialize` keep working.
+The server must therefore never depend on per-connection handshake state: nothing is captured in
+`initialize`, and server→client notifications are only sent from inside the request that caused
+them. Background jobs are addressed by PID, an explicit handle the client passes back.
 ⸻
 
 # Dela MCP — Revised Design (First-Principles)
@@ -57,7 +65,7 @@ This redesign narrows each tool to a single, clear responsibility and aligns wit
 Library & Transport
 	•	Library: rmcp (stdio transport)
 	•	Runtime: tokio multi-thread
-	•	Capabilities: tools + logging (for real-time task output streaming)
+	•	Capabilities: tools + logging (request-scoped task output streaming during `task_start`)
 
 Add (dev):
 
@@ -96,7 +104,7 @@ Libraries and their roles:
   is still running when the window expires, MCP backgrounds it and returns `running` with the PID.
 - **Output ring buffer**: Per-PID bounded buffer (default 10,000 lines, 5 MB). `task_output` returns stream-aware chunks and supports retained-buffer paging with `offset` plus `lines`.
 - **Lifecycle**: `task_stop` sends SIGTERM, waits grace (default 5s), then SIGKILL. Background jobs are GC'd after a TTL (configurable).
-- **Real-time streaming**: Task output is streamed via MCP logging notifications. Clients can subscribe to `notifications/message` to receive output as it happens.
+- **Request-scoped streaming**: While a `task_start` call is in flight (its capture/bounded-wait window), task output and `started`/`exited` events are sent as `notifications/message` on that request. Once the task is backgrounded the request has returned, so nothing more is pushed; clients poll `task_status` and `task_output` by PID.
 
 ⸻
 
@@ -363,7 +371,7 @@ All errors follow the JSON-RPC 2.0 error format:
 }
 ```
 `exit_code` is populated for exited jobs, and `completed_at` is populated for exited/failed jobs so
-polling clients can determine completion without depending on logging notifications alone.
+polling clients can determine completion; backgrounded jobs emit no notifications.
 
 ### 5) task_output
 **Args**
