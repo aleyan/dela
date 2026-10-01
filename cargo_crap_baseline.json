@@ -468,24 +468,40 @@
     },
     {
       "file": "./src/commands/mcp.rs",
-      "function": "Editor::config_path",
-      "line": 43,
-      "cyclomatic": 10.0,
-      "coverage": 100.0,
-      "crap": 10.0
-    },
-    {
-      "file": "./src/commands/mcp.rs",
-      "function": "Editor::dela_json_entry",
-      "line": 83,
+      "function": "Editor::command_shape",
+      "line": 188,
       "cyclomatic": 3.0,
       "coverage": 100.0,
       "crap": 3.0
     },
     {
       "file": "./src/commands/mcp.rs",
-      "function": "Editor::dela_marker",
-      "line": 60,
+      "function": "Editor::config_format",
+      "line": 161,
+      "cyclomatic": 3.0,
+      "coverage": 100.0,
+      "crap": 3.0
+    },
+    {
+      "file": "./src/commands/mcp.rs",
+      "function": "Editor::config_path",
+      "line": 116,
+      "cyclomatic": 11.0,
+      "coverage": 100.0,
+      "crap": 11.0
+    },
+    {
+      "file": "./src/commands/mcp.rs",
+      "function": "Editor::entry_type",
+      "line": 179,
+      "cyclomatic": 4.0,
+      "coverage": 100.0,
+      "crap": 4.0
+    },
+    {
+      "file": "./src/commands/mcp.rs",
+      "function": "Editor::legacy_servers_key",
+      "line": 169,
       "cyclomatic": 3.0,
       "coverage": 100.0,
       "crap": 3.0
@@ -493,18 +509,58 @@
     {
       "file": "./src/commands/mcp.rs",
       "function": "Editor::name",
-      "line": 29,
-      "cyclomatic": 10.0,
+      "line": 101,
+      "cyclomatic": 11.0,
       "coverage": 100.0,
-      "crap": 10.0
+      "crap": 11.0
     },
     {
       "file": "./src/commands/mcp.rs",
       "function": "Editor::servers_key",
-      "line": 68,
+      "line": 147,
       "cyclomatic": 5.0,
-      "coverage": 85.71428571428571,
-      "crap": 5.072886297376093
+      "coverage": 100.0,
+      "crap": 5.0
+    },
+    {
+      "file": "./src/commands/mcp.rs",
+      "function": "InitTarget::args_need_replacing",
+      "line": 61,
+      "cyclomatic": 3.0,
+      "coverage": 100.0,
+      "crap": 3.0
+    },
+    {
+      "file": "./src/commands/mcp.rs",
+      "function": "InitTarget::dela_json_entry",
+      "line": 200,
+      "cyclomatic": 4.0,
+      "coverage": 100.0,
+      "crap": 4.0
+    },
+    {
+      "file": "./src/commands/mcp.rs",
+      "function": "InitTarget::desired_args",
+      "line": 50,
+      "cyclomatic": 2.0,
+      "coverage": 100.0,
+      "crap": 2.0
+    },
+    {
+      "file": "./src/commands/mcp.rs",
+      "function": "args_need_update",
+      "line": 24,
+      "cyclomatic": 7.0,
+      "coverage": 100.0,
+      "crap": 7.0
+    },
+    {
+      "file": "./src/commands/mcp.rs",
+      "function": "command_needs_update",
+      "line": 14,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
     },
     {
       "file": "./src/commands/mcp.rs",
@@ -517,15 +573,15 @@
     {
       "file": "./src/commands/mcp.rs",
       "function": "execute",
-      "line": 248,
-      "cyclomatic": 6.0,
-      "coverage": 34.78260869565217,
-      "crap": 15.98602778006082
+      "line": 586,
+      "cyclomatic": 7.0,
+      "coverage": 30.76923076923077,
+      "crap": 23.25898953117888
     },
     {
       "file": "./src/commands/mcp.rs",
       "function": "generate_config",
-      "line": 242,
+      "line": 551,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -533,26 +589,106 @@
     {
       "file": "./src/commands/mcp.rs",
       "function": "generate_config_at",
-      "line": 167,
-      "cyclomatic": 19.0,
+      "line": 518,
+      "cyclomatic": 10.0,
+      "coverage": 90.47619047619048,
+      "crap": 10.086383759853147
+    },
+    {
+      "file": "./src/commands/mcp.rs",
+      "function": "json_string_array",
+      "line": 301,
+      "cyclomatic": 2.0,
       "coverage": 100.0,
-      "crap": 19.0
+      "crap": 2.0
     },
     {
       "file": "./src/commands/mcp.rs",
       "function": "merge_dela_into_json",
-      "line": 100,
-      "cyclomatic": 7.0,
-      "coverage": 96.0,
-      "crap": 7.003136
+      "line": 332,
+      "cyclomatic": 10.0,
+      "coverage": 100.0,
+      "crap": 10.0
     },
     {
       "file": "./src/commands/mcp.rs",
       "function": "merge_dela_into_toml",
-      "line": 134,
+      "line": 422,
       "cyclomatic": 5.0,
       "coverage": 100.0,
       "crap": 5.0
+    },
+    {
+      "file": "./src/commands/mcp.rs",
+      "function": "merge_dela_json_entry",
+      "line": 222,
+      "cyclomatic": 12.0,
+      "coverage": 100.0,
+      "crap": 12.0
+    },
+    {
+      "file": "./src/commands/mcp.rs",
+      "function": "merge_dela_toml_entry",
+      "line": 388,
+      "cyclomatic": 4.0,
+      "coverage": 100.0,
+      "crap": 4.0
+    },
+    {
+      "file": "./src/commands/mcp.rs",
+      "function": "merge_editor_config",
+      "line": 477,
+      "cyclomatic": 3.0,
+      "coverage": 100.0,
+      "crap": 3.0
+    },
+    {
+      "file": "./src/commands/mcp.rs",
+      "function": "pinned_workspace",
+      "line": 560,
+      "cyclomatic": 5.0,
+      "coverage": 88.23529411764706,
+      "crap": 5.0407083248524325
+    },
+    {
+      "file": "./src/commands/mcp.rs",
+      "function": "remove_legacy_dela_entry",
+      "line": 310,
+      "cyclomatic": 2.0,
+      "coverage": 100.0,
+      "crap": 2.0
+    },
+    {
+      "file": "./src/commands/mcp.rs",
+      "function": "toml_args_value",
+      "line": 384,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/commands/mcp.rs",
+      "function": "toml_string_array",
+      "line": 376,
+      "cyclomatic": 3.0,
+      "coverage": 100.0,
+      "crap": 3.0
+    },
+    {
+      "file": "./src/commands/mcp.rs",
+      "function": "update_existing_config",
+      "line": 484,
+      "cyclomatic": 6.0,
+      "coverage": 100.0,
+      "crap": 6.0
+    },
+    {
+      "file": "./src/commands/mcp.rs",
+      "function": "write_config_atomically",
+      "line": 452,
+      "cyclomatic": 4.0,
+      "coverage": 50.0,
+      "crap": 6.0
     },
     {
       "file": "./src/commands/mod.rs",
@@ -837,7 +973,7 @@
     {
       "file": "./src/main.rs",
       "function": "main",
-      "line": 272,
+      "line": 283,
       "cyclomatic": 4.0,
       "coverage": 0.0,
       "crap": 20.0
@@ -845,10 +981,10 @@
     {
       "file": "./src/main.rs",
       "function": "run_command",
-      "line": 199,
-      "cyclomatic": 21.0,
-      "coverage": 85.24590163934425,
-      "crap": 22.416369652085418
+      "line": 206,
+      "cyclomatic": 22.0,
+      "coverage": 86.15384615384616,
+      "crap": 23.284791989076012
     },
     {
       "file": "./src/mcp/allowlist.rs",
@@ -1381,15 +1517,159 @@
     {
       "file": "./src/mcp/mod.rs",
       "function": "run_stdio_server",
-      "line": 12,
+      "line": 13,
       "cyclomatic": 1.0,
       "coverage": 0.0,
       "crap": 2.0
     },
     {
+      "file": "./src/mcp/notifier.rs",
+      "function": "OutputNotificationBatch::add_line",
+      "line": 89,
+      "cyclomatic": 2.0,
+      "coverage": 100.0,
+      "crap": 2.0
+    },
+    {
+      "file": "./src/mcp/notifier.rs",
+      "function": "OutputNotificationBatch::flush_due_at",
+      "line": 106,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/mcp/notifier.rs",
+      "function": "OutputNotificationBatch::is_empty",
+      "line": 85,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/mcp/notifier.rs",
+      "function": "OutputNotificationBatch::new",
+      "line": 76,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/mcp/notifier.rs",
+      "function": "OutputNotificationBatch::should_flush",
+      "line": 101,
+      "cyclomatic": 2.0,
+      "coverage": 100.0,
+      "crap": 2.0
+    },
+    {
+      "file": "./src/mcp/notifier.rs",
+      "function": "OutputNotificationBatch::take_entries",
+      "line": 111,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/mcp/notifier.rs",
+      "function": "TaskStartNotifier::flush",
+      "line": 180,
+      "cyclomatic": 2.0,
+      "coverage": 100.0,
+      "crap": 2.0
+    },
+    {
+      "file": "./src/mcp/notifier.rs",
+      "function": "TaskStartNotifier::log",
+      "line": 224,
+      "cyclomatic": 2.0,
+      "coverage": 100.0,
+      "crap": 2.0
+    },
+    {
+      "file": "./src/mcp/notifier.rs",
+      "function": "TaskStartNotifier::log_output",
+      "line": 205,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/mcp/notifier.rs",
+      "function": "TaskStartNotifier::new",
+      "line": 158,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/mcp/notifier.rs",
+      "function": "TaskStartNotifier::progress",
+      "line": 189,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/mcp/notifier.rs",
+      "function": "TaskStartNotifier::task_event",
+      "line": 167,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/mcp/notifier.rs",
+      "function": "classify_output_log_level",
+      "line": 20,
+      "cyclomatic": 9.0,
+      "coverage": 100.0,
+      "crap": 9.0
+    },
+    {
+      "file": "./src/mcp/notifier.rs",
+      "function": "flush_batch",
+      "line": 242,
+      "cyclomatic": 3.0,
+      "coverage": 100.0,
+      "crap": 3.0
+    },
+    {
+      "file": "./src/mcp/notifier.rs",
+      "function": "is_at_least",
+      "line": 56,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/mcp/notifier.rs",
+      "function": "log_output_lines",
+      "line": 127,
+      "cyclomatic": 2.0,
+      "coverage": 100.0,
+      "crap": 2.0
+    },
+    {
+      "file": "./src/mcp/notifier.rs",
+      "function": "progress_message",
+      "line": 118,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/mcp/notifier.rs",
+      "function": "severity",
+      "line": 43,
+      "cyclomatic": 9.0,
+      "coverage": 72.72727272727273,
+      "crap": 10.64312546957175
+    },
+    {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::add_job_output_chunks",
-      "line": 241,
+      "line": 115,
       "cyclomatic": 6.0,
       "coverage": 100.0,
       "crap": 6.0
@@ -1397,7 +1677,7 @@
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::append_output_chunk",
-      "line": 234,
+      "line": 108,
       "cyclomatic": 3.0,
       "coverage": 100.0,
       "crap": 3.0
@@ -1405,7 +1685,7 @@
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::build_job_metadata",
-      "line": 803,
+      "line": 561,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -1413,7 +1693,7 @@
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::build_task_command",
-      "line": 759,
+      "line": 517,
       "cyclomatic": 6.0,
       "coverage": 66.66666666666666,
       "crap": 7.333333333333336
@@ -1421,23 +1701,15 @@
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::call_tool",
-      "line": 1452,
+      "line": 1203,
       "cyclomatic": 13.0,
       "coverage": 100.0,
       "crap": 13.0
     },
     {
       "file": "./src/mcp/server.rs",
-      "function": "DelaMcpServer::flush_output_notification_batch",
-      "line": 280,
-      "cyclomatic": 2.0,
-      "coverage": 66.66666666666666,
-      "crap": 2.1481481481481484
-    },
-    {
-      "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::get_discovered_tasks",
-      "line": 363,
+      "line": 185,
       "cyclomatic": 2.0,
       "coverage": 100.0,
       "crap": 2.0
@@ -1445,7 +1717,7 @@
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::get_info",
-      "line": 1419,
+      "line": 1183,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -1453,23 +1725,15 @@
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::handle_completed_process",
-      "line": 890,
-      "cyclomatic": 8.0,
-      "coverage": 78.57142857142857,
-      "crap": 8.629737609329446
-    },
-    {
-      "file": "./src/mcp/server.rs",
-      "function": "DelaMcpServer::initialize",
-      "line": 1438,
-      "cyclomatic": 2.0,
-      "coverage": 0.0,
-      "crap": 6.0
+      "line": 648,
+      "cyclomatic": 9.0,
+      "coverage": 80.0,
+      "crap": 9.648
     },
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::interpret_exit_status",
-      "line": 871,
+      "line": 629,
       "cyclomatic": 2.0,
       "coverage": 76.92307692307693,
       "crap": 2.049157942649067
@@ -1477,7 +1741,7 @@
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::list_tasks",
-      "line": 452,
+      "line": 274,
       "cyclomatic": 3.0,
       "coverage": 100.0,
       "crap": 3.0
@@ -1485,7 +1749,7 @@
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::list_tools",
-      "line": 1492,
+      "line": 1244,
       "cyclomatic": 1.0,
       "coverage": 0.0,
       "crap": 2.0
@@ -1493,7 +1757,7 @@
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::new",
-      "line": 168,
+      "line": 55,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -1501,7 +1765,7 @@
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::new_inner",
-      "line": 176,
+      "line": 63,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -1509,7 +1773,7 @@
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::new_with_allowlist",
-      "line": 194,
+      "line": 80,
       "cyclomatic": 3.0,
       "coverage": 100.0,
       "crap": 3.0
@@ -1517,7 +1781,7 @@
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::new_with_allowlist_and_cache_ttl",
-      "line": 208,
+      "line": 94,
       "cyclomatic": 3.0,
       "coverage": 75.0,
       "crap": 3.140625
@@ -1525,7 +1789,7 @@
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::output_entries_to_json",
-      "line": 261,
+      "line": 135,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -1533,7 +1797,7 @@
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::output_flush_timer_deadline",
-      "line": 299,
+      "line": 154,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -1541,7 +1805,7 @@
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::resolve_requested_cwd",
-      "line": 389,
+      "line": 211,
       "cyclomatic": 5.0,
       "coverage": 34.375,
       "crap": 12.065582275390625
@@ -1549,7 +1813,7 @@
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::resolve_wait_for_exit_seconds",
-      "line": 306,
+      "line": 161,
       "cyclomatic": 4.0,
       "coverage": 100.0,
       "crap": 4.0
@@ -1557,7 +1821,7 @@
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::root",
-      "line": 359,
+      "line": 181,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -1565,47 +1829,23 @@
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::run_background_monitoring",
-      "line": 596,
-      "cyclomatic": 7.0,
-      "coverage": 60.67415730337079,
-      "crap": 9.980095578670834
+      "line": 421,
+      "cyclomatic": 5.0,
+      "coverage": 77.5,
+      "crap": 5.284765625
     },
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::run_initial_capture",
-      "line": 510,
+      "line": 332,
       "cyclomatic": 5.0,
-      "coverage": 91.66666666666666,
-      "crap": 5.014467592592593
-    },
-    {
-      "file": "./src/mcp/server.rs",
-      "function": "DelaMcpServer::send_log",
-      "line": 223,
-      "cyclomatic": 2.0,
-      "coverage": 44.44444444444444,
-      "crap": 2.6858710562414267
-    },
-    {
-      "file": "./src/mcp/server.rs",
-      "function": "DelaMcpServer::send_task_event",
-      "line": 344,
-      "cyclomatic": 1.0,
-      "coverage": 100.0,
-      "crap": 1.0
-    },
-    {
-      "file": "./src/mcp/server.rs",
-      "function": "DelaMcpServer::send_task_output",
-      "line": 326,
-      "cyclomatic": 2.0,
-      "coverage": 0.0,
-      "crap": 6.0
+      "coverage": 96.66666666666667,
+      "crap": 5.000925925925926
     },
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::serve_stdio",
-      "line": 434,
+      "line": 256,
       "cyclomatic": 2.0,
       "coverage": 0.0,
       "crap": 6.0
@@ -1613,7 +1853,7 @@
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::set_level",
-      "line": 1851,
+      "line": 1603,
       "cyclomatic": 1.0,
       "coverage": 0.0,
       "crap": 2.0
@@ -1621,7 +1861,7 @@
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::set_level_impl",
-      "line": 1863,
+      "line": 1615,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -1629,7 +1869,7 @@
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::set_level_impl",
-      "line": 1869,
+      "line": 1622,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -1637,15 +1877,15 @@
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::setup_background_job",
-      "line": 957,
+      "line": 719,
       "cyclomatic": 5.0,
-      "coverage": 82.14285714285714,
-      "crap": 5.142356049562682
+      "coverage": 82.35294117647058,
+      "crap": 5.137390596376959
     },
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::spawn_pipe_reader",
-      "line": 821,
+      "line": 579,
       "cyclomatic": 6.0,
       "coverage": 82.35294117647058,
       "crap": 6.197842458782821
@@ -1653,15 +1893,23 @@
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::spawn_stderr_reader",
-      "line": 846,
+      "line": 604,
       "cyclomatic": 6.0,
       "coverage": 82.35294117647058,
       "crap": 6.197842458782821
     },
     {
       "file": "./src/mcp/server.rs",
+      "function": "DelaMcpServer::start_task",
+      "line": 794,
+      "cyclomatic": 12.0,
+      "coverage": 80.72289156626506,
+      "crap": 13.031544963421693
+    },
+    {
+      "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::status",
-      "line": 481,
+      "line": 303,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -1669,7 +1917,7 @@
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::task_output",
-      "line": 1200,
+      "line": 964,
       "cyclomatic": 16.0,
       "coverage": 73.40425531914893,
       "crap": 20.81588857960183
@@ -1677,15 +1925,15 @@
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::task_start",
-      "line": 1028,
-      "cyclomatic": 11.0,
-      "coverage": 80.24691358024691,
-      "crap": 11.932588942140331
+      "line": 785,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
     },
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::task_status",
-      "line": 1139,
+      "line": 903,
       "cyclomatic": 6.0,
       "coverage": 89.58333333333334,
       "crap": 6.040690104166666
@@ -1693,7 +1941,7 @@
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::task_stop",
-      "line": 1330,
+      "line": 1094,
       "cyclomatic": 8.0,
       "coverage": 62.71186440677966,
       "crap": 11.318119184532012
@@ -1701,7 +1949,7 @@
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::truncate_output_entry_for_chunk",
-      "line": 271,
+      "line": 145,
       "cyclomatic": 2.0,
       "coverage": 100.0,
       "crap": 2.0
@@ -1709,71 +1957,15 @@
     {
       "file": "./src/mcp/server.rs",
       "function": "DelaMcpServer::validate_task_for_start",
-      "line": 721,
+      "line": 479,
       "cyclomatic": 5.0,
       "coverage": 87.5,
       "crap": 5.048828125
     },
     {
       "file": "./src/mcp/server.rs",
-      "function": "OutputNotificationBatch::add_line",
-      "line": 92,
-      "cyclomatic": 2.0,
-      "coverage": 100.0,
-      "crap": 2.0
-    },
-    {
-      "file": "./src/mcp/server.rs",
-      "function": "OutputNotificationBatch::flush_due_at",
-      "line": 109,
-      "cyclomatic": 1.0,
-      "coverage": 100.0,
-      "crap": 1.0
-    },
-    {
-      "file": "./src/mcp/server.rs",
-      "function": "OutputNotificationBatch::is_empty",
-      "line": 88,
-      "cyclomatic": 1.0,
-      "coverage": 100.0,
-      "crap": 1.0
-    },
-    {
-      "file": "./src/mcp/server.rs",
-      "function": "OutputNotificationBatch::new",
-      "line": 79,
-      "cyclomatic": 1.0,
-      "coverage": 100.0,
-      "crap": 1.0
-    },
-    {
-      "file": "./src/mcp/server.rs",
-      "function": "OutputNotificationBatch::should_flush",
-      "line": 104,
-      "cyclomatic": 2.0,
-      "coverage": 100.0,
-      "crap": 2.0
-    },
-    {
-      "file": "./src/mcp/server.rs",
-      "function": "OutputNotificationBatch::take_notification_data",
-      "line": 114,
-      "cyclomatic": 4.0,
-      "coverage": 100.0,
-      "crap": 4.0
-    },
-    {
-      "file": "./src/mcp/server.rs",
-      "function": "classify_output_log_level",
-      "line": 39,
-      "cyclomatic": 11.0,
-      "coverage": 100.0,
-      "crap": 11.0
-    },
-    {
-      "file": "./src/mcp/server.rs",
       "function": "parse_tool_args",
-      "line": 1404,
+      "line": 1168,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -1981,15 +2173,23 @@
     {
       "file": "./src/parsers/parse_mise.rs",
       "function": "file_task_name",
-      "line": 190,
+      "line": 228,
       "cyclomatic": 3.0,
       "coverage": 100.0,
       "crap": 3.0
     },
     {
       "file": "./src/parsers/parse_mise.rs",
+      "function": "includes_from_config",
+      "line": 67,
+      "cyclomatic": 2.0,
+      "coverage": 65.51724137931035,
+      "crap": 2.1640083644265857
+    },
+    {
+      "file": "./src/parsers/parse_mise.rs",
       "function": "mise_directive",
-      "line": 221,
+      "line": 259,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -1997,15 +2197,23 @@
     {
       "file": "./src/parsers/parse_mise.rs",
       "function": "parse",
-      "line": 6,
-      "cyclomatic": 3.0,
+      "line": 20,
+      "cyclomatic": 2.0,
       "coverage": 100.0,
-      "crap": 3.0
+      "crap": 2.0
+    },
+    {
+      "file": "./src/parsers/parse_mise.rs",
+      "function": "parse_config",
+      "line": 30,
+      "cyclomatic": 2.0,
+      "coverage": 100.0,
+      "crap": 2.0
     },
     {
       "file": "./src/parsers/parse_mise.rs",
       "function": "parse_file_task",
-      "line": 105,
+      "line": 143,
       "cyclomatic": 4.0,
       "coverage": 96.15384615384616,
       "crap": 4.000910332271279
@@ -2013,7 +2221,7 @@
     {
       "file": "./src/parsers/parse_mise.rs",
       "function": "parse_file_task_metadata",
-      "line": 204,
+      "line": 242,
       "cyclomatic": 3.0,
       "coverage": 85.71428571428571,
       "crap": 3.0262390670553936
@@ -2021,7 +2229,7 @@
     {
       "file": "./src/parsers/parse_mise.rs",
       "function": "parse_included_toml",
-      "line": 21,
+      "line": 51,
       "cyclomatic": 3.0,
       "coverage": 100.0,
       "crap": 3.0
@@ -2029,15 +2237,23 @@
     {
       "file": "./src/parsers/parse_mise.rs",
       "function": "parse_task_table",
-      "line": 136,
+      "line": 174,
       "cyclomatic": 7.0,
       "coverage": 88.63636363636364,
       "crap": 7.071903174305034
     },
     {
       "file": "./src/parsers/parse_mise.rs",
+      "function": "read_toml",
+      "line": 5,
+      "cyclomatic": 3.0,
+      "coverage": 100.0,
+      "crap": 3.0
+    },
+    {
+      "file": "./src/parsers/parse_mise.rs",
       "function": "render_task_include",
-      "line": 63,
+      "line": 101,
       "cyclomatic": 5.0,
       "coverage": 88.46153846153845,
       "crap": 5.038404642694584
@@ -2045,15 +2261,23 @@
     {
       "file": "./src/parsers/parse_mise.rs",
       "function": "task_includes",
-      "line": 28,
-      "cyclomatic": 4.0,
-      "coverage": 66.66666666666666,
-      "crap": 4.5925925925925934
+      "line": 59,
+      "cyclomatic": 2.0,
+      "coverage": 100.0,
+      "crap": 2.0
+    },
+    {
+      "file": "./src/parsers/parse_mise.rs",
+      "function": "tasks_from_config",
+      "line": 10,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
     },
     {
       "file": "./src/parsers/parse_mise.rs",
       "function": "unsupported_include_template",
-      "line": 96,
+      "line": 134,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -2573,7 +2797,7 @@
     {
       "file": "./src/task_discovery/mise.rs",
       "function": "MiseDiscovery::discover",
-      "line": 36,
+      "line": 35,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -2581,7 +2805,7 @@
     {
       "file": "./src/task_discovery/mise.rs",
       "function": "conf_d_config_files",
-      "line": 136,
+      "line": 199,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -2589,7 +2813,7 @@
     {
       "file": "./src/task_discovery/mise.rs",
       "function": "discover_file_task",
-      "line": 233,
+      "line": 296,
       "cyclomatic": 4.0,
       "coverage": 85.71428571428571,
       "crap": 4.0466472303206995
@@ -2597,7 +2821,7 @@
     {
       "file": "./src/task_discovery/mise.rs",
       "function": "discover_included_toml",
-      "line": 219,
+      "line": 282,
       "cyclomatic": 3.0,
       "coverage": 91.66666666666666,
       "crap": 3.0052083333333335
@@ -2605,15 +2829,23 @@
     {
       "file": "./src/task_discovery/mise.rs",
       "function": "discover_mise_tasks",
-      "line": 41,
-      "cyclomatic": 9.0,
-      "coverage": 98.33333333333333,
-      "crap": 9.000375
+      "line": 40,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/task_discovery/mise.rs",
+      "function": "discover_mise_tasks_with_env",
+      "line": 45,
+      "cyclomatic": 15.0,
+      "coverage": 96.42857142857143,
+      "crap": 15.010249635568513
     },
     {
       "file": "./src/task_discovery/mise.rs",
       "function": "discover_task_directory",
-      "line": 168,
+      "line": 231,
       "cyclomatic": 11.0,
       "coverage": 58.82352941176471,
       "crap": 19.447588031752492
@@ -2621,15 +2853,15 @@
     {
       "file": "./src/task_discovery/mise.rs",
       "function": "discover_task_source",
-      "line": 151,
+      "line": 214,
       "cyclomatic": 5.0,
-      "coverage": 81.25,
-      "crap": 5.164794921875
+      "coverage": 75.0,
+      "crap": 5.390625
     },
     {
       "file": "./src/task_discovery/mise.rs",
       "function": "find_mise_config_files",
-      "line": 119,
+      "line": 153,
       "cyclomatic": 4.0,
       "coverage": 100.0,
       "crap": 4.0
@@ -2637,7 +2869,7 @@
     {
       "file": "./src/task_discovery/mise.rs",
       "function": "insert_tasks_if_absent",
-      "line": 249,
+      "line": 312,
       "cyclomatic": 2.0,
       "coverage": 100.0,
       "crap": 2.0
@@ -2645,7 +2877,7 @@
     {
       "file": "./src/task_discovery/mise.rs",
       "function": "is_executable",
-      "line": 291,
+      "line": 358,
       "cyclomatic": 2.0,
       "coverage": 100.0,
       "crap": 2.0
@@ -2653,7 +2885,23 @@
     {
       "file": "./src/task_discovery/mise.rs",
       "function": "is_local_include",
-      "line": 287,
+      "line": 354,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/task_discovery/mise.rs",
+      "function": "mise_config_paths_high_to_low",
+      "line": 168,
+      "cyclomatic": 3.0,
+      "coverage": 100.0,
+      "crap": 3.0
+    },
+    {
+      "file": "./src/task_discovery/mise.rs",
+      "function": "push_error",
+      "line": 329,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -2661,7 +2909,7 @@
     {
       "file": "./src/task_discovery/mise.rs",
       "function": "record_parse_error",
-      "line": 266,
+      "line": 337,
       "cyclomatic": 1.0,
       "coverage": 0.0,
       "crap": 2.0
@@ -2669,7 +2917,7 @@
     {
       "file": "./src/task_discovery/mise.rs",
       "function": "record_parsed",
-      "line": 255,
+      "line": 318,
       "cyclomatic": 1.0,
       "coverage": 100.0,
       "crap": 1.0
@@ -2677,7 +2925,7 @@
     {
       "file": "./src/task_discovery/mise.rs",
       "function": "task_directory_entry",
-      "line": 214,
+      "line": 277,
       "cyclomatic": 2.0,
       "coverage": 100.0,
       "crap": 2.0
@@ -3060,9 +3308,9 @@
     }
   ],
   "diagnostics": {
-    "analyzed_files": 62,
-    "lcov_files": 62,
-    "matched_files": 62,
+    "analyzed_files": 63,
+    "lcov_files": 63,
+    "matched_files": 63,
     "source_only": {
       "count": 0,
       "examples": []
