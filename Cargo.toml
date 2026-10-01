@@ -31,7 +31,7 @@ schemars = "1.2.1"
 tracing = "0.1.44"
 tracing-subscriber = "0.3.23"
 nix = { version = "0.31", features = ["signal"] }
-dirs = "6.0.0"
+dirs = "7.0.0"
 shell-words = "1.1.1"
 chrono = { version = "0.4.42", default-features = false, features = ["clock", "std"] }
 thiserror = "2.0.18"
