@@ -327,6 +327,7 @@ Advanced MCP features for better editor integration and real-time feedback.
 **High Priority:**
 - [x] **[DTKT-177]** MCP **logging notifications** for real-time output streaming (tracing + subscriber)
 - [x] **[DTKT-201]** Add stream-aware `task_start.output` chunks
+- [x] **[DTKT-217]** **Honor task_start cancellation** - a cancelled `task_start` stops waiting and stops notifying, leaving the task running in the background for `status`/`task_stop` (PR #190 review)
 - [x] **[DTKT-216]** **Progress notifications & per-request log level** - `task_start` streams output as `notifications/progress` when the request has a `progressToken`, and sends log notifications only at or above the request's `io.modelcontextprotocol/logLevel` `_meta`
 - [x] **[DTKT-215]** **Stateless MCP** - bump rmcp to 3.5 and serve MCP `2026-07-28` clients without an `initialize` handshake: drop the peer captured in `initialize`, scope output notifications to the in-flight `task_start` request, and have background jobs be polled via `task_status`/`task_output`
 - [x] **[DTKT-214]** Repair malformed MCP launch arguments, honor `GROK_HOME`, and refuse unsafe Crush legacy configuration merges (PR #189 review).

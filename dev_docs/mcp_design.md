@@ -108,6 +108,7 @@ Libraries and their roles:
   - **Progress**: if the request `_meta` has a `progressToken`, each batch is a `notifications/progress` whose `message` is the batch text and whose `progress` is the running count of streamed lines (no `total`; the task length is unknown).
   - **Logs**: if the request `_meta` has `io.modelcontextprotocol/logLevel`, output lines classified at or above that level are sent as `notifications/message` (`{type, pid, lines}`, tagged with the most severe line's level), plus `started`/`exited` events at `notice`. Without a requested level no log notifications are sent. `logging/setLevel` is accepted for legacy clients but ignored, since a connection-wide level would be session state.
   - Once the task is backgrounded the request has returned, so nothing more is pushed; clients poll `task_status` and `task_output` by PID.
+  - **Cancellation**: `notifications/cancelled` for a `task_start` ends its wait window immediately and stops all notifications for it. rmcp drops the response, so the client never sees the PID, but the task keeps running in the background and stays visible via `status`. Cancel has a single meaning ("I no longer need this response"); terminating the process is an explicit `task_stop`, whose `grace_period` picks the escalation (TERM, then KILL after the grace period: default 5s, `0` sends KILL right after TERM).
 
 ⸻
 

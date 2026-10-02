@@ -345,6 +345,10 @@ impl DelaMcpServer {
         let mut stderr_done = false;
         let mut stdout_batch = OutputNotificationBatch::new("stdout");
         let mut stderr_batch = OutputNotificationBatch::new("stderr");
+        let request_cancelled = notifier
+            .as_ref()
+            .map(TaskStartNotifier::request_cancellation)
+            .unwrap_or_default();
 
         loop {
             let now = std::time::Instant::now();
@@ -402,6 +406,9 @@ impl DelaMcpServer {
                     flush_batch(notifier.as_mut(), pid_u32, &mut stderr_batch).await;
                     break;
                 }
+                // The client no longer wants the response, so stop waiting and let the task
+                // continue in the background; its output is still kept for polling.
+                _ = request_cancelled.cancelled() => break,
             }
 
             if stdout_done && stderr_done {
@@ -1195,7 +1202,7 @@ impl ServerHandler for DelaMcpServer {
                 )
         )
         .with_instructions(
-            "List tasks, start them with a default 1-second capture window or an optional wait_for_exit_seconds bounded wait, and manage running tasks via PID; all execution is gated by an MCP allowlist. The server keeps no session state: while a task_start request is in flight its output is sent as progress notifications (if the request has a progressToken) and as log notifications at or above the request's io.modelcontextprotocol/logLevel _meta; afterwards poll task_status and task_output by PID."
+            "List tasks, start them with a default 1-second capture window or an optional wait_for_exit_seconds bounded wait, and manage running tasks via PID; all execution is gated by an MCP allowlist. Cancelling a task_start stops waiting but leaves the task running; find it with status and stop it with task_stop. The server keeps no session state: while a task_start request is in flight its output is sent as progress notifications (if the request has a progressToken) and as log notifications at or above the request's io.modelcontextprotocol/logLevel _meta; afterwards poll task_status and task_output by PID."
         )
     }
 
@@ -1216,7 +1223,7 @@ impl ServerHandler for DelaMcpServer {
             }
             "task_start" => {
                 let args: TaskStartArgs = parse_tool_args(request.arguments)?;
-                let notifier = TaskStartNotifier::new(context.peer, &context.meta);
+                let notifier = TaskStartNotifier::new(context.peer, &context.meta, context.ct);
                 self.start_task(args, Some(notifier)).await
             }
             "task_status" => {
@@ -4022,6 +4029,29 @@ add_custom_target(build-all COMMENT "Build everything")
             self.writer.write_all(line.as_bytes()).await.unwrap();
         }
 
+        async fn send_notification(&mut self, method: &str, params: serde_json::Value) {
+            use tokio::io::AsyncWriteExt;
+            let message = serde_json::json!({
+                "jsonrpc": "2.0",
+                "method": method,
+                "params": params,
+            });
+            let mut line = message.to_string();
+            line.push('\n');
+            self.writer.write_all(line.as_bytes()).await.unwrap();
+        }
+
+        /// Every message the server sends within `window`, while no request is awaited.
+        async fn messages_within(&mut self, window: Duration) -> Vec<serde_json::Value> {
+            let mut messages = Vec::new();
+            let deadline = tokio::time::Instant::now() + window;
+            while let Ok(line) = tokio::time::timeout_at(deadline, self.reader.next_line()).await {
+                let line = line.unwrap().expect("MCP server closed the stream");
+                messages.push(serde_json::from_str(&line).unwrap());
+            }
+            messages
+        }
+
         /// Read until the response for `id`, returning it with the notifications seen first.
         async fn read_response(&mut self, id: u64) -> (serde_json::Value, Vec<serde_json::Value>) {
             let mut notifications = Vec::new();
@@ -4177,6 +4207,84 @@ add_custom_target(build-all COMMENT "Build everything")
             logs.iter().all(|log| log["level"] != "info"),
             "info output must be filtered at notice: {logs:?}"
         );
+    }
+
+    #[tokio::test]
+    async fn test_cancelled_task_start_stops_waiting_and_notifying() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let server = server_with_allowlisted_script(
+            &temp_dir,
+            "cancel_me",
+            "echo 'before cancel'\nsleep 1\necho 'after cancel'\nsleep 3\n",
+        );
+        let mut client = RawMcpClient::spawn(server);
+
+        client
+            .send_stateless(
+                1,
+                "tools/call",
+                serde_json::json!({
+                    "name": "task_start",
+                    "arguments": {"unique_name": "cancel_me", "wait_for_exit_seconds": 60},
+                    "_meta": {
+                        "progressToken": "cancel-me",
+                        "io.modelcontextprotocol/logLevel": "debug",
+                    },
+                }),
+            )
+            .await;
+        // Wait for the first output batch so the cancel lands mid-capture.
+        let mut before_cancel = Vec::new();
+        while !before_cancel
+            .iter()
+            .any(|n: &serde_json::Value| n["method"] == "notifications/progress")
+        {
+            before_cancel.extend(client.messages_within(Duration::from_millis(100)).await);
+        }
+
+        client
+            .send_notification(
+                "notifications/cancelled",
+                serde_json::json!({"requestId": 1, "reason": "user pressed escape"}),
+            )
+            .await;
+        let after_cancel = client.messages_within(Duration::from_millis(2000)).await;
+        assert!(
+            after_cancel.is_empty(),
+            "a cancelled request must get no notifications or response: {after_cancel:?}"
+        );
+
+        // The wait ended early: the task is already a background job, well before its 60s window.
+        client
+            .send_stateless(2, "tools/call", serde_json::json!({"name": "status"}))
+            .await;
+        let (status_response, _) = client.read_response(2).await;
+        let running = tool_result_json(&status_response)["running"].clone();
+        let job = running
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|job| job["unique_name"] == "cancel_me")
+            .unwrap_or_else(|| panic!("cancelled task should keep running: {running}"))
+            .clone();
+
+        client
+            .send_stateless(
+                3,
+                "tools/call",
+                serde_json::json!({"name": "task_output", "arguments": {"pid": job["pid"]}}),
+            )
+            .await;
+        let (output_response, _) = client.read_response(3).await;
+        let output = tool_result_json(&output_response);
+        let stdout: Vec<&str> = output["output"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|chunk| chunk["stdout"].as_str())
+            .map(str::trim_end)
+            .collect();
+        assert_eq!(stdout, vec!["before cancel", "after cancel"], "{output}");
     }
 
     #[tokio::test]

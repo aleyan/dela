@@ -37,6 +37,7 @@ chrono = { version = "0.4.42", default-features = false, features = ["clock", "s
 thiserror = "2.0.18"
 anyhow = "1.0.102"
 toml_edit = "0.25.13"
+tokio-util = "0.7"
 
 [dev-dependencies]
 tempfile = "3.27.0"

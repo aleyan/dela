@@ -12,6 +12,7 @@ use rmcp::model::{
 };
 use rmcp::service::{Peer, RoleServer};
 use std::time::{Duration, Instant};
+use tokio_util::sync::CancellationToken;
 
 const OUTPUT_NOTIFICATION_FLUSH_INTERVAL: Duration = Duration::from_secs(1);
 const OUTPUT_NOTIFICATION_MAX_BYTES: usize = 4 * 1024;
@@ -145,23 +146,36 @@ fn log_output_lines(
 /// Streams a task's output to the client waiting on the `task_start` request that started it.
 ///
 /// Output is sent as progress notifications when the request carried a `progressToken`, and as
-/// log notifications only when the request's `_meta` asked for a log level.
+/// log notifications only when the request's `_meta` asked for a log level. Nothing is sent once
+/// the request is cancelled.
 #[derive(Clone)]
 pub(super) struct TaskStartNotifier {
     peer: Peer<RoleServer>,
+    request_ct: CancellationToken,
     progress_token: Option<ProgressToken>,
     min_log_level: Option<LoggingLevel>,
     lines_sent: u64,
 }
 
 impl TaskStartNotifier {
-    pub(super) fn new(peer: Peer<RoleServer>, meta: &RequestMetaObject) -> Self {
+    pub(super) fn new(
+        peer: Peer<RoleServer>,
+        meta: &RequestMetaObject,
+        request_ct: CancellationToken,
+    ) -> Self {
         Self {
             peer,
+            request_ct,
             progress_token: meta.get_progress_token(),
             min_log_level: meta.log_level(),
             lines_sent: 0,
         }
+    }
+
+    /// Cancelled when the client cancels the request; rmcp then drops the response but does
+    /// not stop the handler, so callers must stop waiting on their own.
+    pub(super) fn request_cancellation(&self) -> CancellationToken {
+        self.request_ct.clone()
     }
 
     pub(super) async fn task_event(&self, pid: u32, event: &str, details: serde_json::Value) {
@@ -190,6 +204,9 @@ impl TaskStartNotifier {
         let Some(token) = self.progress_token.clone() else {
             return;
         };
+        if self.request_ct.is_cancelled() {
+            return;
+        }
         // Progress must increase on every notification and the task's total is unknown, so
         // report the running count of streamed lines.
         self.lines_sent += entries.len() as u64;
@@ -222,9 +239,10 @@ impl TaskStartNotifier {
     }
 
     async fn log(&self, pid: u32, level: LoggingLevel, data: serde_json::Value) {
-        if !self
-            .min_log_level
-            .is_some_and(|min_level| is_at_least(level, min_level))
+        if self.request_ct.is_cancelled()
+            || !self
+                .min_log_level
+                .is_some_and(|min_level| is_at_least(level, min_level))
         {
             return;
         }
