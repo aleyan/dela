@@ -627,11 +627,23 @@ impl DelaMcpServer {
         pid: u32,
         exit_status: std::process::ExitStatus,
         metadata: JobMetadata,
-        output_chunks: Vec<OutputChunkDto>,
+        mut output_chunks: Vec<OutputChunkDto>,
+        mut stdout_rx: tokio::sync::mpsc::Receiver<String>,
+        mut stderr_rx: tokio::sync::mpsc::Receiver<String>,
         unique_name: &str,
         stdout_task: Option<tokio::task::JoinHandle<()>>,
         stderr_task: Option<tokio::task::JoinHandle<()>>,
     ) -> Result<CallToolResult, ErrorData> {
+        // Capture may have stopped (e.g. request cancelled) with lines still queued.
+        // Drain until the readers close their channels so nothing is lost and no
+        // reader stays blocked on a full channel.
+        while let Some(line) = stdout_rx.recv().await {
+            Self::append_output_chunk(&mut output_chunks, "stdout", &line);
+        }
+        while let Some(line) = stderr_rx.recv().await {
+            Self::append_output_chunk(&mut output_chunks, "stderr", &line);
+        }
+
         if let Some(task) = stdout_task {
             let _ = task.await;
         }
@@ -839,6 +851,8 @@ impl DelaMcpServer {
                     exit_status,
                     metadata,
                     output_chunks,
+                    stdout_rx,
+                    stderr_rx,
                     &args.unique_name,
                     stdout_task,
                     stderr_task,
