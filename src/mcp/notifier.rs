@@ -150,7 +150,8 @@ fn log_output_lines(
 /// the request is cancelled.
 #[derive(Clone)]
 pub(super) struct TaskStartNotifier {
-    peer: Peer<RoleServer>,
+    /// `None` when the task was not started by an MCP request, so there is no one to notify.
+    peer: Option<Peer<RoleServer>>,
     request_ct: CancellationToken,
     progress_token: Option<ProgressToken>,
     min_log_level: Option<LoggingLevel>,
@@ -164,10 +165,21 @@ impl TaskStartNotifier {
         request_ct: CancellationToken,
     ) -> Self {
         Self {
-            peer,
+            peer: Some(peer),
             request_ct,
             progress_token: meta.get_progress_token(),
             min_log_level: meta.log_level(),
+            lines_sent: 0,
+        }
+    }
+
+    #[cfg(test)]
+    pub(super) fn silent() -> Self {
+        Self {
+            peer: None,
+            request_ct: CancellationToken::new(),
+            progress_token: None,
+            min_log_level: None,
             lines_sent: 0,
         }
     }
@@ -191,7 +203,7 @@ impl TaskStartNotifier {
         .await;
     }
 
-    async fn flush(&mut self, pid: u32, batch: &mut OutputNotificationBatch) {
+    pub(super) async fn flush(&mut self, pid: u32, batch: &mut OutputNotificationBatch) {
         let entries = batch.take_entries();
         if entries.is_empty() {
             return;
@@ -201,7 +213,7 @@ impl TaskStartNotifier {
     }
 
     async fn progress(&mut self, entries: &[OutputNotificationEntry]) {
-        let Some(token) = self.progress_token.clone() else {
+        let (Some(peer), Some(token)) = (&self.peer, self.progress_token.clone()) else {
             return;
         };
         if self.request_ct.is_cancelled() {
@@ -210,8 +222,7 @@ impl TaskStartNotifier {
         // Progress must increase on every notification and the task's total is unknown, so
         // report the running count of streamed lines.
         self.lines_sent += entries.len() as u64;
-        let _ = self
-            .peer
+        let _ = peer
             .notify_progress(
                 ProgressNotificationParam::new(token, self.lines_sent as f64)
                     .with_message(progress_message(entries)),
@@ -239,6 +250,9 @@ impl TaskStartNotifier {
     }
 
     async fn log(&self, pid: u32, level: LoggingLevel, data: serde_json::Value) {
+        let Some(peer) = &self.peer else {
+            return;
+        };
         if self.request_ct.is_cancelled()
             || !self
                 .min_log_level
@@ -246,27 +260,12 @@ impl TaskStartNotifier {
         {
             return;
         }
-        let _ = self
-            .peer
+        let _ = peer
             .notify_logging_message(
                 LoggingMessageNotificationParam::new(level, data)
                     .with_logger(format!("task:{pid}")),
             )
             .await;
-    }
-}
-
-/// Send `batch` to the request's client, or just drain it when there is no request to notify.
-pub(super) async fn flush_batch(
-    notifier: Option<&mut TaskStartNotifier>,
-    pid: u32,
-    batch: &mut OutputNotificationBatch,
-) {
-    match notifier {
-        Some(notifier) => notifier.flush(pid, batch).await,
-        None => {
-            batch.take_entries();
-        }
     }
 }
 

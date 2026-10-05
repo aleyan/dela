@@ -256,6 +256,12 @@ def test_legacy_initialize():
         assert_condition(result["serverInfo"]["name"], "serverInfo.name should be present", result)
         assert_instructions(result.get("instructions", ""))
 
+        set_level = {"jsonrpc": "2.0", "id": 3, "method": "logging/setLevel", "params": {"level": "debug"}}
+        process.stdin.write(json.dumps(set_level) + "\n")
+        process.stdin.flush()
+        set_level_response, _ = read_until_response(process, 3)
+        assert_condition("result" in set_level_response, "legacy logging/setLevel should be accepted", set_level_response)
+
         process.stdin.write(json.dumps(tool_request(2, "status")) + "\n")
         process.stdin.flush()
         response, _ = read_until_response(process, 2)

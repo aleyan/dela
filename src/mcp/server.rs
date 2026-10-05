@@ -7,7 +7,7 @@ use super::dto::{
 };
 use super::errors::DelaError;
 use super::job_manager::{JobManager, JobMetadata, JobState, OutputLine};
-use super::notifier::{OutputNotificationBatch, TaskStartNotifier, flush_batch};
+use super::notifier::{OutputNotificationBatch, TaskStartNotifier};
 use crate::runner::{is_runner_available_for_mcp, split_command_words};
 use crate::task_discovery;
 use chrono::SecondsFormat;
@@ -329,96 +329,65 @@ impl DelaMcpServer {
         ]))
     }
 
+    /// Collect output until the task's pipes close, the wait window ends, or the request is
+    /// cancelled, streaming it to the request's client along the way.
     async fn run_initial_capture(
-        mut notifier: Option<TaskStartNotifier>,
-        pid_u32: u32,
+        notifier: &mut TaskStartNotifier,
+        pid: u32,
         capture_duration: Duration,
         mut stdout_rx: tokio::sync::mpsc::Receiver<String>,
         mut stderr_rx: tokio::sync::mpsc::Receiver<String>,
-        captured_output_chunks: Arc<tokio::sync::Mutex<Vec<crate::mcp::dto::OutputChunkDto>>>,
     ) -> (
         tokio::sync::mpsc::Receiver<String>,
         tokio::sync::mpsc::Receiver<String>,
+        Vec<OutputChunkDto>,
     ) {
-        let deadline = std::time::Instant::now() + capture_duration;
-        let mut stdout_done = false;
-        let mut stderr_done = false;
+        let deadline = Instant::now() + capture_duration;
+        let request_cancelled = notifier.request_cancellation();
+        let mut output_chunks = Vec::new();
         let mut stdout_batch = OutputNotificationBatch::new("stdout");
         let mut stderr_batch = OutputNotificationBatch::new("stderr");
-        let request_cancelled = notifier
-            .as_ref()
-            .map(TaskStartNotifier::request_cancellation)
-            .unwrap_or_default();
+        let mut stdout_done = false;
+        let mut stderr_done = false;
 
-        loop {
-            let now = std::time::Instant::now();
-            if now >= deadline {
-                flush_batch(notifier.as_mut(), pid_u32, &mut stdout_batch).await;
-                flush_batch(notifier.as_mut(), pid_u32, &mut stderr_batch).await;
-                break;
-            }
-
+        while !(stdout_done && stderr_done) {
             tokio::select! {
-                line = stdout_rx.recv(), if !stdout_done => {
-                    match line {
-                        Some(line) => {
-                            {
-                                let mut chunks = captured_output_chunks.lock().await;
-                                Self::append_output_chunk(&mut chunks, "stdout", &line);
-                            }
-                            stdout_batch.add_line(&line);
-                            if stdout_batch.should_flush() {
-                                flush_batch(notifier.as_mut(), pid_u32, &mut stdout_batch).await;
-                            }
-                        }
-                        None => {
-                            stdout_done = true;
-                            flush_batch(notifier.as_mut(), pid_u32, &mut stdout_batch).await;
+                line = stdout_rx.recv(), if !stdout_done => match line {
+                    Some(line) => {
+                        Self::append_output_chunk(&mut output_chunks, "stdout", &line);
+                        stdout_batch.add_line(&line);
+                        if stdout_batch.should_flush() {
+                            notifier.flush(pid, &mut stdout_batch).await;
                         }
                     }
-                }
-                line = stderr_rx.recv(), if !stderr_done => {
-                    match line {
-                        Some(line) => {
-                            {
-                                let mut chunks = captured_output_chunks.lock().await;
-                                Self::append_output_chunk(&mut chunks, "stderr", &line);
-                            }
-                            stderr_batch.add_line(&line);
-                            if stderr_batch.should_flush() {
-                                flush_batch(notifier.as_mut(), pid_u32, &mut stderr_batch).await;
-                            }
-                        }
-                        None => {
-                            stderr_done = true;
-                            flush_batch(notifier.as_mut(), pid_u32, &mut stderr_batch).await;
+                    None => stdout_done = true,
+                },
+                line = stderr_rx.recv(), if !stderr_done => match line {
+                    Some(line) => {
+                        Self::append_output_chunk(&mut output_chunks, "stderr", &line);
+                        stderr_batch.add_line(&line);
+                        if stderr_batch.should_flush() {
+                            notifier.flush(pid, &mut stderr_batch).await;
                         }
                     }
-                }
+                    None => stderr_done = true,
+                },
                 _ = tokio::time::sleep_until(Self::output_flush_timer_deadline(stdout_batch.flush_due_at(), deadline)), if !stdout_batch.is_empty() => {
-                    flush_batch(notifier.as_mut(), pid_u32, &mut stdout_batch).await;
+                    notifier.flush(pid, &mut stdout_batch).await;
                 }
                 _ = tokio::time::sleep_until(Self::output_flush_timer_deadline(stderr_batch.flush_due_at(), deadline)), if !stderr_batch.is_empty() => {
-                    flush_batch(notifier.as_mut(), pid_u32, &mut stderr_batch).await;
+                    notifier.flush(pid, &mut stderr_batch).await;
                 }
-                _ = tokio::time::sleep_until(tokio::time::Instant::from_std(deadline)) => {
-                    flush_batch(notifier.as_mut(), pid_u32, &mut stdout_batch).await;
-                    flush_batch(notifier.as_mut(), pid_u32, &mut stderr_batch).await;
-                    break;
-                }
+                _ = tokio::time::sleep_until(tokio::time::Instant::from_std(deadline)) => break,
                 // The client no longer wants the response, so stop waiting and let the task
                 // continue in the background; its output is still kept for polling.
                 _ = request_cancelled.cancelled() => break,
             }
-
-            if stdout_done && stderr_done {
-                flush_batch(notifier.as_mut(), pid_u32, &mut stdout_batch).await;
-                flush_batch(notifier.as_mut(), pid_u32, &mut stderr_batch).await;
-                break;
-            }
         }
 
-        (stdout_rx, stderr_rx)
+        notifier.flush(pid, &mut stdout_batch).await;
+        notifier.flush(pid, &mut stderr_batch).await;
+        (stdout_rx, stderr_rx, output_chunks)
     }
 
     /// Persist output of a backgrounded job until its pipes close, then record its exit.
@@ -654,7 +623,7 @@ impl DelaMcpServer {
     #[allow(clippy::too_many_arguments)]
     async fn handle_completed_process(
         &self,
-        notifier: Option<&TaskStartNotifier>,
+        notifier: &TaskStartNotifier,
         pid: u32,
         exit_status: std::process::ExitStatus,
         metadata: JobMetadata,
@@ -693,19 +662,17 @@ impl DelaMcpServer {
                 })?;
         }
 
-        if let Some(notifier) = notifier {
-            notifier
-                .task_event(
-                    pid,
-                    "exited",
-                    serde_json::json!({
-                        "exit_code": exit_code,
-                        "signal": signal,
-                        "task": unique_name
-                    }),
-                )
-                .await;
-        }
+        notifier
+            .task_event(
+                pid,
+                "exited",
+                serde_json::json!({
+                    "exit_code": exit_code,
+                    "signal": signal,
+                    "task": unique_name
+                }),
+            )
+            .await;
 
         let start_result = StartResultDto {
             state: match exit_state {
@@ -729,13 +696,8 @@ impl DelaMcpServer {
         child: tokio::process::Child,
         metadata: JobMetadata,
         output_chunks: Vec<OutputChunkDto>,
-        capture_result: Result<
-            (
-                tokio::sync::mpsc::Receiver<String>,
-                tokio::sync::mpsc::Receiver<String>,
-            ),
-            tokio::task::JoinError,
-        >,
+        stdout_rx: tokio::sync::mpsc::Receiver<String>,
+        stderr_rx: tokio::sync::mpsc::Receiver<String>,
     ) -> Result<CallToolResult, ErrorData> {
         self.job_manager
             .start_job(pid, metadata, child)
@@ -758,19 +720,11 @@ impl DelaMcpServer {
                 })?;
         }
 
-        let job_manager = self.job_manager.clone();
-
-        let (stdout_rx_opt, stderr_rx_opt) = if let Ok((rx1, rx2)) = capture_result {
-            (Some(rx1), Some(rx2))
-        } else {
-            (None, None)
-        };
-
         tokio::spawn(Self::run_background_monitoring(
             pid,
-            stdout_rx_opt,
-            stderr_rx_opt,
-            job_manager,
+            Some(stdout_rx),
+            Some(stderr_rx),
+            self.job_manager.clone(),
         ));
 
         let start_result = StartResultDto {
@@ -786,6 +740,9 @@ impl DelaMcpServer {
         ]))
     }
 
+    /// Start a task outside of an MCP request, so nothing is streamed. `call_tool` uses
+    /// `start_task` with the request's notifier instead.
+    #[cfg(test)]
     #[tool(
         description = "Start a task (default 1s capture, optional bounded wait, then background)"
     )]
@@ -793,7 +750,7 @@ impl DelaMcpServer {
         &self,
         Parameters(args): Parameters<TaskStartArgs>,
     ) -> Result<CallToolResult, ErrorData> {
-        self.start_task(args, None).await
+        self.start_task(args, TaskStartNotifier::silent()).await
     }
 
     /// Start a task, streaming its output through `notifier` while the `task_start` request is
@@ -801,8 +758,11 @@ impl DelaMcpServer {
     async fn start_task(
         &self,
         args: TaskStartArgs,
-        notifier: Option<TaskStartNotifier>,
+        mut notifier: TaskStartNotifier,
     ) -> Result<CallToolResult, ErrorData> {
+        let capture_duration = Duration::from_secs(Self::resolve_wait_for_exit_seconds(
+            args.wait_for_exit_seconds,
+        )?);
         let root_dir = self.resolve_requested_cwd(&args.cwd)?;
         let discovered = self.get_discovered_tasks(&root_dir).await;
         let task = self.validate_task_for_start(&discovered.tasks, &args.unique_name)?;
@@ -841,23 +801,16 @@ impl DelaMcpServer {
         let stdout_handle = child.stdout.take();
         let stderr_handle = child.stderr.take();
 
-        if let Some(notifier) = &notifier {
-            notifier
-                .task_event(
-                    pid,
-                    "started",
-                    serde_json::json!({
-                        "task": args.unique_name,
-                        "command": full_command
-                    }),
-                )
-                .await;
-        }
-
-        let capture_duration = Duration::from_secs(Self::resolve_wait_for_exit_seconds(
-            args.wait_for_exit_seconds,
-        )?);
-        let captured_output_chunks = Arc::new(tokio::sync::Mutex::new(Vec::new()));
+        notifier
+            .task_event(
+                pid,
+                "started",
+                serde_json::json!({
+                    "task": args.unique_name,
+                    "command": full_command
+                }),
+            )
+            .await;
 
         let (stdout_tx, stdout_rx) = tokio::sync::mpsc::channel::<String>(100);
         let (stderr_tx, stderr_rx) = tokio::sync::mpsc::channel::<String>(100);
@@ -865,16 +818,9 @@ impl DelaMcpServer {
         let stdout_task = Self::spawn_pipe_reader(stdout_handle, stdout_tx);
         let stderr_task = Self::spawn_stderr_reader(stderr_handle, stderr_tx);
 
-        let initial_capture = tokio::spawn(Self::run_initial_capture(
-            notifier.clone(),
-            pid,
-            capture_duration,
-            stdout_rx,
-            stderr_rx,
-            captured_output_chunks.clone(),
-        ));
-
-        let capture_result = initial_capture.await;
+        let (stdout_rx, stderr_rx, output_chunks) =
+            Self::run_initial_capture(&mut notifier, pid, capture_duration, stdout_rx, stderr_rx)
+                .await;
 
         let process_exited = child.try_wait().is_ok_and(|status| status.is_some());
         let metadata = Self::build_job_metadata(started_at, task, &args, &root_dir);
@@ -886,10 +832,9 @@ impl DelaMcpServer {
                     Some("Process management error".to_string()),
                 )
             })?;
-            let output_chunks = captured_output_chunks.lock().await.clone();
             return self
                 .handle_completed_process(
-                    notifier.as_ref(),
+                    &notifier,
                     pid,
                     exit_status,
                     metadata,
@@ -901,8 +846,7 @@ impl DelaMcpServer {
                 .await;
         }
 
-        let output_chunks = captured_output_chunks.lock().await.clone();
-        self.setup_background_job(pid, child, metadata, output_chunks, capture_result)
+        self.setup_background_job(pid, child, metadata, output_chunks, stdout_rx, stderr_rx)
             .await
     }
 
@@ -1224,7 +1168,7 @@ impl ServerHandler for DelaMcpServer {
             "task_start" => {
                 let args: TaskStartArgs = parse_tool_args(request.arguments)?;
                 let notifier = TaskStartNotifier::new(context.peer, &context.meta, context.ct);
-                self.start_task(args, Some(notifier)).await
+                self.start_task(args, notifier).await
             }
             "task_status" => {
                 let args: TaskStatusArgs = parse_tool_args(request.arguments)?;
@@ -1606,29 +1550,13 @@ impl ServerHandler for DelaMcpServer {
         })
     }
 
-    // Implement set_level to satisfy logging capability requirement
-    fn set_level(
+    // Legacy clients send this because logging is advertised. Accept it without storing it: a
+    // connection-wide level would be session state, so levels are honored per request via `_meta`.
+    async fn set_level(
         &self,
-        request: SetLevelRequestParams,
+        _request: SetLevelRequestParams,
         _context: RequestContext<RoleServer>,
-    ) -> impl std::future::Future<Output = Result<(), ErrorData>> + Send + '_ {
-        std::future::ready(self.set_level_impl(request))
-    }
-}
-
-impl DelaMcpServer {
-    /// Internal implementation of set_level for testing
-    #[cfg(test)]
-    pub fn set_level_impl(&self, _request: SetLevelRequestParams) -> Result<(), ErrorData> {
-        // Accepted for legacy clients but not stored: a connection-wide level would be session
-        // state, so log levels are only honored per request via `_meta`.
-        Ok(())
-    }
-
-    #[cfg(not(test))]
-    fn set_level_impl(&self, _request: SetLevelRequestParams) -> Result<(), ErrorData> {
-        // Accepted for legacy clients but not stored: a connection-wide level would be session
-        // state, so log levels are only honored per request via `_meta`.
+    ) -> Result<(), ErrorData> {
         Ok(())
     }
 }
@@ -3545,7 +3473,12 @@ add_custom_target(build-all COMMENT "Build everything")
 
         let temp_dir = TempDir::new().unwrap();
         let script_path = temp_dir.path().join("bounded_task.sh");
-        std::fs::write(&script_path, "#!/bin/bash\necho 'hi'\n").unwrap();
+        let ran_marker = temp_dir.path().join("ran");
+        std::fs::write(
+            &script_path,
+            format!("#!/bin/bash\ntouch '{}'\n", ran_marker.display()),
+        )
+        .unwrap();
         std::fs::set_permissions(&script_path, std::fs::Permissions::from_mode(0o755)).unwrap();
 
         let allowlist_evaluator = McpAllowlistEvaluator {
@@ -3574,6 +3507,9 @@ add_custom_target(build-all COMMENT "Build everything")
         assert_eq!(error.code.0, -32602);
         assert!(error.message.contains("wait_for_exit_seconds"));
         assert!(error.message.contains("3600"));
+        // A rejected request must not have spawned the task.
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        assert!(!ran_marker.exists(), "task ran despite the rejected wait");
     }
 
     #[tokio::test]
@@ -4347,35 +4283,6 @@ add_custom_target(build-all COMMENT "Build everything")
             .map(str::trim_end)
             .collect();
         assert_eq!(stdout, vec!["early", "late"], "{output}");
-    }
-
-    #[tokio::test]
-    async fn test_set_level_handler_exists() {
-        use rmcp::model::{LoggingLevel, SetLevelRequestParams};
-        use std::path::PathBuf;
-
-        let server = DelaMcpServer::new(PathBuf::from("."));
-
-        // Test that set_level can be called with various log levels
-        // This verifies the handler exists and doesn't error
-        let levels = [
-            LoggingLevel::Debug,
-            LoggingLevel::Info,
-            LoggingLevel::Warning,
-            LoggingLevel::Error,
-        ];
-
-        for level in levels {
-            let request = SetLevelRequestParams::new(level);
-            // Test the internal implementation directly since we can't easily
-            // create a RequestContext without a real connection
-            let result = server.set_level_impl(request);
-            assert!(
-                result.is_ok(),
-                "set_level should succeed for level {:?}",
-                level
-            );
-        }
     }
 
     #[test]

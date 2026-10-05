@@ -105,8 +105,6 @@ Assuming you have already run `dela init`.
 $ dela mcp [--cwd <directory>]
 ```
 
-The server communicates over stdio using JSON-RPC 2.0 and is stateless at the protocol level: it serves both MCP `2026-07-28` clients (no `initialize` handshake, per-request metadata) and older clients that still run `initialize`.
-
 ### Available Tools
 
 Tool names are stable, and `list_tasks` exposes a stable wire format (including `unique_name` with suffixes like `test-m`).
