@@ -23,6 +23,14 @@ All human/debug output must go to **stderr**. The server should enter
 JSON-RPC messages over stdio, not `Content-Length` framed messages. Any local debugging
 client or smoke-test utility should write one JSON-RPC message per line and read one line
 per response/notification.
+
+**Stateless protocol:** dela targets MCP `2026-07-28`, which drops the `initialize` handshake.
+A stateless client sends `server/discover` (optional) and then plain requests whose `_meta`
+carries `io.modelcontextprotocol/protocolVersion`, `io.modelcontextprotocol/clientCapabilities`,
+and `io.modelcontextprotocol/clientInfo`. Older clients that still send `initialize` keep working.
+The server must therefore never depend on per-connection handshake state: nothing is captured in
+`initialize`, and server→client notifications are only sent from inside the request that caused
+them. Background jobs are addressed by PID, an explicit handle the client passes back.
 ⸻
 
 # Dela MCP — Revised Design (First-Principles)
@@ -57,7 +65,7 @@ This redesign narrows each tool to a single, clear responsibility and aligns wit
 Library & Transport
 	•	Library: rmcp (stdio transport)
 	•	Runtime: tokio multi-thread
-	•	Capabilities: tools + logging (for real-time task output streaming)
+	•	Capabilities: tools + logging (request-scoped task output streaming during `task_start`, alongside progress notifications)
 
 Add (dev):
 
@@ -96,7 +104,11 @@ Libraries and their roles:
   is still running when the window expires, MCP backgrounds it and returns `running` with the PID.
 - **Output ring buffer**: Per-PID bounded buffer (default 10,000 lines, 5 MB). `task_output` returns stream-aware chunks and supports retained-buffer paging with `offset` plus `lines`.
 - **Lifecycle**: `task_stop` sends SIGTERM, waits grace (default 5s), then SIGKILL. Background jobs are GC'd after a TTL (configurable).
-- **Real-time streaming**: Task output is streamed via MCP logging notifications. Clients can subscribe to `notifications/message` to receive output as it happens.
+- **Request-scoped streaming**: While a `task_start` call is in flight (its capture/bounded-wait window), output is streamed in batches (flushed every second, 100 lines, or 4 KB) using only what that request asked for (`src/mcp/notifier.rs`):
+  - **Progress**: if the request `_meta` has a `progressToken`, each batch is a `notifications/progress` whose `message` is the batch text and whose `progress` is the running count of streamed lines (no `total`; the task length is unknown).
+  - **Logs**: if the request `_meta` has `io.modelcontextprotocol/logLevel`, output lines classified at or above that level are sent as `notifications/message` (`{type, pid, lines}`, tagged with the most severe line's level), plus `started`/`exited` events at `notice`. Without a requested level no log notifications are sent. `logging/setLevel` is accepted for legacy clients but ignored, since a connection-wide level would be session state.
+  - Once the task is backgrounded the request has returned, so nothing more is pushed; clients poll `task_status` and `task_output` by PID.
+  - **Cancellation**: `notifications/cancelled` for a `task_start` ends its wait window immediately and stops all notifications for it. rmcp drops the response, so the client never sees the PID, but the task keeps running in the background and stays visible via `status`. Cancel has a single meaning ("I no longer need this response"); terminating the process is an explicit `task_stop`, whose `grace_period` picks the escalation (TERM, then KILL after the grace period: default 5s, `0` sends KILL right after TERM).
 
 ⸻
 
@@ -363,7 +375,7 @@ All errors follow the JSON-RPC 2.0 error format:
 }
 ```
 `exit_code` is populated for exited jobs, and `completed_at` is populated for exited/failed jobs so
-polling clients can determine completion without depending on logging notifications alone.
+polling clients can determine completion; backgrounded jobs emit no notifications.
 
 ### 5) task_output
 **Args**

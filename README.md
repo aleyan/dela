@@ -105,8 +105,6 @@ Assuming you have already run `dela init`.
 $ dela mcp [--cwd <directory>]
 ```
 
-The server communicates over stdio using JSON-RPC 2.0 and streams task output via logging notifications.
-
 ### Available Tools
 
 Tool names are stable, and `list_tasks` exposes a stable wire format (including `unique_name` with suffixes like `test-m`).
