@@ -27,7 +27,7 @@ pub fn parse(path: &Path) -> Result<Vec<Task>, DelaParseError> {
     }
 
     // Try standard parsing first
-    match Makefile::read(std::io::Cursor::new(&content)) {
+    match Makefile::from_reader(std::io::Cursor::new(&content)) {
         Ok(makefile) => extract_tasks(&makefile, path),
         Err(e) => {
             // If standard parsing fails, try regex-based parsing as fallback
